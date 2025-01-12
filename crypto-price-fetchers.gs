@@ -2,11 +2,13 @@
  * Add this script as a Google Apps Script, via the Extensions menu on a Google Sheet.
  * Example usage in a Google Sheets cell (use no quotes): `= dexToolsGetTokenPrice("pulse", U2)`.
  *
+ * Data Refresh: Use the built-in Google Sheets Trigger, selecting "Time-based" and this function.
+ *
  * @blockchain string E.g., "pulse", "ether", etc.  Full list in DexTools API doc.
  * @tokenAddress string E.g., (use no quotes): `0x51a05d2df463540c2176baddfa946faa0a3b5dc6`.
  */
 function dexToolsGetTokenPrice(blockchain, tokenAddress) {
-  const API_KEY = “put-your”-api-key-here;
+  const API_KEY = 'put-your-api-key-here';
   const SUBSCRIPTION_PLAN = 'trial'; // update with your subscription level
 
   const options = {
