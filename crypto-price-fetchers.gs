@@ -19,13 +19,11 @@
  */
 dexToolsGetTokenPrice.API_KEY = 'Hmy2LRTNg12Zx5X69I45D5xJY4WOCAli1xOYcC1Y';
 dexToolsGetTokenPrice.SUBSCRIPTION_PLAN = 'trial'; // Update with your subscription level
-dexToolsGetTokenPrice.FETCH_INTERVAL_SECONDS = 2; // Used to avoid hitting API rate limits
+dexToolsGetTokenPrice.FETCH_INTERVAL_SECONDS = 4; // Used to avoid hitting API rate limits
 
 // Program constants
 dexToolsGetTokenPrice.MILLISECONDS_IN_SECOND = 1000;
 dexToolsGetTokenPrice.dateLastRequestMS = 0;
-
-dexToolsGetTokenPrice.pendingFetches = [];
 
 /**
  * @blockchain string E.g., "pulse", "ether", etc.  Full list in DexTools API doc.
@@ -40,12 +38,9 @@ function dexToolsGetTokenPrice(blockchain, tokenAddress) {
     dexToolsGetTokenPrice.dateLastRequestMS = now;
     return dexToolsFetchTokenPrice(blockchain, tokenAddress);
   } else {
-    let pendingFetches = dexToolsGetTokenPrice.pendingFetches;
-    pendingFetches.push([blockchain, tokenAddress]);
     // For normal JavaScript/Node, restructure to use `setTimeout` and a closure instead of `Utilities.sleep`.
     Utilities.sleep(intervalMS);
-    fetchItem = pendingFetches.pop();
-    return dexToolsGetTokenPrice(fetchItem[0], fetchItem[1]);
+    return dexToolsGetTokenPrice([blockchain, tokenAddress]);
   }
 }
 
