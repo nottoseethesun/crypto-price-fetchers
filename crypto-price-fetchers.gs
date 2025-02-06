@@ -6,26 +6,65 @@
  *
  * Usage: Update API_KEY with the one you got from DexTools e.g. at https://developer.dextools.io/ , 
  *        and your SUBSCRIPTION_PLAN using for the value, DexTools categories e.g. "trial". 
+ *        Also, set the other remaining variables under the heading below, "User-settable Values",
+ *        to your desired values.
  *
  * Data Refresh: Use the built-in Google Sheets Trigger, selecting "Time-based" and this function.
  *
  * Test: See the `test` function, below.
- *
+ */
+
+/**
+ * User-settable Values
+ */
+dexToolsGetTokenPrice.API_KEY = 'put-your-own-api-key-here';
+dexToolsGetTokenPrice.SUBSCRIPTION_PLAN = 'trial'; // update with your subscription level
+dexToolsGetTokenPrice.FETCH_INTERVAL_SECONDS = 2; // Used to avoid hitting API rate limits
+
+// Program constants
+dexToolsGetTokenPrice.MILLISECONDS_IN_SECOND = 1000;
+dexToolsGetTokenPrice.dateLastRequestMS = 0;
+
+dexToolsGetTokenPrice.pendingFetches = [];
+
+/**
  * @blockchain string E.g., "pulse", "ether", etc.  Full list in DexTools API doc.
  * @tokenAddress string E.g., (use no quotes): `0x51a05d2df463540c2176baddfa946faa0a3b5dc6`.
  */
 function dexToolsGetTokenPrice(blockchain, tokenAddress) {
-  const API_KEY = 'put-your-api-key-here';
-  const SUBSCRIPTION_PLAN = 'trial'; // update with your subscription level
+  const intervalMS = dexToolsGetTokenPrice.FETCH_INTERVAL_SECONDS * 
+    dexToolsGetTokenPrice.MILLISECONDS_IN_SECOND;
+  const now = Date.now()
+  const timeSinceLastRequestMS = now - dexToolsGetTokenPrice.dateLastRequestMS;
+  if (timeSinceLastRequestMS >= intervalMS) {
+    dexToolsGetTokenPrice.dateLastRequestMS = now;
+    dexToolsFetchTokenPrice(blockchain, tokenAddress);
+  } else {
+    let pendingFetches = dexToolsGetTokenPrice.pendingFetches;
+    pendingFetches.push([blockchain, tokenAddress]);
+    // For normal JavaScript/Node, restructure to use `setTimeout` and a closure instead of a loop and `Utilities.sleep`.
+    for (let i = 0; i < pendingFetches.length; i++) {
+      Utilities.sleep(intervalMS);
+      fetchItem = pendingFetches.pop();
+      dexToolsGetTokenPrice(fetchItem[0], fetchItem[1]);
+    }
+  }
+}
 
+/**
+ * @blockchain string E.g., "pulse", "ether", etc.  Full list in DexTools API doc.
+ * @tokenAddress string E.g., (use no quotes): `0x51a05d2df463540c2176baddfa946faa0a3b5dc6`.
+ */
+function dexToolsFetchTokenPrice(blockchain, tokenAddress) {
   const options = {
     method: 'GET',
     headers: {
-      'x-api-key': API_KEY
+      'x-api-key': dexToolsGetTokenPrice.API_KEY
     }
   };
 
-  const url = `https://public-api.dextools.io/${SUBSCRIPTION_PLAN}/v2/token/${blockchain}/${tokenAddress}/price`;
+  const url = `https://public-api.dextools.io/${dexToolsGetTokenPrice.SUBSCRIPTION_PLAN}` +
+    `/v2/token/${blockchain}/${tokenAddress}/price`;
 
   let price;
   try {
@@ -38,6 +77,10 @@ function dexToolsGetTokenPrice(blockchain, tokenAddress) {
 
     return price;
   } catch (error) {
+    // const stringedError = ContentService.createTextOutput(JSON.stringify(error)).getContent();
+    // const errMsg = `DexScreener API Error: ${stringedError}`;
+    // console.error(errMsg);
+    // return errMsg;
     console.error(error);
     return error;
   }
