@@ -17,7 +17,7 @@
 /**
  * User-settable Values
  */
-dexToolsGetTokenPrice.API_KEY = 'Hmy2LRTNg12Zx5X69I45D5xJY4WOCAli1xOYcC1Y';
+dexToolsGetTokenPrice.API_KEY = 'put-your-api-key-here';
 dexToolsGetTokenPrice.SUBSCRIPTION_PLAN = 'trial'; // Update with your subscription level
 dexToolsGetTokenPrice.FETCH_INTERVAL_SECONDS = 4; // Used to avoid hitting API rate limits
 
