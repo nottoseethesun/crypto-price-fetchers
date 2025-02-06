@@ -17,8 +17,8 @@
 /**
  * User-settable Values
  */
-dexToolsGetTokenPrice.API_KEY = 'put-your-own-api-key-here';
-dexToolsGetTokenPrice.SUBSCRIPTION_PLAN = 'trial'; // update with your subscription level
+dexToolsGetTokenPrice.API_KEY = 'Hmy2LRTNg12Zx5X69I45D5xJY4WOCAli1xOYcC1Y';
+dexToolsGetTokenPrice.SUBSCRIPTION_PLAN = 'trial'; // Update with your subscription level
 dexToolsGetTokenPrice.FETCH_INTERVAL_SECONDS = 2; // Used to avoid hitting API rate limits
 
 // Program constants
@@ -38,16 +38,14 @@ function dexToolsGetTokenPrice(blockchain, tokenAddress) {
   const timeSinceLastRequestMS = now - dexToolsGetTokenPrice.dateLastRequestMS;
   if (timeSinceLastRequestMS >= intervalMS) {
     dexToolsGetTokenPrice.dateLastRequestMS = now;
-    dexToolsFetchTokenPrice(blockchain, tokenAddress);
+    return dexToolsFetchTokenPrice(blockchain, tokenAddress);
   } else {
     let pendingFetches = dexToolsGetTokenPrice.pendingFetches;
     pendingFetches.push([blockchain, tokenAddress]);
-    // For normal JavaScript/Node, restructure to use `setTimeout` and a closure instead of a loop and `Utilities.sleep`.
-    for (let i = 0; i < pendingFetches.length; i++) {
-      Utilities.sleep(intervalMS);
-      fetchItem = pendingFetches.pop();
-      dexToolsGetTokenPrice(fetchItem[0], fetchItem[1]);
-    }
+    // For normal JavaScript/Node, restructure to use `setTimeout` and a closure instead of `Utilities.sleep`.
+    Utilities.sleep(intervalMS);
+    fetchItem = pendingFetches.pop();
+    return dexToolsGetTokenPrice(fetchItem[0], fetchItem[1]);
   }
 }
 
@@ -71,8 +69,6 @@ function dexToolsFetchTokenPrice(blockchain, tokenAddress) {
     // For normal web/node instead of Google Apps Script, make function async, use await in caller, and use notes below.
     const response = UrlFetchApp.fetch(url,options);    // Normal web is: an async function with: await fetch(url, options)
     const data = JSON.parse(response.getContentText()); // Normal web is: await response.json();
-    console.log("Here is the data");
-    console.log(data);
     price = data.data.price;
 
     return price;
@@ -91,5 +87,6 @@ function dexToolsFetchTokenPrice(blockchain, tokenAddress) {
  * Then run "Debug".
  */
 function test() {
-    dexToolsGetTokenPrice("pulse", "0x94534EeEe131840b1c0F61847c572228bdfDDE93");
+    console.log("Test Results");
+    console.log(dexToolsGetTokenPrice("pulse", "0x94534EeEe131840b1c0F61847c572228bdfDDE93"));
 }
