@@ -17,8 +17,8 @@
 /**
  * User-settable Values
  */
-dexToolsGetTokenPrice.API_KEY = 'put-your-api-key-here';
-dexToolsGetTokenPrice.SUBSCRIPTION_PLAN = 'trial'; // Update with your subscription level
+dexToolsGetTokenPrice.API_KEY = 'put-your-api-key-here'; // Update with your api key
+dexToolsGetTokenPrice.SUBSCRIPTION_PLAN = 'standard'; // Update with your subscription level
 dexToolsGetTokenPrice.FETCH_INTERVAL_SECONDS = 4; // Used to avoid hitting API rate limits
 
 // Program constants
@@ -28,27 +28,42 @@ dexToolsGetTokenPrice.dateLastRequestMS = 0;
 /**
  * @blockchain string E.g., "pulse", "ether", etc.  Full list in DexTools API doc.
  * @tokenAddress string E.g., (use no quotes): `0x51a05d2df463540c2176baddfa946faa0a3b5dc6`.
+ * @poolAddresses Array<Array<string>> OPTIONAL From Google Sheets, just do: `{v18, 0}` where v18
+ *                is a cell holding the hash that identifies the liquidity pool.  Note: The
+ *                last item, '0', must be there because without a second value, sadly, no array is passed;
+ *                instead, a string is passed, which this function doesn't handle.
+ *                Use this if the price should be pulled from specific pool(s)
+ *                Currently only supports a single pool.
  */
-function dexToolsGetTokenPrice(blockchain, tokenAddress) {
+function dexToolsGetTokenPrice(blockchain, tokenAddress, poolAddresses) {
+  const poolAddress = !!poolAddresses && poolAddresses[0].length > 0 ? poolAddresses[0][0] : "";
+  const address = !!poolAddress ? poolAddress : tokenAddress
   const intervalMS = dexToolsGetTokenPrice.FETCH_INTERVAL_SECONDS * 
     dexToolsGetTokenPrice.MILLISECONDS_IN_SECOND;
   const now = Date.now()
   const timeSinceLastRequestMS = now - dexToolsGetTokenPrice.dateLastRequestMS;
   if (timeSinceLastRequestMS >= intervalMS) {
     dexToolsGetTokenPrice.dateLastRequestMS = now;
-    return dexToolsFetchTokenPrice(blockchain, tokenAddress);
+
+    return dexToolsFetchTokenPrice(blockchain, address, !!poolAddress);
   } else {
     // For normal JavaScript/Node, restructure to use `setTimeout` and a closure instead of `Utilities.sleep`.
     Utilities.sleep(intervalMS);
-    return dexToolsGetTokenPrice([blockchain, tokenAddress]);
+
+    return dexToolsGetTokenPrice(blockchain, tokenAddress, poolAddresses);
   }
 }
+
 
 /**
  * @blockchain string E.g., "pulse", "ether", etc.  Full list in DexTools API doc.
  * @tokenAddress string E.g., (use no quotes): `0x51a05d2df463540c2176baddfa946faa0a3b5dc6`.
+ *                pick the best pool. 
  */
-function dexToolsFetchTokenPrice(blockchain, tokenAddress) {
+function dexToolsFetchTokenPrice(blockchain, address, addressIsPool) {
+  const POOL = "pool";
+  const TOKEN = "token";
+
   const options = {
     method: 'GET',
     headers: {
@@ -56,8 +71,9 @@ function dexToolsFetchTokenPrice(blockchain, tokenAddress) {
     }
   };
 
-  const url = `https://public-api.dextools.io/${dexToolsGetTokenPrice.SUBSCRIPTION_PLAN}` +
-    `/v2/token/${blockchain}/${tokenAddress}/price`;
+  const tokenOrPool = !!addressIsPool ? POOL : TOKEN;
+    const url = `https://public-api.dextools.io/${dexToolsGetTokenPrice.SUBSCRIPTION_PLAN}` +
+    `/v2/${tokenOrPool}/${blockchain}/${address}/price`;
 
   let price;
   try {
