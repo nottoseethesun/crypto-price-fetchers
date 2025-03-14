@@ -1,7 +1,7 @@
 /**
  * Add this script as a Google Apps Script, via the Extensions menu on a Google Sheet.
  * Example usage in a Google Sheets cell, to pull a token price from the best liquidity pool (the API 
- * picks the liquidity pool):
+ * picks the liquidity pool), using the API from DexTools.io :
  *
  *   = dexToolsGetTokenPrice("pulse", U2)
  *
@@ -46,6 +46,8 @@ dexToolsGetTokenPrice.MILLISECONDS_IN_SECOND = 1000;
 dexToolsGetTokenPrice.dateLastRequestMS = 0;
 
 /**
+ * Retrieves the token price using the API from DexTools.io .
+ *
  * @blockchain string E.g., "pulse", "ether", etc.  Full list in DexTools API doc.
  * @tokenAddress string E.g., (use no quotes): `0x51a05d2df463540c2176baddfa946faa0a3b5dc6`.
  * @poolAddresses Array<Array<string>> OPTIONAL From Google Sheets, just do: `{v18, 0}` where v18
