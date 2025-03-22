@@ -1,7 +1,7 @@
 /**
  * Add this script as a Google Apps Script, via the Extensions menu on a Google Sheet.
  * Example usage in a Google Sheets cell, to pull a token price from the best liquidity pool (the API 
- * picks the liquidity pool), using the API from DexTools.io :
+ * picks the liquidity pool):
  *
  *   = dexToolsGetTokenPrice("pulse", U2)
  *
@@ -37,17 +37,19 @@
 /**
  * User-settable Values
  */
-dexToolsGetTokenPrice.API_KEY = 'put-your-api-key-here'; // Update with your api key
+dexToolsGetTokenPrice.API_KEY = 'Hmy2LRTNg12Zx5X69I45D5xJY4WOCAli1xOYcC1Y'; // Update with your api key
 dexToolsGetTokenPrice.SUBSCRIPTION_PLAN = 'standard'; // Update with your subscription level
-dexToolsGetTokenPrice.FETCH_INTERVAL_SECONDS = 4; // Used to avoid hitting API rate limits
+dexToolsGetTokenPrice.FETCH_INTERVAL_SECONDS = 3; // Used to avoid hitting API rate limits
+dexToolsGetTokenPrice.API_HOST = "https://public-api.dextools.io";
+dexToolsGetTokenPrice.API_VERSION = "v2"; // Will rarely change
 
 // Program constants
 dexToolsGetTokenPrice.MILLISECONDS_IN_SECOND = 1000;
+dexToolsGetTokenPrice.INTERVAL_MS = dexToolsGetTokenPrice.FETCH_INTERVAL_SECONDS * 
+  dexToolsGetTokenPrice.MILLISECONDS_IN_SECOND;
 dexToolsGetTokenPrice.dateLastRequestMS = 0;
 
 /**
- * Retrieves the token price using the API from DexTools.io .
- *
  * @blockchain string E.g., "pulse", "ether", etc.  Full list in DexTools API doc.
  * @tokenAddress string E.g., (use no quotes): `0x51a05d2df463540c2176baddfa946faa0a3b5dc6`.
  * @poolAddresses Array<Array<string>> OPTIONAL From Google Sheets, just do: `{v18, 0}` where v18
@@ -60,22 +62,34 @@ dexToolsGetTokenPrice.dateLastRequestMS = 0;
 function dexToolsGetTokenPrice(blockchain, tokenAddress, poolAddresses) {
   const poolAddress = !!poolAddresses && poolAddresses[0].length > 0 ? poolAddresses[0][0] : "";
   const address = !!poolAddress ? poolAddress : tokenAddress
-  const intervalMS = dexToolsGetTokenPrice.FETCH_INTERVAL_SECONDS * 
-    dexToolsGetTokenPrice.MILLISECONDS_IN_SECOND;
   const now = Date.now()
   const timeSinceLastRequestMS = now - dexToolsGetTokenPrice.dateLastRequestMS;
-  if (timeSinceLastRequestMS >= intervalMS) {
+  if (timeSinceLastRequestMS >= dexToolsGetTokenPrice.INTERVAL_MS) {
     dexToolsGetTokenPrice.dateLastRequestMS = now;
 
     return dexToolsFetchTokenPrice(blockchain, address, !!poolAddress);
   } else {
     // For normal JavaScript/Node, restructure to use `setTimeout` and a closure instead of `Utilities.sleep`.
-    Utilities.sleep(intervalMS);
+    Utilities.sleep(dexToolsGetTokenPrice.INTERVAL_MS);
 
     return dexToolsGetTokenPrice(blockchain, tokenAddress, poolAddresses);
   }
 }
 
+function dexToolsGetTokenFDV(blockchain, tokenAddress) {
+  const now = Date.now()
+  const timeSinceLastRequestMS = now - dexToolsGetTokenPrice.dateLastRequestMS;
+  if (timeSinceLastRequestMS >= dexToolsGetTokenPrice.INTERVAL_MS) {
+    dexToolsGetTokenPrice.dateLastRequestMS = now;
+
+    return dexToolsFetchTokenInfo(blockchain, tokenAddress).fdv;
+  } else {
+    // For normal JavaScript/Node, restructure to use `setTimeout` and a closure instead of `Utilities.sleep`.
+    Utilities.sleep(dexToolsGetTokenPrice.INTERVAL_MS);
+
+    return dexToolsGetTokenFDV(blockchain, tokenAddress);
+  }
+}
 
 /**
  * @blockchain string E.g., "pulse", "ether", etc.  Full list in DexTools API doc.
@@ -86,21 +100,13 @@ function dexToolsFetchTokenPrice(blockchain, address, addressIsPool) {
   const POOL = "pool";
   const TOKEN = "token";
 
-  const options = {
-    method: 'GET',
-    headers: {
-      'x-api-key': dexToolsGetTokenPrice.API_KEY
-    }
-  };
-
   const tokenOrPool = !!addressIsPool ? POOL : TOKEN;
-    const url = `https://public-api.dextools.io/${dexToolsGetTokenPrice.SUBSCRIPTION_PLAN}` +
-    `/v2/${tokenOrPool}/${blockchain}/${address}/price`;
+  const url = `${cpf_getUrlFirstSection()}/${tokenOrPool}/${blockchain}/${address}/price`;
 
   let price;
   try {
     // For normal web/node instead of Google Apps Script, make function async, use await in caller, and use notes below.
-    const response = UrlFetchApp.fetch(url,options);    // Normal web is: an async function with: await fetch(url, options)
+    const response = UrlFetchApp.fetch(url, cpf_getOptionsConf());    // Normal web is: an async function with: await fetch(url, options)
     const data = JSON.parse(response.getContentText()); // Normal web is: await response.json();
     price = data.data.price;
 
@@ -115,11 +121,44 @@ function dexToolsFetchTokenPrice(blockchain, address, addressIsPool) {
   }
 }
 
+function dexToolsFetchTokenInfo(blockchain, tokenAddress) {
+  const url = `${cpf_getUrlFirstSection()}/${blockchain}/${tokenAddress}/info`;
+
+  try {
+    const response = UrlFetchApp.fetch(url, cpf_getOptionsConf()); // See comments in `dexToolsFetchTokenPrice`
+    const data = JSON.parse(response.getContentText());
+
+    return data.data;
+  } catch (error) {
+    console.error(error);
+    return error;
+  }
+}
+
+function cpf_getUrlFirstSection() {
+  const firstPart = `${dexToolsGetTokenPrice.API_HOST}/${dexToolsGetTokenPrice.SUBSCRIPTION_PLAN}` +
+    `/${dexToolsGetTokenPrice.API_VERSION}`;
+
+  return firstPart;
+}
+
+function cpf_getOptionsConf() {
+  const optionsConf = {
+    method: 'GET',
+    headers: {
+      'x-api-key': dexToolsGetTokenPrice.API_KEY
+    }
+  };
+
+  return optionsConf; 
+}
+
 /**
  * To debug in Google Apps Script, select this function by the "Debug" command at top of screen.
  * Then run "Debug".
  */
-function test() {
+function cpf_test() {
     console.log("Test Results");
-    console.log(dexToolsGetTokenPrice("pulse", "0x94534EeEe131840b1c0F61847c572228bdfDDE93"));
+    console.log(dexToolsGetTokenPrice("pulse", "0xF84b84dAAce6Ac00DbBAed26CA32Ff3570Aaf66C"));
+    console.log(dexToolsGetTokenFDV("pulse", "0xF84b84dAAce6Ac00DbBAed26CA32Ff3570Aaf66C"));
 }
