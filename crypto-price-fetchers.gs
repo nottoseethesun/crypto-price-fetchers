@@ -122,7 +122,8 @@ function dexToolsFetchTokenPrice(blockchain, address, addressIsPool) {
 }
 
 function dexToolsFetchTokenInfo(blockchain, tokenAddress) {
-  const url = `${cpf_getUrlFirstSection()}/${blockchain}/${tokenAddress}/info`;
+  const TOKEN_SEGMENT = "token"
+  const url = `${cpf_getUrlFirstSection()}/${TOKEN_SEGMENT}/${blockchain}/${tokenAddress}/info`;
 
   try {
     const response = UrlFetchApp.fetch(url, cpf_getOptionsConf()); // See comments in `dexToolsFetchTokenPrice`
