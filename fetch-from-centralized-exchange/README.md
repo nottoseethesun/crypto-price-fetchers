@@ -4,7 +4,7 @@
 
 USE AT YOUR OWN RISK: SEE LICENSE FILE, INCLUDED IN PARENT DIRECTORY.
 
-Gets the price for tokens not supported by smart-contract-oriented API, such as DexScreener's or DexTools.
+Gets the price at a speficied point in the past (can be a prior minute, even) for tokens not supported by smart-contract-oriented API, such as DexScreener's or DexTools.
 
 For example, tokens such as Bitcoin and Monero, although someetimes they have wrapped versions such as $wBTC, don't trade directly in decentralized exchange liquidity pools.  
 

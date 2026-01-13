@@ -2,7 +2,9 @@
 
 ## Overview
 
-A collection of scripts useful for fetching the price of various crypto tokens.
+A collection of scripts useful for fetching the current price and also the price at
+a point in time in the past (can even be one minute in the past) of various
+crypto tokens.
 
 The need for this arises out of the proliferation of crypto tokens, such that
 most tracking services simply cannot fetch the price of many of the great tokens out
@@ -12,7 +14,20 @@ Note that for the files that are for Google Sheets, Google Sheets does not use t
 now-standard `fetch` API.  So, to convert these scripts to work under Web or NodeJS,
 you will need to use `fetch` with `async` and `await` as per normal for those platforms.
 
+### Options
+
+`crypto-price-fetchers.gs` currently fetches only the current price, and is limited to
+tokens that are based on smart-contract technology, such as in Ethereum and Solana.
+
+`fetch-from-centralized-exchage/getCryptoPriceFromCentralizedExchange.gs` currently 
+fetches the price only in the past, although "the past" can be just one minute in the
+past.  It is limited to tokens traded on the API of the Centralized Exchanges that
+it currently supports.
+
 ## Install
+
+Note: For `fetch-from-centralized-exchage/getCryptoPriceFromCentralizedExchange.gs`, see the
+`README.md` in that directory.
 
 Add the script `./crypto-price-fetchers.gs` as a Google Apps Script, via the "Extensions"
 menu on a Google Sheet: To do this, first start at the "Extensions" menu at the
