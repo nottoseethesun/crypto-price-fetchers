@@ -19,10 +19,10 @@ you will need to use `fetch` with `async` and `await` as per normal for those pl
 `crypto-price-fetchers.gs` currently fetches only the current price, and is limited to
 tokens that are based on smart-contract technology, such as in Ethereum and Solana.
 
-`fetch-from-centralized-exchage/getCryptoPriceFromCentralizedExchange.gs` currently 
-fetches the price only in the past, although "the past" can be just one minute in the
-past.  It is limited to tokens traded on the API of the Centralized Exchanges that
-it currently supports.
+`fetch-from-centralized-exchage/getCryptoPriceFromCentralizedExchange.gs` currently
+fetches the price only at a point in time in the past, although "the past"
+can be just one minute in the past.  It is limited to tokens traded on the
+API of the Centralized Exchanges that it currently supports.
 
 ## Install
 
