@@ -4,22 +4,24 @@
 
 USE AT YOUR OWN RISK: SEE LICENSE FILE, INCLUDED TWO DIRECTORIES UP.
 
-This is a NodeJS utility that gets the price at a speficied point in time in the past (can be a prior minute, even) for tokens not supported by smart-contract-oriented API, such as DexScreener's or DexTools.
+This is a NodeJS utility that reads a given input csv that contains a set of rows each with a timestamp, and gets the
+price at a speficied point in time in the past (can be a prior minute, even) for the specified token, writing it out to
+an `output.csv` file that also contains the timestamps, but paired with the price of the token for each row.
 
-For example, tokens such as Bitcoin and Monero, although someetimes they have wrapped versions such as $wBTC, don't trade directly in decentralized exchange liquidity pools.  
+This utility is useful for tokens not supported by smart-contract-oriented API, such as DexScreener's or DexTools, since
+it focuses on reading prices from Centralized Exchanges as distinguished from Decentralized Exchanges.
 
-Instead, it's easiest to get their current price from a centralized exchange, which calls for a different codebase as for example, one cannot specifiy a liquidity pool.  
+For example, tokens such as Bitcoin and Monero, although someetimes they have wrapped versions such as $wBTC, don't trade 
+directly in decentralized exchange liquidity pools.  
+
+Instead, it's easiest to get their current price from a centralized exchange, which calls for a different codebase 
+as for example, one cannot specifiy a liquidity pool.  
 
 Note: If the few decentralized trading exchanges for these coins had more volume and an API, then that could be used.
 
 ### Current Roster of Utilities
 
-- `getCryptoPriceFromCentralizedExchange.js`, a NodeJS Script
-
-#### Sample Output
-
-![Validator Rewards with Prices](./readme-images/xnt-rewards-with-prices.png)
-![Validator Rewards Analytics](./readme-images/xnt-rewards-analytics.png)
+- `index.js`, a NodeJS Script
 
 ## Prerequisites
 
