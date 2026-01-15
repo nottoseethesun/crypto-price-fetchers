@@ -1,0 +1,27 @@
+{
+  "name": "crypto-price-filler",
+  "version": "1.0.0",
+  "description": "Local NodeJS tool to fetch historical crypto prices and fill USD columns in CSV files",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "test": "vitest run --coverage",
+    "test:watch": "vitest --coverage"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "node-fetch": "^2.7.0",
+    "csv-parse": "^5.5.6",
+    "csv-writer": "^1.6.0",
+    "date-fns": "^3.6.0"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.9",
+    "@vitest/coverage-v8": "^2.1.9"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

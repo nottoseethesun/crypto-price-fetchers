@@ -1,0 +1,28 @@
+{
+  "EXCHANGE_BASE_URL": "https://api.mexc.com/api/v3",
+  "QUOTE_CURRENCY": "USDT",
+  "DEFAULT_INTERVAL": "1m",
+  "FALLBACK_INTERVAL": "60m",
+  "TIMEZONE_OFFSETS": {
+    "UTC": 0,
+    "GMT": 0,
+    "EST": -5,
+    "EDT": -4,
+    "CST": -6,
+    "CDT": -5,
+    "MST": -7,
+    "MDT": -6,
+    "PST": -8,
+    "PDT": -7
+  },
+  "COINGECKO_BASE": "https://api.coingecko.com/api/v3",
+  "COINPAPRIKA_BASE": "https://api.coinpaprika.com/v1",
+  "COINGECKO_TICKERS_TEMPLATE": "{base}/coins/{id}/tickers",
+  "COINGECKO_HISTORY_TEMPLATE": "{base}/coins/{id}/history?date={date}",
+  "COINGECKO_SIMPLE_PRICE_TEMPLATE": "{base}/simple/price?ids=bitcoin&vs_currencies=usd",
+  "COINPAPRIKA_TICKERS_TEMPLATE": "{base}/tickers/{id}",
+  "COINPAPRIKA_OHLCV_TEMPLATE": "{base}/ohlcv/{id}/historical?start={start}&end={end}",
+  "RETRY_BACKOFF_MS": [5000, 10000, 20000],
+  "MAX_RETRIES": 3,
+  "REQUEST_DELAY_MS": 1200
+}

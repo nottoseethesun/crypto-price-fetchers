@@ -6,12 +6,13 @@
  * using the MEXC public API primarily. Tries 1-minute resolution first; falls back to 1-hour
  * if no trades occurred in the requested minute.
  *
- * Upgraded Features (v2.8 - Production Hardened & Fully Modular):
+ * Upgraded Features (v2.9.2 - Automatic Backoff Retry on Busy):
  * - Dynamic discovery of supported trading pairs for each provider
  * - Fresh fetch for MEXC exchangeInfo (no caching of large symbols array)
  * - Aggressive per-token/date caching (24h TTL) + negative caching (5 min) for scale
- * - Rate-limit protection: LockService + configurable apiDelayMs (default 500ms in prod, 0ms in tests)
- * - CoinGecko retry on 429 (up to 3 attempts, 10s sleep)
+ * - Rate-limit protection: LockService + configurable apiDelayMs (default 200ms in prod, 0ms in tests)
+ * - **Automatic retry on lock failure ("Rate limit busy") with exponential backoff** (5s → 10s → 20s, up to 3 attempts)
+ * - CoinGecko retry on 429 (up to 3 attempts, 5s sleep)
  * - Early future timestamp detection → immediate error
  * - Stricter MEXC candle timestamp validation (skip if off by >2 min)
  * - Heavy, granular logging at every step for debugging
@@ -24,50 +25,12 @@
  * - Robust toast handling (null check) to avoid TypeError on setText
  * - Custom menu action that refreshes prices then "freezes" them as static values
  *   (converts live formulas to plain numbers → instant sheet loads on re-open)
+ * - All API URLs defined as constants (no repetition of base URLs)
+ * - Fixed invalid URL construction: all `{base}` placeholders correctly replaced
  *
- * CUSTOM MENU & FREEZE WORKFLOW (NEW - v2.8+)
- * =============================================
- *
- * This script adds a separate top-level menu in Google Sheets called "Fetch Historical Crypto Prices".
- * The menu provides a one-click way to refresh prices and freeze them for fast loading.
- *
- * Menu Item: Refresh & Freeze All Prices
- * ---------------------------------------
- * This item performs the following steps automatically:
- * 1. Temporarily re-inserts the live custom formulas (=getCryptoPrice(...)) into the price column.
- * 2. Forces Google Sheets to recalculate all prices (this is the slow part, may take several minutes
- *    for 2,300+ rows due to API calls, retries, rate limits, and lock protection).
- * 3. Once recalculation completes, immediately converts the results from live formulas into plain,
- *    unchanging static numbers (equivalent to manually selecting the column → Copy → Paste special →
- *    Paste values only).
- *
- * Result of "Freeze as static values (no more slow loads on open)":
- * -------------------------------------------------------------------
- * - After freezing, the price cells contain **hard-coded numbers** instead of formulas.
- * - No custom functions run on sheet open/reload → the sheet loads instantly (usually < 2 seconds),
- *   even with thousands of rows.
- * - No API calls, no rate limits, no timeouts, no "Loading..." delays just from opening the sheet.
- * - Prices remain current only until the next refresh — they are no longer dynamic.
- *
- * When to use the menu:
- * - Run it whenever you need updated prices (e.g., daily, weekly, or after significant market changes).
- * - After the menu finishes, the sheet is "frozen" again → fast loads forever until the next refresh.
- *
- * Why freeze? For large sheets (2,300–4,000+ rows), live custom functions in every cell cause:
- * - Slow sheet loading on open
- * - Frequent timeouts ("Exceeded maximum execution time")
- * - Rate-limit errors (429 from APIs)
- * Freezing eliminates these issues while preserving the ability to refresh on demand.
- *
- * Manual alternative (if preferred):
- * - After prices populate, select the price column → Copy → Right-click → Paste special → Paste values only.
- * - To refresh later, re-paste formulas from a backup/template sheet and repeat.
- *
- * Note: The menu is separate from any existing "Tari Tools" menu — no conflicts or merging.
- * 
  * @fileoverview Main utility for large-scale historical crypto price tracking in Sheets.
  * @author Grok-assisted development
- * @version 2.8 (Complete file, menu name updated, full logging)
+ * @version 2.9.2 (Complete file, automatic backoff retry, full logging)
  * @lastModified January 14, 2026
  *
  * Usage in Google Sheets:
@@ -96,7 +59,25 @@ const CONFIG = {
     DAILY_PRICE: 86400,   // 24 hours
     NEGATIVE_CACHE: 300,  // 5 min for failures
     BTC_PRICE: 300        // 5 min
-  }
+  },
+
+  // API URL bases
+  COINGECKO_BASE: 'https://api.coingecko.com/api/v3',
+  COINPAPRIKA_BASE: 'https://api.coinpaprika.com/v1',
+
+  // Endpoint templates
+  COINGECKO_SIMPLE_PRICE_TEMPLATE: '{base}/simple/price?ids=bitcoin&vs_currencies=usd',
+  COINGECKO_TICKERS_TEMPLATE: '{base}/coins/{id}/tickers',
+  COINGECKO_HISTORY_TEMPLATE: '{base}/coins/{id}/history?date={date}',
+
+  COINPAPRIKA_TICKERS_TEMPLATE: '{base}/tickers/{id}',
+  COINPAPRIKA_OHLCV_TEMPLATE: '{base}/coins/{id}/ohlcv/historical?start={start}&end={end}&quote=usd',
+
+  // Rate limit tuning
+  LOCK_WAIT_MS: 2000,                  // Wait time for lock acquisition
+  GENERAL_DELAY_MS: 200,               // Delay between calls (reduced for speed)
+  MAX_LOCK_RETRIES: 3,                 // Number of retry attempts on lock failure
+  LOCK_RETRY_BACKOFF: [5000, 10000, 20000] // Exponential backoff (5s → 10s → 20s)
 };
 
 const API_LOCK = LockService.getScriptLock();
@@ -145,7 +126,7 @@ function setCachedResult(key, value, ttl = CONFIG.CACHE_EXPIRY_SECONDS.DAILY_PRI
 /** ============================================================================
  * Main entry point custom function for Google Sheets
  * ========================================================================== */
-function getCryptoPrice(token, dateStr, tz, highOrLow = 'high', apiDelayMs = 500) {
+function getCryptoPrice(token, dateStr, tz, highOrLow = 'high', apiDelayMs = CONFIG.GENERAL_DELAY_MS) {
   Logger.log(`getCryptoPrice called: token=${token}, date=${dateStr}, tz=${tz}, mode=${highOrLow}, delay=${apiDelayMs}ms`);
 
   token = token.toLowerCase();
@@ -158,60 +139,103 @@ function getCryptoPrice(token, dateStr, tz, highOrLow = 'high', apiDelayMs = 500
   } else if (dateStr instanceof Date && !isNaN(dateStr.getTime())) {
     safeDateStr = Utilities.formatDate(dateStr, 'UTC', 'yyyy-MM-dd HH:mm:ss');
   } else {
+    Logger.log(`Invalid dateStr type: ${typeof dateStr}, value: ${dateStr}`);
     return 'Invalid date format';
   }
 
   const utcMs = parseInputToUtcMs(safeDateStr, offsetHours);
-  if (typeof utcMs === 'string') return utcMs;
+  if (typeof utcMs === 'string') {
+    Logger.log(`Parse error: ${utcMs}`);
+    return utcMs;
+  }
 
   if (utcMs > Date.now()) {
+    Logger.log(`Future timestamp detected (${new Date(utcMs).toISOString()})`);
     return 'No data available for future dates';
   }
 
   const target = highOrLow.toLowerCase() === 'low' ? 'low' : 'high';
 
   const cacheKey = `price_${token}_${safeDateStr.replace(/[^0-9-]/g, '')}_${tz}_${target}`;
+  Logger.log(`Generated cache key: ${cacheKey}`);
   let cached = getCachedResult(cacheKey);
-  if (cached !== null) return cached;
+  if (cached !== null) {
+    Logger.log(`Returning cached result: ${cached}`);
+    return cached;
+  }
 
-  if (apiDelayMs > 0) {
-    if (!API_LOCK.tryLock(5000)) {
-      return 'Rate limit busy - retry later';
+  // Rate-limit protection with automatic retry on lock failure
+  let lockAcquired = false;
+  let retryDelay = 0;
+
+  for (let attempt = 0; attempt < CONFIG.MAX_LOCK_RETRIES; attempt++) {
+    if (apiDelayMs > 0) {
+      Logger.log(`Lock attempt ${attempt + 1}/${CONFIG.MAX_LOCK_RETRIES} (delay so far: ${retryDelay}ms)`);
+      if (API_LOCK.tryLock(CONFIG.LOCK_WAIT_MS)) {
+        lockAcquired = true;
+        Logger.log(`Lock acquired on attempt ${attempt + 1}, sleeping ${apiDelayMs}ms`);
+        Utilities.sleep(apiDelayMs);
+        break;
+      }
+      // Backoff increases with each failed attempt
+      retryDelay = CONFIG.LOCK_RETRY_BACKOFF[attempt] || 5000;
+      Logger.log(`Lock timeout on attempt ${attempt + 1} - backoff ${retryDelay}ms`);
+      Utilities.sleep(retryDelay);
+    } else {
+      lockAcquired = true;
+      break;
     }
-    Utilities.sleep(apiDelayMs);
+  }
+
+  if (!lockAcquired && apiDelayMs > 0) {
+    Logger.log('All lock attempts failed after retries');
+    return 'Rate limit busy - retry later';
   }
 
   try {
+    Logger.log('Starting provider chain');
     let price = getPriceFromMEXC(token, utcMs, target);
-    if (typeof price === 'number') {
+    if (typeof price === 'number' && !isNaN(price)) {
       setCachedResult(cacheKey, price);
+      Logger.log(`Final price from MEXC: ${price}`);
       return price;
     }
 
     const idMap = TOKEN_TO_ID[token] || { gecko: token, paprika: token };
+    Logger.log(`Using ID map: ${JSON.stringify(idMap)}`);
 
     price = getPriceFromCryptoCompare(token, utcMs, target);
-    if (typeof price === 'number') {
+    if (typeof price === 'number' && !isNaN(price)) {
       setCachedResult(cacheKey, price);
+      Logger.log(`Final price from CryptoCompare: ${price}`);
       return price;
     }
 
     price = getPriceFromCoinGecko(idMap.gecko, utcMs, target);
-    if (typeof price === 'number') {
+    if (typeof price === 'number' && !isNaN(price)) {
       setCachedResult(cacheKey, price);
+      Logger.log(`Final price from CoinGecko: ${price}`);
       return price;
     }
 
     price = getPriceFromCoinPaprika(idMap.paprika, utcMs, target);
-    if (typeof price === 'number') {
+    if (typeof price === 'number' && !isNaN(price)) {
       setCachedResult(cacheKey, price);
+      Logger.log(`Final price from CoinPaprika: ${price}`);
       return price;
     }
 
+    Logger.log('All providers failed - caching NO_DATA');
     setCachedResult(cacheKey, 'NO_DATA', CONFIG.CACHE_EXPIRY_SECONDS.NEGATIVE_CACHE);
     return 'No data available from any source';
+  } catch (e) {
+    Logger.log(`Critical error in getCryptoPrice: ${e.message} - stack: ${e.stack}`);
+    return `Error: ${e.message}`;
   } finally {
-    if (API_LOCK.hasLock()) API_LOCK.releaseLock();
+    if (lockAcquired) {
+      API_LOCK.releaseLock();
+      Logger.log('Lock released');
+    }
   }
 }
 
@@ -221,14 +245,21 @@ function getCryptoPrice(token, dateStr, tz, highOrLow = 'high', apiDelayMs = 500
 
 function getTimezoneOffsetHours(tz) {
   const key = (tz || 'UTC').toUpperCase();
-  return CONFIG.TIMEZONE_OFFSETS[key] !== undefined ? CONFIG.TIMEZONE_OFFSETS[key] : 0;
+  const offset = CONFIG.TIMEZONE_OFFSETS[key];
+  Logger.log(`Timezone ${tz} → offset: ${offset || 0} hours`);
+  return offset !== undefined ? offset : 0;
 }
 
 function parseInputToUtcMs(dateInput, offsetHours) {
+  Logger.log(`Parsing dateInput: ${dateInput}, offsetHours: ${offsetHours}`);
+
   let components;
   if (typeof dateInput === 'string') {
     components = parseDateStringToComponents(dateInput);
-    if (typeof components === 'string') return components;
+    if (typeof components === 'string') {
+      Logger.log(`Date string parse failed: ${components}`);
+      return components;
+    }
   } else if (dateInput instanceof Date && !isNaN(dateInput.getTime())) {
     components = {
       year: dateInput.getUTCFullYear(),
@@ -238,60 +269,116 @@ function parseInputToUtcMs(dateInput, offsetHours) {
       minute: dateInput.getUTCMinutes(),
       second: dateInput.getUTCSeconds()
     };
+    Logger.log(`Parsed Date object: ${JSON.stringify(components)}`);
   } else {
-    return 'Error: dateStr must be string "YYYY-MM-DD HH:MM:SS" or valid Date';
+    const err = 'Error: dateStr must be string "YYYY-MM-DD HH:MM:SS" or valid Date';
+    Logger.log(err);
+    return err;
   }
 
   const utcMs = createUtcTimestampFromComponents(components);
-  if (typeof utcMs === 'string') return utcMs;
+  if (typeof utcMs === 'string') {
+    Logger.log(`UTC timestamp creation failed: ${utcMs}`);
+    return utcMs;
+  }
 
-  return utcMs - (offsetHours * 3600000);
+  Logger.log(`UTC ms before offset: ${utcMs}`);
+  const finalMs = utcMs - (offsetHours * 3600000);
+  Logger.log(`Final UTC ms after offset: ${finalMs}`);
+  return finalMs;
 }
 
 function parseDateStringToComponents(dateStr) {
+  Logger.log(`Parsing date string: ${dateStr}`);
   const regex = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/;
   const match = dateStr.match(regex);
-  if (!match) return 'Invalid format. Use YYYY-MM-DD HH:MM:SS';
 
-  const [, y, m, d, h, min, s] = match.map(Number);
-  if (y < 1970 || y > 2100 || m < 1 || m > 12 || d < 1 || d > 31 ||
-      h < 0 || h > 23 || min < 0 || min > 59 || s < 0 || s > 59) {
-    return 'Invalid date components';
+  if (!match) {
+    const err = 'Invalid format. Use exactly YYYY-MM-DD HH:MM:SS (24-hour)';
+    Logger.log(err);
+    return err;
   }
 
-  const temp = new Date(y, m - 1, d);
-  if (temp.getFullYear() !== y || temp.getMonth() + 1 !== m || temp.getDate() !== d) {
-    return 'Invalid date';
+  const [, yStr, mStr, dStr, hStr, minStr, sStr] = match;
+  const year   = parseInt(yStr, 10);
+  const month  = parseInt(mStr, 10);
+  const day    = parseInt(dStr, 10);
+  const hour   = parseInt(hStr, 10);
+  const minute = parseInt(minStr, 10);
+  const second = parseInt(sStr, 10);
+
+  if (year < 1970 || year > 2100) return 'Invalid year (1970–2100)';
+  if (month < 1 || month > 12)    return 'Invalid month (01–12)';
+  if (day < 1 || day > 31)        return 'Invalid day (01–31)';
+  if (hour < 0 || hour > 23)      return 'Invalid hour (00–23)';
+  if (minute < 0 || minute > 59)  return 'Invalid minute (00–59)';
+  if (second < 0 || second > 59)  return 'Invalid second (00–59)';
+
+  const tempDate = new Date(year, month - 1, day);
+  if (tempDate.getFullYear() !== year || tempDate.getMonth() + 1 !== month || tempDate.getDate() !== day) {
+    return 'Invalid date (e.g., Feb 30 does not exist)';
   }
 
-  return { year: y, month: m, day: d, hour: h, minute: min, second: s };
+  const components = { year, month, day, hour, minute, second };
+  Logger.log(`Parsed components: ${JSON.stringify(components)}`);
+  return components;
 }
 
-function createUtcTimestampFromComponents(c) {
-  const date = new Date(Date.UTC(c.year, c.month - 1, c.day, c.hour, c.minute, c.second));
-  return isNaN(date.getTime()) ? 'Error creating UTC timestamp' : date.getTime();
+function createUtcTimestampFromComponents(components) {
+  Logger.log(`Creating UTC timestamp from: ${JSON.stringify(components)}`);
+  const date = new Date(Date.UTC(
+    components.year,
+    components.month - 1,
+    components.day,
+    components.hour,
+    components.minute,
+    components.second
+  ));
+
+  if (isNaN(date.getTime())) {
+    const err = 'Error creating UTC timestamp';
+    Logger.log(err);
+    return err;
+  }
+
+  Logger.log(`UTC timestamp created: ${date.getTime()}`);
+  return date.getTime();
 }
 
 function getBTCUSDTPrice() {
+  Logger.log('Fetching BTC/USDT price');
+
   const cache = CacheService.getScriptCache();
   const cached = cache.get('btc_usdt');
-  if (cached) return parseFloat(cached);
+  if (cached) {
+    Logger.log(`BTC/USDT cache hit: ${cached}`);
+    return parseFloat(cached);
+  }
 
-  const url = 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd';
-  const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-  if (res.getResponseCode() !== 200) return null;
+  const url = CONFIG.COINGECKO_SIMPLE_PRICE_TEMPLATE.replace('{base}', CONFIG.COINGECKO_BASE);
+  const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+  if (response.getResponseCode() !== 200) {
+    Logger.log(`BTC price fetch failed: HTTP ${response.getResponseCode()}`);
+    return null;
+  }
 
-  const data = JSON.parse(res.getContentText());
+  const data = JSON.parse(response.getContentText());
   const price = data.bitcoin?.usd;
-  if (!price) return null;
+  if (!price) {
+    Logger.log('BTC price not found in response');
+    return null;
+  }
 
   cache.put('btc_usdt', price.toString(), CONFIG.CACHE_EXPIRY_SECONDS.BTC_PRICE);
+  Logger.log(`BTC/USDT price fetched and cached: ${price}`);
   return price;
 }
 
 function applySpread(price, target) {
-  const spread = 0.015;
-  return target === 'low' ? price * (1 - spread) : price * (1 + spread);
+  const spread = 0.015; // 1.5%
+  const result = target === 'low' ? price * (1 - spread) : price * (1 + spread);
+  Logger.log(`Applied spread (${target}): ${price} → ${result}`);
+  return result;
 }
 
 /** ============================================================================
@@ -309,7 +396,10 @@ function getPriceFromMEXC(token, utcMs, target) {
 
   const url = CONFIG.EXCHANGE_BASE_URL + '/exchangeInfo';
   const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-  if (response.getResponseCode() !== 200) return null;
+  if (response.getResponseCode() !== 200) {
+    Logger.log(`MEXC exchangeInfo failed: HTTP ${response.getResponseCode()}`);
+    return null;
+  }
 
   const symbols = JSON.parse(response.getContentText()).symbols || [];
   const upperToken = token.toUpperCase();
@@ -379,10 +469,13 @@ function getPriceFromCoinGecko(id, utcMs, target) {
   let price = null;
   const dateStr = Utilities.formatDate(new Date(utcMs), 'UTC', 'dd-MM-yyyy');
 
-  price = getCachedGeckoDailyPrice(id, dateStr);
+  // Check cache first
+  price = getCachedResult(`gecko_daily_${id}_${dateStr}`);
   if (price !== null) return applySpread(price, target);
 
+  // Rate-limit protection
   if (!API_LOCK.tryLock(5000)) {
+    Logger.log('API lock timeout - too many concurrent calls');
     return 'Rate limit busy - retry later';
   }
   Utilities.sleep(500);
@@ -399,11 +492,11 @@ function getPriceFromCoinGecko(id, utcMs, target) {
     }
 
     if (price !== null) {
-      setCachedGeckoDailyPrice(id, dateStr, price);
+      setCachedResult(`gecko_daily_${id}_${dateStr}`, price);
       return applySpread(price, target);
     }
 
-    setCachedGeckoDailyPrice(id, dateStr, 'NO_DATA');
+    setCachedResult(`gecko_daily_${id}_${dateStr}`, 'NO_DATA');
     return 'No data available (cached)';
   } finally {
     if (API_LOCK.hasLock()) API_LOCK.releaseLock();
@@ -414,11 +507,14 @@ function tryCoinGeckoTickers(id) {
   let attempts = 0;
   while (attempts < 3) {
     attempts++;
-    const tickersUrl = `https://api.coingecko.com/api/v3/coins/${id}/tickers`;
+    const tickersUrl = CONFIG.COINGECKO_TICKERS_TEMPLATE
+      .replace('{base}', CONFIG.COINGECKO_BASE)
+      .replace('{id}', id);
     const tickersRes = UrlFetchApp.fetch(tickersUrl, { muteHttpExceptions: true });
 
     if (tickersRes.getResponseCode() === 429) {
-      Utilities.sleep(10000);
+      Logger.log(`CoinGecko 429 on tickers - sleeping 5s (attempt ${attempts}/3)`);
+      Utilities.sleep(5000); // Reduced from 10s
       continue;
     }
 
@@ -434,6 +530,8 @@ function tryCoinGeckoTickers(id) {
         }
       }
       return selPrice;
+    } else {
+      Logger.log(`CoinGecko tickers failed: HTTP ${tickersRes.getResponseCode()}`);
     }
   }
   return null;
@@ -443,17 +541,24 @@ function tryCoinGeckoHistory(id, dateStr) {
   let attempts = 0;
   while (attempts < 3) {
     attempts++;
-    const histUrl = `https://api.coingecko.com/api/v3/coins/${id}/history?date=${dateStr}`;
+    const histUrl = CONFIG.COINGECKO_HISTORY_TEMPLATE
+      .replace('{base}', CONFIG.COINGECKO_BASE)
+      .replace('{id}', id)
+      .replace('{date}', dateStr);
     const histRes = UrlFetchApp.fetch(histUrl, { muteHttpExceptions: true });
 
     if (histRes.getResponseCode() === 429) {
-      Utilities.sleep(10000);
+      Logger.log(`CoinGecko 429 on history - sleeping 5s (attempt ${attempts}/3)`);
+      Utilities.sleep(5000); // Reduced from 10s
       continue;
     }
 
     if (histRes.getResponseCode() === 200) {
       const data = JSON.parse(histRes.getContentText());
-      return data.market_data?.current_price?.usd;
+      const price = data.market_data?.current_price?.usd;
+      if (price) return price;
+    } else {
+      Logger.log(`CoinGecko history failed: HTTP ${histRes.getResponseCode()}`);
     }
   }
   return null;
@@ -462,8 +567,10 @@ function tryCoinGeckoHistory(id, dateStr) {
 function getPriceFromCoinPaprika(id, utcMs, highOrLow) {
   Logger.log('Trying CoinPaprika for ' + id);
 
-  const url = `https://api.coinpaprika.com/v1/tickers/${id}`;
-  const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+  const tickersUrl = CONFIG.COINPAPRIKA_TICKERS_TEMPLATE
+    .replace('{base}', CONFIG.COINPAPRIKA_BASE)
+    .replace('{id}', id);
+  const response = UrlFetchApp.fetch(tickersUrl, { muteHttpExceptions: true });
   if (response.getResponseCode() !== 200) return null;
   const data = JSON.parse(response.getContentText());
 
@@ -471,13 +578,20 @@ function getPriceFromCoinPaprika(id, utcMs, highOrLow) {
 
   const start = utcMs / 1000 - 60;
   const end = utcMs / 1000;
-  const ohlcvUrl = `https://api.coinpaprika.com/v1/coins/${id}/ohlcv/historical?start=${Math.floor(start)}&end=${Math.floor(end)}&quote=usd`;
+  const ohlcvUrl = CONFIG.COINPAPRIKA_OHLCV_TEMPLATE
+    .replace('{base}', CONFIG.COINPAPRIKA_BASE)
+    .replace('{id}', id)
+    .replace('{start}', Math.floor(start))
+    .replace('{end}', Math.floor(end));
   const ohlcvRes = UrlFetchApp.fetch(ohlcvUrl, { muteHttpExceptions: true });
-  const ohlcv = ohlcvRes.getResponseCode() === 200 ? JSON.parse(ohlcvRes.getContentText()) : null;
+  if (ohlcvRes.getResponseCode() !== 200) return null;
+  const ohlcv = JSON.parse(ohlcvRes.getContentText());
 
   if (!ohlcv || ohlcv.length === 0) return null;
 
-  return highOrLow === 'low' ? ohlcv[0].low : ohlcv[0].high;
+  const price = highOrLow === 'low' ? parseFloat(ohlcv[0].low) : parseFloat(ohlcv[0].high);
+  Logger.log(`CoinPaprika final price: ${price} (${highOrLow})`);
+  return price;
 }
 
 /** ============================================================================
@@ -486,7 +600,7 @@ function getPriceFromCoinPaprika(id, utcMs, highOrLow) {
 function testGetCryptoPrice() {
   console.log("══════════════════════════════════════════════════════════════");
   console.log("STARTING FULL TEST SUITE - " + new Date().toISOString());
-  console.log("Script version: Dynamic pair discovery v2.7 (refactored + logging)");
+  console.log("Script version: Dynamic pair discovery v2.8 (refactored + logging)");
   console.log("══════════════════════════════════════════════════════════════\n");
 
   const testCases = [
@@ -525,7 +639,7 @@ function testGetCryptoPrice() {
 
     let isPass = false;
     if (test.expectedRange) {
-      if (typeof result === 'number') {
+      if (typeof result === 'number' && !isNaN(result)) {
         isPass = result >= test.expectedRange[0] && result <= test.expectedRange[1];
         console.log(`│ Range check: ${isPass ? 'PASS ✓' : 'FAIL ✗'} (${test.expectedRange[0]} – ${test.expectedRange[1]})`);
       } else {
@@ -578,27 +692,34 @@ function onOpen() {
 }
 
 /**
- * Refreshes all prices in the GridCoin tab, recalculates, then freezes them as static values
+ * Refreshes all prices in the currently active sheet, recalculates, then freezes them as static values.
+ * Works on whichever tab is active when the menu item is clicked (no hard-coded tab name dependency).
  */
 function refreshPrices() {
   const ui = SpreadsheetApp.getUi();
   const response = ui.alert(
     'Refresh All Prices?',
-    'This may take several minutes for 2,300+ rows. All formulas will be temporarily re-run, then frozen as static values.\n\nContinue?',
+    'This may take several minutes for large sheets. All formulas in the current sheet will be temporarily re-run, then frozen as static values.\n\nContinue?',
     ui.ButtonSet.YES_NO
   );
 
   if (response !== ui.Button.YES) return;
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('GridCoin');
+  const sheet = SpreadsheetApp.getActiveSheet(); // Always use the currently active tab
   if (!sheet) {
-    ui.alert('Error: "GridCoin" tab not found!');
+    ui.alert('Error: No active sheet found!');
     return;
   }
 
+  const sheetName = sheet.getName();
+  Logger.log(`Refreshing prices on active sheet: ${sheetName}`);
+
   const lastRow = sheet.getLastRow();
-  if (lastRow < 2) return;
+  if (lastRow < 2) {
+    ui.alert('No data rows to refresh on this sheet.');
+    return;
+  }
 
   // Change to your actual price column (1 = A, 2 = B, ..., 4 = D, etc.)
   const priceColumn = 4; // ← EDIT THIS IF NEEDED
@@ -606,7 +727,7 @@ function refreshPrices() {
   const formulaRange = sheet.getRange(2, priceColumn, lastRow - 1, 1);
 
   // Robust toast handling (null check)
-  let toast = ss.toast('Starting price refresh...', 'Progress', -1);
+  let toast = ss.toast(`Starting refresh on "${sheetName}"...`, 'Progress', -1);
   if (toast === null) {
     Logger.log('Toast creation failed - skipping progress updates');
   }
@@ -629,5 +750,5 @@ function refreshPrices() {
     }
   }
 
-  ui.alert('Done!', 'Prices refreshed and frozen.', ui.ButtonSet.OK);
+  ui.alert('Done!', `Prices on sheet "${sheetName}" refreshed and frozen.`, ui.ButtonSet.OK);
 }
