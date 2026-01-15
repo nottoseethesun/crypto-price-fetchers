@@ -1,3 +1,113 @@
+/**
+ * Crypto Price Filler
+ * =====================
+ *
+ * A Node.js CLI tool to fetch historical cryptocurrency prices (high/low) for a given token
+ * and date/time, then fill a CSV file with USD prices and calculated USD amounts.
+ *
+ * Features:
+ * - Primary source: MEXC (1m & 60m klines)
+ * - Fallbacks: CoinGecko (tickers + history), CoinPaprika (tickers + OHLCV)
+ * - Supports timezone offsets, caching, rate-limit retry, BTC-pair adjustment
+ * - Verbose logging for debugging
+ * - Handles invalid/future dates gracefully
+ *
+ * @version 1.0.0
+ * @author Christopher M. Balz
+ * @license MIT (or your preferred license)
+ *
+ * Installation / Usage
+ * --------------------
+  *
+ * 1. Install dependencies:
+ *    npm install
+ *
+ * 2. Ensure that your CSV input file's format, where you list out the dates that you want 
+ *    to fetch the price for, matches the sample CSV file provided in `tests/input.csv` exactly 
+ *    in terms of column headers and date format (YYYY-MM-DD HH:MM:SS).
+ * 
+ * 2. Basic usage:
+ *    node index.js --token=xtm --input=input.csv --output=output.csv
+ *
+ * Command-Line Options
+ * --------------------
+ * All options are passed as --key=value or --key (flag style)
+ *
+ * --token       {string}  Required. Token symbol (e.g. xtm, btc, xmr). Case-insensitive.
+ * --input       {string}  Required. Path to input CSV. Supports ~ for home directory.
+ * --output      {string}  Output CSV path. Default: 'output.csv'
+ * --mode        {string}  Price type: 'high' (default) or 'low'
+ * --tz          {string}  Timezone abbreviation. Default: 'UTC'
+ *                         Supported: UTC, GMT, EST, EDT, CST, CDT, MST, MDT, PST, PDT
+ * --verbose     {flag}    Enable detailed [VERBOSE] logging. Default: false
+ *                         Also enabled by env var: VERBOSE=1
+ *
+ * Examples
+ * --------
+ *
+ * # Basic high-price fill (UTC)
+ * node index.js --token=xtm --input=tests/input.csv --output=filled.csv --mode=high --tz=UTC
+ *
+ * # Low price in CDT timezone + verbose
+ * node index.js --token=xtm --input=input.csv --output=low_prices.csv --mode=low --tz=CDT --verbose
+ *
+ * # Missing args → shows usage
+ * node index.js
+ *
+ * Testing Instructions
+ * --------------------
+ *
+ * 1. Unit/Integration Tests (Vitest)
+ *    Run the full suite (15 tests):
+ *    npm run test              # clean output
+ *    npm run test:verbose      # with full [VERBOSE] logs
+ *
+ *    All tests use mocks for APIs, cache, fallback, retry, etc.
+ *    Coverage: ~44% statements (mostly CLI & rare edges uncovered)
+ *
+ * 2. Production-Style Test with Real Data
+ *    Use the provided sample CSV in tests/input.csv (10 rows with dates & amounts)
+ *    Run:
+ *    node index.js --token=xtm --input=tests/input.csv --output=filled_output.csv --mode=high --tz=UTC --verbose
+ *
+ *    Expected output:
+ *    - Reads 10 rows
+ *    - Fetches real XTM prices from MEXC (or fallbacks)
+ *    - Fills $usd price and $usd amount columns
+ *    - Writes filled_output.csv
+ *    - Verbose logs show every fetch attempt, parse step, price result
+ *    - Future/invalid dates left blank
+ *    - If no price available → writes 'Error'
+ *
+ *    After running:
+ *    - Open filled_output.csv in LibreOffice Calc, Excel, etc.
+ *    - Verify prices are filled for valid past dates
+ *    - Check log.txt for full trace (if redirected)
+ *
+ *    Note: Real API calls may hit rate limits → verbose logs will show retries/backoffs.
+ *
+ * 
+ */
+
+/**
+ * Configuration object with API endpoints, intervals, timezones, etc.
+ * @constant {Object}
+ * @property {string} EXCHANGE_BASE_URL - MEXC API base
+ * @property {string} QUOTE_CURRENCY - Default quote asset
+ * @property {string} DEFAULT_INTERVAL - Primary kline interval
+ * @property {string} FALLBACK_INTERVAL - Secondary kline interval
+ * @property {Object} TIMEZONE_OFFSETS - Supported timezone abbreviations → hours offset
+ * @property {string} COINGECKO_BASE - CoinGecko API base
+ * @property {string} COINPAPRIKA_BASE - CoinPaprika API base
+ * @property {string} COINGECKO_TICKERS_TEMPLATE - Ticker endpoint template
+ * @property {string} COINGECKO_HISTORY_TEMPLATE - Historical data endpoint template
+ * @property {string} COINGECKO_SIMPLE_PRICE_TEMPLATE - Simple price endpoint for BTC
+ * @property {string} COINPAPRIKA_TICKERS_TEMPLATE - Paprika ticker endpoint
+ * @property {string} COINPAPRIKA_OHLCV_TEMPLATE - Paprika OHLCV historical
+ * @property {number[]} RETRY_BACKOFF_MS - Exponential backoff delays for 429
+ * @property {number} MAX_RETRIES - Maximum retry attempts
+ */
+
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
