@@ -4,10 +4,10 @@ import os from 'os';
 import fetch from 'node-fetch';
 import { parse as csvParse } from 'csv-parse/sync';
 import { createObjectCsvWriter } from 'csv-writer';
-import { parse as dateParse, isValid } from 'date-fns';
+import { DateTime } from 'luxon';
 
-// Config (must be defined before any function that uses it)
-const CONFIG = {
+// Config - exported for tests
+export const CONFIG = {
   EXCHANGE_BASE_URL: 'https://api.mexc.com/api/v3',
   QUOTE_CURRENCY: 'USDT',
   DEFAULT_INTERVAL: '1m',
@@ -37,7 +37,7 @@ const TOKEN_TO_ID = {
   'xtm': { gecko: 'tari', paprika: 'xtm-tari' }
 };
 
-// Guard: only run CLI logic when this file is executed directly (not imported by tests)
+// Guard: only run CLI logic when executed directly (not imported by tests)
 if (import.meta.url === `file://${process.argv[1]}`) {
   // Parse command-line args
   const args = process.argv.slice(2).reduce((acc, arg) => {
@@ -51,7 +51,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const outputFile = args.output || 'output.csv';
   const mode = args.mode || 'high';
   const tz = args.tz || 'UTC';
-  const verbose = args.verbose === true || args.verbose === 'true';
+  const verbose = args.verbose === true || args.verbose === 'true' || process.env.VERBOSE === '1';
 
   if (inputFile && inputFile.startsWith('~')) {
     inputFile = path.join(os.homedir(), inputFile.slice(1));
@@ -69,10 +69,13 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
   console.log(`Starting price filler for token: ${token}, mode: ${mode}, tz: ${tz}`);
   console.log(`Input: ${inputFile}, Output: ${outputFile}`);
-  console.log(`Verbose mode: ${verbose ? 'ENABLED' : 'disabled'}`);
+  if (verbose) console.log('[VERBOSE] Verbose mode ENABLED - detailed logging activated');
 
   // Main execution
+  if (verbose) console.log(`[VERBOSE] Reading CSV from: ${inputFile}`);
   const csvContent = fs.readFileSync(inputFile, 'utf8');
+  if (verbose) console.log(`[VERBOSE] CSV content length: ${csvContent.length} chars`);
+
   const records = csvParse(csvContent, {
     columns: true,
     skip_empty_lines: true,
@@ -90,9 +93,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   console.log(`Read ${rows.length} rows from input CSV.`);
 
   if (verbose) {
-    console.log('First 5 rows raw data (for debug):');
+    console.log('[VERBOSE] First 5 rows raw data:');
     rows.slice(0, 5).forEach((row, idx) => {
-      console.log(`Row ${idx + 1} raw: ${JSON.stringify(row)}`);
+      console.log(`[VERBOSE] Row ${idx + 1}: ${JSON.stringify(row)}`);
     });
   }
 
@@ -113,7 +116,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   let lastValidDateIndex = -1;
   for (let i = rows.length - 1; i >= 0; i--) {
     const dateStr = (rows[i][dateColName] || '').trim();
-    if (verbose) console.log(`Row ${i + 1} raw date: "${dateStr}"`);
+    if (verbose) console.log(`[VERBOSE] Row ${i + 1} raw date: "${dateStr}"`);
 
     if (dateStr && dateStr.length > 0 && !dateStr.includes(',,,,') && !dateStr.includes('Total')) {
       const parsedDate = dateParse(dateStr, 'yyyy-MM-dd HH:mm:ss', new Date());
@@ -121,6 +124,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
         lastValidDateIndex = i;
         console.log(`Last valid date row found at index ${i + 1} (date: ${dateStr})`);
         break;
+      } else if (verbose) {
+        console.log(`[VERBOSE] Row ${i + 1} date invalid after parsing`);
       }
     }
   }
@@ -155,11 +160,11 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     let price = null;
     let usdAmount = '';
 
-    if (verbose) console.log(`Row ${i + 1}: Attempting price fetch for date "${dateStr}"`);
+    if (verbose) console.log(`[VERBOSE] Row ${i + 1}: Attempting price fetch for date "${dateStr}"`);
 
     try {
-      price = await getCryptoPrice(token, dateStr, tz, mode);
-      if (verbose) console.log(`Row ${i + 1}: Fetched price for "${dateStr}": ${price}`);
+      price = await getCryptoPrice(token, dateStr, tz, mode, verbose);
+      if (verbose) console.log(`[VERBOSE] Row ${i + 1}: Fetched price for "${dateStr}": ${price}`);
     } catch (e) {
       console.error(`Row ${i + 1}: Error fetching price for date "${dateStr}": ${e.message}`);
     }
@@ -170,6 +175,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       const amount = parseFloat(amountStr);
       if (!isNaN(amount)) {
         usdAmount = (amount * price).toFixed(8);
+        if (verbose) console.log(`[VERBOSE] Row ${i + 1}: Calculated $usd amount = ${usdAmount}`);
       }
     }
 
@@ -191,78 +197,105 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     .catch(e => console.error(`Error writing output CSV: ${e.message}`));
 }
 
-// Crypto price fetching logic
-export async function getCryptoPrice(token, dateStr, tz, highOrLow = 'high') {
+// Crypto price fetching logic - verbose param
+export async function getCryptoPrice(token, dateStr, tz, highOrLow = 'high', verbose = false) {
+  verbose = verbose || process.env.VERBOSE === '1';
+
+  if (verbose) console.log(`[VERBOSE] getCryptoPrice called for ${dateStr} (tz: ${tz}, mode: ${highOrLow})`);
+
   const offsetHours = getTimezoneOffsetHours(tz);
+  if (verbose) console.log(`[VERBOSE] Offset hours for ${tz}: ${offsetHours}`);
 
   let safeDateStr = '';
   if (dateStr != null) {
     safeDateStr = String(dateStr).trim();
   }
+  if (verbose) console.log(`[VERBOSE] Safe date string: "${safeDateStr}"`);
 
   if (!safeDateStr) {
+    if (verbose) console.log('[VERBOSE] Skipping: empty safeDateStr');
     return null;
   }
 
-  const utcMs = parseInputToUtcMs(safeDateStr, offsetHours);
+  const utcMs = parseInputToUtcMs(safeDateStr, offsetHours, verbose);
+  if (verbose) console.log(`[VERBOSE] Parsed UTC ms: ${utcMs} (${new Date(utcMs).toISOString()})`);
 
   if (utcMs === null || utcMs > Date.now()) {
+    if (verbose) console.log(`[VERBOSE] Skipping: invalid or future date "${safeDateStr}"`);
     return null;
   }
 
   const target = highOrLow.toLowerCase() === 'low' ? 'low' : 'high';
+  if (verbose) console.log(`[VERBOSE] Target price: ${target}`);
 
   const cleanedDate = safeDateStr.replace(/[^0-9-]/g, '');
-  const cacheKey = `price_${token}_${cleanedDate}_${tz}_${target}`;
+  if (verbose) console.log(`[VERBOSE] Cleaned date for cache key: "${cleanedDate}"`);
 
+  const cacheKey = `price_${token}_${cleanedDate}_${tz}_${target}`;
   if (cache.has(cacheKey)) {
+    if (verbose) console.log(`[VERBOSE] Cache hit for ${cacheKey}`);
     return cache.get(cacheKey);
   }
 
+  if (verbose) console.log('[VERBOSE] Trying MEXC first...');
   let price = await getPriceFromMEXC(token, utcMs, target);
   if (price !== null) {
+    if (verbose) console.log(`[VERBOSE] MEXC returned price: ${price}`);
     cache.set(cacheKey, price);
     return price;
   }
 
   const idMap = TOKEN_TO_ID[token] || { gecko: token, paprika: token };
+  if (verbose) console.log(`[VERBOSE] Fallback IDs: CoinGecko=${idMap.gecko}, CoinPaprika=${idMap.paprika}`);
 
+  if (verbose) console.log('[VERBOSE] Trying CoinGecko...');
   price = await getPriceFromCoinGecko(idMap.gecko, utcMs, target);
   if (price !== null) {
+    if (verbose) console.log(`[VERBOSE] CoinGecko returned price: ${price}`);
     cache.set(cacheKey, price);
     return price;
   }
 
+  if (verbose) console.log('[VERBOSE] Trying CoinPaprika...');
   price = await getPriceFromCoinPaprika(idMap.paprika, utcMs, target);
   if (price !== null) {
+    if (verbose) console.log(`[VERBOSE] CoinPaprika returned price: ${price}`);
     cache.set(cacheKey, price);
     return price;
   }
 
+  if (verbose) console.log('[VERBOSE] All sources failed - returning null');
   cache.set(cacheKey, null);
   return null;
 }
 
 // Helper functions
 export function getTimezoneOffsetHours(tz) {
-  return CONFIG.TIMEZONE_OFFSETS[tz.toUpperCase()] || 0;
+  return CONFIG.TIMEZONE_OFFSETS[tz?.toUpperCase()] || 0;
 }
 
-export function parseInputToUtcMs(dateStr, offsetHours) {
-  // Parse the local date/time string (as if it is in the given timezone)
-  const parsed = dateParse(dateStr, 'yyyy-MM-dd HH:mm:ss', new Date());
-  if (isValid(parsed)) {
-    // Convert local time to UTC: localMs - (offset * ms_per_hour)
-    // Negative offset (west of UTC) means local is behind → subtract negative = add hours
-    const utcMs = parsed.getTime() - (offsetHours * 3600000);
+export function parseInputToUtcMs(dateStr, offsetHours, verbose = false) {
+  verbose = verbose || process.env.VERBOSE === '1';
+
+  if (verbose) console.log(`[VERBOSE] parseInputToUtcMs called with "${dateStr}", offset: ${offsetHours}`);
+
+  const zone = `UTC${offsetHours >= 0 ? '+' : ''}${offsetHours}`;
+  const dt = DateTime.fromFormat(dateStr, 'yyyy-MM-dd HH:mm:ss', { zone });
+
+  if (!dt.isValid) {
+    if (verbose) console.log('[VERBOSE] Luxon parsing failed, falling back to new Date()');
+    const fallback = new Date(dateStr);
+    if (isNaN(fallback.getTime())) {
+      if (verbose) console.log('[VERBOSE] Fallback also failed - returning null');
+      return null;
+    }
+    const utcMs = fallback.getTime() + (offsetHours * 3600000);
+    if (verbose) console.log(`[VERBOSE] Fallback succeeded, UTC ms: ${utcMs} (${new Date(utcMs).toISOString()})`);
     return utcMs;
   }
 
-  // Fallback for other formats
-  const fallback = new Date(dateStr);
-  if (isNaN(fallback.getTime())) return null;
-
-  const utcMs = fallback.getTime() - (offsetHours * 3600000);
+  const utcMs = dt.toUTC().toMillis();
+  if (verbose) console.log(`[VERBOSE] Luxon parsed successfully, UTC ms: ${utcMs} (${dt.toUTC().toISO()})`);
   return utcMs;
 }
 
@@ -428,10 +461,12 @@ async function fetchWithRetry(url) {
   return null;
 }
 
-// Exports for testing (single block - no duplicates)
+// Exports for testing - single block (no duplicates!)
 export {
+  CONFIG,
   getCryptoPrice,
   getTimezoneOffsetHours,
+  parseInputToUtcMs,
   getPriceFromMEXC,
   getPriceFromCoinGecko,
   getPriceFromCoinPaprika,

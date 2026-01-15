@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { parse, isValid } from 'date-fns';
-import { getTimezoneOffsetHours, parseInputToUtcMs } from '../index.js';
+import { DateTime } from 'luxon';
+import { getTimezoneOffsetHours, parseInputToUtcMs, CONFIG } from '../index.js';
+import fs from 'fs';
+import { parse as csvParse } from 'csv-parse/sync';
+
+// Verbose from env var
+const verbose = process.env.VERBOSE === '1';
 
 describe('Crypto Price Filler Helpers', () => {
   describe('getTimezoneOffsetHours', () => {
@@ -18,27 +23,45 @@ describe('Crypto Price Filler Helpers', () => {
 
   describe('parseInputToUtcMs', () => {
     it('parses valid date string correctly in UTC (offset 0)', () => {
-      const result = parseInputToUtcMs('2025-12-19 00:17:00', 0);
+      const result = parseInputToUtcMs('2025-12-19 00:17:00', 0, verbose);
       expect(result).toBeTypeOf('number');
-      const date = new Date(result);
-      expect(date.getUTCFullYear()).toBe(2025);
-      expect(date.getUTCMonth()).toBe(11);
-      expect(date.getUTCDate()).toBe(19);
-      expect(date.getUTCHours()).toBe(0);   // Local 00:17 = UTC 00:17
-      expect(date.getUTCMinutes()).toBe(17);
+      const dt = DateTime.fromMillis(result, { zone: 'utc' });
+      expect(dt.year).toBe(2025);
+      expect(dt.month).toBe(12);
+      expect(dt.day).toBe(19);
+      expect(dt.hour).toBe(0);
+      expect(dt.minute).toBe(17);
     });
 
     it('correctly applies negative timezone offset (CDT = -5)', () => {
-      const result = parseInputToUtcMs('2025-12-19 00:17:00', -5);
+      const result = parseInputToUtcMs('2025-12-19 00:17:00', -5, verbose);
       expect(result).toBeTypeOf('number');
-      const date = new Date(result);
-      expect(date.getUTCHours()).toBe(5);   // Local 00:17 in CDT → UTC 05:17
-      expect(date.getUTCMinutes()).toBe(17);
+      const dt = DateTime.fromMillis(result, { zone: 'utc' });
+      expect(dt.hour).toBe(5);
+      expect(dt.minute).toBe(17);
     });
 
     it('returns null for invalid date', () => {
-      expect(parseInputToUtcMs('invalid', 0)).toBeNull();
-      expect(parseInputToUtcMs('', 0)).toBeNull();
+      expect(parseInputToUtcMs('invalid', 0, verbose)).toBeNull();
+      expect(parseInputToUtcMs('', 0, verbose)).toBeNull();
+    });
+  });
+
+  describe('CSV Parsing', () => {
+    it('parses tests/input.csv correctly', () => {
+      const csvContent = fs.readFileSync('tests/input.csv', 'utf8');
+      const records = csvParse(csvContent, {
+        columns: true,
+        skip_empty_lines: true,
+        trim: true,
+        delimiter: ',',
+        quote: '"',
+        relax_column_count: true
+      });
+
+      expect(records.length).toBeGreaterThan(0);
+      expect(records[0]['date (UTC)']).toBe('2025-12-19 00:17:00');
+      expect(records[0]['amount']).toBe('200.24');
     });
   });
 });
