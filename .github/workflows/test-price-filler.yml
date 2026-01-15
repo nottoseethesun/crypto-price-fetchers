@@ -1,0 +1,45 @@
+name: Test Crypto Price Filler
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'fetch-from-centralized-exchange/crypto-price-filler/**'  # only run on changes in this folder
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'fetch-from-centralized-exchange/crypto-price-filler/**'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: fetch-from-centralized-exchange/crypto-price-filler  # ← important!
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: fetch-from-centralized-exchange/crypto-price-filler/package-lock.json
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run tests
+      run: npm run test
+
+    # Optional: Upload coverage
+    - name: Upload coverage
+      if: always()
+      uses: codecov/codecov-action@v4
+      with:
+        fail_ci_if_error: false
+        # token: ${{ secrets.CODECOV_TOKEN }}   # add later if using Codecov
+        

@@ -52,3 +52,5 @@ To be accepted for pull request:
 - All tests must pass
 - Any major new functionality must have a test runnable from the current approach
 - All code must be modular e.g. low cyclomatic complexity ~17 or so.
+
+[![Price Filler Tests](https://github.com/nottoseethesun/crypto-price-fetchers/actions/workflows/test-price-filler.yml/badge.svg)](https://github.com/nottoseethesun/crypto-price-fetchers/actions/workflows/test-price-filler.yml)
