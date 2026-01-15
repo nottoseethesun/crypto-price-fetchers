@@ -2,6 +2,9 @@
 output.csv
 tests/output.csv
 
+# Dev
+log.txt
+
 # Logs
 logs
 *.log

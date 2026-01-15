@@ -7,7 +7,7 @@ import { createObjectCsvWriter } from 'csv-writer';
 import { DateTime } from 'luxon';
 
 // Exported configuration (complete)
-export const CONFIG = {
+const CONFIG = {
   EXCHANGE_BASE_URL: 'https://api.mexc.com/api/v3',
   QUOTE_CURRENCY: 'USDT',
   DEFAULT_INTERVAL: '1m',
@@ -642,8 +642,10 @@ async function fetchWithRetry(url, verbose = false) {
 
 // Single export block - no duplicates
 export {
+  CONFIG,
   getCryptoPrice,
   getTimezoneOffsetHours,
+  parseInputToUtcMs,
   getPriceFromMEXC,
   getPriceFromCoinGecko,
   getPriceFromCoinPaprika,
