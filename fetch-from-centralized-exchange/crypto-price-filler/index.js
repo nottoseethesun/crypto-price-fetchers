@@ -42,15 +42,15 @@ const TOKEN_TO_ID = {
   xtm: { gecko: 'tari', paprika: 'xtm-tari' }
 };
 
-// Global cache (not exported to avoid getter issues)
+// Global cache (not exported directly)
 let cache = new Map();
 
-// Helpers to access/mock cache in tests
-export function getCache() {
+// Helpers to access/mock cache in tests (defined here, exported at the end)
+function getCache() {
   return cache;
 }
 
-export function setCache(newCache) {
+function setCache(newCache) {
   cache = newCache;
 }
 
@@ -193,7 +193,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 }
 
 // Exported API functions
-export async function getCryptoPrice(token, dateStr, tz, highOrLow = 'high', verbose = false) {
+async function getCryptoPrice(token, dateStr, tz, highOrLow = 'high', verbose = false) {
   verbose = verbose || process.env.VERBOSE === '1';
 
   if (verbose) console.log(`[VERBOSE] getCryptoPrice START: token=${token}, date="${dateStr}", tz=${tz}, mode=${highOrLow}`);
@@ -269,11 +269,11 @@ export async function getCryptoPrice(token, dateStr, tz, highOrLow = 'high', ver
   return null;
 }
 
-export function getTimezoneOffsetHours(tz) {
+function getTimezoneOffsetHours(tz) {
   return CONFIG.TIMEZONE_OFFSETS[tz?.toUpperCase()] || 0;
 }
 
-export function parseInputToUtcMs(dateStr, offsetHours, verbose = false) {
+function parseInputToUtcMs(dateStr, offsetHours, verbose = false) {
   verbose = verbose || process.env.VERBOSE === '1';
 
   if (verbose) console.log(`[VERBOSE] parseInputToUtcMs called with "${dateStr}", offset: ${offsetHours}`);
@@ -642,10 +642,8 @@ async function fetchWithRetry(url, verbose = false) {
 
 // Single export block - no duplicates
 export {
-  CONFIG,
   getCryptoPrice,
   getTimezoneOffsetHours,
-  parseInputToUtcMs,
   getPriceFromMEXC,
   getPriceFromCoinGecko,
   getPriceFromCoinPaprika,
