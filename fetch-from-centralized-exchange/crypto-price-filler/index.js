@@ -81,9 +81,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
   console.log(`Starting price filler for token: ${token}, mode: ${mode}, tz: ${tz}`);
   console.log(`Input: ${inputFile}, Output: ${outputFile}`);
-  if (verbose) console.log('[VERBOSE] Verbose mode ENABLED');
+  if (verbose) console.log('[VERBOSE] Verbose mode ENABLED. Starting CLI logic');
 
   const csvContent = fs.readFileSync(inputFile, 'utf8');
+  if (verbose) console.log('[VERBOSE] Read CSV content from input file, length: ' + csvContent.length);
   const records = csvParse(csvContent, {
     columns: true,
     skip_empty_lines: true,
@@ -106,6 +107,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
   let dateColName = headers.find(h => h.includes('date') && h.includes('UTC')) ||
                     headers.find(h => h.toLowerCase().includes('date'));
+  if (verbose) console.log('[VERBOSE] Searching for date column in headers: ' + headers.join(', '));
   if (!dateColName) {
     console.error('No date column found in CSV headers');
     process.exit(1);
@@ -121,10 +123,11 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   let lastValidDateIndex = -1;
   for (let i = rows.length - 1; i >= 0; i--) {
     const dateStr = (rows[i][dateColName] || '').trim();
-    if (verbose) console.log(`[VERBOSE] Row ${i + 1} date: "${dateStr}"`);
+    if (verbose) console.log(`[VERBOSE] Checking row ${i + 1} date: "${dateStr}"`);
 
     if (dateStr && !dateStr.includes(',,,,') && !dateStr.includes('Total')) {
       const parsed = DateTime.fromFormat(dateStr, 'yyyy-MM-dd HH:mm:ss');
+      if (verbose) console.log(`[VERBOSE] Date parse result for "${dateStr}": valid=${parsed.isValid}`);
       if (parsed.isValid) {
         lastValidDateIndex = i;
         console.log(`Last valid date row: index ${i + 1} (${dateStr})`);
@@ -155,8 +158,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
     try {
       price = await getCryptoPrice(token, dateStr, tz, mode, verbose);
-      if (verbose) console.log(`[VERBOSE] Price fetched: ${price}`);
+      if (verbose) console.log(`[VERBOSE] Price fetched for row ${i + 1}: ${price}`);
     } catch (e) {
+      if (verbose) console.log(`[VERBOSE] Error fetching price for row ${i + 1}: ${e.message}`);
       console.error(`Error fetching price for "${dateStr}": ${e.message}`);
     }
 
@@ -166,11 +170,15 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       const amount = parseFloat(amountStr);
       if (!isNaN(amount)) {
         row[usdAmountColName] = (amount * price).toFixed(8);
+      } else {
+        if (verbose) console.log(`[VERBOSE] Invalid amount in row ${i + 1}: "${amountStr}"`);
       }
     }
 
     outputRows.push(row);
   }
+
+  if (verbose) console.log('[VERBOSE] Preparing to write output CSV with ' + outputRows.length + ' rows');
 
   const csvWriter = createObjectCsvWriter({
     path: outputFile,
@@ -188,7 +196,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 export async function getCryptoPrice(token, dateStr, tz, highOrLow = 'high', verbose = false) {
   verbose = verbose || process.env.VERBOSE === '1';
 
-  if (verbose) console.log(`[VERBOSE] getCryptoPrice called: ${dateStr} (tz: ${tz}, mode: ${highOrLow})`);
+  if (verbose) console.log(`[VERBOSE] getCryptoPrice START: token=${token}, date="${dateStr}", tz=${tz}, mode=${highOrLow}`);
 
   const offsetHours = getTimezoneOffsetHours(tz);
   if (verbose) console.log(`[VERBOSE] Offset hours for ${tz}: ${offsetHours}`);
@@ -205,7 +213,7 @@ export async function getCryptoPrice(token, dateStr, tz, highOrLow = 'high', ver
   if (verbose) console.log(`[VERBOSE] Parsed UTC ms: ${utcMs} (${new Date(utcMs).toISOString()})`);
 
   if (utcMs === null || utcMs > Date.now()) {
-    if (verbose) console.log(`[VERBOSE] Skipping: invalid or future date "${safeDateStr}"`);
+    if (verbose) console.log(`[VERBOSE] Skipping: invalid or future date "${safeDateStr}" (utcMs=${utcMs}, now=${Date.now()})`);
     return null;
   }
 
@@ -217,20 +225,20 @@ export async function getCryptoPrice(token, dateStr, tz, highOrLow = 'high', ver
 
   if (cache.has(cacheKey)) {
     const cached = cache.get(cacheKey);
-    if (verbose) console.log(`[VERBOSE] Cache hit! Returning cached price: ${cached}`);
+    if (verbose) console.log(`[VERBOSE] Cache HIT! Returning cached price: ${cached}`);
     return cached;
   } else {
-    if (verbose) console.log('[VERBOSE] No cache hit - proceeding to API fetches');
+    if (verbose) console.log('[VERBOSE] Cache MISS - proceeding to API fetches');
   }
 
   if (verbose) console.log('[VERBOSE] Trying MEXC first...');
   let price = await getPriceFromMEXC(token, utcMs, target, verbose);
   if (price !== null) {
-    if (verbose) console.log(`[VERBOSE] MEXC returned price: ${price}`);
+    if (verbose) console.log(`[VERBOSE] MEXC SUCCESS - price: ${price}`);
     cache.set(cacheKey, price);
     return price;
   } else {
-    if (verbose) console.log('[VERBOSE] MEXC failed - trying CoinGecko');
+    if (verbose) console.log('[VERBOSE] MEXC FAILED or returned null - trying CoinGecko');
   }
 
   const idMap = TOKEN_TO_ID[token] || { gecko: token, paprika: token };
@@ -239,23 +247,24 @@ export async function getCryptoPrice(token, dateStr, tz, highOrLow = 'high', ver
   if (verbose) console.log('[VERBOSE] Trying CoinGecko...');
   price = await getPriceFromCoinGecko(idMap.gecko, utcMs, target, verbose);
   if (price !== null) {
-    if (verbose) console.log(`[VERBOSE] CoinGecko returned price: ${price}`);
+    if (verbose) console.log(`[VERBOSE] CoinGecko SUCCESS - price: ${price}`);
     cache.set(cacheKey, price);
     return price;
   } else {
-    if (verbose) console.log('[VERBOSE] CoinGecko failed - trying CoinPaprika');
+    if (verbose) console.log('[VERBOSE] CoinGecko FAILED or returned null - trying CoinPaprika');
   }
 
   if (verbose) console.log('[VERBOSE] Trying CoinPaprika...');
   price = await getPriceFromCoinPaprika(idMap.paprika, utcMs, target, verbose);
   if (price !== null) {
-    if (verbose) console.log(`[VERBOSE] CoinPaprika returned price: ${price}`);
+    if (verbose) console.log(`[VERBOSE] CoinPaprika SUCCESS - price: ${price}`);
     cache.set(cacheKey, price);
     return price;
   } else {
-    if (verbose) console.log('[VERBOSE] All sources failed - returning null');
+    if (verbose) console.log('[VERBOSE] CoinPaprika FAILED or returned null - all sources exhausted');
   }
 
+  if (verbose) console.log('[VERBOSE] All sources failed - returning null and caching null');
   cache.set(cacheKey, null);
   return null;
 }
@@ -273,19 +282,19 @@ export function parseInputToUtcMs(dateStr, offsetHours, verbose = false) {
   const dt = DateTime.fromFormat(dateStr, 'yyyy-MM-dd HH:mm:ss', { zone });
 
   if (!dt.isValid) {
-    if (verbose) console.log('[VERBOSE] Luxon parsing failed, falling back to new Date()');
+    if (verbose) console.log('[VERBOSE] Luxon parsing FAILED, falling back to new Date()');
     const fallback = new Date(dateStr);
     if (isNaN(fallback.getTime())) {
-      if (verbose) console.log('[VERBOSE] Fallback also failed - returning null');
+      if (verbose) console.log('[VERBOSE] Fallback new Date() also FAILED - returning null');
       return null;
     }
     const utcMs = fallback.getTime() + (offsetHours * 3600000);
-    if (verbose) console.log(`[VERBOSE] Fallback succeeded, UTC ms: ${utcMs} (${new Date(utcMs).toISOString()})`);
+    if (verbose) console.log(`[VERBOSE] Fallback new Date() SUCCEEDED, UTC ms: ${utcMs} (${new Date(utcMs).toISOString()})`);
     return utcMs;
   }
 
   const utcMs = dt.toUTC().toMillis();
-  if (verbose) console.log(`[VERBOSE] Luxon parsed successfully, UTC ms: ${utcMs} (${dt.toUTC().toISO()})`);
+  if (verbose) console.log(`[VERBOSE] Luxon parsing SUCCEEDED, UTC ms: ${utcMs} (${dt.toUTC().toISO()})`);
   return utcMs;
 }
 
@@ -293,7 +302,7 @@ export function parseInputToUtcMs(dateStr, offsetHours, verbose = false) {
 async function getPriceFromMEXC(token, utcMs, target, verbose = false) {
   const skipTokens = new Set(['grc']);
   if (skipTokens.has(token)) {
-    if (verbose) console.log('[VERBOSE] Token skipped for MEXC: ' + token);
+    if (verbose) console.log(`[VERBOSE] Token ${token} skipped for MEXC`);
     return null;
   }
 
@@ -301,12 +310,20 @@ async function getPriceFromMEXC(token, utcMs, target, verbose = false) {
   if (verbose) console.log(`[VERBOSE] MEXC exchangeInfo URL: ${exchangeInfoUrl}`);
   const exchangeRes = await fetchWithRetry(exchangeInfoUrl, verbose);
   if (!exchangeRes) {
-    if (verbose) console.log('[VERBOSE] MEXC exchangeInfo fetch failed');
+    if (verbose) console.log('[VERBOSE] MEXC exchangeInfo fetch FAILED (no response)'); 
     return null;
   }
 
-  const exchangeData = await exchangeRes.json();
-  if (verbose) console.log(`[VERBOSE] MEXC exchangeInfo raw data: ${JSON.stringify(exchangeData, null, 2)}`);
+  if (verbose) console.log('[VERBOSE] MEXC exchangeInfo response ok: ' + exchangeRes.ok);
+
+  let exchangeData;
+  try {
+    exchangeData = await exchangeRes.json();
+    if (verbose) console.log(`[VERBOSE] MEXC exchangeInfo raw data: ${JSON.stringify(exchangeData, null, 2)}`);
+  } catch (e) {
+    if (verbose) console.log(`[VERBOSE] MEXC exchangeInfo JSON parse FAILED: ${e.message}`);
+    return null;
+  }
 
   const symbols = exchangeData.symbols || [];
   if (verbose) console.log(`[VERBOSE] MEXC symbols loaded: ${symbols.length} symbols`);
@@ -316,13 +333,16 @@ async function getPriceFromMEXC(token, utcMs, target, verbose = false) {
   let useBTC = false;
 
   for (const sym of symbols) {
-    if (verbose) console.log(`[VERBOSE] Checking symbol: ${sym.symbol || 'no symbol'} (base: ${sym.baseAsset}, quote: ${sym.quoteAsset})`);
-    if (sym.baseAsset === upperToken) {
-      if (sym.quoteAsset === 'USDT') {
+    const symStr = sym.symbol || 'missing';
+    const base = sym.baseAsset || 'missing';
+    const quote = sym.quoteAsset || 'missing';
+    if (verbose) console.log(`[VERBOSE] Checking symbol: symbol=${symStr}, base=${base}, quote=${quote}`);
+    if (base === upperToken) {
+      if (quote === 'USDT') {
         symbol = upperToken + 'USDT';
         if (verbose) console.log(`[VERBOSE] Found USDT pair: ${symbol}`);
         break;
-      } else if (sym.quoteAsset === 'BTC') {
+      } else if (quote === 'BTC') {
         symbol = upperToken + 'BTC';
         useBTC = true;
         if (verbose) console.log(`[VERBOSE] Found BTC pair: ${symbol}`);
@@ -331,65 +351,112 @@ async function getPriceFromMEXC(token, utcMs, target, verbose = false) {
   }
 
   if (!symbol) {
-    if (verbose) console.log(`[VERBOSE] No symbol found for ${token} in MEXC`);
+    if (verbose) console.log(`[VERBOSE] No matching symbol found for ${token} in MEXC`);
     return null;
   }
 
-  if (verbose) console.log(`[VERBOSE] Using symbol: ${symbol} (BTC: ${useBTC})`);
+  if (verbose) console.log(`[VERBOSE] Using symbol: ${symbol} (BTC pair: ${useBTC})`);
 
   let interval = CONFIG.DEFAULT_INTERVAL;
   let klineUrl = CONFIG.EXCHANGE_BASE_URL + `/klines?symbol=${symbol}&interval=${interval}&startTime=${utcMs - 60000}&endTime=${utcMs}&limit=1`;
-  if (verbose) console.log(`[VERBOSE] MEXC klines URL (1m): ${klineUrl}`);
+  if (verbose) console.log(`[VERBOSE] MEXC klines URL (${interval}): ${klineUrl}`);
   let klineRes = await fetchWithRetry(klineUrl, verbose);
-  let data = klineRes ? await klineRes.json() : null;
+  if (verbose) console.log('[VERBOSE] MEXC klines response (1m): ' + (klineRes ? 'received' : 'null'));
+
+  let data = null;
+
+  if (klineRes) {
+    if (verbose) console.log('[VERBOSE] MEXC klines (1m) response ok: ' + klineRes.ok);
+    try {
+      data = await klineRes.json();
+      if (verbose) console.log(`[VERBOSE] MEXC ${interval} klines data: ${JSON.stringify(data)}`);
+    } catch (e) {
+      if (verbose) console.log(`[VERBOSE] MEXC ${interval} klines JSON parse FAILED: ${e.message}`);
+      data = null;
+    }
+  }
 
   if (data && data.length > 0) {
     const candleTime = data[0][0];
     if (verbose) console.log(`[VERBOSE] MEXC candle time: ${candleTime} (diff from target: ${Math.abs(candleTime - utcMs)}ms)`);
     if (Math.abs(candleTime - utcMs) > 120000) {
-      if (verbose) console.log('[VERBOSE] 1m candle time too far - discarding');
+      if (verbose) console.log('[VERBOSE] 1m candle time too far from target - discarding and trying fallback');
       data = null;
+    } else {
+      if (verbose) console.log('[VERBOSE] 1m candle time acceptable');
     }
+  } else {
+    if (verbose) console.log('[VERBOSE] No data or empty data from 1m klines - trying fallback');
   }
 
   if (!data || data.length === 0) {
     interval = CONFIG.FALLBACK_INTERVAL;
     klineUrl = CONFIG.EXCHANGE_BASE_URL + `/klines?symbol=${symbol}&interval=${interval}&startTime=${utcMs - 3600000}&endTime=${utcMs}&limit=1`;
-    if (verbose) console.log(`[VERBOSE] MEXC klines URL (fallback 60m): ${klineUrl}`);
+    if (verbose) console.log(`[VERBOSE] MEXC klines fallback URL (${interval}): ${klineUrl}`);
     klineRes = await fetchWithRetry(klineUrl, verbose);
-    data = klineRes ? await klineRes.json() : null;
+    if (verbose) console.log('[VERBOSE] MEXC klines response (fallback): ' + (klineRes ? 'received' : 'null'));
+
+    if (klineRes) {
+      if (verbose) console.log('[VERBOSE] MEXC klines (fallback) response ok: ' + klineRes.ok);
+      try {
+        data = await klineRes.json();
+        if (verbose) console.log(`[VERBOSE] MEXC fallback ${interval} klines data: ${JSON.stringify(data)}`);
+      } catch (e) {
+        if (verbose) console.log(`[VERBOSE] MEXC fallback ${interval} klines JSON parse FAILED: ${e.message}`);
+        data = null;
+      }
+    }
   }
 
   if (!data || data.length === 0) {
-    if (verbose) console.log('[VERBOSE] No klines data from MEXC after fallback');
+    if (verbose) console.log('[VERBOSE] No klines data from MEXC after fallback attempt');
     return null;
   }
 
-  let price = target === 'low' ? parseFloat(data[0][3]) : parseFloat(data[0][2]);
+  const candle = data[0];
+  if (verbose) console.log(`[VERBOSE] MEXC final candle data: ${JSON.stringify(candle)}`);
+
+  let price = target === 'low' ? parseFloat(candle[3]) : parseFloat(candle[2]);
+  if (isNaN(price)) {
+    if (verbose) console.log('[VERBOSE] MEXC price parse FAILED - NaN from candle');
+    return null;
+  }
+
   if (verbose) console.log(`[VERBOSE] MEXC raw price: ${price} (from ${target})`);
 
   if (useBTC) {
+    if (verbose) console.log('[VERBOSE] Using BTC pair - fetching BTC/USDT price');
     const btcPrice = await getBTCUSDTPrice(verbose);
-    if (btcPrice === null) return null;
+    if (btcPrice === null) {
+      if (verbose) console.log('[VERBOSE] BTC price fetch FAILED');
+      return null;
+    }
     price *= btcPrice;
-    if (verbose) console.log(`[VERBOSE] BTC adjusted price: ${price}`);
+    if (verbose) console.log(`[VERBOSE] BTC adjusted price: ${price} (BTC price was ${btcPrice})`);
   }
 
+  if (verbose) console.log(`[VERBOSE] MEXC final price returning: ${price}`);
   return price;
 }
 
 // CoinGecko fetch (accepts verbose)
 async function getPriceFromCoinGecko(id, utcMs, target, verbose = false) {
   const dateStr = new Date(utcMs).toISOString().slice(0, 10);
-
-  if (verbose) console.log(`[VERBOSE] CoinGecko date string: ${dateStr}`);
+  if (verbose) console.log(`[VERBOSE] CoinGecko calculated date: ${dateStr}`);
 
   let price = await tryCoinGeckoTickers(id, verbose);
-  if (price !== null) return price;
+  if (price !== null) {
+    if (verbose) console.log(`[VERBOSE] CoinGecko tickers returned price: ${price}`);
+    return price;
+  }
 
   price = await tryCoinGeckoHistory(id, dateStr, verbose);
-  if (price !== null) return price;
+  if (price !== null) {
+    if (verbose) console.log(`[VERBOSE] CoinGecko history returned price: ${price}`);
+    return price;
+  }
 
+  if (verbose) console.log('[VERBOSE] CoinGecko both paths failed');
   return null;
 }
 
@@ -400,21 +467,31 @@ async function tryCoinGeckoTickers(id, verbose = false) {
   if (verbose) console.log(`[VERBOSE] CoinGecko tickers URL: ${tickersUrl}`);
   const res = await fetchWithRetry(tickersUrl, verbose);
   if (!res) {
-    if (verbose) console.log('[VERBOSE] CoinGecko tickers fetch failed');
+    if (verbose) console.log('[VERBOSE] CoinGecko tickers fetch FAILED');
     return null;
   }
 
-  const data = await res.json();
-  if (verbose) console.log(`[VERBOSE] CoinGecko tickers data: ${JSON.stringify(data, null, 2)}`);
+  let data;
+  try {
+    data = await res.json();
+    if (verbose) console.log(`[VERBOSE] CoinGecko tickers data received (keys: ${Object.keys(data).join(', ')})`);
+  } catch (e) {
+    if (verbose) console.log(`[VERBOSE] CoinGecko tickers JSON parse FAILED: ${e.message}`);
+    return null;
+  }
 
   const tickers = data.tickers || [];
+  if (verbose) console.log(`[VERBOSE] CoinGecko tickers count: ${tickers.length}`);
+
   let maxVol = 0;
   let selPrice = null;
   for (const t of tickers) {
-    if (verbose) console.log(`[VERBOSE] Checking ticker: ${t.base}/${t.target} vol=${t.volume} usd=${t.converted_last?.usd || 'no usd'}`);
-    if (!t.is_stale && t.volume > maxVol && t.converted_last?.usd) {
-      maxVol = t.volume;
-      selPrice = t.converted_last.usd;
+    const vol = t.volume || 0;
+    const usd = t.converted_last?.usd || null;
+    if (verbose) console.log(`[VERBOSE] Ticker: ${t.base}/${t.target || 'unknown'}, vol=${vol}, usd=${usd || 'none'}, stale=${t.is_stale}`);
+    if (!t.is_stale && vol > maxVol && usd) {
+      maxVol = vol;
+      selPrice = usd;
     }
   }
   if (verbose) console.log(`[VERBOSE] CoinGecko tickers selected price: ${selPrice || 'null'} (max vol: ${maxVol})`);
@@ -429,15 +506,33 @@ async function tryCoinGeckoHistory(id, dateStr, verbose = false) {
   if (verbose) console.log(`[VERBOSE] CoinGecko history URL: ${histUrl}`);
   const res = await fetchWithRetry(histUrl, verbose);
   if (!res) {
-    if (verbose) console.log('[VERBOSE] CoinGecko history fetch failed');
+    if (verbose) console.log('[VERBOSE] CoinGecko history fetch FAILED');
     return null;
   }
 
-  const data = await res.json();
-  if (verbose) console.log(`[VERBOSE] CoinGecko history raw data: ${JSON.stringify(data, null, 2)}`);
+  let data;
+  try {
+    data = await res.json();
+    if (verbose) console.log(`[VERBOSE] CoinGecko history data received (keys: ${Object.keys(data).join(', ')})`);
+  } catch (e) {
+    if (verbose) console.log(`[VERBOSE] CoinGecko history JSON parse FAILED: ${e.message}`);
+    return null;
+  }
 
-  const price = data.market_data?.current_price?.usd;
-  if (verbose) console.log(`[VERBOSE] CoinGecko history price: ${price || 'null'} (market_data present: ${!!data.market_data})`);
+  const marketData = data.market_data;
+  if (!marketData) {
+    if (verbose) console.log('[VERBOSE] CoinGecko history missing market_data key');
+    return null;
+  }
+
+  const currentPrice = marketData.current_price;
+  if (!currentPrice) {
+    if (verbose) console.log('[VERBOSE] CoinGecko history missing current_price object');
+    return null;
+  }
+
+  const price = currentPrice.usd;
+  if (verbose) console.log(`[VERBOSE] CoinGecko history price: ${price || 'null'} (usd key present: ${currentPrice.hasOwnProperty('usd')})`);
   return price;
 }
 
@@ -449,7 +544,15 @@ async function getPriceFromCoinPaprika(id, utcMs, highOrLow, verbose = false) {
   if (verbose) console.log(`[VERBOSE] CoinPaprika tickers URL: ${tickersUrl}`);
   const res = await fetchWithRetry(tickersUrl, verbose);
   if (!res) return null;
-  const data = await res.json();
+
+  let data;
+  try {
+    data = await res.json();
+    if (verbose) console.log(`[VERBOSE] CoinPaprika tickers data received (keys: ${Object.keys(data).join(', ')})`);
+  } catch (e) {
+    if (verbose) console.log(`[VERBOSE] CoinPaprika tickers JSON parse FAILED: ${e.message}`);
+    return null;
+  }
 
   if (!data.quotes || !data.quotes.USD) {
     if (verbose) console.log('[VERBOSE] CoinPaprika quotes missing or no USD');
@@ -466,7 +569,15 @@ async function getPriceFromCoinPaprika(id, utcMs, highOrLow, verbose = false) {
   if (verbose) console.log(`[VERBOSE] CoinPaprika OHLCV URL: ${ohlcvUrl}`);
   const ohlcvRes = await fetchWithRetry(ohlcvUrl, verbose);
   if (!ohlcvRes) return null;
-  const ohlcv = await ohlcvRes.json();
+
+  let ohlcv;
+  try {
+    ohlcv = await ohlcvRes.json();
+    if (verbose) console.log(`[VERBOSE] CoinPaprika OHLCV data received (length: ${ohlcv.length})`);
+  } catch (e) {
+    if (verbose) console.log(`[VERBOSE] CoinPaprika OHLCV JSON parse FAILED: ${e.message}`);
+    return null;
+  }
 
   if (!ohlcv || ohlcv.length === 0) {
     if (verbose) console.log('[VERBOSE] CoinPaprika OHLCV empty');
@@ -484,7 +595,16 @@ async function getBTCUSDTPrice(verbose = false) {
   if (verbose) console.log(`[VERBOSE] BTC price URL: ${url}`);
   const res = await fetchWithRetry(url, verbose);
   if (!res) return null;
-  const data = await res.json();
+
+  let data;
+  try {
+    data = await res.json();
+    if (verbose) console.log(`[VERBOSE] BTC price data: ${JSON.stringify(data)}`);
+  } catch (e) {
+    if (verbose) console.log(`[VERBOSE] BTC price JSON parse FAILED: ${e.message}`);
+    return null;
+  }
+
   const price = data.bitcoin?.usd;
   if (verbose) console.log(`[VERBOSE] BTC price: ${price || 'null'}`);
   return price;
@@ -495,7 +615,7 @@ async function fetchWithRetry(url, verbose = false) {
   let attempts = 0;
   while (attempts < CONFIG.MAX_RETRIES) {
     attempts++;
-    if (verbose) console.log(`[VERBOSE] Fetch attempt ${attempts} for ${url}`);
+    if (verbose) console.log(`[VERBOSE] Fetch attempt ${attempts}/${CONFIG.MAX_RETRIES} for ${url}`);
     try {
       const res = await fetch(url);
       if (verbose) console.log(`[VERBOSE] Fetch response status: ${res.status} for ${url}`);
@@ -505,14 +625,14 @@ async function fetchWithRetry(url, verbose = false) {
       }
       if (res.status === 429) {
         const backoff = CONFIG.RETRY_BACKOFF_MS[attempts - 1] || 5000;
-        console.log(`429 rate limit - backoff ${backoff}ms (attempt ${attempts}/${CONFIG.MAX_RETRIES})`);
+        if (verbose) console.log(`[VERBOSE] 429 rate limit - backoff ${backoff}ms (attempt ${attempts}/${CONFIG.MAX_RETRIES})`);
         await new Promise(resolve => setTimeout(resolve, backoff));
       } else {
-        console.log(`Fetch failed: HTTP ${res.status} for ${url}`);
+        if (verbose) console.log(`[VERBOSE] Fetch failed: HTTP ${res.status} for ${url}`);
         break;
       }
     } catch (e) {
-      console.log(`Fetch error: ${e.message} for ${url}`);
+      if (verbose) console.log(`[VERBOSE] Fetch error: ${e.message} for ${url}`);
       break;
     }
   }
