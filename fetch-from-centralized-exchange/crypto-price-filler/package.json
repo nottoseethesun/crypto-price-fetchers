@@ -11,7 +11,7 @@
     "test:watch": "vitest --coverage"
   },
   "author": "",
-  "license": "ISC",
+  "license": "Apache-2.0",
   "dependencies": {
     "node-fetch": "^2.7.0",
     "csv-parse": "^5.5.6",
