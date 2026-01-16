@@ -15,7 +15,7 @@
  *     → User can manually override 0 in the sheet if needed
  *   - Graceful handling of lock timeouts: returns visible string in cells
  *   - Custom Sheets menu "DexTools Price/FDV" with "Refresh" option to clear cache and flush sheet
- *     (currently not showing; code left in for later troubleshooting)
+ *     (must be manually installed - see instructions below)
  *   - Never caches zeros or failures → forces fresh retry on next call after transient issues
  * 
  * IMPORTANT – SUBSCRIPTION PLAN CONFIGURATION
