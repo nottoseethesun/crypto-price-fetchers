@@ -86,7 +86,7 @@
  * Use at your own risk. This script interacts with external APIs and handles
  * financial data. The author provides no warranty, expressed or implied.
  * 
- * Full license details (MIT License) are available here:
+ * Full license details (Apache 2.0 License) are available here:
  * https://github.com/nottoseethesun/crypto-price-fetchers/blob/main/LICENSE
  * 
  * TEST
