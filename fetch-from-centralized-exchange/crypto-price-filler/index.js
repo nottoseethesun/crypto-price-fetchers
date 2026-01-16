@@ -13,8 +13,8 @@
  * - Handles invalid/future dates gracefully
  *
  * @version 1.0.0
- * @author Christopher M. Balz
- * @license MIT (or your preferred license)
+ * @author Christopher M. Balz with Grok
+ * @license See the file, `../LICENSE`
  *
  * Installation / Usage
  * --------------------
