@@ -4,11 +4,17 @@
 
 USE AT YOUR OWN RISK: SEE LICENSE FILE, INCLUDED IN PARENT DIRECTORY.
 
-Gets the price at a speficied point in time in the past (can be a prior minute, even) for tokens not supported by smart-contract-oriented API, such as DexScreener's or DexTools.
+Gets the price at a speficied point in time in the past (can be a prior minute, even) for tokens not supported by smart-contract-oriented API,
+such as DexScreener's or DexTools.
 
-For example, tokens such as Bitcoin and Monero, although someetimes they have wrapped versions such as $wBTC, don't trade directly in decentralized exchange liquidity pools.  
+For example, tokens such as Bitcoin and Monero, although someetimes they have wrapped versions such as $wBTC, don't trade directly in
+decentralized exchange liquidity pools.  
 
-Instead, it's easiest to get their current price from a centralized exchange, which calls for a different codebase as for example, one cannot specifiy a liquidity pool.  
+Instead, it's easiest to get their current price from a centralized exchange, which calls for a different codebase as for example, one
+cannot specifiy a liquidity pool.  
+
+Important: As a Google Apps Script, this cannot handle more than 100 or so calls at a time.  For more capacity, use
+`crypto-price-filler/index.js`.
 
 Note: If the few decentralized trading exchanges for these coins had more volume and an API, then that could be used.
 

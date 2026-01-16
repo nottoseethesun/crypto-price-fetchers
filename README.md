@@ -23,11 +23,17 @@ and Solana.
 `fetch-from-centralized-exchage/getCryptoPriceFromCentralizedExchange.gs` currently
 fetches the price only at a point in time in the past, although "the past"
 can be just one minute in the past.  It is limited to tokens traded on the
-API of the Centralized Exchanges that it currently supports.
+API of the Centralized Exchanges that it currently supports and also, as a Google
+Apps Script, cannot handle more than 100 or so calls at a time.
+
+`fetch-from-centralized-exchage/crypto-price-filler/index.js` is like
+`getCryptoPriceFromCentralizedExchange.gs` but can handle any load in terms of
+numbers of price points to fetch.
 
 ## Install
 
-Note: For `fetch-from-centralized-exchage/getCryptoPriceFromCentralizedExchange.gs`, see the
+Note: For `fetch-from-centralized-exchage/getCryptoPriceFromCentralizedExchange.gs`,
+and all other scripts in other sub-directories here, see the
 `README.md` in that directory.
 
 Add the script `./crypto-price-fetchers.gs` as a Google Apps Script, via the "Extensions"
