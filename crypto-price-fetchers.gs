@@ -68,7 +68,8 @@
  *       → Returns FDV in USD for the Pulse token
  * 
  *    C. Price from a specific liquidity pool (most precise):  
- *       =dexToolsGetTokenPrice("ether", "0x2b591e99afe9f32eaa6214f7b7629768c40eeb39", {{"0x69d91b94f0aaf8e8a2586909fa77a5c2c89818d5", 0}})
+ *       =dexToolsGetTokenPrice("ether", "0x2b591e99afe9f32eaa6214f7b7629768c40eeb39",
+ *          {{"0x69d91b94f0aaf8e8a2586909fa77a5c2c89818d5", 0}})
  *       → Returns HEX price from the specified >$1M LP on Ethereum
  *       → Note: The extra "0" is required in Sheets to force array passing
  * 
@@ -102,10 +103,12 @@
  *    - Select the function: testDexToolsVerbose
  *    - Click Run
  *    - Or, select testDexToolsFunctions, then pass true as parameter (if dialog allows)
- *    - Expected: Detailed logs for every step (timestamps, lock attempts, raw API responses, data keys, cache info)
+ *    - Expected: Detailed logs for every step (timestamps, lock attempts, raw API responses,
+ *      data keys, cache info)
  * 
  * Run tests periodically, especially after changes to CONFIG, tokens, or during heavy sheet usage.
- * If any test fails with 0 (and verbose mode shows empty data keys), it indicates DexTools has no indexed data for that token/pool.
+ * If any test fails with 0 (and verbose mode shows empty data keys), it indicates DexTools has 
+ * no indexed data for that token/pool.
  * 
  * TROUBLESHOOTING TIPS
  * 
@@ -121,14 +124,16 @@
  * 
  * 2. Persistent "Exceeded maximum execution time" in SUM or dependent cells
  *    - Caused by too many parallel custom function calls + temporary delays (locks/sleeps) during recalc
- *    - The error can "stick" in some cells even after the issue is resolved because Sheets' internal computation queue gets corrupted
+ *    - The error can "stick" in some cells even after the issue is resolved because Sheets' internal computation 
+ *      queue gets corrupted
  *    - Automatic retry happens on next recalc (edit, open, background), but sometimes it doesn't clear the stuck state
  *    - Immediate fix that works reliably (your current method):
  *      1. Temporarily break the formula in the stuck cell (e.g., change `U18` to `U18a`)
  *      2. Wait a few seconds for Sheets to process the error
  *      3. Fix it back (remove the "a")
  *      → This forces Sheets to treat it as a new formula and re-queue it correctly
- *    - For large sheets (e.g. 100+ DexTools cells), do this in small batches (10–20 cells at a time) to avoid overwhelming the queue
+ *    - For large sheets (e.g. 100+ DexTools cells), do this in small batches (10–20 cells at a time) to
+ *      avoid overwhelming the queue
  *    - Long-term solution (recommended when you have time):
  *      Replace many individual custom function calls with one ARRAYFORMULA at the top of the column.
  *      Example:
@@ -157,7 +162,9 @@
  * 
  * OPTIONAL: Add Custom Refresh Menu
  * 
- * The script includes code to create a custom menu "DexTools Price/FDV" with a "Refresh" item, but if the menu is not appearing automatically, use an installable "On open" trigger for reliability (simple triggers can be flaky with conflicts or permissions).
+ * The script includes code to create a custom menu "DexTools Price/FDV" with a "Refresh" item, but if the 
+ * menu is not appearing automatically, use an installable "On open" trigger for reliability (simple triggers can
+ * be flaky with conflicts or permissions).
  * 
  * Step-by-step to add an installable trigger:
  * 1. In the Apps Script editor, go to the left sidebar and click the clock icon (Triggers).
@@ -166,13 +173,15 @@
  * 4. Leave "Choose which deployment should run" as "Head" (default).
  * 5. For "Select event source", choose: From spreadsheet
  * 6. For "Select event type", choose: On open
- * 7. (Optional) Set "Failure notification settings" to "Notify me immediately" so you get email alerts if the trigger ever fails.
+ * 7. (Optional) Set "Failure notification settings" to "Notify me immediately" so you get email alerts if
+ *    the trigger ever fails.
  * 8. Click "Save" at the bottom.
  * 9. If prompted, review and grant the requested permissions (this is normal for installable triggers).
  * 10. Close and reopen your spreadsheet tab (or refresh the page).
  * 
  * The menu should now appear consistently every time the sheet opens.
- * If it still does not appear, check the Triggers list for errors, ensure the function name is exactly "onOpenDexTools", and verify no other scripts are conflicting.
+ * If it still does not appear, check the Triggers list for errors, ensure the function name is exactly
+ * "onOpenDexTools", and verify no other scripts are conflicting.
  * 
  * Rate Limiting Strategy:
  *   - LockService.getScriptLock() → mutual exclusion (only one execution makes API call at a time)
@@ -205,8 +214,8 @@
  * @property {number} LOCK_WAIT_MS             Max milliseconds to wait for lock acquisition
  */
 const CONFIG = {
-  API_KEY:               'GB40f7xbB04X0NNvnkYir4tdFH2sF0VLpZ6LxZe6',
-  SUBSCRIPTION_PLAN:     'standard',          // ← MUST match your key's actual plan tier
+  API_KEY:               'put-yours-here',    // Remember, there's a free tier if needed
+  SUBSCRIPTION_PLAN:     'standard',          // ← MUST match your key's actual plan tier; free should work too
   MIN_SECONDS_BETWEEN_CALLS: 0.7,               // Safe for Standard+; 1.5–3 for free tier
   API_HOST:              "https://public-api.dextools.io",
   API_VERSION:           "v2",
