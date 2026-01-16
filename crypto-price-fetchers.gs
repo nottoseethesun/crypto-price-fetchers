@@ -18,15 +18,6 @@
  *     (currently not showing; code left in for later troubleshooting)
  *   - Never caches zeros or failures → forces fresh retry on next call after transient issues
  * 
- * INSTALL
- * 
- * Add this code as a Google Apps Script, via the "Extensions"
- * menu on a Google Sheet: To do this, first start at the "Extensions" menu at the
- * top-mid-center of your Google Sheet. Then click on the "Apps Script" menu option.
- * From there, click on the big "+" button at top left, to add a file.  Then, copy all of
- * the file contents of `./crypto-price-fetchers.gs` onto your clipboard, and next,
- * paste the file contents right in the Google Apps Script new file text editor.
- * 
  * IMPORTANT – SUBSCRIPTION PLAN CONFIGURATION
  * 
  * The DexTools public API v2 requires the plan segment in the URL:
@@ -68,7 +59,7 @@
  * 
  * 2. Example calls (use these in your Google Sheets formulas):
  * 
- *    A. Basic token price (token address, no pool specified: DexTools will pick best pool):  
+ *    A. Basic token price (token address, no pool specified):  
  *       =dexToolsGetTokenPrice("ether", "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48")
  *       → Returns USDC price on Ethereum (~1.00 USD)
  * 
@@ -77,8 +68,7 @@
  *       → Returns FDV in USD for the Pulse token
  * 
  *    C. Price from a specific liquidity pool (most precise):  
- *       =dexToolsGetTokenPrice("ether", 
- *          "0x2b591e99afe9f32eaa6214f7b7629768c40eeb39", {{"0x69d91b94f0aaf8e8a2586909fa77a5c2c89818d5", 0}})
+ *       =dexToolsGetTokenPrice("ether", "0x2b591e99afe9f32eaa6214f7b7629768c40eeb39", {{"0x69d91b94f0aaf8e8a2586909fa77a5c2c89818d5", 0}})
  *       → Returns HEX price from the specified >$1M LP on Ethereum
  *       → Note: The extra "0" is required in Sheets to force array passing
  * 
@@ -155,21 +145,34 @@
  *      - Avoid massive simultaneous edits that trigger full recalc
  *      - Mac users: Use Cmd + Shift + R for hard refresh (Windows: Ctrl + Shift + R)
  * 
- * 3. Custom menu "DexTools Price/FDV" not appearing
- *    - Run onOpen() manually from editor → grant permissions if prompted
- *    - Reload sheet tab
- *    - Check for conflicting onOpen() from other scripts (e.g. DexScreener) → merge menus if needed
- *    - Create installable trigger for onOpen() if simple trigger fails
- * 
- * 4. Cells show 0 for tokens that should have data
+ * 3. Cells show 0 for tokens that should have data
  *    - Run testDexToolsVerbose() → check logs for "empty data keys"
  *    - If empty: DexTools has no indexed data for that token/pool → normal, return 0
  *    - Hard refresh or edit sheet → retries automatically
  * 
- * 5. General tips
+ * 4. General tips
  *    - Mac users: Use Cmd (not Ctrl) for shortcuts (e.g. Cmd + Shift + R for hard refresh)
  *    - Monitor Executions log for warnings/errors
  *    - If issues persist: Run resetDexToolsLock() to force timestamp update
+ * 
+ * OPTIONAL: Add Custom Refresh Menu
+ * 
+ * The script includes code to create a custom menu "DexTools Price/FDV" with a "Refresh" item, but if the menu is not appearing automatically, use an installable "On open" trigger for reliability (simple triggers can be flaky with conflicts or permissions).
+ * 
+ * Step-by-step to add an installable trigger:
+ * 1. In the Apps Script editor, go to the left sidebar and click the clock icon (Triggers).
+ * 2. At the bottom right, click the blue "+ Add Trigger" button.
+ * 3. In the "Choose which function to run" dropdown, select: onOpenDexTools
+ * 4. Leave "Choose which deployment should run" as "Head" (default).
+ * 5. For "Select event source", choose: From spreadsheet
+ * 6. For "Select event type", choose: On open
+ * 7. (Optional) Set "Failure notification settings" to "Notify me immediately" so you get email alerts if the trigger ever fails.
+ * 8. Click "Save" at the bottom.
+ * 9. If prompted, review and grant the requested permissions (this is normal for installable triggers).
+ * 10. Close and reopen your spreadsheet tab (or refresh the page).
+ * 
+ * The menu should now appear consistently every time the sheet opens.
+ * If it still does not appear, check the Triggers list for errors, ensure the function name is exactly "onOpenDexTools", and verify no other scripts are conflicting.
  * 
  * Rate Limiting Strategy:
  *   - LockService.getScriptLock() → mutual exclusion (only one execution makes API call at a time)
@@ -204,11 +207,11 @@
 const CONFIG = {
   API_KEY:               'GB40f7xbB04X0NNvnkYir4tdFH2sF0VLpZ6LxZe6',
   SUBSCRIPTION_PLAN:     'standard',          // ← MUST match your key's actual plan tier
-  MIN_SECONDS_BETWEEN_CALLS: 2,               // Safe for Standard+; 1.5–3 for free tier
+  MIN_SECONDS_BETWEEN_CALLS: 0.7,               // Safe for Standard+; 1.5–3 for free tier
   API_HOST:              "https://public-api.dextools.io",
   API_VERSION:           "v2",
   CACHE_SECONDS:         300,                 // 5 minutes default – only successful results cached
-  LOCK_WAIT_MS:          60000,               // 60 seconds for lock wait (increased for stability)
+  LOCK_WAIT_MS:          120000,               // 60 seconds for lock wait (increased for stability)
 };
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -428,7 +431,7 @@ function getOptions() {
  * Menu title: "DexTools Price/FDV"
  * Item: "Refresh" → calls refreshDexTools()
  */
-function onOpen() {
+function onOpenDexTools() {
   SpreadsheetApp.getUi()
     .createMenu("DexTools Price/FDV")
     .addItem("Refresh", "refreshDexTools")
@@ -437,13 +440,14 @@ function onOpen() {
 
 /**
  * Refresh function called from the menu.
- * Clears DexTools cache keys to force fresh API calls on next recalc.
- * Flushes the spreadsheet to trigger recalculations.
+ * Forces immediate recalculation of all formulas in the sheet.
+ * This helps clear stuck "#ERROR!" or "Exceeded maximum execution time" states.
+ * Note: Does NOT clear cache (cache expires naturally in 5 min).
+ * To fully clear cache, hard-refresh the page or wait for expiration.
  */
 function refreshDexTools() {
-  CACHE.removeAll(CACHE.getKeys().filter(key => key.startsWith('dt_')));
   SpreadsheetApp.flush();
-  console.log("DexTools cache cleared and sheet flushed for refresh.");
+  console.log("Sheet formulas forcibly re-evaluated. Stuck cells should update.");
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
