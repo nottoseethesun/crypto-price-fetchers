@@ -11,10 +11,10 @@ an `output.csv` file that also contains the timestamps, but paired with the pric
 This utility is useful for tokens not supported by smart-contract-oriented API, such as DexScreener's or DexTools, since
 it focuses on reading prices from Centralized Exchanges as distinguished from Decentralized Exchanges.
 
-For example, tokens such as Bitcoin and Monero, although someetimes they have wrapped versions such as $wBTC, don't trade 
+For example, tokens such as Bitcoin and Monero, although sometimes they have wrapped versions such as $wBTC, don't trade
 directly in decentralized exchange liquidity pools.  
 
-Instead, it's easiest to get their current price from a centralized exchange, which calls for a different codebase 
+Instead, it's easiest to get their current price from a centralized exchange, which calls for a different codebase
 as for example, one cannot specifiy a liquidity pool.  
 
 Note: If the few decentralized trading exchanges for these coins had more volume and an API, then that could be used.
