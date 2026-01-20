@@ -21,12 +21,14 @@
   *
  * 1. Install dependencies:
  *    npm install
+ * 
+ * 2. Ensure that your coin is entered into the `TOKEN_TO_ID` mapping in this file.
  *
- * 2. Ensure that your CSV input file's format, where you list out the dates that you want 
+ * 3. Ensure that your CSV input file's format, where you list out the dates that you want 
  *    to fetch the price for, matches the sample CSV file provided in `tests/input.csv` exactly 
  *    in terms of column headers and date format (YYYY-MM-DD HH:MM:SS).
  * 
- * 2. Basic usage:
+ * 4. Basic usage:
  *    node index.js --token=xtm --input=input.csv --output=output.csv
  *
  * Command-Line Options
@@ -46,10 +48,10 @@
  * --------
  *
  * # Basic high-price fill (UTC)
- * node index.js --token=xtm --input=tests/input.csv --output=filled.csv --mode=high --tz=UTC
+ * node index.js --token=xtm --input=tests/input.csv --output=filled_output.csv --mode=high --tz=UTC
  *
  * # Low price in CDT timezone + verbose
- * node index.js --token=xtm --input=input.csv --output=low_prices.csv --mode=low --tz=CDT --verbose
+ * node index.js --token=xtm --input=input.csv --output=low_prices_output.csv --mode=low --tz=CDT --verbose
  *
  * # Missing args → shows usage
  * node index.js
@@ -86,6 +88,16 @@
  *
  *    Note: Real API calls may hit rate limits → verbose logs will show retries/backoffs.
  *
+ * TroubleShooting
+ * ----------------
+ * 
+ * - Ensure Node.js v14+ is installed
+ * - Ensure internet connectivity for API access
+ * - Check that input CSV matches expected format exactly
+ * - Use --verbose flag for detailed logs
+ * - Check API status of MEXC, CoinGecko, CoinPaprika if fetches fail
+ * - Review rate-limit handling in logs if many requests are made
+ * - For unexpected errors, check stack traces in verbose output
  * 
  */
 
