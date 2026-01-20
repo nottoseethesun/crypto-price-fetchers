@@ -149,7 +149,8 @@ const TOKEN_TO_ID = {
   btc: { gecko: 'bitcoin', paprika: 'btc-bitcoin' },
   xmr: { gecko: 'monero', paprika: 'xmr-monero' },
   grc: { gecko: 'gridcoin-research', paprika: 'grc-gridcoin' },
-  xtm: { gecko: 'tari', paprika: 'xtm-tari' }
+  xtm: { gecko: 'tari', paprika: 'xtm-tari' },
+  xtz: { gecko: 'tezos', paprika: 'xtz-tezos' }
 };
 
 // Global cache (not exported directly)
