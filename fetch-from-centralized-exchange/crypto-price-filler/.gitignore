@@ -1,6 +1,8 @@
 # App
 output.csv
 tests/output.csv
+filled_output.csv
+low_prices_output.csv
 
 # Dev
 log.txt
