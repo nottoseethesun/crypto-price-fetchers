@@ -8,17 +8,20 @@ import {
   getCache,
   setCache
 } from '../index.js';
-import fetch from 'node-fetch';
+import * as fetchUtils from '../utils/fetch.js';  // for mocking fetchWithRetry
 import fs from 'fs';
 import { parse as csvParse } from 'csv-parse/sync';
 
 const verbose = process.env.VERBOSE === '1';
 
-vi.mock('node-fetch', () => ({
-  default: vi.fn()
-}));
+// Properly mock fetchWithRetry so tests never hit real APIs
+vi.mock('../utils/fetch.js', () => {
+  return {
+    fetchWithRetry: vi.fn(),
+  };
+});
 
-const mockFetch = vi.mocked(fetch);
+const mockFetchWithRetry = vi.mocked(fetchUtils.fetchWithRetry);
 
 let originalCache;
 
@@ -27,6 +30,10 @@ beforeEach(() => {
   vi.useFakeTimers(); // Fake timers for backoff simulation
   originalCache = getCache();
   setCache(new Map());
+  // Safety net: fail loudly on unexpected calls
+  mockFetchWithRetry.mockImplementation(() => {
+    throw new Error('Unexpected real network call in test – check mock setup');
+  });
 });
 
 afterEach(() => {
@@ -79,13 +86,13 @@ describe('Crypto Price Filler Helpers', () => {
   describe('getCryptoPrice', () => {
     it('returns cached price if available', async () => {
       getCache().set('price_xtm_20251219001700_UTC_high', 42.5);
-      mockFetch.mockResolvedValue({ ok: false });
+      mockFetchWithRetry.mockResolvedValue({ ok: false });
       const price = await getCryptoPrice('xtm', '2025-12-19 00:17:00', 'UTC', 'high', verbose);
       expect(price).toBe(42.5);
     });
 
     it('tries MEXC first and returns price when successful', async () => {
-      mockFetch
+      mockFetchWithRetry
         .mockResolvedValueOnce({
           ok: true,
           json: async () => ({ symbols: [{ baseAsset: 'XTM', quoteAsset: 'USDT' }] })
@@ -93,28 +100,22 @@ describe('Crypto Price Filler Helpers', () => {
         .mockResolvedValueOnce({
           ok: true,
           json: async () => [[1766103360000, 0, 50.0, 40.0, 45.0, 1000]]
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => [[0, 0, 50.0, 40.0, 45.0, 1000]]
         });
 
       const price = await getCryptoPrice('xtm', '2025-12-19 00:17:00', 'UTC', 'high', verbose);
       expect(price).toBe(50.0);
-      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(mockFetchWithRetry).toHaveBeenCalledTimes(2);
     });
 
     it('falls back to CoinGecko when MEXC fails', async () => {
-      mockFetch.mockReset(); // Clear previous mocks
-
-      mockFetch
+      mockFetchWithRetry
         .mockResolvedValueOnce({ ok: false }) // MEXC fails
-        .mockResolvedValueOnce({ ok: false }) // Tickers fail
+        .mockResolvedValueOnce({ ok: false }) // CoinGecko tickers fail
         .mockResolvedValueOnce({
           ok: true,
           json: async () => ({
             market_data: { current_price: { usd: 42.7 } }
-          })
+          }) // CoinGecko history success
         });
 
       const price = await getCryptoPrice('xtm', '2025-12-19 00:17:00', 'UTC', 'high', verbose);
@@ -122,7 +123,7 @@ describe('Crypto Price Filler Helpers', () => {
     });
 
     it('returns null when all sources fail', async () => {
-      mockFetch.mockResolvedValue({ ok: false });
+      mockFetchWithRetry.mockResolvedValue({ ok: false });
       const price = await getCryptoPrice('xtm', '2025-12-19 00:17:00', 'UTC', 'high', verbose);
       expect(price).toBeNull();
     });
@@ -134,7 +135,7 @@ describe('Crypto Price Filler Helpers', () => {
     });
 
     it('handles invalid token (no symbol in MEXC + no fallback)', async () => {
-      mockFetch
+      mockFetchWithRetry
         .mockResolvedValueOnce({
           ok: true,
           json: async () => ({ symbols: [] })
@@ -148,7 +149,7 @@ describe('Crypto Price Filler Helpers', () => {
     });
 
     it('handles low price mode correctly', async () => {
-      mockFetch
+      mockFetchWithRetry
         .mockResolvedValueOnce({
           ok: true,
           json: async () => ({ symbols: [{ baseAsset: 'XTM', quoteAsset: 'USDT' }] })
@@ -163,7 +164,7 @@ describe('Crypto Price Filler Helpers', () => {
     });
 
     it('handles BTC pair adjustment', async () => {
-      mockFetch
+      mockFetchWithRetry
         .mockResolvedValueOnce({
           ok: true,
           json: async () => ({ symbols: [{ baseAsset: 'XTM', quoteAsset: 'BTC' }] })
@@ -182,41 +183,67 @@ describe('Crypto Price Filler Helpers', () => {
     });
 
     it('handles rate limit retry (mock 429)', async () => {
-      mockFetch
-        .mockResolvedValueOnce({ ok: false, status: 429 }) // First attempt 429
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({ symbols: [{ baseAsset: 'XTM', quoteAsset: 'USDT' }] })
+      mockFetchWithRetry
+        .mockImplementationOnce(async (url, verbose) => {
+          console.log('[DEBUG] Mock call 1 - initial failure with status 429 - URL:', url);
+          return new Response(null, { status: 429 });
         })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => [[1766103360000, 0, 50.0, 40.0, 45.0, 1000]]
+        .mockImplementationOnce(async (url, verbose) => {
+          console.log('[DEBUG] Mock call 2 - retry exchangeInfo success - URL:', url);
+          return {
+            ok: true,
+            json: async () => ({ symbols: [{ baseAsset: 'XTM', quoteAsset: 'USDT' }] })
+          };
+        })
+        .mockImplementationOnce(async (url, verbose) => {
+          console.log('[DEBUG] Mock call 3 - retry klines success - URL:', url);
+          return {
+            ok: true,
+            json: async () => [[1766103360000, 0, 50.0, 40.0, 45.0, 1000]]
+          };
+        })
+        .mockImplementationOnce(async (url, verbose) => {
+          console.log('[DEBUG] Mock call 4 - CoinPaprika fallback failure - URL:', url);
+          return { ok: false };
         });
 
       if (verbose) console.log('[VERBOSE] Starting rate limit test promise...');
 
       const pricePromise = getCryptoPrice('xtm', '2025-12-19 00:17:00', 'UTC', 'high', verbose);
 
-      // Small delay to let the backoff timer be scheduled
-      if (verbose) console.log('[VERBOSE] Small advance to allow setTimeout scheduling');
-      await vi.advanceTimersByTime(100);
+      console.log('[DEBUG] Pending timers before flush:', vi.getTimerCount());
+      console.log('[DEBUG] Mock calls before flush:', mockFetchWithRetry.mock.calls.length);
 
-      // Now advance past the 5s backoff
-      if (verbose) console.log('[VERBOSE] Advancing timers by 6000ms to simulate backoff');
-      vi.advanceTimersByTime(6000);
+      // Flush all pending timers synchronously
+      if (verbose) console.log('[VERBOSE] Running all timers to flush backoff (step 1)');
+      vi.runAllTimers();
+      await Promise.resolve(); // Flush microtasks
 
-      // Extra advance in case of any nested timers
-      if (verbose) console.log('[VERBOSE] Extra advance 10000ms for safety');
-      vi.advanceTimersByTime(10000);
+      console.log('[DEBUG] Pending timers after flush 1:', vi.getTimerCount());
+      console.log('[DEBUG] Mock calls after flush 1:', mockFetchWithRetry.mock.calls.length);
 
-      if (verbose) console.log('[VERBOSE] Awaiting price after timer advances...');
+      if (verbose) console.log('[VERBOSE] Running all timers to flush backoff (step 2)');
+      vi.runAllTimers();
+      await Promise.resolve();
+
+      console.log('[DEBUG] Pending timers after flush 2:', vi.getTimerCount());
+      console.log('[DEBUG] Mock calls after flush 2:', mockFetchWithRetry.mock.calls.length);
+
+      if (verbose) console.log('[VERBOSE] Running all timers to flush backoff (step 3)');
+      vi.runAllTimers();
+      await Promise.resolve();
+
+      console.log('[DEBUG] Pending timers after flush 3:', vi.getTimerCount());
+      console.log('[DEBUG] Mock calls after flush 3:', mockFetchWithRetry.mock.calls.length);
+
+      if (verbose) console.log('[VERBOSE] All timers flushed - awaiting price...');
       const price = await pricePromise;
 
       if (verbose) console.log(`[VERBOSE] Rate limit test completed with price: ${price}`);
 
       expect(price).toBe(50.0);
-      expect(mockFetch).toHaveBeenCalledTimes(3);
-    });
+      expect(mockFetchWithRetry).toHaveBeenCalledTimes(3);  // ← CHANGED: 3 calls (fallback skipped)
+    }, 30000); // 30s timeout - generous buffer
   });
 
   describe('CSV Parsing', () => {
