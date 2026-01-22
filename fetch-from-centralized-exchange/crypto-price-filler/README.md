@@ -25,7 +25,7 @@ Note: If the few decentralized trading exchanges for these coins had more volume
 
 ## Prerequisites
 
-NodeJS 18+
+NodeJS 21.1.0+
 
 ## Installation
 
@@ -39,13 +39,20 @@ Refer to the module or file header documentation.
 
 ### Test
 
+Because `vitest` (amazingly) neglects to verify that the files will actually load into
+NodeJS, a whole separate test target, `test:strict`, is required for that.
+This way, if an `import` statement is incorrect, the error will be caught in test
+and not break production.
+
 `npm run test`
+`npm run test:strict`
 
-or
+#### Debug Test
 
-`npm run test:verbose`
+`npm run test:debug`
+`npm run test:strict`
 
-#### Save log to file
+#### Save Test Log to File
 
 `npm run test:debug > test.log 2>&1`
 

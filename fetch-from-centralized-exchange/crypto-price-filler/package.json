@@ -27,6 +27,6 @@
     "@vitest/coverage-v8": "^4.0.17"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=21.1.0"
   }
 }
