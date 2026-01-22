@@ -1,18 +1,18 @@
-name: Test Crypto Price Filler
+name: CI - Tests & Strict Validation
 
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  workflow_dispatch:  # allows manual trigger from GitHub UI
+  workflow_dispatch:
 
 jobs:
-  test:
+  validate-and-test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -20,19 +20,25 @@ jobs:
         with:
           node-version: '24'
           cache: 'npm'
+          cache-dependency-path: fetch-from-centralized-exchange/crypto-price-filler/package-lock.json  # ← THIS LINE FIXES IT
 
       - name: Install dependencies
+        working-directory: fetch-from-centralized-exchange/crypto-price-filler
         run: npm ci
 
-      - name: Run strict CLI parse check (fail fast)
+      - name: Run strict CLI parse/validation check (fail fast)
+        working-directory: fetch-from-centralized-exchange/crypto-price-filler
         run: npm run test:strict
 
-      - name: Run full Vitest suite + coverage
+      - name: Run full Vitest test suite + coverage
+        working-directory: fetch-from-centralized-exchange/crypto-price-filler
         run: npm run test
 
-      - name: Upload coverage report (optional but recommended)
-        uses: codecov/codecov-action@v5
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}  # optional — add if you use Codecov
-          fail_ci_if_error: true
-          
+      # Optional coverage upload
+      # - name: Upload coverage
+      #   uses: codecov/codecov-action@v5
+      #   with:
+      #     token: ${{ secrets.CODECOV_TOKEN }}
+      #     fail_ci_if_error: true
+      #     directory: fetch-from-centralized-exchange/crypto-price-filler/coverage
+      
