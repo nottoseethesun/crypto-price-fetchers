@@ -6,11 +6,12 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
-    "test": "vitest run --coverage",
-    "test:verbose": "VERBOSE=1 vitest run --coverage",
+    "test": "vitest run --coverage --silent",
+    "test:ci": "vitest run -- --no-cache --coverage",
+    "test:debug": "VERBOSE=1 vitest run -- --no-cache --reporter=verbose --coverage",
     "test:watch": "vitest --coverage"
   },
-  "author": "",
+  "author": "Christopher M. Balz with Grok",
   "license": "Apache-2.0",
   "dependencies": {
     "node-fetch": "^2.7.0",

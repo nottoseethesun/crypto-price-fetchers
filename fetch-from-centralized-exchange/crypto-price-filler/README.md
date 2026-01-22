@@ -45,6 +45,29 @@ or
 
 `npm run test:verbose`
 
+#### Save log to file
+
+`npm run test:debug > test.log 2>&1`
+
+#### View Log for Quick Copy-Paste of Log
+
+##### Install `aha`
+
+`sudo apt install aha`
+
+##### Run the Command
+
+`aha --black -y 'body { font-size: 14px; }' < test.log > test.html && xdg-open test.html`
+
+##### Optionally Add To Your Shell Alias File
+
+```bash
+# - - - - - - Test Log Utilities
+
+alias svtlog='npm run test:debug > test.log 2>&1'
+alias swtlog="aha --black -y 'body { font-size: 14px; }' < test.log > test.html && xdg-open test.html"
+```
+
 ## Contributing
 
 Fork me on GitHub. :)  Contributions are welcome but note that any contributions are subject to the license as defined in the LICENSE file here.
