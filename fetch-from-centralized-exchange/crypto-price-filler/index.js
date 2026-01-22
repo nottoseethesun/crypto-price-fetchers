@@ -43,7 +43,8 @@
  *                         Supported: UTC, GMT, EST, EDT, CST, CDT, MST, MDT, PST, PDT
  * --verbose     {flag}    Enable detailed [VERBOSE] logging. Default: false
  *                         Also enabled by env var: VERBOSE=1
- *
+ * --help        {flag}    Show usage information
+ * 
  * Examples
  * --------
  *
@@ -107,149 +108,146 @@ import { getTimezoneOffsetHours, parseInputToUtcMs } from './utils/date.js';
 import { getCryptoPrice } from './sources/price.js';
 import { getCache, setCache } from './utils/cache.js';
 
+// Import CLI setup from separate module
+import { parseArgs } from './commander.js';
+
 // Verbosity-aware logger
 function logv(shouldLog, level, message, ...args) {
   if (!shouldLog || level < 1) return;
   console.log(`[VERBOSE:${level}] ${message}`, ...args);
 }
 
-// Only run main CLI logic when file is executed directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-  const args = process.argv.slice(2).reduce((acc, arg) => {
-    const [key, value] = arg.split('=');
-    acc[key.replace('--', '')] = value || true;
-    return acc;
-  }, {});
+// Parse CLI args using commander (moved to commander.js)
+const args = parseArgs();
 
-  const token = args.token;
-  let inputFile = args.input;
-  const outputFile = args.output || 'output.csv';
-  const mode = args.mode || 'high';
-  const tz = args.tz || 'UTC';
-  const verbose = args.verbose === true || args.verbose === 'true' || process.env.VERBOSE === '1';
+const token = args.token;
+let inputFile = args.input;
+const outputFile = args.output || 'output.csv';
+const mode = args.mode || 'high';
+const tz = args.tz || 'UTC';
+const verbose = args.verbose || process.env.VERBOSE === '1';
 
-  if (inputFile?.startsWith('~')) {
-    inputFile = path.join(os.homedir(), inputFile.slice(1));
-  }
-
-  if (!token || !inputFile) {
-    console.error('Missing required args. Usage:');
-    console.error('  node index.js --token=xtm --input=~/path/to/file.csv [--output=output.csv] [--mode=high] [--tz=CDT] [--verbose]');
-    process.exit(1);
-  }
-
-  console.log(`Starting price filler for token: ${token}, mode: ${mode}, tz: ${tz}`);
-  console.log(`Input: ${inputFile}, Output: ${outputFile}`);
-  logv(verbose, 1, 'Verbose mode ENABLED. Starting CLI logic');
-
-  const csvContent = fs.readFileSync(inputFile, 'utf8');
-  logv(verbose, 1, `Read CSV content from input file, length: ${csvContent.length}`);
-  const records = csvParse(csvContent, {
-    columns: true,
-    skip_empty_lines: true,
-    trim: true,
-    delimiter: ',',
-    quote: '"',
-    relax_column_count: true
-  });
-
-  const headers = Object.keys(records[0] || {});
-  console.log(`Detected headers (${headers.length}): ${headers.join(', ')}`);
-
-  const rows = records;
-  console.log(`Read ${rows.length} rows from input CSV.`);
-
-  logv(verbose, 1, 'First 5 rows:');
-  rows.slice(0, 5).forEach((row, i) => logv(verbose, 1, `Row ${i + 1}: ${JSON.stringify(row)}`));
-
-  let dateColName = headers.find(h => h.includes('date') && h.includes('UTC')) ||
-                    headers.find(h => h.toLowerCase().includes('date'));
-  logv(verbose, 1, `Searching for date column in headers: ${headers.join(', ')}`);
-  if (!dateColName) {
-    console.error('No date column found in CSV headers');
-    process.exit(1);
-  }
-  console.log(`Using date column: "${dateColName}"`);
-
-  const amountColName = headers.find(h => h.toLowerCase().includes('amount'));
-  if (amountColName) console.log(`Using amount column: "${amountColName}"`);
-
-  const priceColName = '$usd price';
-  const usdAmountColName = '$usd amount';
-
-  let lastValidDateIndex = -1;
-  for (let i = rows.length - 1; i >= 0; i--) {
-    const dateStr = (rows[i][dateColName] || '').trim();
-    logv(verbose, 2, `Checking row ${i + 1} date: "${dateStr}"`);
-
-    if (dateStr && !dateStr.includes(',,,,') && !dateStr.includes('Total')) {
-      const parsed = DateTime.fromFormat(dateStr, 'yyyy-MM-dd HH:mm:ss');
-      logv(verbose, 2, `Date parse result for "${dateStr}": valid=${parsed.isValid}`);
-      if (parsed.isValid) {
-        lastValidDateIndex = i;
-        console.log(`Last valid date row: index ${i + 1} (${dateStr})`);
-        break;
-      }
-    }
-  }
-
-  if (lastValidDateIndex === -1) console.warn('No valid date rows found');
-
-  const outputRows = [];
-
-  for (let i = 0; i < rows.length; i++) {
-    const row = { ...rows[i] };
-    const dateStr = (row[dateColName] || '').trim();
-
-    if (i > lastValidDateIndex || !dateStr || dateStr.includes(',,,,') || dateStr.includes('Total')) {
-      row[priceColName] = '';
-      row[usdAmountColName] = '';
-      outputRows.push(row);
-      continue;
-    }
-
-    const amountStr = amountColName ? (row[amountColName] || '').trim() : '';
-    let price = null;
-
-    logv(verbose, 1, `Processing row ${i + 1}: "${dateStr}"`);
-
-    try {
-      price = await getCryptoPrice(token, dateStr, tz, mode, verbose);
-      logv(verbose, 1, `Price fetched for row ${i + 1}: ${price}`);
-    } catch (e) {
-      logv(verbose, 1, `Error fetching price for row ${i + 1}: ${e.message}`);
-      console.error(`Error fetching price for "${dateStr}": ${e.message}`);
-    }
-
-    row[priceColName] = price ?? 'Error';
-
-    if (price !== null && amountStr) {
-      const amount = parseFloat(amountStr);
-      if (!isNaN(amount)) {
-        row[usdAmountColName] = (amount * price).toFixed(8);
-      } else {
-        logv(verbose, 1, `Invalid amount in row ${i + 1}: "${amountStr}"`);
-      }
-    }
-
-    outputRows.push(row);
-  }
-
-  logv(verbose, 1, `Preparing to write output CSV with ${outputRows.length} rows`);
-
-  const csvWriter = createObjectCsvWriter({
-    path: outputFile,
-    header: headers.map(h => ({ id: h, title: h })),
-    fieldDelimiter: ',',
-    quote: '"',
-    escape: '"'
-  });
-
-  await csvWriter.writeRecords(outputRows);
-  console.log(`Output CSV written to ${outputFile}`);
+if (inputFile?.startsWith('~')) {
+  inputFile = path.join(os.homedir(), inputFile.slice(1));
 }
 
-// Export everything needed for tests
+// Existing missing arg check (now handled by commander, but kept for safety)
+if (!token || !inputFile) {
+  console.log('Missing required args. See --help for usage.');
+  process.exit(1);
+}
+
+console.log(`Starting price filler for token: ${token}, mode: ${mode}, tz: ${tz}`);
+console.log(`Input: ${inputFile}, Output: ${outputFile}`);
+logv(verbose, 1, 'Verbose mode ENABLED. Starting CLI logic');
+
+const csvContent = fs.readFileSync(inputFile, 'utf8');
+logv(verbose, 1, `Read CSV content from input file, length: ${csvContent.length}`);
+const records = csvParse(csvContent, {
+  columns: true,
+  skip_empty_lines: true,
+  trim: true,
+  delimiter: ',',
+  quote: '"',
+  relax_column_count: true
+});
+
+const headers = Object.keys(records[0] || {});
+console.log(`Detected headers (${headers.length}): ${headers.join(', ')}`);
+
+const rows = records;
+console.log(`Read ${rows.length} rows from input CSV.`);
+
+logv(verbose, 1, 'First 5 rows:');
+rows.slice(0, 5).forEach((row, i) => logv(verbose, 1, `Row ${i + 1}: ${JSON.stringify(row)}`));
+
+let dateColName = headers.find(h => h.includes('date') && h.includes('UTC')) ||
+  headers.find(h => h.toLowerCase().includes('date'));
+logv(verbose, 1, `Searching for date column in headers: ${headers.join(', ')}`);
+if (!dateColName) {
+  console.error('No date column found in CSV headers');
+  process.exit(1);
+}
+console.log(`Using date column: "${dateColName}"`);
+
+const amountColName = headers.find(h => h.toLowerCase().includes('amount'));
+if (amountColName) console.log(`Using amount column: "${amountColName}"`);
+
+const priceColName = '$usd price';
+const usdAmountColName = '$usd amount';
+
+let lastValidDateIndex = -1;
+for (let i = rows.length - 1; i >= 0; i--) {
+  const dateStr = (rows[i][dateColName] || '').trim();
+  logv(verbose, 2, `Checking row ${i + 1} date: "${dateStr}"`);
+
+  if (dateStr && !dateStr.includes(',,,,') && !dateStr.includes('Total')) {
+    const parsed = DateTime.fromFormat(dateStr, 'yyyy-MM-dd HH:mm:ss');
+    logv(verbose, 2, `Date parse result for "${dateStr}": valid=${parsed.isValid}`);
+    if (parsed.isValid) {
+      lastValidDateIndex = i;
+      console.log(`Last valid date row: index ${i + 1} (${dateStr})`);
+      break;
+    }
+  }
+}
+
+if (lastValidDateIndex === -1) console.warn('No valid date rows found');
+
+const outputRows = [];
+
+for (let i = 0; i < rows.length; i++) {
+  const row = { ...rows[i] };
+  const dateStr = (row[dateColName] || '').trim();
+
+  if (i > lastValidDateIndex || !dateStr || dateStr.includes(',,,,') || dateStr.includes('Total')) {
+    row[priceColName] = '';
+    row[usdAmountColName] = '';
+    outputRows.push(row);
+    continue;
+  }
+
+  const amountStr = amountColName ? (row[amountColName] || '').trim() : '';
+  let price = null;
+
+  logv(verbose, 1, `Processing row ${i + 1}: "${dateStr}"`);
+
+  try {
+    price = await getCryptoPrice(token, dateStr, tz, mode, verbose);
+    logv(verbose, 1, `Price fetched for row ${i + 1}: ${price}`);
+  } catch (e) {
+    logv(verbose, 1, `Error fetching price for row ${i + 1}: ${e.message}`);
+    console.error(`Error fetching price for "${dateStr}": ${e.message}`);
+  }
+
+  row[priceColName] = price ?? 'Error';
+
+  if (price !== null && amountStr) {
+    const amount = parseFloat(amountStr);
+    if (!isNaN(amount)) {
+      row[usdAmountColName] = (amount * price).toFixed(8);
+    } else {
+      logv(verbose, 1, `Invalid amount in row ${i + 1}: "${amountStr}"`);
+    }
+  }
+
+  outputRows.push(row);
+}
+
+logv(verbose, 1, `Preparing to write output CSV with ${outputRows.length} rows`);
+
+const csvWriter = createObjectCsvWriter({
+  path: outputFile,
+  header: headers.map(h => ({ id: h, title: h })),
+  fieldDelimiter: ',',
+  quote: '"',
+  escape: '"'
+});
+
+await csvWriter.writeRecords(outputRows);
+console.log(`Output CSV written to ${outputFile}`);
+
+// Export everything needed for tests (unchanged)
 export {
   getCryptoPrice,
   getCache,
