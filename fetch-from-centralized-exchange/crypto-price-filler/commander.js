@@ -42,53 +42,53 @@ import { program } from 'commander';
  * @returns {import('commander').Command} Configured Commander program
  */
 export function setupCommander() {
-  program
-    .name('crypto-price-filler')
-    .description('Fetch historical crypto prices from centralized exchanges and fill CSV with USD values')
-    .version('1.0.0', '-v, --version', 'output the version number')
+    program
+        .name('crypto-price-filler')
+        .description('Fetch historical crypto prices from centralized exchanges and fill CSV with USD values')
+        .version('1.0.0', '-v, --version', 'output the version number')
 
-    // Required options
-    .requiredOption(
-      '--token <symbol>',
-      'Crypto token symbol (e.g. grc, xtm, btc)',
-      (value) => value.toLowerCase()
-    )
-    .requiredOption(
-      '--input <path>',
-      'Path to input CSV file (must contain "date (UTC)" column in format yyyy-MM-dd HH:mm:ss)'
-    )
+        // Required options
+        .requiredOption(
+            '--token <symbol>',
+            'Crypto token symbol (e.g. grc, xtm, btc)',
+            (value) => value.toLowerCase()
+        )
+        .requiredOption(
+            '--input <path>',
+            'Path to input CSV file (must contain "date (UTC)" column in format yyyy-MM-dd HH:mm:ss)'
+        )
 
-    // Optional options with defaults
-    .option(
-      '--output <path>',
-      'Path to output CSV file',
-      'output.csv'
-    )
-    .option(
-      '--mode <mode>',
-      'Price target to fetch: high, low, or close',
-      (value) => {
-        const valid = ['high', 'low', 'close'];
-        if (!valid.includes(value.toLowerCase())) {
-          throw new Error(`--mode must be one of: high, low, close`);
-        }
-        return value.toLowerCase();
-      },
-      'close'
-    )
-    .option(
-      '--tz <timezone>',
-      'Timezone abbreviation for date parsing (e.g. UTC, CDT, PST)',
-      'UTC'
-    )
-    .option(
-      '--verbose',
-      'Enable detailed logging during processing',
-      false
-    )
+        // Optional options with defaults
+        .option(
+            '--output <path>',
+            'Path to output CSV file',
+            'output.csv'
+        )
+        .option(
+            '--mode <mode>',
+            'Price target to fetch: high, low, or close',
+            (value) => {
+                const valid = ['high', 'low', 'close'];
+                if (!valid.includes(value.toLowerCase())) {
+                    throw new Error(`--mode must be one of: high, low, close`);
+                }
+                return value.toLowerCase();
+            },
+            'close'
+        )
+        .option(
+            '--tz <timezone>',
+            'Timezone abbreviation for date parsing (e.g. UTC, CDT, PST)',
+            'UTC'
+        )
+        .option(
+            '--verbose',
+            'Enable detailed logging during processing',
+            false
+        )
 
-    // Custom help formatting
-    .addHelpText('after', `
+        // Custom help formatting
+        .addHelpText('after', `
 Examples:
   Basic usage:
     $ node index.js --token=grc --input=mining.csv
@@ -100,10 +100,18 @@ Examples:
     $ node index.js --help
     `)
 
-    // Make --help more visible
-    .helpOption('-h, --help', 'display help for command');
+        // Make --help more visible
+        .helpOption('-h, --help', 'display help for command');
 
-  return program;
+    // It makes no sense for Commander to exit with code 1 on help display, so fix that:
+    program.exitOverride((err) => {
+        if (err.code === 'commander.helpDisplayed') {
+            process.exit(0);  // force exit 0 on --help
+        }
+        throw err;
+    });
+
+    return program;
 }
 
 /**
@@ -118,9 +126,9 @@ Examples:
  * @throws {Error} If parsing fails (Commander already prints error + exits in most cases)
  */
 export function parseArgs() {
-  const cmd = setupCommander();
-  cmd.parse(process.argv);
-  return cmd.opts();
+    const cmd = setupCommander();
+    cmd.parse(process.argv);
+    return cmd.opts();
 }
 
 // Optional: export the program itself for advanced testing / extension
