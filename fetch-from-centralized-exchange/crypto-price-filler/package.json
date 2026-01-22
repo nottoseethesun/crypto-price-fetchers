@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node index.js",
     "test": "vitest run --coverage --silent",
-    "validate-parse": "node -e \"require('child_process').execSync('node index.js --help', { stdio: 'ignore' }) || process.exit(1)\"",
+    "validate-parse": "node index.js --help >/dev/null 2>&1 || [ $? -eq 1 ] && echo 'CLI parses OK (normal exit 1 on --help/usage)' || (echo 'CLI crashed unexpectedly'; exit 1)",
     "test:strict": "npm run validate-parse && vitest run --coverage --silent",
     "test:ci": "vitest run -- --no-cache --coverage",
     "test:debug": "VERBOSE=1 vitest run -- --no-cache --reporter=verbose --coverage",

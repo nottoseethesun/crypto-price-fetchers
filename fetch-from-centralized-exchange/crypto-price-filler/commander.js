@@ -103,20 +103,6 @@ Examples:
         // Make --help more visible
         .helpOption('-h, --help', 'display help for command');
 
-    /*-
-     * Somehow, in GitHub c.i. but never locally, Commander will produce a program exit 
-     * status code of 1 for `npm index.js --help`.  It makes no sense for Commander to exit
-     * with code 1 on help display, ever, so fix that:
-     */
-    program.exitOverride((err) => {
-        // Help requested or displayed → treat as success
-        if (err.code === 'commander.helpDisplayed' ||
-            err.code === 'commander.missingRequiredArgument') {
-            process.exit(0); // force exit 0 on --help
-        }
-        // Real error → propagate
-        throw err;
-    });
     return program;
 }
 

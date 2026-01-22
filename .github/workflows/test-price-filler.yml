@@ -5,7 +5,7 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  workflow_dispatch:
+  workflow_dispatch:  # manual trigger from GitHub UI
 
 jobs:
   validate-and-test:
@@ -20,25 +20,21 @@ jobs:
         with:
           node-version: '24'
           cache: 'npm'
-          cache-dependency-path: fetch-from-centralized-exchange/crypto-price-filler/package-lock.json  # ← THIS LINE FIXES IT
+          cache-dependency-path: fetch-from-centralized-exchange/crypto-price-filler/package-lock.json
 
       - name: Install dependencies
         working-directory: fetch-from-centralized-exchange/crypto-price-filler
         run: npm ci
 
-      - name: Run strict CLI parse/validation check (fail fast)
+      - name: Run strict CLI parse/validation + full Vitest suite (fail fast)
         working-directory: fetch-from-centralized-exchange/crypto-price-filler
         run: npm run test:strict
 
-      - name: Run full Vitest test suite + coverage
-        working-directory: fetch-from-centralized-exchange/crypto-price-filler
-        run: npm run test
-
-      # Optional coverage upload
-      # - name: Upload coverage
+      # Optional: Upload coverage report (uncomment when you have Codecov token)
+      # - name: Upload coverage to Codecov
       #   uses: codecov/codecov-action@v5
       #   with:
       #     token: ${{ secrets.CODECOV_TOKEN }}
-      #     fail_ci_if_error: true
       #     directory: fetch-from-centralized-exchange/crypto-price-filler/coverage
+      #     fail_ci_if_error: true
       
