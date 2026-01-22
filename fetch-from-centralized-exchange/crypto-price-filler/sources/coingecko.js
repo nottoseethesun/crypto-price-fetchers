@@ -8,7 +8,7 @@
  * @author Christopher M. Balz with Grok
  */
 
-import fetchWithRetry from '../utils/fetch.js';
+import { fetchWithRetry } from '../utils/fetch.js';
 const VERBOSE = process.env.VERBOSE ? Number(process.env.VERBOSE) : 1;
 const COINGECKO_BASE = 'https://api.coingecko.com/api/v3';
 

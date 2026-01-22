@@ -104,7 +104,7 @@ import { parse as csvParse } from 'csv-parse/sync';
 import { createObjectCsvWriter } from 'csv-writer';
 
 import { getTimezoneOffsetHours, parseInputToUtcMs } from './utils/date.js';
-import { getCryptoPrice } from './sources/index.js'; // Using barrel file
+import { getCryptoPrice } from './sources/price.js';
 import { getCache, setCache } from './utils/cache.js';
 
 // Verbosity-aware logger
@@ -251,7 +251,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
 // Export everything needed for tests
 export {
-  CONFIG,
   getCryptoPrice,
   getCache,
   setCache,

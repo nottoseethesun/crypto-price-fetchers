@@ -7,6 +7,8 @@
   "scripts": {
     "start": "node index.js",
     "test": "vitest run --coverage --silent",
+    "validate-parse": "node -e \"require('child_process').execSync('node index.js --help', { stdio: 'ignore' }) || process.exit(1)\"",
+    "test:strict": "npm run validate-parse && vitest run --coverage --silent",
     "test:ci": "vitest run -- --no-cache --coverage",
     "test:debug": "VERBOSE=1 vitest run -- --no-cache --reporter=verbose --coverage",
     "test:watch": "vitest --coverage"

@@ -9,8 +9,7 @@
  */
 
 import { fetchWithRetry } from '../utils/fetch.js';
-import config from '../config.json' assert { type: 'json' };
-import tokenMap from '../supported-tokens.json' assert { type: 'json' };
+import config from '../config.json' with { type: 'json' };
 import { getBTCUSDTPrice } from './utils/btc.js';
 
 /**
