@@ -86,7 +86,7 @@
  *
  * TroubleShooting
  * ----------------
- * 
+ *
  * - Ensure Node.js v14+ is installed
  * - Ensure internet connectivity for API access
  * - Check that input CSV matches expected format exactly
@@ -94,7 +94,41 @@
  * - Check API status of MEXC, CoinGecko, CoinPaprika if fetches fail
  * - Review rate-limit handling in logs if many requests are made
  * - For unexpected errors, check stack traces in verbose output
- * 
+ *
+ * Configuration (config.json)
+ * ---------------------------
+ *
+ * API Keys:
+ *
+ *   COINGECKO_API_KEY    Your CoinGecko API key. Obtain one from https://www.coingecko.com/en/api
+ *                        The free "Demo" tier provides 30 requests/minute and 365 days of
+ *                        historical data. Leave empty ("") to use unauthenticated access
+ *                        (stricter rate limits, no historical data beyond current day).
+ *
+ * Rate Limiting:
+ *
+ *   REQUEST_DELAY_MS     Default delay (in milliseconds) between successive API requests.
+ *                        Used as a baseline for all sources. Default: 1200ms.
+ *
+ *   COINGECKO_RATE_LIMIT_MS
+ *                        CoinGecko-specific delay between requests. Set based on your plan:
+ *                        - Demo (free with key): 30 req/min → 2000ms recommended
+ *                        - Analyst: 500 req/min → 120ms
+ *                        - Pro: higher limits → adjust accordingly
+ *                        Default: 2000ms. This delay is skipped in test environments.
+ *
+ * Customizing for Your API Plan:
+ *
+ *   1. Check your API provider's documentation for rate limits and features.
+ *   2. Open config.json and locate the relevant setting (e.g., COINGECKO_RATE_LIMIT_MS).
+ *   3. Calculate the appropriate delay: (60000 ms / requests_per_minute).
+ *   4. Update the value and save. No code changes required.
+ *
+ *   Other configurable values in config.json:
+ *   - MAX_RETRIES: Number of retry attempts on rate-limit (429) errors. Default: 3.
+ *   - RETRY_BACKOFF_MS: Array of backoff delays [5000, 10000, 20000] for successive retries.
+ *   - TIMEZONE_OFFSETS: Add custom timezone abbreviations if needed.
+ *
  */
 
 import fs from 'fs';
