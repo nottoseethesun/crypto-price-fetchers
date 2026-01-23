@@ -1,22 +1,23 @@
 {
-  "btc": {
-    "gecko": "bitcoin",
-    "paprika": "btc-bitcoin"
-  },
-  "xmr": {
-    "gecko": "monero",
-    "paprika": "xmr-monero"
-  },
-  "grc": {
-    "gecko": "gridcoin-research",
-    "paprika": "grc-gridcoin"
-  },
-  "xtm": {
-    "gecko": "tari",
-    "paprika": "xtm-tari"
-  },
-  "xtz": {
-    "gecko": "tezos",
-    "paprika": "xtz-tezos"
+  "tokens": {
+    "grc": {
+      "name": "GridCoin",
+      "coingecko_id": null,
+      "coinpaprika_id": "grc-gridcoin",
+      "mexc_symbol": null,
+      "note": "Not on MEXC; CoinGecko + CoinPaprika fallbacks"
+    },
+    "xtm": {
+      "name": "Tari",
+      "coingecko_id": "tari",
+      "mexc_symbol": "XTM",
+      "note": "Listed on MEXC as XTMUSDT"
+    },
+    "btc": {
+      "name": "Bitcoin",
+      "coingecko_id": "bitcoin",
+      "mexc_symbol": "BTC",
+      "note": "BTC pair adjustment needed"
+    }
   }
 }
