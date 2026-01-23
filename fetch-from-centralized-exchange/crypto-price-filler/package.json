@@ -13,7 +13,7 @@
     "test:debug": "VERBOSE=1 vitest run -- --no-cache --reporter=verbose --coverage",
     "test:watch": "vitest --coverage"
   },
-  "author": "Christopher M. Balz with Grok",
+  "author": "Christopher M. Balz with Grok and Claude.ai",
   "license": "Apache-2.0",
   "dependencies": {
     "commander": "^12.1.0",

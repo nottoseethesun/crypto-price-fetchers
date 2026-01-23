@@ -6,7 +6,7 @@
  * Global shared cache for Crypto Price Filler
  * Uses globalThis to ensure the same Map instance across all modules/workers.
  * @version 1.0.0
- * @author Christopher M. Balz with Grok
+ * @author Christopher M. Balz with Grok and Claude.ai
  */
 
 if (!globalThis.__crypto_price_cache__) {

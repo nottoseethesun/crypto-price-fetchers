@@ -13,7 +13,7 @@
  * - Handles invalid/future dates gracefully
  *
  * @version 1.0.0
- * @author Christopher M. Balz with Grok
+ * @author Christopher M. Balz with Grok and Claude.ai
  * @license See the file, `../LICENSE`
  *
  * Installation / Usage

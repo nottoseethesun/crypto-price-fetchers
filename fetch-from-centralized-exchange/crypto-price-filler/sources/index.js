@@ -6,7 +6,7 @@
  * import { getPriceFromMEXC, getPriceFromCoinGecko } from './sources';
  * 
  * @version 1.0.0
- * @author Christopher M. Balz with Grok
+ * @author Christopher M. Balz with Grok and Claude.ai
  */
 
 export { getPriceFromMEXC } from './mexc.js';

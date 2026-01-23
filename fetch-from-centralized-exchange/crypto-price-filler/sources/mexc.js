@@ -5,7 +5,7 @@
  * Handles symbol lookup, 1m/60m klines, BTC pair adjustment, and 429 retry.
  * 
  * @version 1.0.0
- * @author Christopher M. Balz with Grok
+ * @author Christopher M. Balz with Grok and Claude.ai
  */
 
 import { fetchWithRetry } from '../utils/fetch.js';

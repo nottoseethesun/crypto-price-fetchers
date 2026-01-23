@@ -6,7 +6,7 @@
  *
  * @module price
  * @version 1.0.0
- * @author Christopher M. Balz with Grok
+ * @author Christopher M. Balz with Grok and Claude.ai
  */
 
 import { getPriceFromMEXC } from './mexc.js';

@@ -5,7 +5,7 @@
  * Used by getCryptoPrice to convert local time inputs into UTC timestamps.
  * 
  * @version 1.0.0
- * @author Christopher M. Balz with Grok
+ * @author Christopher M. Balz with Grok and Claude.ai
  */
 
 import { DateTime } from 'luxon';
