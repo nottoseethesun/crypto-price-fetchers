@@ -108,8 +108,14 @@ import { getTimezoneOffsetHours, parseInputToUtcMs } from './utils/date.js';
 import { getCryptoPrice } from './sources/price.js';
 import { getCache, setCache } from './utils/cache.js';
 
+// Added missing luxon import (fixes DateTime is not defined)
+import { DateTime } from 'luxon';
+
 // Import CLI setup from separate module
 import { parseArgs } from './commander.js';
+
+// Load central token configurations from supported-tokens.json
+const supportedTokens = JSON.parse(fs.readFileSync('./supported-tokens.json', 'utf8'));
 
 // Verbosity-aware logger
 function logv(shouldLog, level, message, ...args) {
@@ -131,12 +137,14 @@ if (inputFile?.startsWith('~')) {
   inputFile = path.join(os.homedir(), inputFile.slice(1));
 }
 
-// Existing missing arg check (now handled by commander, but kept for safety)
-if (!token || !inputFile) {
-  console.log('Missing required args. See --help for usage.');
-  process.exit(1);
-}
+// Resolve CoinGecko and CoinPaprika IDs from central mapping
+const tokenConfig = supportedTokens.tokens?.[token.toLowerCase()] || {};
+const coingeckoId = tokenConfig.coingecko_id || token.toLowerCase();
+const coinpaprikaId = tokenConfig.coinpaprika_id || null;
+logv(verbose, 1, `Resolved CoinGecko ID for ${token}: ${coingeckoId}`);
+logv(verbose, 1, `Resolved CoinPaprika ID for ${token}: ${coinpaprikaId || 'none'}`);
 
+// No need for manual missing arg check — commander.requiredOption handles it
 console.log(`Starting price filler for token: ${token}, mode: ${mode}, tz: ${tz}`);
 console.log(`Input: ${inputFile}, Output: ${outputFile}`);
 logv(verbose, 1, 'Verbose mode ENABLED. Starting CLI logic');
@@ -155,6 +163,15 @@ const records = csvParse(csvContent, {
 const headers = Object.keys(records[0] || {});
 console.log(`Detected headers (${headers.length}): ${headers.join(', ')}`);
 
+// Add new columns if not already present
+const priceColName = '$usd price';
+const usdAmountColName = '$usd amount';
+const grandTotalColName = 'grand total ($usd)';
+
+if (!headers.includes(priceColName)) headers.push(priceColName);
+if (!headers.includes(usdAmountColName)) headers.push(usdAmountColName);
+if (!headers.includes(grandTotalColName)) headers.push(grandTotalColName);
+
 const rows = records;
 console.log(`Read ${rows.length} rows from input CSV.`);
 
@@ -172,9 +189,6 @@ console.log(`Using date column: "${dateColName}"`);
 
 const amountColName = headers.find(h => h.toLowerCase().includes('amount'));
 if (amountColName) console.log(`Using amount column: "${amountColName}"`);
-
-const priceColName = '$usd price';
-const usdAmountColName = '$usd amount';
 
 let lastValidDateIndex = -1;
 for (let i = rows.length - 1; i >= 0; i--) {
@@ -196,6 +210,8 @@ if (lastValidDateIndex === -1) console.warn('No valid date rows found');
 
 const outputRows = [];
 
+let grandTotalUsd = 0;
+
 for (let i = 0; i < rows.length; i++) {
   const row = { ...rows[i] };
   const dateStr = (row[dateColName] || '').trim();
@@ -203,6 +219,7 @@ for (let i = 0; i < rows.length; i++) {
   if (i > lastValidDateIndex || !dateStr || dateStr.includes(',,,,') || dateStr.includes('Total')) {
     row[priceColName] = '';
     row[usdAmountColName] = '';
+    row[grandTotalColName] = grandTotalUsd.toFixed(6);
     outputRows.push(row);
     continue;
   }
@@ -213,7 +230,7 @@ for (let i = 0; i < rows.length; i++) {
   logv(verbose, 1, `Processing row ${i + 1}: "${dateStr}"`);
 
   try {
-    price = await getCryptoPrice(token, dateStr, tz, mode, verbose);
+    price = await getCryptoPrice(token, dateStr, tz, mode, verbose, null, coingeckoId, coinpaprikaId);
     logv(verbose, 1, `Price fetched for row ${i + 1}: ${price}`);
   } catch (e) {
     logv(verbose, 1, `Error fetching price for row ${i + 1}: ${e.message}`);
@@ -225,12 +242,15 @@ for (let i = 0; i < rows.length; i++) {
   if (price !== null && amountStr) {
     const amount = parseFloat(amountStr);
     if (!isNaN(amount)) {
-      row[usdAmountColName] = (amount * price).toFixed(8);
+      const usdAmount = amount * price;
+      row[usdAmountColName] = usdAmount.toFixed(8);
+      grandTotalUsd += usdAmount;
     } else {
       logv(verbose, 1, `Invalid amount in row ${i + 1}: "${amountStr}"`);
     }
   }
 
+  row[grandTotalColName] = grandTotalUsd.toFixed(6);
   outputRows.push(row);
 }
 
@@ -247,7 +267,7 @@ const csvWriter = createObjectCsvWriter({
 await csvWriter.writeRecords(outputRows);
 console.log(`Output CSV written to ${outputFile}`);
 
-// Export everything needed for tests (unchanged)
+// Export everything needed for tests
 export {
   getCryptoPrice,
   getCache,

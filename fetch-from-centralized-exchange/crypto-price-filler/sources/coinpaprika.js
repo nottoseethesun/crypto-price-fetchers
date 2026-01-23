@@ -20,27 +20,10 @@ export async function getPriceFromCoinPaprika(id, utcMs, highOrLow, verbose = fa
     console.log(`[VERBOSE:${level}] ${message}`, ...args);
   };
 
-  const tickersUrl = config.COINPAPRIKA_TICKERS_TEMPLATE
-    .replace('{base}', config.COINPAPRIKA_BASE)
-    .replace('{id}', id);
-  logv(2, `CoinPaprika tickers URL: ${tickersUrl}`);
-  const res = await fetchWithRetry(tickersUrl, verbose);
-  if (!res) return null;
+  const date = new Date(utcMs);
+  const dateStr = date.toISOString().split('T')[0]; // yyyy-mm-dd
 
-  let data;
-  try {
-    data = await res.json();
-    logv(2, `CoinPaprika tickers data received (keys: ${Object.keys(data).join(', ')})`);
-  } catch (e) {
-    logv(1, `CoinPaprika tickers JSON parse FAILED: ${e.message}`);
-    return null;
-  }
-
-  if (!data.quotes || !data.quotes.USD) {
-    logv(1, 'CoinPaprika quotes missing or no USD');
-    return null;
-  }
-
+  // First attempt: precise timestamp (minute-level if available)
   const start = Math.floor(utcMs / 1000 - 60);
   const end = Math.floor(utcMs / 1000);
   const ohlcvUrl = config.COINPAPRIKA_OHLCV_TEMPLATE
@@ -48,25 +31,58 @@ export async function getPriceFromCoinPaprika(id, utcMs, highOrLow, verbose = fa
     .replace('{id}', id)
     .replace('{start}', start)
     .replace('{end}', end);
-  logv(2, `CoinPaprika OHLCV URL: ${ohlcvUrl}`);
-  const ohlcvRes = await fetchWithRetry(ohlcvUrl, verbose);
-  if (!ohlcvRes) return null;
+  logv(2, `CoinPaprika OHLCV URL (precise): ${ohlcvUrl}`);
+  let ohlcvRes = await fetchWithRetry(ohlcvUrl, verbose);
 
-  let ohlcv;
-  try {
-    ohlcv = await ohlcvRes.json();
-    logv(2, `CoinPaprika OHLCV data received (length: ${ohlcv.length})`);
-  } catch (e) {
-    logv(1, `CoinPaprika OHLCV JSON parse FAILED: ${e.message}`);
-    return null;
+  let ohlcv = null;
+  if (ohlcvRes && ohlcvRes.ok) {
+    try {
+      ohlcv = await ohlcvRes.json();
+      logv(2, `CoinPaprika precise OHLCV data received (length: ${ohlcv.length})`);
+    } catch (e) {
+      logv(1, `CoinPaprika precise OHLCV JSON parse FAILED: ${e.message}`);
+    }
+  }
+
+  // If no data or error, fallback to daily granularity (same day)
+  if (!ohlcv || ohlcv.length === 0) {
+    logv(1, 'No precise data - retrying with daily granularity');
+    const dailyOhlcvUrl = config.COINPAPRIKA_OHLCV_TEMPLATE
+      .replace('{base}', config.COINPAPRIKA_BASE)
+      .replace('{id}', id)
+      .replace('{start}', dateStr)
+      .replace('{end}', dateStr);
+    logv(2, `CoinPaprika daily OHLCV URL: ${dailyOhlcvUrl}`);
+    ohlcvRes = await fetchWithRetry(dailyOhlcvUrl, verbose);
+
+    if (ohlcvRes && ohlcvRes.ok) {
+      try {
+        ohlcv = await ohlcvRes.json();
+        logv(2, `CoinPaprika daily OHLCV data received (length: ${ohlcv.length})`);
+      } catch (e) {
+        logv(1, `CoinPaprika daily OHLCV JSON parse FAILED: ${e.message}`);
+        return null;
+      }
+    }
   }
 
   if (!ohlcv || ohlcv.length === 0) {
-    logv(1, 'CoinPaprika OHLCV empty');
+    logv(1, 'CoinPaprika OHLCV empty after fallback');
     return null;
   }
 
-  const price = highOrLow === 'low' ? parseFloat(ohlcv[0].low) : parseFloat(ohlcv[0].high);
-  logv(1, `CoinPaprika price: ${price}`);
-  return price;
+  const dayData = ohlcv[0]; // daily or closest data point
+  let price = null;
+
+  if (highOrLow === 'close') price = parseFloat(dayData.close);
+  else if (highOrLow === 'high') price = parseFloat(dayData.high);
+  else if (highOrLow === 'low') price = parseFloat(dayData.low);
+
+  if (price !== null && !isNaN(price)) {
+    logv(1, `CoinPaprika success - ${highOrLow} price: ${price}`);
+    return price;
+  }
+
+  logv(1, `CoinPaprika missing/invalid ${highOrLow} price`);
+  return null;
 }

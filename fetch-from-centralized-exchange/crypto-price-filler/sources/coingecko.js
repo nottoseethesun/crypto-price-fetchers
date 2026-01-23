@@ -1,133 +1,104 @@
 /**
- * CoinGecko API integration for Crypto Price Filler
- * @module sources/coingecko
- * @description Fetches historical crypto prices from CoinGecko as fallback.
- * Uses tickers endpoint first, falls back to history endpoint if needed.
- * Handles rate limiting, invalid responses, missing keys, parse errors.
+ * CoinGecko price fetching logic for crypto-price-filler.
+ * Tries tickers endpoint first, then historical endpoint.
+ * Handles rate-limit retry, verbose logging.
+ *
+ * @module coingecko
  * @version 1.0.0
  * @author Christopher M. Balz with Grok
  */
 
 import { fetchWithRetry } from '../utils/fetch.js';
-const VERBOSE = process.env.VERBOSE ? Number(process.env.VERBOSE) : 1;
-const COINGECKO_BASE = 'https://api.coingecko.com/api/v3';
 
 /**
- * Log verbose messages if VERBOSE is enabled.
- * @param {number} level - Verbosity level (1-4)
- * @param {...any} args - Messages to log
- */
-function logv(level, ...args) {
-  if (VERBOSE >= level) {
-    console.log(...args);
-  }
-}
-
-/**
- * Try fetching price from CoinGecko tickers endpoint.
- * @param {string} token - Token ID (e.g. 'xtm')
- * @param {boolean} verbose - Verbose logging
+ * Fetch price from CoinGecko for a given token and timestamp.
+ * @param {string} token - Token symbol (for logging/fallback)
+ * @param {number} utcMs - Unix timestamp in milliseconds
+ * @param {string} target - 'high', 'low', or 'close'
+ * @param {boolean} verbose - Enable verbose logging
+ * @param {string} [coingeckoId=token.toLowerCase()] - Resolved CoinGecko ID
  * @returns {Promise<number|null>} Price in USD or null
  */
-async function tryCoinGeckoTickers(token, verbose) {
-  const url = `${COINGECKO_BASE}/coins/${token}/tickers`;
-  logv(2, '[CoinGecko] Tickers URL:', url);
+export async function getPriceFromCoinGecko(
+  token,
+  utcMs,
+  target = 'close',
+  verbose = false,
+  coingeckoId = token.toLowerCase()
+) {
+  const logv = (level, message, ...args) => {
+    if (!verbose || level < 1) return;
+    console.log(`[VERBOSE:${level}] ${message}`, ...args);
+  };
 
+  const date = new Date(utcMs);
+  const dateStr = `${date.getDate().toString().padStart(2, '0')}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getFullYear()}`;
+
+  let price = null;
+
+  // Try tickers endpoint first (current price)
+  const tickersUrl = `https://api.coingecko.com/api/v3/coins/${coingeckoId}/tickers`;
   try {
-    const res = await fetchWithRetry(url, verbose);
-    if (!res.ok) {
-      logv(1, '[CoinGecko] Tickers failed with status:', res.status);
-      return null;
-    }
-
-    const data = await res.json();
-    logv(2, '[CoinGecko] Tickers data received (keys:', Object.keys(data), ')');
-
-    const tickers = data.tickers || [];
-    logv(2, '[CoinGecko] Tickers count:', tickers.length);
-
-    let maxVolumePrice = null;
-    let maxVolume = 0;
-
-    for (const ticker of tickers) {
-      const vol = ticker.volume || 0;
-      const price = ticker.converted_last?.usd;
-      const stale = ticker.is_stale || false;
-
-      logv(3, '[CoinGecko] Ticker:', ticker.base?.toLowerCase(), '/', ticker.target?.toLowerCase(), 'vol=' + vol, 'usd=' + price, 'stale=' + stale);
-
-      if (price && !stale && vol > maxVolume) {
-        maxVolume = vol;
-        maxVolumePrice = price;
+    logv(2, `Fetch attempt 1/3 for ${tickersUrl}`);
+    const response = await fetchWithRetry(tickersUrl, {}, verbose);
+    if (response.ok) {
+      const data = await response.json();
+      const ticker = data.tickers?.find(t => t.target === 'USD' || t.base === 'USD');
+      if (ticker) {
+        price = ticker.last;
+        logv(1, `CoinGecko tickers success - price: ${price}`);
+        return price;
       }
     }
-
-    logv(2, '[CoinGecko] Selected tickers price:', maxVolumePrice, '(max vol:', maxVolume, ')');
-    return maxVolumePrice;
   } catch (err) {
-    logv(1, '[CoinGecko] Tickers JSON parse FAILED:', err.message);
-    return null;
+    logv(1, `Tickers fetch failed: ${err.message}`);
   }
-}
 
-/**
- * Try fetching price from CoinGecko history endpoint.
- * @param {string} token - Token ID
- * @param {string} date - Date in YYYY-MM-DD
- * @param {boolean} verbose - Verbose logging
- * @returns {Promise<number|null>} Price in USD or null
- */
-async function tryCoinGeckoHistory(token, date, verbose) {
-  const url = `${COINGECKO_BASE}/coins/${token}/history?date=${date}`;
-  logv(2, '[CoinGecko] History URL:', url);
-
+  // Fallback to historical endpoint (precise timestamp attempt)
+  const historyUrl = `https://api.coingecko.com/api/v3/coins/${coingeckoId}/history?date=${dateStr}`;
   try {
-    const res = await fetchWithRetry(url, verbose);
-    if (!res.ok) {
-      logv(1, '[CoinGecko] History failed with status:', res.status);
-      return null;
+    logv(2, `Fetch attempt 1/3 for ${historyUrl}`);
+    const response = await fetchWithRetry(historyUrl, {}, verbose);
+    if (response.ok) {
+      const data = await response.json();
+      const marketData = data.market_data;
+      if (marketData) {
+        if (target === 'close') price = marketData.current_price?.usd;
+        else if (target === 'high') price = marketData.high_24h?.usd;
+        else if (target === 'low') price = marketData.low_24h?.usd;
+        if (price) {
+          logv(1, `CoinGecko history success - ${target} price: ${price}`);
+          return price;
+        }
+      }
     }
-
-    const data = await res.json();
-    logv(2, '[CoinGecko] History data received (keys:', Object.keys(data), ')');
-
-    const price = data.market_data?.current_price?.usd;
-
-    if (price) {
-      logv(2, '[CoinGecko] History price:', price, '(usd key present: true)');
-      return price;
-    }
-
-    logv(2, '[CoinGecko] History price: null (usd key present: false)');
-    return null; // Explicit return (safety - prevents undefined if code changes later)
   } catch (err) {
-    logv(1, '[CoinGecko] History JSON parse FAILED:', err.message);
-    return null;
+    logv(1, `History fetch failed: ${err.message}`);
   }
-}
 
-/**
- * Get USD price from CoinGecko (tickers first, history fallback).
- * @param {string} token - Token ID
- * @param {number} utcMs - Target timestamp (not used directly, only date)
- * @param {boolean} verbose - Verbose logging
- * @returns {Promise<number|null>} Price in USD or null
- */
-export async function getPriceFromCoinGecko(token, utcMs, verbose = false) {
-  const date = new Date(utcMs).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  }).replace(/\//g, '-');
+  // Fallback to daily granularity (same day) when precise timestamp fails
+  if (price === null) {
+    logv(1, 'No precise data - retrying with daily granularity');
+    try {
+      const response = await fetchWithRetry(historyUrl, {}, verbose);
+      if (response.ok) {
+        const data = await response.json();
+        const marketData = data.market_data;
+        if (marketData) {
+          if (target === 'close') price = marketData.current_price?.usd;
+          else if (target === 'high') price = marketData.high_24h?.usd;
+          else if (target === 'low') price = marketData.low_24h?.usd;
+          if (price) {
+            logv(1, `CoinGecko daily fallback success - ${target} price: ${price}`);
+            return price;
+          }
+        }
+      }
+    } catch (err) {
+      logv(1, `Daily fallback fetch failed: ${err.message}`);
+    }
+  }
 
-  logv(2, '[CoinGecko] Calculated date for CoinGecko:', date);
-
-  let price = await tryCoinGeckoTickers(token, verbose);
-  if (price) return price;
-
-  price = await tryCoinGeckoHistory(token, date, verbose);
-  if (price) return price;
-
-  logv(1, '[CoinGecko] CoinGecko both paths failed');
+  logv(1, `CoinGecko both paths failed for ${coingeckoId}`);
   return null;
 }

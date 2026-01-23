@@ -16,26 +16,63 @@ if (!globalThis.__crypto_price_cache__) {
 const cacheInstance = globalThis.__crypto_price_cache__;
 
 /**
- * Get the shared cache Map instance.
- * @returns {Map} The global cache Map
+ * Get the cached value for a specific key, or the entire cache Map if no key is provided.
+ * Returns the raw cached price (number or null) or undefined if not found/expired.
+ * For backward compatibility with tests that expect the whole Map.
+ *
+ * @param {string} [key] - Optional cache key to lookup
+ * @returns {number|null|undefined|Map} Cached price, undefined, or the full Map
  */
-export function getCache() {
-  return cacheInstance;
+export function getCache(key = null) {
+  if (key === null) {
+    return cacheInstance; // return whole Map for backward compatibility with tests
+  }
+
+  const entry = cacheInstance.get(key);
+  if (!entry) return undefined;
+
+  const now = Date.now();
+  if (entry.expires && now > entry.expires) {
+    cacheInstance.delete(key);
+    return undefined;
+  }
+
+  return entry.value; // return primitive price value for normal CLI usage
 }
 
 /**
- * Replace the cache with a new Map (used in tests).
+ * Set a value in the cache for a specific key with optional TTL.
+ *
+ * @param {string} key - The cache key
+ * @param {number|null} value - The price to cache
+ * @param {number} [ttlMs] - Time to live in ms (optional)
+ */
+export function setCache(key, value, ttlMs = null) {
+  const expires = ttlMs ? Date.now() + ttlMs : null;
+  cacheInstance.set(key, { value, expires });
+}
+
+/**
+ * Replace the entire cache with a new Map (used in tests).
  * @param {Map} newCache - New cache instance
  * @returns {Map} The new cache
  */
-export function setCache(newCache) {
+export function replaceCache(newCache) {
   globalThis.__crypto_price_cache__ = newCache;
   return newCache;
 }
 
 /**
- * Clear the cache (useful for tests or reset).
+ * Clear the entire cache (useful for tests or reset).
  */
 export function clearCache() {
   cacheInstance.clear();
+}
+
+/**
+ * Get current cache size (for debugging).
+ * @returns {number} Number of entries
+ */
+export function cacheSize() {
+  return cacheInstance.size;
 }
