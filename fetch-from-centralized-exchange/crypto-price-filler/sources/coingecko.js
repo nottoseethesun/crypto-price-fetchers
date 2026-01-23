@@ -9,6 +9,7 @@
  */
 
 import { fetchWithRetry } from '../utils/fetch.js';
+import config from '../config.json' with { type: 'json' };
 
 /**
  * Fetch price from CoinGecko for a given token and timestamp.
@@ -34,13 +35,22 @@ export async function getPriceFromCoinGecko(
   const date = new Date(utcMs);
   const dateStr = `${date.getDate().toString().padStart(2, '0')}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getFullYear()}`;
 
+  // CoinGecko API headers with demo key
+  const cgHeaders = config.COINGECKO_API_KEY
+    ? { headers: { 'x-cg-demo-api-key': config.COINGECKO_API_KEY } }
+    : {};
+
+  // Rate limit delay (default 2000ms for 30 req/min, skipped in test env)
+  const rateLimitMs = process.env.NODE_ENV === 'test' ? 0 : (config.COINGECKO_RATE_LIMIT_MS || 2000);
+  const delay = (ms) => ms > 0 ? new Promise(resolve => setTimeout(resolve, ms)) : Promise.resolve();
+
   let price = null;
 
   // Try tickers endpoint first (current price)
   const tickersUrl = `https://api.coingecko.com/api/v3/coins/${coingeckoId}/tickers`;
   try {
     logv(2, `Fetch attempt 1/3 for ${tickersUrl}`);
-    const response = await fetchWithRetry(tickersUrl, {}, verbose);
+    const response = await fetchWithRetry(tickersUrl, cgHeaders, verbose);
     if (response.ok) {
       const data = await response.json();
       const ticker = data.tickers?.find(t => t.target === 'USD' || t.base === 'USD');
@@ -56,9 +66,10 @@ export async function getPriceFromCoinGecko(
 
   // Fallback to historical endpoint (precise timestamp attempt)
   const historyUrl = `https://api.coingecko.com/api/v3/coins/${coingeckoId}/history?date=${dateStr}`;
+  await delay(rateLimitMs); // Rate limit before next request
   try {
     logv(2, `Fetch attempt 1/3 for ${historyUrl}`);
-    const response = await fetchWithRetry(historyUrl, {}, verbose);
+    const response = await fetchWithRetry(historyUrl, cgHeaders, verbose);
     if (response.ok) {
       const data = await response.json();
       const marketData = data.market_data;
@@ -79,8 +90,9 @@ export async function getPriceFromCoinGecko(
   // Fallback to daily granularity (same day) when precise timestamp fails
   if (price === null) {
     logv(1, 'No precise data - retrying with daily granularity');
+    await delay(rateLimitMs); // Rate limit before next request
     try {
-      const response = await fetchWithRetry(historyUrl, {}, verbose);
+      const response = await fetchWithRetry(historyUrl, cgHeaders, verbose);
       if (response.ok) {
         const data = await response.json();
         const marketData = data.market_data;

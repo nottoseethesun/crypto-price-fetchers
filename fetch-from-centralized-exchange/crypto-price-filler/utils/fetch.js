@@ -8,10 +8,11 @@ import config from '../config.json' with { type: 'json' };
 /**
  * Fetches a URL with automatic retry on 429 (rate limit) errors.
  * @param {string} url - The URL to fetch
+ * @param {Object} [options={}] - Fetch options (headers, etc.)
  * @param {boolean} [verbose=false] - Enable verbose logging
  * @returns {Promise<Response|null>} Response object if successful, null if all retries fail
  */
-export async function fetchWithRetry(url, verbose = false) {
+export async function fetchWithRetry(url, options = {}, verbose = false) {
   const logv = (shouldLog, level, message, ...args) => {
     if (!shouldLog || level < 1) return;
     console.log(`[VERBOSE:${level}] ${message}`, ...args);
@@ -23,7 +24,7 @@ export async function fetchWithRetry(url, verbose = false) {
     logv(verbose, 2, `Fetch attempt ${attempts}/${config.MAX_RETRIES} for ${url}`);
 
     try {
-      const res = await fetch(url);
+      const res = await fetch(url, options);
       logv(verbose, 2, `Fetch response status: ${res.status} for ${url}`);
 
       if (res.ok) {

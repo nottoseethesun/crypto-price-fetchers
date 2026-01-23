@@ -1,4 +1,5 @@
 {
+  "COINGECKO_API_KEY": "",
   "EXCHANGE_BASE_URL": "https://api.mexc.com/api/v3",
   "QUOTE_CURRENCY": "USDT",
   "DEFAULT_INTERVAL": "1m",
@@ -24,5 +25,6 @@
   "COINPAPRIKA_OHLCV_TEMPLATE": "{base}/ohlcv/{id}/historical?start={start}&end={end}",
   "RETRY_BACKOFF_MS": [5000, 10000, 20000],
   "MAX_RETRIES": 3,
-  "REQUEST_DELAY_MS": 1200
+  "REQUEST_DELAY_MS": 1200,
+  "COINGECKO_RATE_LIMIT_MS": 2000
 }

@@ -32,7 +32,7 @@ export async function getPriceFromCoinPaprika(id, utcMs, highOrLow, verbose = fa
     .replace('{start}', start)
     .replace('{end}', end);
   logv(2, `CoinPaprika OHLCV URL (precise): ${ohlcvUrl}`);
-  let ohlcvRes = await fetchWithRetry(ohlcvUrl, verbose);
+  let ohlcvRes = await fetchWithRetry(ohlcvUrl, {}, verbose);
 
   let ohlcv = null;
   if (ohlcvRes && ohlcvRes.ok) {
@@ -53,7 +53,7 @@ export async function getPriceFromCoinPaprika(id, utcMs, highOrLow, verbose = fa
       .replace('{start}', dateStr)
       .replace('{end}', dateStr);
     logv(2, `CoinPaprika daily OHLCV URL: ${dailyOhlcvUrl}`);
-    ohlcvRes = await fetchWithRetry(dailyOhlcvUrl, verbose);
+    ohlcvRes = await fetchWithRetry(dailyOhlcvUrl, {}, verbose);
 
     if (ohlcvRes && ohlcvRes.ok) {
       try {

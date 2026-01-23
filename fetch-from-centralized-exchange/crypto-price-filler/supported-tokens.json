@@ -2,7 +2,7 @@
   "tokens": {
     "grc": {
       "name": "GridCoin",
-      "coingecko_id": null,
+      "coingecko_id": "gridcoin-research",
       "coinpaprika_id": "grc-gridcoin",
       "mexc_symbol": null,
       "note": "Not on MEXC; CoinGecko + CoinPaprika fallbacks"

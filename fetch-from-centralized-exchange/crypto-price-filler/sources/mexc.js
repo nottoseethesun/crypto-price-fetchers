@@ -73,7 +73,7 @@ export async function getPriceFromMEXC(token, utcMs, target, verbose = false, pr
     attempts++;
     logv(verbose, 1, `Attempt ${attempts}/${config.MAX_RETRIES} fetching exchangeInfo`);
 
-    exchangeRes = await fetchWithRetry(exchangeInfoUrl, verbose);
+    exchangeRes = await fetchWithRetry(exchangeInfoUrl, {}, verbose);
     logv(verbose, 2, `exchangeRes after attempt ${attempts}: ${exchangeRes ? 'received' : 'null'}`);
 
     if (exchangeRes === null) {
@@ -158,7 +158,7 @@ export async function getPriceFromMEXC(token, utcMs, target, verbose = false, pr
   let interval = config.DEFAULT_INTERVAL;
   let klineUrl = config.EXCHANGE_BASE_URL + `/klines?symbol=${symbol}&interval=${interval}&startTime=${utcMs - 60000}&endTime=${utcMs}&limit=1`;
   logv(2, `MEXC klines URL (${interval}): ${klineUrl}`);
-  let klineRes = await fetchWithRetry(klineUrl, verbose);
+  let klineRes = await fetchWithRetry(klineUrl, {}, verbose);
   logv(2, `MEXC klines response (1m): ${klineRes ? 'received' : 'null'}`);
 
   let data = null;
@@ -194,7 +194,7 @@ export async function getPriceFromMEXC(token, utcMs, target, verbose = false, pr
     interval = config.FALLBACK_INTERVAL;
     klineUrl = config.EXCHANGE_BASE_URL + `/klines?symbol=${symbol}&interval=${interval}&startTime=${utcMs - 3600000}&endTime=${utcMs}&limit=1`;
     logv(2, `MEXC klines fallback URL (${interval}): ${klineUrl}`);
-    klineRes = await fetchWithRetry(klineUrl, verbose);
+    klineRes = await fetchWithRetry(klineUrl, {}, verbose);
     logv(2, `MEXC klines response (fallback): ${klineRes ? 'received' : 'null'}`);
 
     if (klineRes) {
