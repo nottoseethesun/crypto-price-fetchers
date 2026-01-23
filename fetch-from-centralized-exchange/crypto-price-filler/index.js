@@ -16,96 +16,80 @@
  * @author Christopher M. Balz with Grok and Claude.ai
  * @license See the file, `../LICENSE`
  *
- * Installation / Usage
- * --------------------
+ * Installation
+ * ------------
  *
- * 1. Install dependencies:
+ * 1. Ensure Node.js v21.1.0 or later is installed
+ * 2. Install dependencies:
  *    npm install
- * 
- * 2. Ensure that your coin is entered into the `tokenMap` mapping in this file.
  *
- * 3. Ensure that your CSV input file's format, where you list out the dates that you want 
- *    to fetch the price for, matches the sample CSV file provided in `tests/input.csv` exactly 
- *    in terms of column headers and date format (YYYY-MM-DD HH:mm:SS).
- * 
- * 4. Basic usage:
- *    node index.js --token=xtm --input=input.csv --output=output.csv
+ * Configuration
+ * -------------
  *
- * Command-Line Options
- * --------------------
- * All options are passed as --key=value or --key (flag style)
+ * All configuration is done via two JSON files: `supported-tokens.json` for tokens
+ * and `config.json` for API settings. No code changes required.
  *
- * --token       {string}  Required. Token symbol (e.g. xtm, btc, xmr). Case-insensitive.
- * --input       {string}  Required. Path to input CSV. Supports ~ for home directory.
- * --output      {string}  Output CSV path. Default: 'output.csv'
- * --mode        {string}  Price type: 'high' (default) or 'low'
- * --tz          {string}  Timezone abbreviation. Default: 'UTC'
- *                         Supported: UTC, GMT, EST, EDT, CST, CDT, MST, MDT, PST, PDT
- * --verbose     {flag}    Enable detailed [VERBOSE] logging. Default: false
- *                         Also enabled by env var: VERBOSE=1
- * --help        {flag}    Show usage information
- * 
- * Examples
- * --------
+ * ADDING A NEW COIN (supported-tokens.json):
  *
- * # Basic high-price fill (UTC)
- * node index.js --token=xtm --input=tests/input.csv --output=filled_output.csv --mode=high --tz=UTC
+ *   Open `supported-tokens.json` and add an entry under the "tokens" object:
  *
- * # Low price in CDT timezone + verbose
- * node index.js --token=xtm --input=input.csv --output=low_prices_output.csv --mode=low --tz=CDT --verbose
+ *   "symbol": {
+ *     "name": "Human-readable name",
+ *     "coingecko_id": "coingecko-api-id",      // or null if not on CoinGecko
+ *     "coinpaprika_id": "coinpaprika-api-id",  // or null if not on CoinPaprika
+ *     "mexc_symbol": "SYMBOL",                 // base symbol (e.g. "XTM"), or null
+ *     "note": "Optional notes about this token"
+ *   }
  *
- * # Missing args → shows usage
- * node index.js
+ *   To find the correct IDs:
+ *   - CoinGecko: Search at https://www.coingecko.com, the ID is in the URL
+ *     (e.g., https://www.coingecko.com/en/coins/gridcoin-research → "gridcoin-research")
+ *   - CoinPaprika: Search at https://coinpaprika.com, ID format is "symbol-name"
+ *     (e.g., "grc-gridcoin")
+ *   - MEXC: Use the base symbol only (e.g., "XTM" not "XTMUSDT")
  *
- * Testing Instructions
- * --------------------
+ *   Example - adding Monero:
+ *   "xmr": {
+ *     "name": "Monero",
+ *     "coingecko_id": "monero",
+ *     "coinpaprika_id": "xmr-monero",
+ *     "mexc_symbol": "XMR",
+ *     "note": "Privacy coin"
+ *   }
  *
- * 1. Unit/Integration Tests (Vitest)
- *    Run the full suite (15 tests):
- *    npm run test              # clean output
- *    npm run test:verbose      # with full [VERBOSE] logs
+ * ADDING A NEW DATA SOURCE:
  *
- *    All tests use mocks for APIs, cache, fallback, retry, etc.
- *    Coverage: ~44% statements (mostly CLI & rare edges uncovered)
+ *   To add a new price API source (e.g., CryptoCompare, Binance):
  *
- * 2. Production-Style Test with Real Data
- *    Use the provided sample CSV in tests/input.csv (10 rows with dates & amounts)
- *    Run:
- *    node index.js --token=xtm --input=tests/input.csv --output=filled_output.csv --mode=high --tz=UTC --verbose
+ *   1. Create a new module in `sources/` (e.g., `sources/cryptoCompare.js`)
+ *      Export a function like: getPriceFromCryptoCompare(id, utcMs, target, verbose)
+ *      - Should return a price (number) or null if unavailable
+ *      - Use `fetchWithRetry` from `utils/fetch.js` for rate-limit handling
+ *      - Include verbose logging with logv() pattern
  *
- *    Expected output:
- *    - Reads 10 rows
- *    - Fetches real XTM prices from MEXC (or fallbacks)
- *    - Fills $usd price and $usd amount columns
- *    - Writes filled_output.csv
- *    - Verbose logs show every fetch attempt, parse step, price result
- *    - Future/invalid dates left blank
- *    - If no price available → writes 'Error'
+ *   2. Add API configuration to `config.json`:
+ *      - Base URL (e.g., "CRYPTOOMPARE_BASE": "https://...")
+ *      - API key if required (e.g., "CRYPTOOMPARE_API_KEY": "")
+ *      - Rate limit delay (e.g., "CRYPTOOMPARE_RATE_LIMIT_MS": 1000)
  *
- *    Note: Real API calls may hit rate limits → verbose logs will show retries/backoffs.
+ *   3. Add the source ID field to `supported-tokens.json` schema:
+ *      - Add "cryptoCompare_id" field to relevant tokens
  *
- * TroubleShooting
- * ----------------
+ *   4. Integrate into `sources/price.js`:
+ *      - Import your new function
+ *      - Add it to the fallback chain (after MEXC, CoinGecko, CoinPaprika)
+ *      - Follow the existing pattern for null checks and logging
  *
- * - Ensure Node.js v14+ is installed
- * - Ensure internet connectivity for API access
- * - Check that input CSV matches expected format exactly
- * - Use --verbose flag for detailed logs
- * - Check API status of MEXC, CoinGecko, CoinPaprika if fetches fail
- * - Review rate-limit handling in logs if many requests are made
- * - For unexpected errors, check stack traces in verbose output
+ *   5. Export from `sources/index.js` (barrel file)
  *
- * Configuration (config.json)
- * ---------------------------
+ * API KEYS (config.json):
  *
- * API Keys:
- *
- *   COINGECKO_API_KEY    Your CoinGecko API key. Obtain one from https://www.coingecko.com/en/api
+ *   COINGECKO_API_KEY    Your CoinGecko API key. Obtain from https://www.coingecko.com/en/api
  *                        The free "Demo" tier provides 30 requests/minute and 365 days of
- *                        historical data. Leave empty ("") to use unauthenticated access
+ *                        historical data. Leave empty ("") for unauthenticated access
  *                        (stricter rate limits, no historical data beyond current day).
  *
- * Rate Limiting:
+ * RATE LIMITING (config.json):
  *
  *   REQUEST_DELAY_MS     Default delay (in milliseconds) between successive API requests.
  *                        Used as a baseline for all sources. Default: 1200ms.
@@ -115,19 +99,95 @@
  *                        - Demo (free with key): 30 req/min → 2000ms recommended
  *                        - Analyst: 500 req/min → 120ms
  *                        - Pro: higher limits → adjust accordingly
- *                        Default: 2000ms. This delay is skipped in test environments.
+ *                        Default: 2000ms. Skipped in test environments.
  *
- * Customizing for Your API Plan:
+ *   To customize for your API plan:
+ *   1. Check your provider's documentation for rate limits
+ *   2. Calculate delay: (60000 ms / requests_per_minute)
+ *   3. Update the relevant *_RATE_LIMIT_MS value in config.json
  *
- *   1. Check your API provider's documentation for rate limits and features.
- *   2. Open config.json and locate the relevant setting (e.g., COINGECKO_RATE_LIMIT_MS).
- *   3. Calculate the appropriate delay: (60000 ms / requests_per_minute).
- *   4. Update the value and save. No code changes required.
+ * OTHER SETTINGS (config.json):
  *
- *   Other configurable values in config.json:
- *   - MAX_RETRIES: Number of retry attempts on rate-limit (429) errors. Default: 3.
- *   - RETRY_BACKOFF_MS: Array of backoff delays [5000, 10000, 20000] for successive retries.
- *   - TIMEZONE_OFFSETS: Add custom timezone abbreviations if needed.
+ *   MAX_RETRIES          Number of retry attempts on rate-limit (429) errors. Default: 3.
+ *   RETRY_BACKOFF_MS     Array of backoff delays for successive retries. Default: [5000, 10000, 20000].
+ *   TIMEZONE_OFFSETS     Add custom timezone abbreviations and their UTC offsets.
+ *
+ * Usage
+ * -----
+ *
+ * Prepare your input CSV file with the following format (see `tests/mock-input.csv`):
+ *   - Required column: "date (UTC)" in format YYYY-MM-DD HH:mm:ss
+ *   - Required column: "amount" (quantity of tokens)
+ *   - Optional columns are preserved in output
+ *
+ * Basic command:
+ *   node index.js --token=<symbol> --input=<file.csv> --output=<output.csv>
+ *
+ * Command-Line Options:
+ *   --token       {string}  Required. Token symbol (e.g. xtm, grc, btc). Case-insensitive.
+ *   --input       {string}  Required. Path to input CSV. Supports ~ for home directory.
+ *   --output      {string}  Output CSV path. Default: 'output.csv'
+ *   --mode        {string}  Price type: 'high', 'low', or 'close'. Default: 'close'
+ *   --tz          {string}  Timezone abbreviation. Default: 'UTC'
+ *                           Supported: UTC, GMT, EST, EDT, CST, CDT, MST, MDT, PST, PDT
+ *   --verbose     {flag}    Enable detailed [VERBOSE] logging. Also: VERBOSE=1 env var
+ *   --help        {flag}    Show usage information
+ *
+ * Examples:
+ *
+ *   # Basic close-price fill (UTC)
+ *   node index.js --token=grc --input=mining.csv --output=filled.csv
+ *
+ *   # High price in CDT timezone with verbose logging
+ *   node index.js --token=xtm --input=input.csv --output=prices.csv --mode=high --tz=CDT --verbose
+ *
+ *   # Show help
+ *   node index.js --help
+ *
+ * Testing
+ * -------
+ *
+ * Unit/Integration Tests (Vitest):
+ *   npm run test              # standard test run
+ *   npm run test:strict       # includes import verification (recommended)
+ *   npm run test:debug        # with full [VERBOSE] logs
+ *
+ *   All tests use mocks for APIs, cache, fallback, retry, etc.
+ *
+ *   IMPORTANT: Use `test:strict` to catch import errors that `vitest` alone may miss.
+ *   This ensures files will actually load into Node.js, preventing production breakage.
+ *
+ * Production-Style Test with Real Data:
+ *   node index.js --token=grc --input=tests/mock-input.csv --output=tests/mock-filled.csv --verbose
+ *
+ *   Expected behavior:
+ *   - Fetches real prices from configured sources (MEXC → CoinGecko → CoinPaprika)
+ *   - Fills $usd price, $usd amount, and grand total columns
+ *   - Future/invalid dates left blank
+ *   - If no price available → writes 'Error'
+ *   - Verbose logs show every fetch attempt, parse step, price result
+ *
+ * Saving Test Logs:
+ *   npm run test:debug > test.log 2>&1
+ *
+ *   To view logs in HTML (requires `aha`: sudo apt install aha):
+ *   aha --black -y 'body { font-size: 14px; }' < test.log > test.html && xdg-open test.html
+ *
+ *   Optional shell aliases for convenience:
+ *     alias svtlog='npm run test:debug > test.log 2>&1'
+ *     alias swtlog="aha --black -y 'body { font-size: 14px; }' < test.log > test.html && xdg-open test.html"
+ *
+ * TroubleShooting
+ * ---------------
+ *
+ * - Ensure Node.js v21.1.0 or later is installed
+ * - Ensure internet connectivity for API access
+ * - Check that input CSV matches expected format exactly
+ * - Use --verbose flag for detailed logs
+ * - Check API status of MEXC, CoinGecko, CoinPaprika if fetches fail
+ * - Review rate-limit handling in logs if many requests are made
+ * - For unexpected errors, check stack traces in verbose output
+ * - If historical data returns 401, check API key and plan limits (e.g., 365-day limit)
  *
  */
 

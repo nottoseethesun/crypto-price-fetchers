@@ -470,8 +470,8 @@ describe('Crypto Price Filler Helpers', () => {
   });
 
   describe('CSV Parsing', () => {
-    it('parses tests/input.csv correctly', () => {
-      const csvContent = fs.readFileSync('tests/input.csv', 'utf8');
+    it('parses tests/mock-input.csv correctly', () => {
+      const csvContent = fs.readFileSync('tests/mock-input.csv', 'utf8');
       const records = csvParse(csvContent, {
         columns: true,
         skip_empty_lines: true,
@@ -482,8 +482,8 @@ describe('Crypto Price Filler Helpers', () => {
       });
 
       expect(records.length).toBeGreaterThan(0);
-      expect(records[0]['date (UTC)']).toBe('2025-12-19 00:17:00');
-      expect(records[0]['amount']).toBe('200.24');
+      expect(records[0]['date (UTC)']).toBe('2025-02-01 00:00:00');
+      expect(records[0]['amount']).toBe('10.5');
     });
   });
 
