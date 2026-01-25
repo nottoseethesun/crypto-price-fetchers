@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
+    "clean": "rm -f tests/mock-filled*.csv test.log test.html",
     "test": "vitest run --coverage --silent",
     "validate-parse": "node index.js --help >/dev/null 2>&1 || [ $? -eq 1 ] && echo 'CLI parses OK (normal exit 1 on --help/usage)' || (echo 'CLI crashed unexpectedly'; exit 1)",
     "test:strict": "npm run validate-parse && vitest run --coverage --silent",
