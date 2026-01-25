@@ -133,6 +133,16 @@
  *   --verbose     {flag}    Enable detailed [VERBOSE] logging. Also: VERBOSE=1 env var
  *   --help        {flag}    Show usage information
  *
+ * Progress Bar:
+ *   A progress bar is displayed by default during processing, showing:
+ *   - Current row / total rows
+ *   - Percentage complete
+ *   - Estimated time remaining (ETA)
+ *
+ *   The progress bar is automatically disabled in:
+ *   - Verbose mode (--verbose) - detailed logs shown instead
+ *   - Test environments (NODE_ENV=test or VITEST)
+ *
  * Examples:
  *
  *   # Basic close-price fill (UTC)
@@ -201,6 +211,7 @@ import { createObjectCsvWriter } from 'csv-writer';
 import { getTimezoneOffsetHours, parseInputToUtcMs } from './utils/date.js';
 import { getCryptoPrice } from './sources/price.js';
 import { getCache, setCache } from './utils/cache.js';
+import { getProgressBar } from './utils/progress.js';
 
 // Added missing luxon import (fixes DateTime is not defined)
 import { DateTime } from 'luxon';
@@ -306,6 +317,10 @@ const outputRows = [];
 
 let grandTotalUsd = 0;
 
+// Initialize progress bar (shows in non-verbose mode, disabled in tests)
+const progressBar = getProgressBar(rows.length, verbose);
+progressBar.start();
+
 for (let i = 0; i < rows.length; i++) {
   const row = { ...rows[i] };
   const dateStr = (row[dateColName] || '').trim();
@@ -346,7 +361,13 @@ for (let i = 0; i < rows.length; i++) {
 
   row[grandTotalColName] = grandTotalUsd.toFixed(6);
   outputRows.push(row);
+
+  // Update progress bar
+  progressBar.increment();
 }
+
+// Stop progress bar
+progressBar.stop();
 
 logv(verbose, 1, `Preparing to write output CSV with ${outputRows.length} rows`);
 
