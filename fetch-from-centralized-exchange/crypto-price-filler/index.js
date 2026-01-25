@@ -11,6 +11,7 @@
  * - Supports timezone offsets, caching, rate-limit retry, BTC-pair adjustment
  * - Verbose logging for debugging
  * - Handles invalid/future dates gracefully
+ * - Backfill options for empty prices (tax estimation)
  *
  * @version 1.0.0
  * @author Christopher M. Balz with Grok and Claude.ai
@@ -112,6 +113,17 @@
  *   RETRY_BACKOFF_MS     Array of backoff delays for successive retries. Default: [5000, 10000, 20000].
  *   TIMEZONE_OFFSETS     Add custom timezone abbreviations and their UTC offsets.
  *
+ *   BACKFILL_HIGHEST     Set to true to enable --backfill-highest by default. Default: false.
+ *                        Fills empty/error prices with the highest of the two bracketing prices.
+ *                        Use for conservative tax estimates (higher taxable income).
+ *
+ *   BACKFILL_LOWEST      Set to true to enable --backfill-lowest by default. Default: false.
+ *                        Fills empty/error prices with the lowest of the two bracketing prices.
+ *                        Use for budgeting to avoid over-estimating income.
+ *
+ *   Note: CLI flags (--backfill-highest, --backfill-lowest) override config.json settings.
+ *   If both are enabled, BACKFILL_HIGHEST takes precedence.
+ *
  * Usage
  * -----
  *
@@ -131,7 +143,36 @@
  *   --tz          {string}  Timezone abbreviation. Default: 'UTC'
  *                           Supported: UTC, GMT, EST, EDT, CST, CDT, MST, MDT, PST, PDT
  *   --verbose     {flag}    Enable detailed [VERBOSE] logging. Also: VERBOSE=1 env var
+ *   --backfill-highest {flag}  Fill empty/error prices with highest bracketing price.
+ *                           Use for conservative tax estimates (higher taxable income).
+ *   --backfill-lowest  {flag}  Fill empty/error prices with lowest bracketing price.
+ *                           Use for budgeting to avoid over-estimating income.
  *   --help        {flag}    Show usage information
+ *
+ * Backfill Options:
+ *   When price data is unavailable for certain rows (API errors, unsupported dates),
+ *   the output will contain empty or 'Error' values. The backfill options allow you
+ *   to fill these gaps using neighboring prices for tax estimation purposes.
+ *
+ *   How it works:
+ *   - Finds contiguous blocks of empty/error prices
+ *   - Looks at the valid prices immediately before and after the block
+ *   - Fills with the higher (--backfill-highest) or lower (--backfill-lowest) of the two
+ *   - If only one bracketing price exists (start/end of file), uses that price
+ *   - Recalculates USD amounts and grand totals after backfilling
+ *
+ *   Use cases:
+ *   - --backfill-highest: Conservative tax estimates (assumes higher price at time
+ *     of receipt, resulting in higher reported taxable income)
+ *   - --backfill-lowest: Budgeting (assumes lower price at time of receipt to avoid
+ *     over-estimating income when planning)
+ *
+ *   Configuration:
+ *   These options can also be set in config.json for persistent defaults:
+ *     "BACKFILL_HIGHEST": true   // Enable by default (CLI flag overrides)
+ *     "BACKFILL_LOWEST": true    // Enable by default (CLI flag overrides)
+ *
+ *   Note: If both flags are specified, --backfill-highest takes precedence.
  *
  * Progress Bar:
  *   A progress bar is displayed by default during processing, showing:
@@ -150,6 +191,12 @@
  *
  *   # High price in CDT timezone with verbose logging
  *   node index.js --token=xtm --input=input.csv --output=prices.csv --mode=high --tz=CDT --verbose
+ *
+ *   # Backfill empty prices with highest bracketing price (conservative tax estimates)
+ *   node index.js --token=grc --input=mining.csv --output=filled.csv --backfill-highest
+ *
+ *   # Backfill empty prices with lowest bracketing price (budgeting)
+ *   node index.js --token=grc --input=mining.csv --output=filled.csv --backfill-lowest
  *
  *   # Show help
  *   node index.js --help
@@ -219,13 +266,77 @@ import { DateTime } from 'luxon';
 // Import CLI setup from separate module
 import { parseArgs } from './commander.js';
 
-// Load central token configurations from supported-tokens.json
+// Load configuration files
 const supportedTokens = JSON.parse(fs.readFileSync('./supported-tokens.json', 'utf8'));
+const config = JSON.parse(fs.readFileSync('./config.json', 'utf8'));
 
 // Verbosity-aware logger
 function logv(shouldLog, level, message, ...args) {
   if (!shouldLog || level < 1) return;
   console.log(`[VERBOSE:${level}] ${message}`, ...args);
+}
+
+/**
+ * Backfills empty price rows using bracketing prices.
+ * Empty prices are filled with either the highest or lowest of the surrounding valid prices.
+ * Also recalculates USD amounts and grand totals after backfilling.
+ *
+ * @param {Array<Object>} rows - Array of row objects to process
+ * @param {string} priceColName - Name of the price column
+ * @param {string} amountColName - Name of the amount column
+ * @param {string} usdAmountColName - Name of the USD amount column
+ * @param {string} grandTotalColName - Name of the grand total column
+ * @param {boolean} useHighest - If true, use highest bracketing price; if false, use lowest
+ * @param {boolean} verbose - Enable verbose logging
+ */
+function backfillPrices(rows, priceColName, amountColName, usdAmountColName, grandTotalColName, useHighest, verbose) {
+    const isEmpty = (price) => price === '' || price === 'Error';
+
+    let i = 0;
+    while (i < rows.length) {
+        if (isEmpty(rows[i][priceColName])) {
+            const blockStart = i;
+            while (i < rows.length && isEmpty(rows[i][priceColName])) i++;
+            const blockEnd = i;
+
+            // Find bracketing prices
+            let leftPrice = blockStart > 0 ? parseFloat(rows[blockStart - 1][priceColName]) : null;
+            let rightPrice = blockEnd < rows.length ? parseFloat(rows[blockEnd][priceColName]) : null;
+            if (isNaN(leftPrice)) leftPrice = null;
+            if (isNaN(rightPrice)) rightPrice = null;
+
+            // Determine fill price
+            let fillPrice = null;
+            if (leftPrice !== null && rightPrice !== null) {
+                fillPrice = useHighest ? Math.max(leftPrice, rightPrice) : Math.min(leftPrice, rightPrice);
+            } else {
+                fillPrice = leftPrice ?? rightPrice;
+            }
+
+            // Fill the block
+            if (fillPrice !== null) {
+                logv(verbose, 1, `Backfilling rows ${blockStart + 1}-${blockEnd} with price ${fillPrice}`);
+                for (let j = blockStart; j < blockEnd; j++) {
+                    rows[j][priceColName] = fillPrice;
+                }
+            }
+        } else {
+            i++;
+        }
+    }
+
+    // Recalculate USD amounts and grand totals
+    let grandTotalUsd = 0;
+    for (const row of rows) {
+        const price = parseFloat(row[priceColName]);
+        const amount = parseFloat((row[amountColName] || '').trim());
+        if (!isNaN(price) && !isNaN(amount)) {
+            const usdAmount = amount * price;
+            row[usdAmountColName] = usdAmount.toFixed(8);
+            grandTotalUsd += usdAmount;
+        }
+        row[grandTotalColName] = grandTotalUsd.toFixed(6);
+    }
 }
 
 // Parse CLI args using commander (moved to commander.js)
@@ -237,6 +348,8 @@ const outputFile = args.output || 'output.csv';
 const mode = args.mode || 'high';
 const tz = args.tz || 'UTC';
 const verbose = args.verbose || process.env.VERBOSE === '1';
+const backfillHighest = args.backfillHighest || config.BACKFILL_HIGHEST || false;
+const backfillLowest = args.backfillLowest || config.BACKFILL_LOWEST || false;
 
 if (inputFile?.startsWith('~')) {
   inputFile = path.join(os.homedir(), inputFile.slice(1));
@@ -369,6 +482,13 @@ for (let i = 0; i < rows.length; i++) {
 // Stop progress bar
 progressBar.stop();
 
+// Apply backfill if requested (backfillHighest takes precedence if both are set)
+if (backfillHighest || backfillLowest) {
+    const useHighest = backfillHighest; // backfillHighest takes precedence
+    logv(verbose, 1, `Backfill mode: ${useHighest ? 'highest' : 'lowest'}`);
+    backfillPrices(outputRows, priceColName, amountColName, usdAmountColName, grandTotalColName, useHighest, verbose);
+}
+
 logv(verbose, 1, `Preparing to write output CSV with ${outputRows.length} rows`);
 
 const csvWriter = createObjectCsvWriter({
@@ -388,5 +508,6 @@ export {
   getCache,
   setCache,
   getTimezoneOffsetHours,
-  parseInputToUtcMs
+  parseInputToUtcMs,
+  backfillPrices
 };

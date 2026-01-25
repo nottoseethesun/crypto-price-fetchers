@@ -86,6 +86,16 @@ export function setupCommander() {
             'Enable detailed logging during processing',
             false
         )
+        .option(
+            '--backfill-highest',
+            'Fill empty prices with highest bracketing price (conservative tax estimates)',
+            false
+        )
+        .option(
+            '--backfill-lowest',
+            'Fill empty prices with lowest bracketing price (budgeting: avoid over-estimating income)',
+            false
+        )
 
         // Custom help formatting
         .addHelpText('after', `
@@ -95,6 +105,12 @@ Examples:
 
   Full options:
     $ node index.js --token=xtm --input=input.csv --output=prices.csv --mode=high --tz=CDT --verbose
+
+  Backfill empty prices (conservative tax estimates - use higher bracketing price):
+    $ node index.js --token=grc --input=mining.csv --backfill-highest
+
+  Backfill empty prices (budgeting - use lower bracketing price):
+    $ node index.js --token=grc --input=mining.csv --backfill-lowest
 
   Show help:
     $ node index.js --help
