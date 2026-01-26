@@ -21,7 +21,8 @@ Note: If the few decentralized trading exchanges for these coins had more volume
 
 ### Current Roster of Utilities
 
-- `index.js`, a NodeJS Script
+- `index.js` - Main CLI tool for fetching prices and filling CSV files
+- `backfill.js` - Standalone utility to backfill empty prices in existing CSV files
 
 ## Prerequisites
 
@@ -33,7 +34,26 @@ NodeJS 21.1.0+
 
 ### Usage
 
-Refer to the module or file header documentation.
+#### index.js - Price Fetching
+
+Refer to the file-header documentation in `./index.js` for complete usage details.
+
+```bash
+node index.js --token=grc --input=mining.csv --output=filled.csv
+```
+
+#### backfill.js - Backfill Existing CSV
+
+Use `backfill.js` to apply backfill to an existing output CSV file without re-fetching prices.
+Refer to the file-header documentation in `./backfill.js` for complete usage details.
+
+```bash
+# Backfill with highest bracketing price (conservative tax estimates)
+node backfill.js --input=output.csv --backfill-highest
+
+# Backfill with lowest bracketing price (budgeting)
+node backfill.js --input=output.csv --backfill-lowest
+```
 
 ## Development
 

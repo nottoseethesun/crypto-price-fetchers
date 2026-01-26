@@ -259,6 +259,7 @@ import { getTimezoneOffsetHours, parseInputToUtcMs } from './utils/date.js';
 import { getCryptoPrice } from './sources/price.js';
 import { getCache, setCache } from './utils/cache.js';
 import { getProgressBar } from './utils/progress.js';
+import { backfillPrices, logv } from './utils/backfill.js';
 
 // Added missing luxon import (fixes DateTime is not defined)
 import { DateTime } from 'luxon';
@@ -269,75 +270,6 @@ import { parseArgs } from './commander.js';
 // Load configuration files
 const supportedTokens = JSON.parse(fs.readFileSync('./supported-tokens.json', 'utf8'));
 const config = JSON.parse(fs.readFileSync('./config.json', 'utf8'));
-
-// Verbosity-aware logger
-function logv(shouldLog, level, message, ...args) {
-  if (!shouldLog || level < 1) return;
-  console.log(`[VERBOSE:${level}] ${message}`, ...args);
-}
-
-/**
- * Backfills empty price rows using bracketing prices.
- * Empty prices are filled with either the highest or lowest of the surrounding valid prices.
- * Also recalculates USD amounts and grand totals after backfilling.
- *
- * @param {Array<Object>} rows - Array of row objects to process
- * @param {string} priceColName - Name of the price column
- * @param {string} amountColName - Name of the amount column
- * @param {string} usdAmountColName - Name of the USD amount column
- * @param {string} grandTotalColName - Name of the grand total column
- * @param {boolean} useHighest - If true, use highest bracketing price; if false, use lowest
- * @param {boolean} verbose - Enable verbose logging
- */
-function backfillPrices(rows, priceColName, amountColName, usdAmountColName, grandTotalColName, useHighest, verbose) {
-    const isEmpty = (price) => price === '' || price === 'Error';
-
-    let i = 0;
-    while (i < rows.length) {
-        if (isEmpty(rows[i][priceColName])) {
-            const blockStart = i;
-            while (i < rows.length && isEmpty(rows[i][priceColName])) i++;
-            const blockEnd = i;
-
-            // Find bracketing prices
-            let leftPrice = blockStart > 0 ? parseFloat(rows[blockStart - 1][priceColName]) : null;
-            let rightPrice = blockEnd < rows.length ? parseFloat(rows[blockEnd][priceColName]) : null;
-            if (isNaN(leftPrice)) leftPrice = null;
-            if (isNaN(rightPrice)) rightPrice = null;
-
-            // Determine fill price
-            let fillPrice = null;
-            if (leftPrice !== null && rightPrice !== null) {
-                fillPrice = useHighest ? Math.max(leftPrice, rightPrice) : Math.min(leftPrice, rightPrice);
-            } else {
-                fillPrice = leftPrice ?? rightPrice;
-            }
-
-            // Fill the block
-            if (fillPrice !== null) {
-                logv(verbose, 1, `Backfilling rows ${blockStart + 1}-${blockEnd} with price ${fillPrice}`);
-                for (let j = blockStart; j < blockEnd; j++) {
-                    rows[j][priceColName] = fillPrice;
-                }
-            }
-        } else {
-            i++;
-        }
-    }
-
-    // Recalculate USD amounts and grand totals
-    let grandTotalUsd = 0;
-    for (const row of rows) {
-        const price = parseFloat(row[priceColName]);
-        const amount = parseFloat((row[amountColName] || '').trim());
-        if (!isNaN(price) && !isNaN(amount)) {
-            const usdAmount = amount * price;
-            row[usdAmountColName] = usdAmount.toFixed(8);
-            grandTotalUsd += usdAmount;
-        }
-        row[grandTotalColName] = grandTotalUsd.toFixed(6);
-    }
-}
 
 // Parse CLI args using commander (moved to commander.js)
 const args = parseArgs();
@@ -486,7 +418,14 @@ progressBar.stop();
 if (backfillHighest || backfillLowest) {
     const useHighest = backfillHighest; // backfillHighest takes precedence
     logv(verbose, 1, `Backfill mode: ${useHighest ? 'highest' : 'lowest'}`);
-    backfillPrices(outputRows, priceColName, amountColName, usdAmountColName, grandTotalColName, useHighest, verbose);
+    backfillPrices(outputRows, {
+        priceColName,
+        amountColName,
+        usdAmountColName,
+        grandTotalColName,
+        useHighest,
+        verbose
+    });
 }
 
 logv(verbose, 1, `Preparing to write output CSV with ${outputRows.length} rows`);
