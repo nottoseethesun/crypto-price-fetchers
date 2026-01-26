@@ -57,6 +57,15 @@ node backfill.js --input=output.csv --backfill-lowest
 
 ## Development
 
+### Lint
+
+ESLint is configured to enforce code quality and cyclomatic complexity (max 17).
+
+```bash
+npm run lint        # Check for lint errors
+npm run lint:fix    # Auto-fix lint errors where possible
+```
+
 ### Test
 
 Because `vitest` (amazingly) neglects to verify that the files will actually load into
@@ -64,8 +73,10 @@ NodeJS, a whole separate test target, `test:strict`, is required for that.
 This way, if an `import` statement is incorrect, the error will be caught in test
 and not break production.
 
-`npm run test`
-`npm run test:strict`
+```bash
+npm run test        # Run tests with coverage
+npm run test:strict # Validate CLI parsing + run tests
+```
 
 #### Debug Test
 
@@ -101,8 +112,9 @@ Fork me on GitHub. :)  Contributions are welcome but note that any contributions
 
 To be accepted for pull request:
 
-- All tests must pass
+- **ESLint must pass** (`npm run lint`) - enforces cyclomatic complexity max 17
+- **All tests must pass** (`npm run test:strict`)
 - Any major new functionality must have a test runnable from the current approach
-- All code must be modular e.g. low cyclomatic complexity ~17 or so.
+- Statement coverage must remain at or above 80%
 
-[![Price Filler Tests](https://github.com/nottoseethesun/crypto-price-fetchers/actions/workflows/test-price-filler.yml/badge.svg)](https://github.com/nottoseethesun/crypto-price-fetchers/actions/workflows/test-price-filler.yml)
+[![CI - Lint & Tests](https://github.com/nottoseethesun/crypto-price-fetchers/actions/workflows/test-price-filler.yml/badge.svg)](https://github.com/nottoseethesun/crypto-price-fetchers/actions/workflows/test-price-filler.yml)

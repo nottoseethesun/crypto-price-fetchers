@@ -34,8 +34,8 @@ const mockExchangeInfoUSDT = {
   ]
 };
 
-// Mock kline data
-const mockKlineData = [
+// Mock kline data (prefixed with _ as it's available for future tests)
+const _mockKlineData = [
   [1704110400000, '0.00001', '0.000012', '0.000008', '0.000011', '1000000']
 ];
 

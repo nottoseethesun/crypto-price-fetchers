@@ -17,6 +17,163 @@ import { parseInputToUtcMs, getTimezoneOffsetHours } from '../utils/date.js';
 import fs from 'fs';
 
 /**
+ * Helper logging function.
+ * @param {boolean} shouldLog - Whether to log
+ * @param {number} level - Log level
+ * @param {string} message - Message to log
+ * @param {...*} args - Additional arguments
+ */
+function logv(shouldLog, level, message, ...args) {
+  if (!shouldLog || level < 1) return;
+  console.log(`[VERBOSE:${level}] ${message}`, ...args);
+}
+
+/**
+ * Loads token configuration from supported-tokens.json.
+ * @param {string} token - Token symbol
+ * @returns {Object} Token configuration with coingeckoId, coinpaprikaId, mexcSymbol
+ */
+function loadTokenConfig(token) {
+  const supportedTokens = JSON.parse(fs.readFileSync('./supported-tokens.json', 'utf8'));
+  const tokenConfig = supportedTokens.tokens?.[token.toLowerCase()] || {};
+
+  return {
+    coingeckoId: tokenConfig.coingecko_id || null,
+    coinpaprikaId: tokenConfig.coinpaprika_id || null,
+    mexcSymbol: tokenConfig.mexc_symbol || null
+  };
+}
+
+/**
+ * Generates a cache key for the price lookup.
+ * @param {string} token - Token symbol
+ * @param {number} utcMs - UTC timestamp in milliseconds
+ * @param {string} target - Price target (high/low/close)
+ * @returns {string} Cache key
+ */
+function generateCacheKey(token, utcMs, target) {
+  const dateKey = new Date(utcMs).toISOString().slice(0, 19).replace(/[-:T]/g, '');
+  return `price_${token.toLowerCase()}_${dateKey}_UTC_${target}`;
+}
+
+/**
+ * Checks cache for a price.
+ * @param {string} cacheKey - Cache key to look up
+ * @param {Object|null} testCache - Optional test cache
+ * @param {boolean} verbose - Enable verbose logging
+ * @returns {number|null|undefined} Cached price, or undefined if not found
+ */
+function checkCache(cacheKey, testCache, verbose) {
+  if (testCache) {
+    if (testCache.has(cacheKey)) {
+      const cached = testCache.get(cacheKey);
+      logv(verbose, 1, `Cache HIT for key "${cacheKey}"`);
+      return cached;
+    }
+  } else if (getCache(cacheKey)) {
+    const cached = getCache(cacheKey);
+    logv(verbose, 1, `Cache HIT for key "${cacheKey}"`);
+    return cached;
+  }
+  return undefined;
+}
+
+/**
+ * Stores a price in cache.
+ * @param {string} cacheKey - Cache key
+ * @param {number|null} price - Price to cache
+ * @param {Object|null} testCache - Optional test cache
+ */
+function storeInCache(cacheKey, price, testCache) {
+  if (testCache) {
+    testCache.set(cacheKey, price);
+  } else {
+    setCache(cacheKey, price);
+  }
+}
+
+/**
+ * Attempts to fetch price from MEXC.
+ * @param {string} mexcSymbol - MEXC symbol
+ * @param {number} utcMs - UTC timestamp
+ * @param {string} target - Price target
+ * @param {boolean} verbose - Enable verbose logging
+ * @returns {Promise<number|null>} Price or null
+ */
+async function tryMEXC(mexcSymbol, utcMs, target, verbose) {
+  if (mexcSymbol === null) {
+    logv(verbose, 1, 'MEXC skipped since set to null');
+    return null;
+  }
+
+  try {
+    const price = await getPriceFromMEXC(mexcSymbol, utcMs, target, verbose);
+    if (price !== null) {
+      logv(verbose, 1, `MEXC success - price: ${price}`);
+    }
+    return price;
+  } catch (err) {
+    logv(verbose, 1, `MEXC failed: ${err.message}`);
+    return null;
+  }
+}
+
+/**
+ * Attempts to fetch price from CoinGecko.
+ * @param {string} token - Token symbol
+ * @param {string} coingeckoId - CoinGecko ID
+ * @param {number} utcMs - UTC timestamp
+ * @param {string} target - Price target
+ * @param {boolean} verbose - Enable verbose logging
+ * @returns {Promise<number|null>} Price or null
+ */
+async function tryCoinGecko(token, coingeckoId, utcMs, target, verbose) {
+  if (!coingeckoId) {
+    logv(verbose, 1, 'CoinGecko skipped since set to null');
+    return null;
+  }
+
+  logv(verbose, 1, 'Falling back to CoinGecko');
+  try {
+    const price = await getPriceFromCoinGecko(token, utcMs, target, verbose, coingeckoId);
+    if (price !== null) {
+      logv(verbose, 1, `CoinGecko success - price: ${price}`);
+    }
+    return price;
+  } catch (err) {
+    logv(verbose, 1, `CoinGecko failed: ${err.message}`);
+    return null;
+  }
+}
+
+/**
+ * Attempts to fetch price from CoinPaprika.
+ * @param {string} coinpaprikaId - CoinPaprika ID
+ * @param {number} utcMs - UTC timestamp
+ * @param {string} target - Price target
+ * @param {boolean} verbose - Enable verbose logging
+ * @returns {Promise<number|null>} Price or null
+ */
+async function tryCoinPaprika(coinpaprikaId, utcMs, target, verbose) {
+  if (!coinpaprikaId) {
+    logv(verbose, 1, 'CoinPaprika skipped since set to null');
+    return null;
+  }
+
+  logv(verbose, 1, 'Falling back to CoinPaprika');
+  try {
+    const price = await getPriceFromCoinPaprika(coinpaprikaId, utcMs, target, verbose);
+    if (price !== null) {
+      logv(verbose, 1, `CoinPaprika success - price: ${price}`);
+    }
+    return price;
+  } catch (err) {
+    logv(verbose, 1, `CoinPaprika failed: ${err.message}`);
+    return null;
+  }
+}
+
+/**
  * Fetches historical crypto price for a given token, date/time, and target (high/low/close).
  *
  * Priority:
@@ -41,20 +198,15 @@ export async function getCryptoPrice(
   verbose = false,
   testCache = null
 ) {
-  // Load central token configurations from supported-tokens.json
-  const supportedTokens = JSON.parse(fs.readFileSync('./supported-tokens.json', 'utf8'));
-  const tokenConfig = supportedTokens.tokens?.[token.toLowerCase()] || {};
+  const { coingeckoId, coinpaprikaId, mexcSymbol } = loadTokenConfig(token);
 
-  const coingeckoId = tokenConfig.coingecko_id || null;
-  const coinpaprikaId = tokenConfig.coinpaprika_id || null;
-  const mexcSymbol = tokenConfig.mexc_symbol;
-
-  // Uniform skipped logging for all sources (generic for future additions)
-  const coingeckoStatus = coingeckoId ? coingeckoId : 'skipped since set to null';
-  const coinpaprikaStatus = coinpaprikaId ? coinpaprikaId : 'skipped since set to null';
-  const mexcStatus = mexcSymbol ? mexcSymbol : 'skipped since set to null';
+  // Log resolved IDs
+  const coingeckoStatus = coingeckoId || 'skipped since set to null';
+  const coinpaprikaStatus = coinpaprikaId || 'skipped since set to null';
+  const mexcStatus = mexcSymbol || 'skipped since set to null';
   logv(verbose, 1, `Resolved IDs - CoinGecko: ${coingeckoStatus}, CoinPaprika: ${coinpaprikaStatus}, MEXC: ${mexcStatus}`);
 
+  // Parse date
   const offsetHours = getTimezoneOffsetHours(tz);
   const utcMs = parseInputToUtcMs(dateStr, offsetHours);
 
@@ -63,91 +215,34 @@ export async function getCryptoPrice(
     return null;
   }
 
-  // Skip future dates
   if (utcMs > Date.now()) {
     logv(verbose, 1, `Skipping future date: ${dateStr} (${new Date(utcMs).toISOString()})`);
     return null;
   }
 
-  // Cache key
-  const dateKey = new Date(utcMs).toISOString().slice(0, 19).replace(/[-:T]/g, '');
-  const cacheKey = `price_${token.toLowerCase()}_${dateKey}_UTC_${target}`;
-
-  // Cache check
-  let cachedPrice;
-  if (testCache) {
-    if (testCache.has(cacheKey)) {
-      cachedPrice = testCache.get(cacheKey);
-      logv(verbose, 1, `Cache HIT for key "${cacheKey}"`);
-      return cachedPrice;
-    }
-  } else if (getCache(cacheKey)) {
-    cachedPrice = getCache(cacheKey);
-    logv(verbose, 1, `Cache HIT for key "${cacheKey}"`);
+  // Check cache
+  const cacheKey = generateCacheKey(token, utcMs, target);
+  const cachedPrice = checkCache(cacheKey, testCache, verbose);
+  if (cachedPrice !== undefined) {
     return cachedPrice;
   }
 
   logv(verbose, 1, `Cache MISS for "${cacheKey}" - fetching price`);
 
-  let price = null;
+  // Try sources in order
+  let price = await tryMEXC(mexcSymbol, utcMs, target, verbose);
 
-  // Try MEXC first (only if symbol exists)
-  if (mexcSymbol !== null) {
-    try {
-      price = await getPriceFromMEXC(mexcSymbol, utcMs, target, verbose);
-      if (price !== null) {
-        logv(verbose, 1, `MEXC success - price: ${price}`);
-      }
-    } catch (err) {
-      logv(verbose, 1, `MEXC failed: ${err.message}`);
-    }
-  } else {
-    logv(verbose, 1, `MEXC skipped since set to null`);
+  if (price === null) {
+    price = await tryCoinGecko(token, coingeckoId, utcMs, target, verbose);
   }
 
-  // CoinGecko fallback (only if ID defined)
-  if (price === null && coingeckoId) {
-    logv(verbose, 1, 'Falling back to CoinGecko');
-    try {
-      price = await getPriceFromCoinGecko(token, utcMs, target, verbose, coingeckoId);
-      if (price !== null) {
-        logv(verbose, 1, `CoinGecko success - price: ${price}`);
-      }
-    } catch (err) {
-      logv(verbose, 1, `CoinGecko failed: ${err.message}`);
-    }
-  } else if (price === null) {
-    logv(verbose, 1, 'CoinGecko skipped since set to null');
+  if (price === null) {
+    price = await tryCoinPaprika(coinpaprikaId, utcMs, target, verbose);
   }
 
-  // CoinPaprika fallback (only if ID defined)
-  if (price === null && coinpaprikaId) {
-    logv(verbose, 1, 'Falling back to CoinPaprika');
-    try {
-      price = await getPriceFromCoinPaprika(coinpaprikaId, utcMs, target, verbose);
-      if (price !== null) {
-        logv(verbose, 1, `CoinPaprika success - price: ${price}`);
-      }
-    } catch (err) {
-      logv(verbose, 1, `CoinPaprika failed: ${err.message}`);
-    }
-  } else if (price === null) {
-    logv(verbose, 1, 'CoinPaprika skipped since set to null');
-  }
-
-  // Cache result
-  if (testCache) {
-    testCache.set(cacheKey, price);
-  } else {
-    setCache(cacheKey, price);
-  }
-
+  // Cache and return
+  storeInCache(cacheKey, price, testCache);
   logv(verbose, 1, `[getCryptoPrice] Final price: ${price ?? 'null'}`);
-  return price;
-}
 
-// Helper logging
-function logv(shouldLog, level, message, ...args) {
-  if (!shouldLog || level < 1) return;
-  console.log(`[VERBOSE:${level}] ${message}`, ...args);
+  return price;
 }

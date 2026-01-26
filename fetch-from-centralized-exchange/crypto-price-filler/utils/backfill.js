@@ -29,6 +29,78 @@ export function isPriceEmpty(price) {
 }
 
 /**
+ * Finds the bracketing prices around an empty block.
+ * @param {Array<Object>} rows - Array of row objects
+ * @param {number} blockStart - Start index of empty block
+ * @param {number} blockEnd - End index of empty block (exclusive)
+ * @param {string} priceColName - Name of the price column
+ * @returns {Object} Object with leftPrice and rightPrice (or null if not found)
+ */
+export function findBracketingPrices(rows, blockStart, blockEnd, priceColName) {
+  let leftPrice = blockStart > 0 ? parseFloat(rows[blockStart - 1][priceColName]) : null;
+  let rightPrice = blockEnd < rows.length ? parseFloat(rows[blockEnd][priceColName]) : null;
+
+  if (isNaN(leftPrice)) leftPrice = null;
+  if (isNaN(rightPrice)) rightPrice = null;
+
+  return { leftPrice, rightPrice };
+}
+
+/**
+ * Determines the fill price based on bracketing prices and mode.
+ * @param {number|null} leftPrice - Price before the empty block
+ * @param {number|null} rightPrice - Price after the empty block
+ * @param {boolean} useHighest - If true, use max; if false, use min
+ * @returns {number|null} The price to use for filling, or null if no valid price
+ */
+export function determineFillPrice(leftPrice, rightPrice, useHighest) {
+  if (leftPrice !== null && rightPrice !== null) {
+    return useHighest ? Math.max(leftPrice, rightPrice) : Math.min(leftPrice, rightPrice);
+  }
+  return leftPrice ?? rightPrice;
+}
+
+/**
+ * Fills a block of empty rows with the specified price.
+ * @param {Array<Object>} rows - Array of row objects
+ * @param {number} blockStart - Start index of block to fill
+ * @param {number} blockEnd - End index of block (exclusive)
+ * @param {string} priceColName - Name of the price column
+ * @param {number} fillPrice - Price to fill with
+ * @returns {number} Number of rows filled
+ */
+export function fillBlock(rows, blockStart, blockEnd, priceColName, fillPrice) {
+  let filled = 0;
+  for (let j = blockStart; j < blockEnd; j++) {
+    rows[j][priceColName] = fillPrice;
+    filled++;
+  }
+  return filled;
+}
+
+/**
+ * Recalculates USD amounts and grand totals for all rows.
+ * @param {Array<Object>} rows - Array of row objects to process (mutated in place)
+ * @param {string} priceColName - Name of the price column
+ * @param {string} amountColName - Name of the amount column
+ * @param {string} usdAmountColName - Name of the USD amount column
+ * @param {string} grandTotalColName - Name of the grand total column
+ */
+export function recalculateTotals(rows, priceColName, amountColName, usdAmountColName, grandTotalColName) {
+  let grandTotalUsd = 0;
+  for (const row of rows) {
+    const price = parseFloat(row[priceColName]);
+    const amount = parseFloat((row[amountColName] || '').trim());
+    if (!isNaN(price) && !isNaN(amount)) {
+      const usdAmount = amount * price;
+      row[usdAmountColName] = usdAmount.toFixed(8);
+      grandTotalUsd += usdAmount;
+    }
+    row[grandTotalColName] = grandTotalUsd.toFixed(6);
+  }
+}
+
+/**
  * Backfills empty price rows using bracketing prices.
  * Empty prices are filled with either the highest or lowest of the surrounding valid prices.
  * Also recalculates USD amounts and grand totals after backfilling.
@@ -68,45 +140,19 @@ export function backfillPrices(rows, options) {
 
       stats.blocksFound++;
 
-      // Find bracketing prices
-      let leftPrice = blockStart > 0 ? parseFloat(rows[blockStart - 1][priceColName]) : null;
-      let rightPrice = blockEnd < rows.length ? parseFloat(rows[blockEnd][priceColName]) : null;
-      if (isNaN(leftPrice)) leftPrice = null;
-      if (isNaN(rightPrice)) rightPrice = null;
+      const { leftPrice, rightPrice } = findBracketingPrices(rows, blockStart, blockEnd, priceColName);
+      const fillPrice = determineFillPrice(leftPrice, rightPrice, useHighest);
 
-      // Determine fill price
-      let fillPrice = null;
-      if (leftPrice !== null && rightPrice !== null) {
-        fillPrice = useHighest ? Math.max(leftPrice, rightPrice) : Math.min(leftPrice, rightPrice);
-      } else {
-        fillPrice = leftPrice ?? rightPrice;
-      }
-
-      // Fill the block
       if (fillPrice !== null) {
         logv(verbose, 1, `Backfilling rows ${blockStart + 1}-${blockEnd} with price ${fillPrice}`);
-        for (let j = blockStart; j < blockEnd; j++) {
-          rows[j][priceColName] = fillPrice;
-          stats.emptyRowsFilled++;
-        }
+        stats.emptyRowsFilled += fillBlock(rows, blockStart, blockEnd, priceColName, fillPrice);
       }
     } else {
       i++;
     }
   }
 
-  // Recalculate USD amounts and grand totals
-  let grandTotalUsd = 0;
-  for (const row of rows) {
-    const price = parseFloat(row[priceColName]);
-    const amount = parseFloat((row[amountColName] || '').trim());
-    if (!isNaN(price) && !isNaN(amount)) {
-      const usdAmount = amount * price;
-      row[usdAmountColName] = usdAmount.toFixed(8);
-      grandTotalUsd += usdAmount;
-    }
-    row[grandTotalColName] = grandTotalUsd.toFixed(6);
-  }
+  recalculateTotals(rows, priceColName, amountColName, usdAmountColName, grandTotalColName);
 
   return stats;
 }

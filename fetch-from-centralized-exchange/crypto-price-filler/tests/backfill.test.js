@@ -3,7 +3,7 @@
  * @module tests/backfill.test
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { backfillPrices, logv, isPriceEmpty, DEFAULT_COLUMNS } from '../utils/backfill.js';
 
 // Helper to create test rows

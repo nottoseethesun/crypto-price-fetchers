@@ -1,4 +1,4 @@
-name: CI - Tests & Strict Validation
+name: CI - Lint, Tests & Strict Validation
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
   workflow_dispatch:  # manual trigger from GitHub UI
 
 jobs:
-  validate-and-test:
+  lint-and-test:
     runs-on: ubuntu-latest
 
     steps:
@@ -25,6 +25,10 @@ jobs:
       - name: Install dependencies
         working-directory: fetch-from-centralized-exchange/crypto-price-filler
         run: npm ci
+
+      - name: Run ESLint (complexity max 17)
+        working-directory: fetch-from-centralized-exchange/crypto-price-filler
+        run: npm run lint
 
       - name: Run strict CLI parse/validation + full Vitest suite (fail fast)
         working-directory: fetch-from-centralized-exchange/crypto-price-filler
