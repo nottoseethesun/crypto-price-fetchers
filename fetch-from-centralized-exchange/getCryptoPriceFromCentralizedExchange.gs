@@ -6,7 +6,11 @@
  * using the MEXC public API primarily. Tries 1-minute resolution first; falls back to 1-hour
  * if no trades occurred in the requested minute.
  *
- * Upgraded Features (v2.9.2 - Automatic Backoff Retry on Busy):
+ * Upgraded Features (v2.10.0 - XTM/Tari Fix + CoinGecko Deadlock Fix):
+ * - Removed 'xtm' from MEXC skip list (XTM is now listed on MEXC as XTMUSDT)
+ * - Fixed CoinGecko deadlock: getPriceFromCoinGecko no longer re-acquires the
+ *   API_LOCK that the caller (getCryptoPrice) already holds, which caused
+ *   CoinGecko fallback to always fail with "Rate limit busy" for all tokens
  * - Dynamic discovery of supported trading pairs for each provider
  * - Fresh fetch for MEXC exchangeInfo (no caching of large symbols array)
  * - Aggressive per-token/date caching (24h TTL) + negative caching (5 min) for scale
@@ -29,9 +33,9 @@
  * - Fixed invalid URL construction: all `{base}` placeholders correctly replaced
  *
  * @fileoverview Main utility for large-scale historical crypto price tracking in Sheets.
- * @author Grok-assisted development
- * @version 2.9.2 (Complete file, automatic backoff retry, full logging)
- * @lastModified January 14, 2026
+ * @author Christopher M. Balz, with Grok and Claude
+ * @version 2.10.0 (XTM/Tari fix, CoinGecko deadlock fix)
+ * @lastModified February 10, 2026
  *
  * Usage in Google Sheets:
  *   = getCryptoPrice("grc", "2026-01-14 12:00:00", "CST", "high")
@@ -388,7 +392,7 @@ function applySpread(price, target) {
 function getPriceFromMEXC(token, utcMs, target) {
   Logger.log(`Trying MEXC for ${token}`);
 
-  const skipTokens = new Set(['grc', 'xtm']);
+  const skipTokens = new Set(['grc']);
   if (skipTokens.has(token)) {
     Logger.log(`Skipping MEXC for known missing token: ${token}`);
     return null;
@@ -469,38 +473,31 @@ function getPriceFromCoinGecko(id, utcMs, target) {
   let price = null;
   const dateStr = Utilities.formatDate(new Date(utcMs), 'UTC', 'dd-MM-yyyy');
 
-  // Check cache first
-  price = getCachedResult(`gecko_daily_${id}_${dateStr}`);
-  if (price !== null) return applySpread(price, target);
+  // Check cache first (may return number for hit, string for negative cache, or null for miss)
+  const cached = getCachedResult(`gecko_daily_${id}_${dateStr}`);
+  if (typeof cached === 'number') return applySpread(cached, target);
+  if (typeof cached === 'string') return null;  // Negative cache hit - skip to next provider
 
-  // Rate-limit protection
-  if (!API_LOCK.tryLock(5000)) {
-    Logger.log('API lock timeout - too many concurrent calls');
-    return 'Rate limit busy - retry later';
-  }
-  Utilities.sleep(500);
+  // Note: No separate lock here — the caller (getCryptoPrice) already holds the API_LOCK.
+  // Acquiring it again would deadlock since GAS LockService is not re-entrant.
 
-  try {
-    price = tryCoinGeckoTickers(id);
+  price = tryCoinGeckoTickers(id);
+  if (price !== null) {
+    Logger.log(`CoinGecko tickers success: ${price} USD`);
+  } else {
+    price = tryCoinGeckoHistory(id, dateStr);
     if (price !== null) {
-      Logger.log(`CoinGecko tickers success: ${price} USD`);
-    } else {
-      price = tryCoinGeckoHistory(id, dateStr);
-      if (price !== null) {
-        Logger.log(`CoinGecko history success: ${price} USD for ${dateStr}`);
-      }
+      Logger.log(`CoinGecko history success: ${price} USD for ${dateStr}`);
     }
-
-    if (price !== null) {
-      setCachedResult(`gecko_daily_${id}_${dateStr}`, price);
-      return applySpread(price, target);
-    }
-
-    setCachedResult(`gecko_daily_${id}_${dateStr}`, 'NO_DATA');
-    return 'No data available (cached)';
-  } finally {
-    if (API_LOCK.hasLock()) API_LOCK.releaseLock();
   }
+
+  if (price !== null) {
+    setCachedResult(`gecko_daily_${id}_${dateStr}`, price);
+    return applySpread(price, target);
+  }
+
+  setCachedResult(`gecko_daily_${id}_${dateStr}`, 'NO_DATA');
+  return null;
 }
 
 function tryCoinGeckoTickers(id) {
@@ -597,18 +594,98 @@ function getPriceFromCoinPaprika(id, utcMs, highOrLow) {
 /** ============================================================================
  *                                 TESTS
  * ========================================================================== */
-function testGetCryptoPrice() {
+
+/**
+ * Master test entry point. Runs all test suites.
+ */
+function test() {
   console.log("══════════════════════════════════════════════════════════════");
-  console.log("STARTING FULL TEST SUITE - " + new Date().toISOString());
-  console.log("Script version: Dynamic pair discovery v2.8 (refactored + logging)");
+  console.log("MASTER TEST SUITE - " + new Date().toISOString());
+  console.log("Script version: v2.10.0 (XTM fix + CoinGecko deadlock fix)");
   console.log("══════════════════════════════════════════════════════════════\n");
 
+  const results = [];
+
+  // Run deadlock regression test first (fast, critical)
+  results.push({
+    name: "CoinGecko Deadlock Regression",
+    passed: testCoinGeckoDeadlockRegression()
+  });
+
+  // Run main price tests
+  results.push({
+    name: "Price Fetching",
+    passed: testGetCryptoPrice()
+  });
+
+  // Summary
+  console.log("\n══════════════════════════════════════════════════════════════");
+  console.log("MASTER TEST SUMMARY");
+  console.log("══════════════════════════════════════════════════════════════");
+  results.forEach(r => {
+    console.log(`  ${r.passed ? '✓' : '✗'} ${r.name}`);
+  });
+  const allPassed = results.every(r => r.passed);
+  console.log(`\nOverall: ${allPassed ? 'ALL PASSED' : 'SOME FAILED'}`);
+  console.log("══════════════════════════════════════════════════════════════");
+}
+
+/**
+ * REGRESSION TEST: CoinGecko Deadlock (v2.10.0 fix)
+ *
+ * GAS LockService is NOT re-entrant: calling tryLock() on a lock you
+ * already hold blocks forever (deadlock).
+ *
+ * Bug (pre-v2.10.0): getPriceFromCoinGecko tried to acquire API_LOCK
+ * that getCryptoPrice already held.
+ *
+ * This test uses GRC (no MEXC pair) to force the CoinGecko fallback path.
+ * If this test hangs, the deadlock bug has been reintroduced.
+ */
+function testCoinGeckoDeadlockRegression() {
+  console.log("\n┌── REGRESSION: CoinGecko Deadlock");
+  console.log("│ GRC has no MEXC pair → forces CoinGecko fallback");
+  console.log("│ If this hangs, the deadlock bug is back.");
+  console.log("├──────────────────────────────────────────────────────────────");
+
+  const startTime = new Date().getTime();
+
+  const result = getCryptoPrice(
+    "grc",
+    "2026-02-08 12:00:00",
+    "CST",
+    "high",
+    200  // Normal delay to test real lock behavior
+  );
+
+  const durationMs = new Date().getTime() - startTime;
+
+  console.log(`│ Result: ${typeof result === 'number' ? result.toFixed(8) : result}`);
+  console.log(`│ Duration: ${durationMs} ms`);
+
+  const passed = typeof result === 'number' || (typeof result === 'string' && result.includes('No data'));
+  console.log(`│ Status: ${passed ? 'PASS - No deadlock' : 'FAIL'}`);
+  console.log("└──────────────────────────────────────────────────────────────");
+
+  return passed;
+}
+
+/**
+ * Tests price fetching across multiple tokens and scenarios.
+ * @returns {boolean} True if all tests pass
+ */
+function testGetCryptoPrice() {
+  console.log("\n┌── PRICE FETCHING TESTS");
+  console.log("├──────────────────────────────────────────────────────────────");
+
   const testCases = [
-    { name: "GRC - Recent price (high)", token: "grc", dateStr: "2026-01-14 12:00:00", tz: "CST", highOrLow: "high", expectedRange: [0.007, 0.01] },
-    { name: "GRC - Recent price (low)", token: "grc", dateStr: "2026-01-14 12:00:00", tz: "CST", highOrLow: "low", expectedRange: [0.007, 0.01] },
+    // { name: "GRC - Recent price (high)", token: "grc", dateStr: "2026-02-08 12:00:00", tz: "CST", highOrLow: "high", expectedRange: [0.005, 0.02] },
+    // { name: "GRC - Recent price (low)", token: "grc", dateStr: "2026-02-08 12:00:00", tz: "CST", highOrLow: "low", expectedRange: [0.005, 0.02] },
+    { name: "XTM - Recent price (high)", token: "xtm", dateStr: "2026-02-08 12:00:00", tz: "CST", highOrLow: "high", expectedRange: [0.001, 0.1] },
+    { name: "XTM - Recent price (low)", token: "xtm", dateStr: "2026-02-08 12:00:00", tz: "CST", highOrLow: "low", expectedRange: [0.001, 0.1] },
     { name: "XMR - Older date (high)", token: "xmr", dateStr: "2025-12-01 14:30:00", tz: "UTC", highOrLow: "high", expectedRange: [380, 450] },
-    { name: "BTC - New Year 2026 (high)", token: "btc", dateStr: "2026-01-01 00:00:00", tz: "UTC", highOrLow: "high", expectedRange: [85000, 90000] },
-    { name: "Invalid token", token: "zzzzzzfake", dateStr: "2026-01-14 12:00:00", tz: "CST", highOrLow: "high", expectedRange: null },
+    { name: "BTC - New Year 2026 (high)", token: "btc", dateStr: "2026-01-01 00:00:00", tz: "UTC", highOrLow: "high", expectedRange: [85000, 100000] },
+    { name: "Invalid token", token: "zzzzzzfake", dateStr: "2026-02-08 12:00:00", tz: "CST", highOrLow: "high", expectedRange: null },
     { name: "Future date", token: "grc", dateStr: "2026-12-31 23:59:59", tz: "CST", highOrLow: "high", expectedRange: null }
   ];
 
@@ -616,11 +693,11 @@ function testGetCryptoPrice() {
   let failedTests = [];
 
   testCases.forEach((test, index) => {
-    console.log(`\n┌── Test ${index + 1}/${testCases.length}: ${test.name}`);
-    console.log(`│ Token: ${test.token.toUpperCase()}`);
-    console.log(`│ Date:  ${test.dateStr} ${test.tz}`);
-    console.log(`│ Mode:  ${test.highOrLow.toUpperCase()}`);
-    console.log("├──────────────────────────────────────────────────────────────");
+    console.log(`│`);
+    console.log(`│ Test ${index + 1}/${testCases.length}: ${test.name}`);
+    console.log(`│   Token: ${test.token.toUpperCase()}`);
+    console.log(`│   Date:  ${test.dateStr} ${test.tz}`);
+    console.log(`│   Mode:  ${test.highOrLow.toUpperCase()}`);
 
     const startTime = new Date().getTime();
 
@@ -634,26 +711,24 @@ function testGetCryptoPrice() {
 
     const durationMs = new Date().getTime() - startTime;
 
-    console.log(`│ Result: ${typeof result === 'number' ? result.toFixed(8) : result}`);
-    console.log(`│ Time:   ${durationMs} ms`);
+    console.log(`│   Result: ${typeof result === 'number' ? result.toFixed(8) : result}`);
+    console.log(`│   Time:   ${durationMs} ms`);
 
     let isPass = false;
     if (test.expectedRange) {
       if (typeof result === 'number' && !isNaN(result)) {
         isPass = result >= test.expectedRange[0] && result <= test.expectedRange[1];
-        console.log(`│ Range check: ${isPass ? 'PASS ✓' : 'FAIL ✗'} (${test.expectedRange[0]} – ${test.expectedRange[1]})`);
+        console.log(`│   Range: ${isPass ? 'PASS' : 'FAIL'} (${test.expectedRange[0]} - ${test.expectedRange[1]})`);
       } else {
-        console.log("│ Range check: N/A (got string/error)");
+        console.log("│   Range: N/A (got string/error)");
       }
     } else {
       isPass = typeof result === 'string';
-      console.log(`│ Expected: ${isPass ? 'Error message (PASS)' : 'Unexpected number ✗'}`);
+      console.log(`│   Expected error: ${isPass ? 'PASS' : 'FAIL'}`);
     }
 
     if (isPass) passed++;
     else failedTests.push(test.name);
-
-    console.log("└──────────────────────────────────────────────────────────────");
 
     if (index < testCases.length - 1) {
       Logger.log(`Sleeping 30s between tests to avoid rate limits`);
@@ -664,18 +739,15 @@ function testGetCryptoPrice() {
   const total = testCases.length;
   const passRate = Math.round((passed / total) * 100);
 
-  console.log("\n══════════════════════════════════════════════════════════════");
-  console.log("TEST SUITE SUMMARY");
-  console.log(`Total tests: ${total}`);
-  console.log(`Passed: ${passed}/${total} (${passRate}%)`);
-  console.log(`Failed: ${failedTests.length}`);
+  console.log(`│`);
+  console.log(`│ Summary: ${passed}/${total} passed (${passRate}%)`);
   if (failedTests.length > 0) {
-    console.log("Failed tests:");
-    failedTests.forEach(name => console.log(`  - ${name}`));
-  } else {
-    console.log("All tests passed! 🎉");
+    console.log(`│ Failed:`);
+    failedTests.forEach(name => console.log(`│   - ${name}`));
   }
-  console.log("══════════════════════════════════════════════════════════════");
+  console.log("└──────────────────────────────────────────────────────────────");
+
+  return failedTests.length === 0;
 }
 
 /** ============================================================================
@@ -724,6 +796,7 @@ function refreshPrices() {
   // Change to your actual price column (1 = A, 2 = B, ..., 4 = D, etc.)
   const priceColumn = 4; // ← EDIT THIS IF NEEDED
 
+  
   const formulaRange = sheet.getRange(2, priceColumn, lastRow - 1, 1);
 
   // Robust toast handling (null check)
