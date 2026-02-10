@@ -2,59 +2,146 @@
  * Google Apps Script: Get Crypto Price from Centralized Exchange
  * ==============================================================
  *
- * Fetches historical high or low prices for cryptocurrencies (in USD via USDT pair or equivalent)
- * using the MEXC public API primarily. Tries 1-minute resolution first; falls back to 1-hour
- * if no trades occurred in the requested minute.
- *
- * Upgraded Features (v2.12.0 - Provider chain cleanup):
- * - Removed dead CryptoCompare stub; provider chain: MEXC → CoinGecko → CoinPaprika
- * - CoinPaprika skip list for GRC (is_active: false, free OHLCV limited to 24h)
- * - Clamped market_chart/range toSec to Date.now() for recent timestamps
- * - Reduced test sleep from 30s to 5s (demo API key allows 30 req/min)
- *
- * Previous (v2.11.0 - CoinGecko market_chart/range for GRC):
- * - Added CoinGecko /market_chart/range endpoint with demo API key for time-series data
- *   (fetches 24h window of hourly price points, returns actual max/min for high/low)
- * - Re-enabled GRC integration tests (market_chart/range provides reliable data)
- * - CoinGecko provider now tries: market_chart/range → tickers → history
- * - Widened GRC test expectedRange to [0.001, 0.05] for price volatility
- *
- * Previous (v2.10.0 - XTM/Tari Fix + CoinGecko Deadlock Fix):
- * - Removed 'xtm' from MEXC skip list (XTM is now listed on MEXC as XTMUSDT)
- * - Fixed CoinGecko deadlock: getPriceFromCoinGecko no longer re-acquires the
- *   API_LOCK that the caller (getCryptoPrice) already holds, which caused
- *   CoinGecko fallback to always fail with "Rate limit busy" for all tokens
- * - Dynamic discovery of supported trading pairs for each provider
- * - Fresh fetch for MEXC exchangeInfo (no caching of large symbols array)
- * - Aggressive per-token/date caching (24h TTL) + negative caching (5 min) for scale
- * - Rate-limit protection: LockService + configurable apiDelayMs (default 200ms in prod, 0ms in tests)
- * - **Automatic retry on lock failure ("Rate limit busy") with exponential backoff** (5s → 10s → 20s, up to 3 attempts)
- * - CoinGecko retry on 429 (up to 3 attempts, 5s sleep)
- * - Early future timestamp detection → immediate error
- * - Stricter MEXC candle timestamp validation (skip if off by >2 min)
- * - Heavy, granular logging at every step for debugging
- * - All major functions broken up into small, well-named helpers
- * - Safe handling of dateStr (string or Date object) for cache key
- * - Test suite with pass/fail summary + failed test list
- * - CoinGecko always tries history (even if no pair)
- * - Fast-skip for known non-listed tokens
- * - Separate top-level menu "Fetch Historical Crypto Prices" (no conflict with Tari Tools)
- * - Robust toast handling (null check) to avoid TypeError on setText
- * - Custom menu action that refreshes prices then "freezes" them as static values
- *   (converts live formulas to plain numbers → instant sheet loads on re-open)
- * - All API URLs defined as constants (no repetition of base URLs)
- * - Fixed invalid URL construction: all `{base}` placeholders correctly replaced
- *
- * @fileoverview Main utility for large-scale historical crypto price tracking in Sheets.
+ * @fileoverview Fetches historical high or low cryptocurrency prices (USD)
+ *   from centralized exchanges for use directly in Google Sheets.
  * @author Christopher M. Balz, with Grok and Claude
- * @version 2.12.0 (Provider chain cleanup)
+ * @version 2.12.0
  * @lastModified February 10, 2026
  *
- * Usage in Google Sheets:
- *   = getCryptoPrice("grc", "2026-01-14 12:00:00", "CST", "high")
- *   = getCryptoPrice("grc", A1, "CST")
+ * OVERVIEW
+ * --------
+ * Custom Google Sheets function that returns the historical high or low USD
+ * price for a cryptocurrency on a given date. Queries multiple exchange APIs
+ * in sequence until a price is found.
  *
- * Important: Use correct TZ abbr accounting for DST.
+ * INSTALLATION
+ * ------------
+ * 1. Open Google Sheet -> Extensions -> Apps Script
+ * 2. Paste this file's contents
+ * 3. Save and refresh the sheet
+ *
+ * USAGE
+ * -----
+ *   =getCryptoPrice(token, dateStr, tz, highOrLow)
+ *
+ * Parameters:
+ *   token     - Ticker symbol, case-insensitive ("btc", "grc", "xmr", "xtm")
+ *   dateStr   - "YYYY-MM-DD HH:MM:SS" (24-hour) or a cell reference
+ *   tz        - Timezone abbreviation (see SUPPORTED TIMEZONES below)
+ *   highOrLow - "high" or "low"; defaults to "high" if omitted (any value
+ *               other than "low" is also treated as "high")
+ *
+ * Examples:
+ *   =getCryptoPrice("btc", "2026-01-15 14:30:00", "CST", "high")
+ *   =getCryptoPrice("grc", A1, "CST")
+ *   =getCryptoPrice("xmr", A1, "UTC", "low")
+ *
+ * HIGH / LOW MODE
+ * ---------------
+ * Specifying "high" returns the highest price recorded during the relevant
+ * time period, while "low" returns the lowest. This lets you bound a
+ * transaction's value: use "high" for the best-case sale price and "low"
+ * for the worst-case, or vice versa depending on perspective.
+ *
+ * The time period covered depends on which provider returns the data:
+ *
+ *   MEXC: Tries a 1-minute candle first (the single minute containing
+ *     the requested timestamp). If no trades occurred in that minute, it
+ *     falls back to a 60-minute candle. Returns the real OHLCV high or
+ *     low from whichever candle matched.
+ *
+ *   CoinGecko market_chart/range: Fetches hourly data points over a
+ *     24-hour window centered on the requested time (12 hours before to
+ *     12 hours after), then returns Math.max (high) or Math.min (low)
+ *     across all of those points.
+ *
+ *   CoinGecko tickers/history: These endpoints return only a single spot
+ *     price with no time-range high/low data. A +/-1.5% spread is
+ *     applied as an approximation (high = price * 1.015,
+ *     low = price * 0.985).
+ *
+ *   CoinPaprika: Requests a 1-minute OHLCV candle ending at the
+ *     requested timestamp. Returns the real high or low from that
+ *     candle.
+ *
+ * DATA SOURCES (PROVIDER CHAIN)
+ * -----------------------------
+ * Providers are tried in order; the first successful result is returned:
+ *
+ *   1. MEXC       - Primary. Real OHLCV candles (1-minute, then 1-hour
+ *                   fallback). Queries exchangeInfo to verify the trading
+ *                   pair exists. Skip list: grc (not listed on MEXC).
+ *
+ *   2. CoinGecko  - Tries three sub-endpoints in order:
+ *                   a) market_chart/range (24h window, hourly data points)
+ *                   b) tickers (current spot from highest-volume pair)
+ *                   c) history (historical snapshot for a specific date)
+ *                   Requires a demo API key (set in CONFIG.COINGECKO_API_KEY).
+ *                   Retries on 429 (rate limit) up to 3 times with 5s sleep.
+ *
+ *   3. CoinPaprika - OHLCV fallback. Skip list: grc-gridcoin (is_active is
+ *                   false; free-tier OHLCV is limited to 24h).
+ *
+ * TOKEN MAPPINGS (TOKEN_TO_ID):
+ *   Tokens not listed in TOKEN_TO_ID use the raw ticker as the CoinGecko /
+ *   CoinPaprika ID. To add a new token, add an entry with its gecko and
+ *   paprika IDs:
+ *     'mytok': { gecko: 'mytoken-id', paprika: 'mytok-mytoken' }
+ *   If the token is not on MEXC, add it to the skip set inside
+ *   getPriceFromMEXC. Similarly for CoinPaprika in getPriceFromCoinPaprika.
+ *
+ * CONFIGURATION
+ * -------------
+ * All tuning is in the CONFIG object at the top of this file:
+ *
+ *   EXCHANGE_BASE_URL    - MEXC REST API base ("https://api.mexc.com/api/v3")
+ *   QUOTE_CURRENCY       - Quote side of the pair ("USDT")
+ *   DEFAULT_INTERVAL     - First kline resolution to try ("1m")
+ *   FALLBACK_INTERVAL    - Second kline resolution ("60m")
+ *
+ *   TIMEZONE_OFFSETS     - Map of abbreviation to UTC offset in hours
+ *                          (see SUPPORTED TIMEZONES)
+ *
+ *   CACHE_EXPIRY_SECONDS
+ *     DAILY_PRICE        - TTL for successful price lookups (86400 = 24h)
+ *     NEGATIVE_CACHE     - TTL for "no data" results (300 = 5min)
+ *     BTC_PRICE          - TTL for BTC spot price cache (300 = 5min)
+ *
+ *   COINGECKO_BASE       - CoinGecko API v3 base URL
+ *   COINGECKO_API_KEY    - Demo API key for market_chart/range endpoint
+ *   COINPAPRIKA_BASE     - CoinPaprika API v1 base URL
+ *
+ *   Endpoint templates (use {base}, {id}, {date}, {from}, {to}, {key},
+ *   {start}, {end} placeholders):
+ *     COINGECKO_SIMPLE_PRICE_TEMPLATE
+ *     COINGECKO_TICKERS_TEMPLATE
+ *     COINGECKO_HISTORY_TEMPLATE
+ *     COINGECKO_MARKET_CHART_RANGE_TEMPLATE
+ *     COINPAPRIKA_TICKERS_TEMPLATE
+ *     COINPAPRIKA_OHLCV_TEMPLATE
+ *
+ *   Rate-limit tuning:
+ *     LOCK_WAIT_MS         - Lock acquisition timeout (2000ms)
+ *     GENERAL_DELAY_MS     - Delay between API calls (200ms prod, 0ms test)
+ *     MAX_LOCK_RETRIES     - Retry attempts on lock failure (3)
+ *     LOCK_RETRY_BACKOFF   - Exponential backoff array [5000, 10000, 20000]
+ *
+ * SUPPORTED TIMEZONES
+ * -------------------
+ * UTC, GMT, EST, EDT, CST, CDT, MST, MDT, PST, PDT
+ *
+ * Use the correct abbreviation accounting for Daylight Saving Time
+ * (e.g., CDT in summer, CST in winter for US Central).
+ *
+ * TESTING
+ * -------
+ * In the Apps Script editor, select the "test" function from the function
+ * dropdown and click Run. Results appear in the execution log.
+ *
+ * LIMITATIONS
+ * -----------
+ * Google Apps Script execution limits cap each run at roughly 100 API calls.
+ * For larger batch jobs, use the Node.js CLI in crypto-price-filler/.
  */
 
 /** ============================================================================

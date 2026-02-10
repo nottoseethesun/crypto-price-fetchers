@@ -28,74 +28,26 @@ different use cases:
 
 ### 1. Google Apps Script (`getCryptoPriceFromCentralizedExchange.gs`)
 
-A custom function for Google Sheets that fetches historical
-prices directly in your spreadsheet.
+A custom `=getCryptoPrice()` function for Google Sheets with
+multi-provider fallback (MEXC, CoinGecko, CoinPaprika),
+caching, and rate-limit protection.
 
-**Features:**
-
-- Custom `=getCryptoPrice()` function for use in cells
-- Multi-provider fallback chain: MEXC → CoinGecko → CoinPaprika
-- Aggressive caching (24h for prices, 5min for failures)
-- Rate-limit protection with automatic retry and exponential
-  backoff
-- Menu action to refresh and freeze all prices as static values
-
-**Usage in Google Sheets:**
-
-```text
-=getCryptoPrice("btc", "2026-01-15 14:30:00", "CST", "high")
-=getCryptoPrice("xmr", A1, "UTC", "low")
-```
-
-**Installation:**
-
-1. Open your Google Sheet
-2. Go to **Extensions → Apps Script**
-3. Paste the contents of
-   `getCryptoPriceFromCentralizedExchange.gs`
-4. Save and refresh your sheet
-
-**Testing:**
-In the Apps Script editor, select `test` from the function
-dropdown and click **Run**.
-
-**Limitations:**
-
-- Google Apps Script execution limits (~100 API calls per run)
-- For larger datasets, use the Node.js CLI instead
+For detailed usage, configuration, and data-source
+documentation, see the file header in
+[`getCryptoPriceFromCentralizedExchange.gs`](./getCryptoPriceFromCentralizedExchange.gs).
 
 ---
 
 ### 2. Node.js CLI (`crypto-price-filler/`)
 
 A command-line tool for batch processing CSV files with
-thousands of timestamps.
+thousands of timestamps, using the same multi-provider
+fallback chain.
 
-**Features:**
-
-- Reads timestamps from input CSV, outputs prices to new CSV
-- Same multi-provider fallback chain as the GAS version
-- Backfill utility for filling gaps in existing price data
-- Configurable via `config.json` and `supported-tokens.json`
-- Full test suite with coverage reporting
-
-**Quick Start:**
-
-```bash
-cd crypto-price-filler
-npm install
-node index.js --token=grc --input=timestamps.csv --output=prices.csv
-```
-
-**Backfill existing data:**
-
-```bash
-node backfill.js --input=output.csv --backfill-highest
-```
-
-See
-[`crypto-price-filler/README.md`](./crypto-price-filler/README.md)
-for complete documentation.
+For detailed documentation, see the file header in
+[`crypto-price-filler/index.js`](./crypto-price-filler/index.js)
+and
+[`crypto-price-filler/README.md`](./crypto-price-filler/README.md).
 
 ---
 
