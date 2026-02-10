@@ -134,112 +134,106 @@ function getCryptoPrice(token, dateStr, tz, highOrLow = 'high', apiDelayMs = CON
   Logger.log(`getCryptoPrice called: token=${token}, date=${dateStr}, tz=${tz}, mode=${highOrLow}, delay=${apiDelayMs}ms`);
 
   token = token.toLowerCase();
-  const offsetHours = getTimezoneOffsetHours(tz);
-
-  // Safely handle dateStr
-  let safeDateStr;
-  if (typeof dateStr === 'string') {
-    safeDateStr = dateStr;
-  } else if (dateStr instanceof Date && !isNaN(dateStr.getTime())) {
-    safeDateStr = Utilities.formatDate(dateStr, 'UTC', 'yyyy-MM-dd HH:mm:ss');
-  } else {
-    Logger.log(`Invalid dateStr type: ${typeof dateStr}, value: ${dateStr}`);
-    return 'Invalid date format';
-  }
-
-  const utcMs = parseInputToUtcMs(safeDateStr, offsetHours);
-  if (typeof utcMs === 'string') {
-    Logger.log(`Parse error: ${utcMs}`);
-    return utcMs;
-  }
-
-  if (utcMs > Date.now()) {
-    Logger.log(`Future timestamp detected (${new Date(utcMs).toISOString()})`);
-    return 'No data available for future dates';
-  }
-
   const target = highOrLow.toLowerCase() === 'low' ? 'low' : 'high';
 
+  // Parse and validate date
+  const safeDateStr = normalizeDateStr(dateStr);
+  if (typeof safeDateStr !== 'string') return safeDateStr.error;
+
+  const utcMs = parseInputToUtcMs(safeDateStr, getTimezoneOffsetHours(tz));
+  if (typeof utcMs === 'string') return utcMs;
+  if (utcMs > Date.now()) return 'No data available for future dates';
+
+  // Check cache
   const cacheKey = `price_${token}_${safeDateStr.replace(/[^0-9-]/g, '')}_${tz}_${target}`;
-  Logger.log(`Generated cache key: ${cacheKey}`);
-  let cached = getCachedResult(cacheKey);
-  if (cached !== null) {
-    Logger.log(`Returning cached result: ${cached}`);
-    return cached;
-  }
+  const cached = getCachedResult(cacheKey);
+  if (cached !== null) return cached;
 
-  // Rate-limit protection with automatic retry on lock failure
-  let lockAcquired = false;
-  let retryDelay = 0;
-
-  for (let attempt = 0; attempt < CONFIG.MAX_LOCK_RETRIES; attempt++) {
-    if (apiDelayMs > 0) {
-      Logger.log(`Lock attempt ${attempt + 1}/${CONFIG.MAX_LOCK_RETRIES} (delay so far: ${retryDelay}ms)`);
-      if (API_LOCK.tryLock(CONFIG.LOCK_WAIT_MS)) {
-        lockAcquired = true;
-        Logger.log(`Lock acquired on attempt ${attempt + 1}, sleeping ${apiDelayMs}ms`);
-        Utilities.sleep(apiDelayMs);
-        break;
-      }
-      // Backoff increases with each failed attempt
-      retryDelay = CONFIG.LOCK_RETRY_BACKOFF[attempt] || 5000;
-      Logger.log(`Lock timeout on attempt ${attempt + 1} - backoff ${retryDelay}ms`);
-      Utilities.sleep(retryDelay);
-    } else {
-      lockAcquired = true;
-      break;
-    }
-  }
-
-  if (!lockAcquired && apiDelayMs > 0) {
-    Logger.log('All lock attempts failed after retries');
-    return 'Rate limit busy - retry later';
-  }
+  // Acquire lock with retry
+  const lockAcquired = acquireLockWithRetry(apiDelayMs);
+  if (!lockAcquired) return 'Rate limit busy - retry later';
 
   try {
-    Logger.log('Starting provider chain');
-    let price = getPriceFromMEXC(token, utcMs, target);
-    if (typeof price === 'number' && !isNaN(price)) {
-      setCachedResult(cacheKey, price);
-      Logger.log(`Final price from MEXC: ${price}`);
-      return price;
-    }
-
-    const idMap = TOKEN_TO_ID[token] || { gecko: token, paprika: token };
-    Logger.log(`Using ID map: ${JSON.stringify(idMap)}`);
-
-    price = getPriceFromCryptoCompare(token, utcMs, target);
-    if (typeof price === 'number' && !isNaN(price)) {
-      setCachedResult(cacheKey, price);
-      Logger.log(`Final price from CryptoCompare: ${price}`);
-      return price;
-    }
-
-    price = getPriceFromCoinGecko(idMap.gecko, utcMs, target);
-    if (typeof price === 'number' && !isNaN(price)) {
-      setCachedResult(cacheKey, price);
-      Logger.log(`Final price from CoinGecko: ${price}`);
-      return price;
-    }
-
-    price = getPriceFromCoinPaprika(idMap.paprika, utcMs, target);
-    if (typeof price === 'number' && !isNaN(price)) {
-      setCachedResult(cacheKey, price);
-      Logger.log(`Final price from CoinPaprika: ${price}`);
-      return price;
-    }
-
-    Logger.log('All providers failed - caching NO_DATA');
-    setCachedResult(cacheKey, 'NO_DATA', CONFIG.CACHE_EXPIRY_SECONDS.NEGATIVE_CACHE);
-    return 'No data available from any source';
+    const price = fetchPriceFromProviders(token, utcMs, target);
+    cacheAndReturn(cacheKey, price);
+    return price !== null ? price : 'No data available from any source';
   } catch (e) {
-    Logger.log(`Critical error in getCryptoPrice: ${e.message} - stack: ${e.stack}`);
+    Logger.log(`Critical error: ${e.message}`);
     return `Error: ${e.message}`;
   } finally {
-    if (lockAcquired) {
-      API_LOCK.releaseLock();
-      Logger.log('Lock released');
+    releaseLockIfHeld(lockAcquired);
+  }
+}
+
+/** Normalizes dateStr to string format, returns {error} on failure */
+function normalizeDateStr(dateStr) {
+  if (typeof dateStr === 'string') return dateStr;
+  if (dateStr instanceof Date && !isNaN(dateStr.getTime())) {
+    return Utilities.formatDate(dateStr, 'UTC', 'yyyy-MM-dd HH:mm:ss');
+  }
+  Logger.log(`Invalid dateStr type: ${typeof dateStr}`);
+  return { error: 'Invalid date format' };
+}
+
+/** Attempts to acquire lock with exponential backoff retry */
+function acquireLockWithRetry(apiDelayMs) {
+  if (apiDelayMs <= 0) return true;
+
+  for (let attempt = 0; attempt < CONFIG.MAX_LOCK_RETRIES; attempt++) {
+    Logger.log(`Lock attempt ${attempt + 1}/${CONFIG.MAX_LOCK_RETRIES}`);
+    if (API_LOCK.tryLock(CONFIG.LOCK_WAIT_MS)) {
+      Logger.log(`Lock acquired, sleeping ${apiDelayMs}ms`);
+      Utilities.sleep(apiDelayMs);
+      return true;
     }
+    const backoff = CONFIG.LOCK_RETRY_BACKOFF[attempt] || 5000;
+    Logger.log(`Lock timeout - backoff ${backoff}ms`);
+    Utilities.sleep(backoff);
+  }
+  Logger.log('All lock attempts failed');
+  return false;
+}
+
+/** Releases lock if it was acquired */
+function releaseLockIfHeld(lockAcquired) {
+  if (lockAcquired) {
+    API_LOCK.releaseLock();
+    Logger.log('Lock released');
+  }
+}
+
+/** Tries each provider in order, returns first valid price or null */
+function fetchPriceFromProviders(token, utcMs, target) {
+  const idMap = TOKEN_TO_ID[token] || { gecko: token, paprika: token };
+  const providers = [
+    { name: 'MEXC', fn: () => getPriceFromMEXC(token, utcMs, target) },
+    { name: 'CryptoCompare', fn: () => getPriceFromCryptoCompare(token, utcMs, target) },
+    { name: 'CoinGecko', fn: () => getPriceFromCoinGecko(idMap.gecko, utcMs, target) },
+    { name: 'CoinPaprika', fn: () => getPriceFromCoinPaprika(idMap.paprika, utcMs, target) }
+  ];
+
+  for (const provider of providers) {
+    const price = provider.fn();
+    if (isValidPrice(price)) {
+      Logger.log(`Final price from ${provider.name}: ${price}`);
+      return price;
+    }
+  }
+  Logger.log('All providers failed');
+  return null;
+}
+
+/** Checks if price is a valid number */
+function isValidPrice(price) {
+  return typeof price === 'number' && !isNaN(price);
+}
+
+/** Caches price result (positive or negative) */
+function cacheAndReturn(cacheKey, price) {
+  if (price !== null) {
+    setCachedResult(cacheKey, price);
+  } else {
+    setCachedResult(cacheKey, 'NO_DATA', CONFIG.CACHE_EXPIRY_SECONDS.NEGATIVE_CACHE);
   }
 }
 
@@ -298,34 +292,54 @@ function parseDateStringToComponents(dateStr) {
   const match = dateStr.match(regex);
 
   if (!match) {
-    const err = 'Invalid format. Use exactly YYYY-MM-DD HH:MM:SS (24-hour)';
-    Logger.log(err);
-    return err;
+    return logAndReturn('Invalid format. Use exactly YYYY-MM-DD HH:MM:SS (24-hour)');
   }
 
   const [, yStr, mStr, dStr, hStr, minStr, sStr] = match;
-  const year   = parseInt(yStr, 10);
-  const month  = parseInt(mStr, 10);
-  const day    = parseInt(dStr, 10);
-  const hour   = parseInt(hStr, 10);
-  const minute = parseInt(minStr, 10);
-  const second = parseInt(sStr, 10);
+  const components = {
+    year: parseInt(yStr, 10),
+    month: parseInt(mStr, 10),
+    day: parseInt(dStr, 10),
+    hour: parseInt(hStr, 10),
+    minute: parseInt(minStr, 10),
+    second: parseInt(sStr, 10)
+  };
 
-  if (year < 1970 || year > 2100) return 'Invalid year (1970–2100)';
-  if (month < 1 || month > 12)    return 'Invalid month (01–12)';
-  if (day < 1 || day > 31)        return 'Invalid day (01–31)';
-  if (hour < 0 || hour > 23)      return 'Invalid hour (00–23)';
-  if (minute < 0 || minute > 59)  return 'Invalid minute (00–59)';
-  if (second < 0 || second > 59)  return 'Invalid second (00–59)';
+  const validationError = validateDateComponents(components);
+  if (validationError) return validationError;
 
-  const tempDate = new Date(year, month - 1, day);
-  if (tempDate.getFullYear() !== year || tempDate.getMonth() + 1 !== month || tempDate.getDate() !== day) {
-    return 'Invalid date (e.g., Feb 30 does not exist)';
-  }
-
-  const components = { year, month, day, hour, minute, second };
   Logger.log(`Parsed components: ${JSON.stringify(components)}`);
   return components;
+}
+
+/** Validates date component ranges, returns error string or null */
+function validateDateComponents(c) {
+  if (!inRange(c.year, 1970, 2100)) return 'Invalid year (1970–2100)';
+  if (!inRange(c.month, 1, 12)) return 'Invalid month (01–12)';
+  if (!inRange(c.day, 1, 31)) return 'Invalid day (01–31)';
+  if (!inRange(c.hour, 0, 23)) return 'Invalid hour (00–23)';
+  if (!inRange(c.minute, 0, 59)) return 'Invalid minute (00–59)';
+  if (!inRange(c.second, 0, 59)) return 'Invalid second (00–59)';
+
+  // Check for impossible dates like Feb 30
+  const tempDate = new Date(c.year, c.month - 1, c.day);
+  const dateMatches = tempDate.getFullYear() === c.year &&
+                      tempDate.getMonth() + 1 === c.month &&
+                      tempDate.getDate() === c.day;
+  if (!dateMatches) return 'Invalid date (e.g., Feb 30 does not exist)';
+
+  return null;
+}
+
+/** Checks if value is within range (inclusive) */
+function inRange(value, min, max) {
+  return value >= min && value <= max;
+}
+
+/** Logs message and returns it */
+function logAndReturn(msg) {
+  Logger.log(msg);
+  return msg;
 }
 
 function createUtcTimestampFromComponents(components) {
@@ -392,33 +406,48 @@ function applySpread(price, target) {
 function getPriceFromMEXC(token, utcMs, target) {
   Logger.log(`Trying MEXC for ${token}`);
 
-  const skipTokens = new Set(['grc']);
-  if (skipTokens.has(token)) {
+  if (new Set(['grc']).has(token)) {
     Logger.log(`Skipping MEXC for known missing token: ${token}`);
     return null;
   }
 
+  const symbols = fetchMEXCSymbols();
+  if (!symbols) return null;
+
+  const pairInfo = findMEXCTradingPair(token, symbols);
+  if (!pairInfo) return null;
+
+  const data = fetchMEXCKlineData(pairInfo.symbol, utcMs);
+  if (!data) return null;
+
+  return extractMEXCPrice(data, target, pairInfo.useBTC);
+}
+
+/** Fetches MEXC exchange symbols list */
+function fetchMEXCSymbols() {
   const url = CONFIG.EXCHANGE_BASE_URL + '/exchangeInfo';
   const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
   if (response.getResponseCode() !== 200) {
     Logger.log(`MEXC exchangeInfo failed: HTTP ${response.getResponseCode()}`);
     return null;
   }
+  return JSON.parse(response.getContentText()).symbols || [];
+}
 
-  const symbols = JSON.parse(response.getContentText()).symbols || [];
+/** Finds USDT or BTC trading pair for token */
+function findMEXCTradingPair(token, symbols) {
   const upperToken = token.toUpperCase();
   let symbol = null;
   let useBTC = false;
 
   for (const sym of symbols) {
-    if (sym.baseAsset.toUpperCase() === upperToken) {
-      if (sym.quoteAsset === 'USDT') {
-        symbol = upperToken + 'USDT';
-        break;
-      } else if (sym.quoteAsset === 'BTC') {
-        symbol = upperToken + 'BTC';
-        useBTC = true;
-      }
+    if (sym.baseAsset.toUpperCase() !== upperToken) continue;
+    if (sym.quoteAsset === 'USDT') {
+      return { symbol: upperToken + 'USDT', useBTC: false };
+    }
+    if (sym.quoteAsset === 'BTC') {
+      symbol = upperToken + 'BTC';
+      useBTC = true;
     }
   }
 
@@ -426,38 +455,47 @@ function getPriceFromMEXC(token, utcMs, target) {
     Logger.log(`MEXC: No supported pair for ${token}`);
     return null;
   }
-
   Logger.log(`MEXC using symbol: ${symbol} (useBTC: ${useBTC})`);
+  return { symbol, useBTC };
+}
 
-  let interval = CONFIG.DEFAULT_INTERVAL;
-  let klineUrl = CONFIG.EXCHANGE_BASE_URL + `/klines?symbol=${symbol}&interval=${interval}&startTime=${utcMs - 60000}&endTime=${utcMs}&limit=1`;
-  let klineRes = UrlFetchApp.fetch(klineUrl, { muteHttpExceptions: true });
-  let data = klineRes.getResponseCode() === 200 ? JSON.parse(klineRes.getContentText()) : null;
+/** Fetches kline data, trying 1m then 60m interval */
+function fetchMEXCKlineData(symbol, utcMs) {
+  // Try 1-minute interval first
+  let data = fetchKline(symbol, CONFIG.DEFAULT_INTERVAL, utcMs - 60000, utcMs);
+  if (isValidKlineData(data, utcMs)) return data;
 
-  if (data && data.length > 0) {
-    const candleTime = data[0][0];
-    if (Math.abs(candleTime - utcMs) > 120000) {
-      Logger.log(`Warning: MEXC candle time ${new Date(candleTime).toISOString()} too far from requested ${new Date(utcMs).toISOString()} - skipping`);
-      data = null;
-    }
+  // Fallback to 60-minute interval
+  data = fetchKline(symbol, CONFIG.FALLBACK_INTERVAL, utcMs - 3600000, utcMs);
+  return (data && data.length > 0) ? data : null;
+}
+
+/** Fetches single kline candle */
+function fetchKline(symbol, interval, startTime, endTime) {
+  const url = `${CONFIG.EXCHANGE_BASE_URL}/klines?symbol=${symbol}&interval=${interval}&startTime=${startTime}&endTime=${endTime}&limit=1`;
+  const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+  return res.getResponseCode() === 200 ? JSON.parse(res.getContentText()) : null;
+}
+
+/** Validates kline data timestamp is close enough to requested time */
+function isValidKlineData(data, utcMs) {
+  if (!data || data.length === 0) return false;
+  const candleTime = data[0][0];
+  if (Math.abs(candleTime - utcMs) > 120000) {
+    Logger.log(`Warning: Candle time too far from requested - skipping`);
+    return false;
   }
+  return true;
+}
 
-  if (!data || data.length === 0) {
-    interval = CONFIG.FALLBACK_INTERVAL;
-    klineUrl = CONFIG.EXCHANGE_BASE_URL + `/klines?symbol=${symbol}&interval=${interval}&startTime=${utcMs - 3600000}&endTime=${utcMs}&limit=1`;
-    klineRes = UrlFetchApp.fetch(klineUrl, { muteHttpExceptions: true });
-    data = klineRes.getResponseCode() === 200 ? JSON.parse(klineRes.getContentText()) : null;
-  }
-
-  if (!data || data.length === 0) return null;
-
+/** Extracts price from kline data, converting BTC pair if needed */
+function extractMEXCPrice(data, target, useBTC) {
   let price = target === 'low' ? parseFloat(data[0][3]) : parseFloat(data[0][2]);
   if (useBTC) {
     const btcPrice = getBTCUSDTPrice();
     if (btcPrice === null) return null;
     price *= btcPrice;
   }
-
   Logger.log(`MEXC final price: ${price} (${target})`);
   return price;
 }
@@ -501,62 +539,58 @@ function getPriceFromCoinGecko(id, utcMs, target) {
 }
 
 function tryCoinGeckoTickers(id) {
-  let attempts = 0;
-  while (attempts < 3) {
-    attempts++;
-    const tickersUrl = CONFIG.COINGECKO_TICKERS_TEMPLATE
-      .replace('{base}', CONFIG.COINGECKO_BASE)
-      .replace('{id}', id);
-    const tickersRes = UrlFetchApp.fetch(tickersUrl, { muteHttpExceptions: true });
+  const url = CONFIG.COINGECKO_TICKERS_TEMPLATE
+    .replace('{base}', CONFIG.COINGECKO_BASE)
+    .replace('{id}', id);
 
-    if (tickersRes.getResponseCode() === 429) {
-      Logger.log(`CoinGecko 429 on tickers - sleeping 5s (attempt ${attempts}/3)`);
-      Utilities.sleep(5000); // Reduced from 10s
-      continue;
-    }
+  const response = fetchWithRateLimitRetry(url, 'tickers');
+  if (!response) return null;
 
-    if (tickersRes.getResponseCode() === 200) {
-      const data = JSON.parse(tickersRes.getContentText());
-      const tickers = data.tickers || [];
-      let maxVol = 0;
-      let selPrice = null;
-      for (const t of tickers) {
-        if (!t.is_stale && t.volume > maxVol && t.converted_last?.usd) {
-          maxVol = t.volume;
-          selPrice = t.converted_last.usd;
-        }
-      }
-      return selPrice;
-    } else {
-      Logger.log(`CoinGecko tickers failed: HTTP ${tickersRes.getResponseCode()}`);
+  const tickers = JSON.parse(response).tickers || [];
+  return selectBestTickerPrice(tickers);
+}
+
+/** Selects highest-volume non-stale ticker with USD price */
+function selectBestTickerPrice(tickers) {
+  let maxVol = 0;
+  let bestPrice = null;
+  for (const t of tickers) {
+    const isValid = !t.is_stale && t.converted_last?.usd;
+    if (isValid && t.volume > maxVol) {
+      maxVol = t.volume;
+      bestPrice = t.converted_last.usd;
     }
   }
-  return null;
+  return bestPrice;
 }
 
 function tryCoinGeckoHistory(id, dateStr) {
-  let attempts = 0;
-  while (attempts < 3) {
-    attempts++;
-    const histUrl = CONFIG.COINGECKO_HISTORY_TEMPLATE
-      .replace('{base}', CONFIG.COINGECKO_BASE)
-      .replace('{id}', id)
-      .replace('{date}', dateStr);
-    const histRes = UrlFetchApp.fetch(histUrl, { muteHttpExceptions: true });
+  const url = CONFIG.COINGECKO_HISTORY_TEMPLATE
+    .replace('{base}', CONFIG.COINGECKO_BASE)
+    .replace('{id}', id)
+    .replace('{date}', dateStr);
 
-    if (histRes.getResponseCode() === 429) {
-      Logger.log(`CoinGecko 429 on history - sleeping 5s (attempt ${attempts}/3)`);
-      Utilities.sleep(5000); // Reduced from 10s
+  const response = fetchWithRateLimitRetry(url, 'history');
+  if (!response) return null;
+
+  const data = JSON.parse(response);
+  return data.market_data?.current_price?.usd || null;
+}
+
+/** Fetches URL with retry on 429 rate limit (up to 3 attempts) */
+function fetchWithRateLimitRetry(url, label) {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    const code = res.getResponseCode();
+
+    if (code === 200) return res.getContentText();
+    if (code === 429) {
+      Logger.log(`CoinGecko 429 on ${label} - sleeping 5s (attempt ${attempt}/3)`);
+      Utilities.sleep(5000);
       continue;
     }
-
-    if (histRes.getResponseCode() === 200) {
-      const data = JSON.parse(histRes.getContentText());
-      const price = data.market_data?.current_price?.usd;
-      if (price) return price;
-    } else {
-      Logger.log(`CoinGecko history failed: HTTP ${histRes.getResponseCode()}`);
-    }
+    Logger.log(`CoinGecko ${label} failed: HTTP ${code}`);
+    return null;
   }
   return null;
 }
@@ -679,6 +713,7 @@ function testGetCryptoPrice() {
   console.log("├──────────────────────────────────────────────────────────────");
 
   const testCases = [
+    // GRC tests commented out - API data not reliably available
     // { name: "GRC - Recent price (high)", token: "grc", dateStr: "2026-02-08 12:00:00", tz: "CST", highOrLow: "high", expectedRange: [0.005, 0.02] },
     // { name: "GRC - Recent price (low)", token: "grc", dateStr: "2026-02-08 12:00:00", tz: "CST", highOrLow: "low", expectedRange: [0.005, 0.02] },
     { name: "XTM - Recent price (high)", token: "xtm", dateStr: "2026-02-08 12:00:00", tz: "CST", highOrLow: "high", expectedRange: [0.001, 0.1] },
@@ -686,7 +721,7 @@ function testGetCryptoPrice() {
     { name: "XMR - Older date (high)", token: "xmr", dateStr: "2025-12-01 14:30:00", tz: "UTC", highOrLow: "high", expectedRange: [380, 450] },
     { name: "BTC - New Year 2026 (high)", token: "btc", dateStr: "2026-01-01 00:00:00", tz: "UTC", highOrLow: "high", expectedRange: [85000, 100000] },
     { name: "Invalid token", token: "zzzzzzfake", dateStr: "2026-02-08 12:00:00", tz: "CST", highOrLow: "high", expectedRange: null },
-    { name: "Future date", token: "grc", dateStr: "2026-12-31 23:59:59", tz: "CST", highOrLow: "high", expectedRange: null }
+    { name: "Future date", token: "xtm", dateStr: "2026-12-31 23:59:59", tz: "CST", highOrLow: "high", expectedRange: null }
   ];
 
   let passed = 0;

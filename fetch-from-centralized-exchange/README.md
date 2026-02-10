@@ -1,56 +1,105 @@
-# Get Crypto Price from Centralized Exchange
+# Fetch Crypto Price from Centralized Exchange
 
 ## Overview
 
-USE AT YOUR OWN RISK: SEE LICENSE FILE, INCLUDED IN PARENT DIRECTORY.
+**USE AT YOUR OWN RISK: SEE LICENSE FILE IN PARENT DIRECTORY.**
 
-Gets the price at a speficied point in time in the past (can be a prior minute, even) for tokens not supported by smart-contract-oriented API,
-such as DexScreener's or DexTools.
+This directory contains utilities for fetching historical cryptocurrency prices from centralized exchanges (CEXs). These tools are designed for tokens that don't trade on decentralized exchanges, such as Bitcoin (BTC), Monero (XMR), and Tari (XTM).
 
-For example, tokens such as Bitcoin and Monero, although someetimes they have wrapped versions such as $wBTC, don't trade directly in
-decentralized exchange liquidity pools.  
+Unlike DEX-traded tokens (which can be priced via DexScreener or DexTools APIs), CEX-traded tokens require querying exchange APIs like MEXC, with fallbacks to CoinGecko and CoinPaprika.
 
-Instead, it's easiest to get their current price from a centralized exchange, which calls for a different codebase as for example, one
-cannot specifiy a liquidity pool.  
+## Tools
 
-Important: As a Google Apps Script, this cannot handle more than 100 or so calls at a time.  For more capacity, use
-`crypto-price-filler/index.js`.
+This directory contains two separate implementations for different use cases:
 
-Note: If the few decentralized trading exchanges for these coins had more volume and an API, then that could be used.
+| Tool | Use Case | Capacity |
+|------|----------|----------|
+| **Google Apps Script** | Google Sheets integration | ~100 calls per run |
+| **Node.js CLI** | Batch processing CSV files | Thousands of rows |
 
-### Current Roster of Utilities
+---
 
-- `getCryptoPriceFromCentralizedExchange.gs`, a Google Apps Script
+### 1. Google Apps Script (`getCryptoPriceFromCentralizedExchange.gs`)
 
-#### Sample Output
+A custom function for Google Sheets that fetches historical prices directly in your spreadsheet.
+
+**Features:**
+- Custom `=getCryptoPrice()` function for use in cells
+- Multi-provider fallback chain: MEXC → CoinGecko → CoinPaprika
+- Aggressive caching (24h for prices, 5min for failures)
+- Rate-limit protection with automatic retry and exponential backoff
+- Menu action to refresh and freeze all prices as static values
+
+**Usage in Google Sheets:**
+```
+=getCryptoPrice("btc", "2026-01-15 14:30:00", "CST", "high")
+=getCryptoPrice("xmr", A1, "UTC", "low")
+```
+
+**Installation:**
+1. Open your Google Sheet
+2. Go to **Extensions → Apps Script**
+3. Paste the contents of `getCryptoPriceFromCentralizedExchange.gs`
+4. Save and refresh your sheet
+
+**Testing:**
+In the Apps Script editor, select `test` from the function dropdown and click **Run**.
+
+**Limitations:**
+- Google Apps Script execution limits (~100 API calls per run)
+- For larger datasets, use the Node.js CLI instead
+
+---
+
+### 2. Node.js CLI (`crypto-price-filler/`)
+
+A command-line tool for batch processing CSV files with thousands of timestamps.
+
+**Features:**
+- Reads timestamps from input CSV, outputs prices to new CSV
+- Same multi-provider fallback chain as the GAS version
+- Backfill utility for filling gaps in existing price data
+- Configurable via `config.json` and `supported-tokens.json`
+- Full test suite with coverage reporting
+
+**Quick Start:**
+```bash
+cd crypto-price-filler
+npm install
+node index.js --token=grc --input=timestamps.csv --output=prices.csv
+```
+
+**Backfill existing data:**
+```bash
+node backfill.js --input=output.csv --backfill-highest
+```
+
+See [`crypto-price-filler/README.md`](./crypto-price-filler/README.md) for complete documentation.
+
+---
+
+## Sample Output
 
 ![Validator Rewards with Prices](./readme-images/xnt-rewards-with-prices.png)
 ![Validator Rewards Analytics](./readme-images/xnt-rewards-analytics.png)
 
-## Prerequisites
+## Supported Tokens
 
-Google Sheets
+Both tools support the same set of tokens. Configuration is maintained in:
+- **GAS:** `TOKEN_TO_ID` constant in the `.gs` file
+- **Node.js:** `supported-tokens.json`
 
-## Installation
-
-See the file, `../README.md`, `Install` section.
-
-### Usage
-
-Refer to the module or file header documentation.
-
-## Development
-
-### Test
-
-From the "Run" or "Debug" menu at the top of the Google Apps Script IDE / Editor, run `testGetCryptoPrice` and check the log below at the bottom of the screen.
+Current tokens: BTC, XMR, GRC, XTM (and any token listed on MEXC)
 
 ## Contributing
 
-Fork me on GitHub. :)  Contributions are welcome but note that any contributions are subject to the license as defined in the LICENSE file here.
+Contributions welcome! Fork on GitHub and submit a pull request.
 
-To be accepted for pull request:
-
+**Requirements:**
 - All tests must pass
-- Any major new functionality must have a test runnable from the current approach
-- All code must be modular e.g. low cyclomatic complexity ~17 or so.
+- Code must maintain low cyclomatic complexity (~17 max)
+- New features should include tests
+
+## Authors
+
+Christopher M. Balz, with Grok and Claude
