@@ -6,7 +6,13 @@
  * using the MEXC public API primarily. Tries 1-minute resolution first; falls back to 1-hour
  * if no trades occurred in the requested minute.
  *
- * Upgraded Features (v2.11.0 - CoinGecko market_chart/range for GRC):
+ * Upgraded Features (v2.12.0 - Provider chain cleanup):
+ * - Removed dead CryptoCompare stub; provider chain: MEXC → CoinGecko → CoinPaprika
+ * - CoinPaprika skip list for GRC (is_active: false, free OHLCV limited to 24h)
+ * - Clamped market_chart/range toSec to Date.now() for recent timestamps
+ * - Reduced test sleep from 30s to 5s (demo API key allows 30 req/min)
+ *
+ * Previous (v2.11.0 - CoinGecko market_chart/range for GRC):
  * - Added CoinGecko /market_chart/range endpoint with demo API key for time-series data
  *   (fetches 24h window of hourly price points, returns actual max/min for high/low)
  * - Re-enabled GRC integration tests (market_chart/range provides reliable data)
@@ -41,7 +47,7 @@
  *
  * @fileoverview Main utility for large-scale historical crypto price tracking in Sheets.
  * @author Christopher M. Balz, with Grok and Claude
- * @version 2.11.0 (CoinGecko market_chart/range for GRC)
+ * @version 2.12.0 (Provider chain cleanup)
  * @lastModified February 10, 2026
  *
  * Usage in Google Sheets:
@@ -216,7 +222,6 @@ function fetchPriceFromProviders(token, utcMs, target) {
   const idMap = TOKEN_TO_ID[token] || { gecko: token, paprika: token };
   const providers = [
     { name: 'MEXC', fn: () => getPriceFromMEXC(token, utcMs, target) },
-    { name: 'CryptoCompare', fn: () => getPriceFromCryptoCompare(token, utcMs, target) },
     { name: 'CoinGecko', fn: () => getPriceFromCoinGecko(idMap.gecko, utcMs, target) },
     { name: 'CoinPaprika', fn: () => getPriceFromCoinPaprika(idMap.paprika, utcMs, target) }
   ];
@@ -509,11 +514,6 @@ function extractMEXCPrice(data, target, useBTC) {
   return price;
 }
 
-function getPriceFromCryptoCompare(token, utcMs, target) {
-  Logger.log(`Trying CryptoCompare for ${token}`);
-  return null;
-}
-
 function getPriceFromCoinGecko(id, utcMs, target) {
   Logger.log(`Trying CoinGecko for ${id} at ${new Date(utcMs).toISOString()}`);
 
@@ -596,7 +596,8 @@ function selectBestTickerPrice(tickers) {
  */
 function tryCoinGeckoMarketChartRange(id, utcMs, target) {
   const fromSec = Math.floor((utcMs - 43200000) / 1000);  // 12h before
-  const toSec = Math.floor((utcMs + 43200000) / 1000);    // 12h after
+  const nowSec = Math.floor(Date.now() / 1000);
+  const toSec = Math.min(Math.floor((utcMs + 43200000) / 1000), nowSec);
 
   const url = CONFIG.COINGECKO_MARKET_CHART_RANGE_TEMPLATE
     .replace('{base}', CONFIG.COINGECKO_BASE)
@@ -653,6 +654,11 @@ function fetchWithRateLimitRetry(url, label) {
 function getPriceFromCoinPaprika(id, utcMs, highOrLow) {
   Logger.log('Trying CoinPaprika for ' + id);
 
+  if (new Set(['grc-gridcoin']).has(id)) {
+    Logger.log(`Skipping CoinPaprika for inactive token: ${id}`);
+    return null;
+  }
+
   const tickersUrl = CONFIG.COINPAPRIKA_TICKERS_TEMPLATE
     .replace('{base}', CONFIG.COINPAPRIKA_BASE)
     .replace('{id}', id);
@@ -690,7 +696,7 @@ function getPriceFromCoinPaprika(id, utcMs, highOrLow) {
 function test() {
   console.log("══════════════════════════════════════════════════════════════");
   console.log("MASTER TEST SUITE - " + new Date().toISOString());
-  console.log("Script version: v2.11.0 (CoinGecko market_chart/range for GRC)");
+  console.log("Script version: v2.12.0 (Provider chain cleanup)");
   console.log("══════════════════════════════════════════════════════════════\n");
 
   const results = [];
@@ -820,8 +826,8 @@ function testGetCryptoPrice() {
     else failedTests.push(test.name);
 
     if (index < testCases.length - 1) {
-      Logger.log(`Sleeping 30s between tests to avoid rate limits`);
-      Utilities.sleep(30000);
+      Logger.log(`Sleeping 5s between tests`);
+      Utilities.sleep(5000);
     }
   });
 
