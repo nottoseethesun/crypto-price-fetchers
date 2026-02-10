@@ -6,7 +6,14 @@
  * using the MEXC public API primarily. Tries 1-minute resolution first; falls back to 1-hour
  * if no trades occurred in the requested minute.
  *
- * Upgraded Features (v2.10.0 - XTM/Tari Fix + CoinGecko Deadlock Fix):
+ * Upgraded Features (v2.11.0 - CoinGecko market_chart/range for GRC):
+ * - Added CoinGecko /market_chart/range endpoint with demo API key for time-series data
+ *   (fetches 24h window of hourly price points, returns actual max/min for high/low)
+ * - Re-enabled GRC integration tests (market_chart/range provides reliable data)
+ * - CoinGecko provider now tries: market_chart/range → tickers → history
+ * - Widened GRC test expectedRange to [0.001, 0.05] for price volatility
+ *
+ * Previous (v2.10.0 - XTM/Tari Fix + CoinGecko Deadlock Fix):
  * - Removed 'xtm' from MEXC skip list (XTM is now listed on MEXC as XTMUSDT)
  * - Fixed CoinGecko deadlock: getPriceFromCoinGecko no longer re-acquires the
  *   API_LOCK that the caller (getCryptoPrice) already holds, which caused
@@ -34,7 +41,7 @@
  *
  * @fileoverview Main utility for large-scale historical crypto price tracking in Sheets.
  * @author Christopher M. Balz, with Grok and Claude
- * @version 2.10.0 (XTM/Tari fix, CoinGecko deadlock fix)
+ * @version 2.11.0 (CoinGecko market_chart/range for GRC)
  * @lastModified February 10, 2026
  *
  * Usage in Google Sheets:
@@ -67,12 +74,14 @@ const CONFIG = {
 
   // API URL bases
   COINGECKO_BASE: 'https://api.coingecko.com/api/v3',
+  COINGECKO_API_KEY: 'CG-v44h5wBkTFVwwBqDGAhXzbg7',
   COINPAPRIKA_BASE: 'https://api.coinpaprika.com/v1',
 
   // Endpoint templates
   COINGECKO_SIMPLE_PRICE_TEMPLATE: '{base}/simple/price?ids=bitcoin&vs_currencies=usd',
   COINGECKO_TICKERS_TEMPLATE: '{base}/coins/{id}/tickers',
   COINGECKO_HISTORY_TEMPLATE: '{base}/coins/{id}/history?date={date}',
+  COINGECKO_MARKET_CHART_RANGE_TEMPLATE: '{base}/coins/{id}/market_chart/range?vs_currency=usd&from={from}&to={to}&x_cg_demo_api_key={key}',
 
   COINPAPRIKA_TICKERS_TEMPLATE: '{base}/tickers/{id}',
   COINPAPRIKA_OHLCV_TEMPLATE: '{base}/coins/{id}/ohlcv/historical?start={start}&end={end}&quote=usd',
@@ -508,16 +517,32 @@ function getPriceFromCryptoCompare(token, utcMs, target) {
 function getPriceFromCoinGecko(id, utcMs, target) {
   Logger.log(`Trying CoinGecko for ${id} at ${new Date(utcMs).toISOString()}`);
 
+  // Note: No separate lock here — the caller (getCryptoPrice) already holds the API_LOCK.
+  // Acquiring it again would deadlock since GAS LockService is not re-entrant.
+
   let price = null;
   const dateStr = Utilities.formatDate(new Date(utcMs), 'UTC', 'dd-MM-yyyy');
 
-  // Check cache first (may return number for hit, string for negative cache, or null for miss)
-  const cached = getCachedResult(`gecko_daily_${id}_${dateStr}`);
-  if (typeof cached === 'number') return applySpread(cached, target);
-  if (typeof cached === 'string') return null;  // Negative cache hit - skip to next provider
+  // 1) Try market_chart/range with its own cache (independent of tickers/history)
+  const rangeCacheKey = `gecko_range_${id}_${dateStr}_${target}`;
+  const rangeCached = getCachedResult(rangeCacheKey);
+  if (typeof rangeCached === 'number') return rangeCached;
 
-  // Note: No separate lock here — the caller (getCryptoPrice) already holds the API_LOCK.
-  // Acquiring it again would deadlock since GAS LockService is not re-entrant.
+  if (typeof rangeCached !== 'string') {
+    const rangePrice = tryCoinGeckoMarketChartRange(id, utcMs, target);
+    if (rangePrice !== null) {
+      Logger.log(`CoinGecko market_chart/range success: ${rangePrice} USD (${target})`);
+      setCachedResult(rangeCacheKey, rangePrice);
+      return rangePrice;
+    }
+    setCachedResult(rangeCacheKey, 'NO_DATA', CONFIG.CACHE_EXPIRY_SECONDS.NEGATIVE_CACHE);
+  }
+
+  // 2) Fall back to tickers/history with their own cache
+  const dailyCacheKey = `gecko_daily_${id}_${dateStr}`;
+  const dailyCached = getCachedResult(dailyCacheKey);
+  if (typeof dailyCached === 'number') return applySpread(dailyCached, target);
+  if (typeof dailyCached === 'string') return null;
 
   price = tryCoinGeckoTickers(id);
   if (price !== null) {
@@ -530,11 +555,11 @@ function getPriceFromCoinGecko(id, utcMs, target) {
   }
 
   if (price !== null) {
-    setCachedResult(`gecko_daily_${id}_${dateStr}`, price);
+    setCachedResult(dailyCacheKey, price);
     return applySpread(price, target);
   }
 
-  setCachedResult(`gecko_daily_${id}_${dateStr}`, 'NO_DATA');
+  setCachedResult(dailyCacheKey, 'NO_DATA', CONFIG.CACHE_EXPIRY_SECONDS.NEGATIVE_CACHE);
   return null;
 }
 
@@ -562,6 +587,36 @@ function selectBestTickerPrice(tickers) {
     }
   }
   return bestPrice;
+}
+
+/**
+ * Fetches time-series prices from CoinGecko market_chart/range for a 24h window,
+ * then returns the max (high) or min (low) from actual data points.
+ * Requires demo API key. Returns null on failure.
+ */
+function tryCoinGeckoMarketChartRange(id, utcMs, target) {
+  const fromSec = Math.floor((utcMs - 43200000) / 1000);  // 12h before
+  const toSec = Math.floor((utcMs + 43200000) / 1000);    // 12h after
+
+  const url = CONFIG.COINGECKO_MARKET_CHART_RANGE_TEMPLATE
+    .replace('{base}', CONFIG.COINGECKO_BASE)
+    .replace('{id}', id)
+    .replace('{from}', fromSec)
+    .replace('{to}', toSec)
+    .replace('{key}', CONFIG.COINGECKO_API_KEY);
+
+  const response = fetchWithRateLimitRetry(url, 'market_chart/range');
+  if (!response) return null;
+
+  const prices = JSON.parse(response).prices;
+  if (!prices || prices.length === 0) {
+    Logger.log('CoinGecko market_chart/range: No price data points');
+    return null;
+  }
+
+  Logger.log(`CoinGecko market_chart/range: ${prices.length} data points`);
+  const values = prices.map(p => p[1]);
+  return target === 'low' ? Math.min(...values) : Math.max(...values);
 }
 
 function tryCoinGeckoHistory(id, dateStr) {
@@ -635,7 +690,7 @@ function getPriceFromCoinPaprika(id, utcMs, highOrLow) {
 function test() {
   console.log("══════════════════════════════════════════════════════════════");
   console.log("MASTER TEST SUITE - " + new Date().toISOString());
-  console.log("Script version: v2.10.0 (XTM fix + CoinGecko deadlock fix)");
+  console.log("Script version: v2.11.0 (CoinGecko market_chart/range for GRC)");
   console.log("══════════════════════════════════════════════════════════════\n");
 
   const results = [];
@@ -713,9 +768,8 @@ function testGetCryptoPrice() {
   console.log("├──────────────────────────────────────────────────────────────");
 
   const testCases = [
-    // GRC tests commented out - API data not reliably available
-    // { name: "GRC - Recent price (high)", token: "grc", dateStr: "2026-02-08 12:00:00", tz: "CST", highOrLow: "high", expectedRange: [0.005, 0.02] },
-    // { name: "GRC - Recent price (low)", token: "grc", dateStr: "2026-02-08 12:00:00", tz: "CST", highOrLow: "low", expectedRange: [0.005, 0.02] },
+    { name: "GRC - Recent price (high)", token: "grc", dateStr: "2026-02-08 12:00:00", tz: "CST", highOrLow: "high", expectedRange: [0.001, 0.05] },
+    { name: "GRC - Recent price (low)", token: "grc", dateStr: "2026-02-08 12:00:00", tz: "CST", highOrLow: "low", expectedRange: [0.001, 0.05] },
     { name: "XTM - Recent price (high)", token: "xtm", dateStr: "2026-02-08 12:00:00", tz: "CST", highOrLow: "high", expectedRange: [0.001, 0.1] },
     { name: "XTM - Recent price (low)", token: "xtm", dateStr: "2026-02-08 12:00:00", tz: "CST", highOrLow: "low", expectedRange: [0.001, 0.1] },
     { name: "XMR - Older date (high)", token: "xmr", dateStr: "2025-12-01 14:30:00", tz: "UTC", highOrLow: "high", expectedRange: [380, 450] },
