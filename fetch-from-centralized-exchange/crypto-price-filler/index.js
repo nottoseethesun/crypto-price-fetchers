@@ -132,9 +132,13 @@
  *   - Required column: "amount" (quantity of tokens)
  *   - Optional columns are preserved in output
  *
- * Basic command:
+ * Basic Command:
  *   node index.js --token=<symbol> --input=<file.csv> --output=<output.csv>
  *
+ * More Typical Command with Options:
+ * 
+ *   node index.js --token=<symbol> --input=<file.csv> --output=<output.csv> --backfill-highest
+ * 
  * Command-Line Options:
  *   --token       {string}  Required. Token symbol (e.g. xtm, grc, btc). Case-insensitive.
  *   --input       {string}  Required. Path to input CSV. Supports ~ for home directory.

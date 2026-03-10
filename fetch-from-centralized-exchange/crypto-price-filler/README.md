@@ -5,7 +5,7 @@
 USE AT YOUR OWN RISK: SEE LICENSE FILE, INCLUDED TWO DIRECTORIES UP.
 
 This is a NodeJS utility that reads a given input csv that contains a set of rows each with a timestamp, and gets the
-price at a speficied point in time in the past (can be a prior minute, even) for the specified token, writing it out to
+price at a specified point in time in the past (can be a prior minute, even) for the specified token, writing it out to
 an `output.csv` file that also contains the timestamps, but paired with the price of the token for each row.
 
 This utility is useful for tokens not supported by smart-contract-oriented API, such as DexScreener's or DexTools, since

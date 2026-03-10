@@ -29,7 +29,17 @@
  * @license MIT (or your project's license)
  */
 
+import fs from 'fs';
 import { program } from 'commander';
+
+/**
+ * Loads the supported token symbols from supported-tokens.json.
+ * @returns {Object} The tokens object keyed by lowercase symbol
+ */
+function loadSupportedTokens() {
+    const data = JSON.parse(fs.readFileSync('./supported-tokens.json', 'utf8'));
+    return data.tokens || {};
+}
 
 /**
  * Configures and returns the Commander program instance.
@@ -51,7 +61,20 @@ export function setupCommander() {
         .requiredOption(
             '--token <symbol>',
             'Crypto token symbol (e.g. grc, xtm, btc)',
-            (value) => value.toLowerCase()
+            (value) => {
+                const symbol = value.toLowerCase();
+                const tokens = loadSupportedTokens();
+                if (!tokens[symbol]) {
+                    const supported = Object.entries(tokens)
+                        .map(([sym, cfg]) => `  ${sym}\t${cfg.name}`)
+                        .join('\n');
+                    console.error(`\nError: Unknown token symbol "${value}".`);
+                    console.error(`\nSupported tokens:\n${supported}`);
+                    console.error(`\nTo add a new token, edit supported-tokens.json. See --help for details.`);
+                    process.exit(1);
+                }
+                return symbol;
+            }
         )
         .requiredOption(
             '--input <path>',

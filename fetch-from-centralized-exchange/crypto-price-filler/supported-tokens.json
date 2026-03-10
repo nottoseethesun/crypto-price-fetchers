@@ -13,6 +13,13 @@
       "mexc_symbol": "XTM",
       "note": "Listed on MEXC as XTMUSDT"
     },
+    "xtz": {
+      "name": "Tezos",
+      "coingecko_id": "tezos",
+      "coinpaprika_id": "xtz-tezos",
+      "mexc_symbol": "XTZ",
+      "note": "Listed on MEXC as XTZUSDT"
+    },
     "btc": {
       "name": "Bitcoin",
       "coingecko_id": "bitcoin",
