@@ -16,9 +16,10 @@
  *   - Graceful handling of lock timeouts: returns visible string in cells
  *   - Custom Sheets menu "DexTools Price/FDV" with "Refresh" option to clear cache and flush sheet
  *     (must be manually installed - see instructions below)
- *   - X1 blockchain support: prices on X1 are routed through the same
- *     `dexToolsGetTokenPrice` function (DexTools doesn't list X1 yet —
- *     see "X1 BLOCKCHAIN ROUTING – DESIGN NOTE" below for the rationale)
+ *   - X1 blockchain support: prices and FDVs on X1 are routed through the
+ *     same `dexToolsGetTokenPrice` and `dexToolsGetTokenFDV` functions
+ *     (DexTools doesn't list X1 yet — see "X1 BLOCKCHAIN ROUTING –
+ *     DESIGN NOTE" below for the rationale)
  *   - Never caches zeros or failures → forces fresh retry on next call after transient issues
  * 
  * IMPORTANT – SUBSCRIPTION PLAN CONFIGURATION
@@ -94,19 +95,30 @@
  *         "X1 BLOCKCHAIN ROUTING – DESIGN NOTE" section below for how
  *         to obtain a free-tier key.
  *
+ *    F. X1 blockchain – FDV (same call shape as E):
+ *       =dexToolsGetTokenFDV("x1", "<x1-token-mint>",
+ *          {{"<x1-pool-address>", 0}})
+ *       → Returns the pool's `fdv` field. Caveat: x1.ninja reports
+ *         `fdv: 0` for pools whose base token is the chain-native
+ *         token (Wrapped XNT, mint So11…112) — FDV doesn't map
+ *         cleanly to a chain-native token. For non-native tokens
+ *         the FDV is populated.
+ *       → Uses the same /v1/pools/{poolAddress} endpoint as price.
+ *
  * X1 BLOCKCHAIN ROUTING – DESIGN NOTE
  *
- * Why is X1 routed through a function called `dexToolsGetTokenPrice`?
+ * Why are X1 calls routed through functions named `dexToolsGetTokenPrice`
+ * and `dexToolsGetTokenFDV`?
  *
  *   - DexTools (as of January 2026) does not list X1 among its supported
- *     chains. Without this routing, an X1 price would require a separate
- *     function and a separate config block on the spreadsheet side.
- *   - X1 was folded into `dexToolsGetTokenPrice` so spreadsheet formulas
+ *     chains. Without this routing, X1 price/FDV would require separate
+ *     functions and a separate config block on the spreadsheet side.
+ *   - X1 was folded into the existing functions so spreadsheet formulas
  *     stay uniform across chains: only the chain slug changes
- *     ("ether", "pulse", "x1", …). One function, one mental model.
- *   - If DexTools later adds X1 native support, the X1 branch inside
- *     `dexToolsGetTokenPrice` can be deleted in one step with no
- *     spreadsheet impact.
+ *     ("ether", "pulse", "x1", …). Two functions, one mental model.
+ *   - If DexTools later adds X1 native support, the X1 branches inside
+ *     these functions can be deleted in one step with no spreadsheet
+ *     impact.
  *
  * How to get an x1.ninja API key:
  *   1. Visit https://x1.ninja/developers
@@ -114,15 +126,23 @@
  *   3. Copy the resulting `x1_…` token.
  *   4. Paste it into X1_CONFIG.API_KEY near the top of this file.
  *
- * Endpoint used:
+ * Endpoint used (price AND FDV):
  *   GET /v1/pools/{poolAddress}   (free tier)
- *   Returns `{ pool: { address, baseToken, quoteToken, priceUsd, … }, … }`.
- *   We extract `pool.priceUsd` and return it as the current USD price.
+ *   Returns `{ pool: { address, baseToken, quoteToken, priceUsd, fdv,
+ *   marketCap, liquidity, … }, … }`. `dexToolsGetTokenPrice` extracts
+ *   `pool.priceUsd`; `dexToolsGetTokenFDV` extracts `pool.fdv`. Same
+ *   endpoint, same auth, same cache-key family — only the field name
+ *   differs.
+ *
  *   The caller supplies the pool address via the public function's
  *   third argument (`poolAddresses`, example-C style). x1.ninja's free
  *   tier does not include token→pool resolution (`/v1/search` would
  *   provide it but is paid Starter tier), so the pool address must be
  *   known to the caller.
+ *
+ *   Caveat: x1.ninja reports `fdv: 0` for pools whose base token is
+ *   the chain-native (Wrapped XNT, mint So11…112). FDV is well-defined
+ *   for non-native tokens.
  *
  * PROJECT & LICENSE INFORMATION
  * 
@@ -144,9 +164,9 @@
  *    - In the Apps Script editor, select the function: testDexToolsFunctions
  *    - Click Run (no parameters needed)
  *    - View results in the Executions log or View → Logs
- *    - Expected: All 6 tests PASS with real values for supported tokens
- *      (the 6th test queries x1.ninja for wXNT on X1 and depends on
- *      X1_CONFIG.API_KEY being set)
+ *    - Expected: All 7 tests PASS with real values for supported tokens
+ *      (tests 6 and 7 query x1.ninja for X1 wXNT price and X1 XENCAT
+ *      FDV respectively, and depend on X1_CONFIG.API_KEY being set)
  * 
  * 2. Verbose test (maximum debug detail – recommended for troubleshooting):
  *    - Select the function: testDexToolsVerbose
@@ -357,18 +377,44 @@ function dexToolsGetTokenPrice(blockchain, tokenAddress, poolAddresses = [], cac
 /**
  * Gets the Fully Diluted Value (FDV / fully diluted market cap) in USD.
  *
- * @param {string} blockchain - Chain identifier
- * @param {string} tokenAddress - Token contract address
+ * Routes by `blockchain`:
+ *   - `"x1"`  → x1.ninja `/v1/pools/{poolAddress}` — returns the
+ *               pool's `fdv`. The pool address must be supplied via
+ *               the third argument (`poolAddresses`), example-C style.
+ *               x1.ninja reports `fdv: 0` for pools whose base token
+ *               is the chain-native (Wrapped XNT).
+ *   - other   → DexTools `/token/.../info` (FDV is per-token, not per-pool)
+ *
+ * Design note: DexTools (as of January 2026) does not list X1 among its
+ * supported chains. The X1 branch is folded into this function so
+ * spreadsheet formulas stay uniform across chains — only the chain
+ * slug changes. See the "X1 BLOCKCHAIN ROUTING – DESIGN NOTE" section
+ * in this file's header doc for the full rationale.
+ *
+ * @param {string} blockchain - Chain identifier (e.g. "pulse", "ether", "x1")
+ * @param {string} tokenAddress - Token contract address (or pool address for X1)
+ * @param {Array<Array<string>>} [poolAddresses=[]] - Optional [[poolAddress, unused]].
+ *                                 Required for X1 (x1.ninja keys on
+ *                                 pool address). Ignored by the
+ *                                 DexTools path (FDV is per-token).
  * @param {number} [cacheSeconds=CONFIG.CACHE_SECONDS] - Override cache duration
  * @return {number|string} FDV in USD, or 0 (for math) / friendly string on timeout
  */
-function dexToolsGetTokenFDV(blockchain, tokenAddress, cacheSeconds = CONFIG.CACHE_SECONDS) {
-  const cacheKey = `dt_fdv_${blockchain}_${tokenAddress}`;
+function dexToolsGetTokenFDV(blockchain, tokenAddress, poolAddresses = [], cacheSeconds = CONFIG.CACHE_SECONDS) {
+  const isX1 = String(blockchain || '').toLowerCase() === 'x1';
+  const pool = Array.isArray(poolAddresses) && poolAddresses[0]?.[0];
+  const address = pool || tokenAddress;
+  const isPool = !!pool;
+  const provider = isX1 ? 'x1' : 'dt';
+  const cacheKey = `${provider}_fdv_${blockchain}_${address}_${isPool ? 'pool' : 'token'}`;
 
   const cached = CACHE.get(cacheKey);
   if (cached) return Number(cached);
 
   const fdv = withRateLimitProtection(() => {
+    if (isX1) {
+      return fetchX1NinjaFDV(address);
+    }
     const info = fetchDexToolsTokenInfo(blockchain, tokenAddress);
     return info?.fdv ?? info?.fullyDilutedValue ?? info?.fdvUsd ?? info?.metrics?.fdv ?? 0;
   });
@@ -556,6 +602,47 @@ function fetchX1NinjaPrice(poolAddress) {
 }
 
 /**
+ * Fetches Fully Diluted Value (FDV) in USD for an X1 pool from the
+ * x1.ninja API. Same endpoint and auth as fetchX1NinjaPrice — these
+ * functions differ only in which field is parsed out (`pool.fdv` vs
+ * `pool.priceUsd`).
+ *
+ * Endpoint: GET /v1/pools/{poolAddress}   (free tier)
+ *
+ * Caveat: x1.ninja reports `fdv: 0` for pools whose base token is the
+ * native/wrapped XNT mint (the concept doesn't map cleanly to a
+ * chain-native token). The function returns 0 in that case,
+ * consistent with the 0-on-no-data convention used throughout this
+ * file.
+ *
+ * @param {string} poolAddress - Pool/pair address on X1
+ * @return {number} FDV in USD or 0
+ */
+function fetchX1NinjaFDV(poolAddress) {
+  const url = `${X1_BASE_URL}/pools/${poolAddress}`;
+  console.log(`[X1 FDV] Fetching: ${url}`);
+
+  try {
+    const response = UrlFetchApp.fetch(url, getX1Options());
+    const code = response.getResponseCode();
+    console.log(`[X1 FDV] HTTP: ${code}`);
+
+    if (code !== 200) {
+      console.error(`[X1 FDV] HTTP Error ${code}: ${response.getContentText().substring(0, 300)}`);
+      return 0;
+    }
+
+    const json = JSON.parse(response.getContentText());
+    const fdv = Number(json?.pool?.fdv) || 0;
+    console.log(`[X1 FDV] Pool ${json?.pool?.address}: fdv=${fdv}`);
+    return fdv;
+  } catch (err) {
+    console.error(`[X1 FDV] Exception: ${err.message}`);
+    return 0;
+  }
+}
+
+/**
  * Returns standardized fetch options for the x1.ninja API (Bearer token auth).
  *
  * @return {Object} UrlFetchApp options
@@ -622,6 +709,7 @@ function testDexToolsFunctions(verbose = false) {
     { name: "USDC (Ethereum) FDV – expected very large number (billions)", fn: () => dexToolsGetTokenFDV("ether", "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48") },
     { name: "HEX (Ethereum) price with specific LP (> $1M pool)", fn: () => dexToolsGetTokenPrice("ether", "0x2b591e99afe9f32eaa6214f7b7629768c40eeb39", [["0x69d91b94f0aaf8e8a2586909fa77a5c2c89818d5", 0]]) },
     { name: "X1 wXNT (wrapped XNT) price via x1.ninja – wXNT/USDC.X pool", fn: () => dexToolsGetTokenPrice("x1", "So11111111111111111111111111111111111111112", [["CAJeVEoSm1QQZccnCqYu9cnNF7TTD2fcUA3E5HQoxRvR", 0]]) },
+    { name: "X1 XENCAT (burn) FDV via x1.ninja – XENCAT/wXNT pool", fn: () => dexToolsGetTokenFDV("x1", "DQ6sApYPMJ8LwpvyUjthL7amykNBJ3fx5jZi2koN7vHb", [["6oTV8xMRP6w592xK79Untuq8vqCttFDHZnw3bN5Suxry", 0]]) },
   ];
 
   let passes = 0;

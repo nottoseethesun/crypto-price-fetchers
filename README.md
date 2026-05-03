@@ -22,7 +22,10 @@ async operations, etc.
 
 `crypto-price-fetchers.gs` is a Google Apps Script that fetches only the current
 price, and is limited to tokens that are based on smart-contract technology,
-such as in PulseChain, Ethereum, and Solana.
+such as in PulseChain, Ethereum, and Solana. The X1 blockchain is supported
+here as well, in addition to the blockchains that DexTools already covers — X1
+calls are routed through the x1.ninja API since DexTools does not list X1 yet.
+See the file's header documentation for details.
 
 `fetch-from-centralized-exchage/getCryptoPriceFromCentralizedExchange.gs` is
 a Google Apps Script currently fetches the price only at a point in time in
