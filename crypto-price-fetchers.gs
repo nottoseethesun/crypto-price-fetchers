@@ -1,5 +1,5 @@
 /**
- * DexTools Price & FDV Fetcher – Rate Limit Friendly & Fully Documented (January 2026)
+ * DexTools Price & FDV Fetcher (with X1 blockchain support via x1.ninja) – Rate Limit Friendly & Fully Documented (January 2026)
  * 
  * PURPOSE:
  *   Provides reliable access to DexTools API v2 for token prices and Fully Diluted Values (FDV)
@@ -16,6 +16,9 @@
  *   - Graceful handling of lock timeouts: returns visible string in cells
  *   - Custom Sheets menu "DexTools Price/FDV" with "Refresh" option to clear cache and flush sheet
  *     (must be manually installed - see instructions below)
+ *   - X1 blockchain support: prices on X1 are routed through the same
+ *     `dexToolsGetTokenPrice` function (DexTools doesn't list X1 yet —
+ *     see "X1 BLOCKCHAIN ROUTING – DESIGN NOTE" below for the rationale)
  *   - Never caches zeros or failures → forces fresh retry on next call after transient issues
  * 
  * IMPORTANT – SUBSCRIPTION PLAN CONFIGURATION
@@ -54,8 +57,9 @@
  *      - Ethereum mainnet: "ether"  
  *      - Binance Smart Chain: "bsc"  
  *      - Polygon: "polygon"  
- *      - PulseChain: "pulse"  
- *      - Solana: "solana"  
+ *      - PulseChain: "pulse"
+ *      - Solana: "solana"
+ *      - X1 blockchain (routed to x1.ninja, not DexTools): "x1"
  * 
  * 2. Example calls (use these in your Google Sheets formulas):
  * 
@@ -73,10 +77,53 @@
  *       → Returns HEX price from the specified >$1M LP on Ethereum
  *       → Note: The extra "0" is required in Sheets to force array passing
  * 
- *    D. Using a different chain (e.g., Binance Smart Chain):  
+ *    D. Using a different chain (e.g., Binance Smart Chain):
  *       =dexToolsGetTokenPrice("bsc", "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c")
  *       → Returns WBNB price on BSC
- * 
+ *
+ *    E. X1 blockchain (routed to x1.ninja API – pool address required):
+ *       =dexToolsGetTokenPrice("x1", "So11111111111111111111111111111111111111112",
+ *          {{"CAJeVEoSm1QQZccnCqYu9cnNF7TTD2fcUA3E5HQoxRvR", 0}})
+ *       → Returns the wXNT/USDC.X pool's current USD price on X1.
+ *       → For X1, the pool address is REQUIRED (third argument,
+ *         example-C style with the trailing `0` for Sheets array
+ *         passing). x1.ninja's free tier does not provide token→pool
+ *         resolution — you supply a known pool/pair address from XDEX.
+ *       → Uses x1.ninja's /v1/pools/{poolAddress} endpoint (free tier).
+ *       → Configure X1_CONFIG.API_KEY at the top of this file. See the
+ *         "X1 BLOCKCHAIN ROUTING – DESIGN NOTE" section below for how
+ *         to obtain a free-tier key.
+ *
+ * X1 BLOCKCHAIN ROUTING – DESIGN NOTE
+ *
+ * Why is X1 routed through a function called `dexToolsGetTokenPrice`?
+ *
+ *   - DexTools (as of January 2026) does not list X1 among its supported
+ *     chains. Without this routing, an X1 price would require a separate
+ *     function and a separate config block on the spreadsheet side.
+ *   - X1 was folded into `dexToolsGetTokenPrice` so spreadsheet formulas
+ *     stay uniform across chains: only the chain slug changes
+ *     ("ether", "pulse", "x1", …). One function, one mental model.
+ *   - If DexTools later adds X1 native support, the X1 branch inside
+ *     `dexToolsGetTokenPrice` can be deleted in one step with no
+ *     spreadsheet impact.
+ *
+ * How to get an x1.ninja API key:
+ *   1. Visit https://x1.ninja/developers
+ *   2. Sign up with a wallet (free tier: 500K req/mo, 60 req/min).
+ *   3. Copy the resulting `x1_…` token.
+ *   4. Paste it into X1_CONFIG.API_KEY near the top of this file.
+ *
+ * Endpoint used:
+ *   GET /v1/pools/{poolAddress}   (free tier)
+ *   Returns `{ pool: { address, baseToken, quoteToken, priceUsd, … }, … }`.
+ *   We extract `pool.priceUsd` and return it as the current USD price.
+ *   The caller supplies the pool address via the public function's
+ *   third argument (`poolAddresses`, example-C style). x1.ninja's free
+ *   tier does not include token→pool resolution (`/v1/search` would
+ *   provide it but is paid Starter tier), so the pool address must be
+ *   known to the caller.
+ *
  * PROJECT & LICENSE INFORMATION
  * 
  * This script is named crypto-price-fetcher.gs and is part of the open-source
@@ -97,7 +144,9 @@
  *    - In the Apps Script editor, select the function: testDexToolsFunctions
  *    - Click Run (no parameters needed)
  *    - View results in the Executions log or View → Logs
- *    - Expected: All 5 tests PASS with real values for supported tokens
+ *    - Expected: All 6 tests PASS with real values for supported tokens
+ *      (the 6th test queries x1.ninja for wXNT on X1 and depends on
+ *      X1_CONFIG.API_KEY being set)
  * 
  * 2. Verbose test (maximum debug detail – recommended for troubleshooting):
  *    - Select the function: testDexToolsVerbose
@@ -214,13 +263,25 @@
  * @property {number} LOCK_WAIT_MS             Max milliseconds to wait for lock acquisition
  */
 const CONFIG = {
-  API_KEY:               'put-yours-here',    // Remember, there's a free tier if needed
+  API_KEY:               'paste_your_dextools_api_key_here',    // Remember, there's a free tier if needed
   SUBSCRIPTION_PLAN:     'standard',          // ← MUST match your key's actual plan tier; free should work too
-  MIN_SECONDS_BETWEEN_CALLS: 0.7,               // Safe for Standard+; 1.5–3 for free tier
+  MIN_SECONDS_BETWEEN_CALLS: 0.7,               // Safe for Standard+; 1.5–3 for free tier; 1.0+ if also calling x1.ninja free (60 req/min)
   API_HOST:              "https://public-api.dextools.io",
   API_VERSION:           "v2",
   CACHE_SECONDS:         300,                 // 5 minutes default – only successful results cached
   LOCK_WAIT_MS:          120000,               // 60 seconds for lock wait (increased for stability)
+};
+
+/**
+ * @typedef {Object} X1Config
+ * @property {string} API_KEY      Your x1.ninja API key (bearer token like `x1_...`)
+ * @property {string} API_HOST     Base host for x1.ninja
+ * @property {string} API_VERSION  Current API version
+ */
+const X1_CONFIG = {
+  API_KEY:     'paste_your_x1_ninja_api_key_here',  // Free tier — get yours at https://x1.ninja/developers
+  API_HOST:    'https://api.x1.ninja',
+  API_VERSION: 'v1',
 };
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -229,6 +290,7 @@ const CONFIG = {
 
 const MILLISECONDS_BETWEEN_CALLS = CONFIG.MIN_SECONDS_BETWEEN_CALLS * 1000;
 const BASE_URL = `${CONFIG.API_HOST}/${CONFIG.SUBSCRIPTION_PLAN}/${CONFIG.API_VERSION}`;
+const X1_BASE_URL = `${X1_CONFIG.API_HOST}/${X1_CONFIG.API_VERSION}`;
 
 const props = PropertiesService.getScriptProperties();
 const CACHE = CacheService.getScriptCache();
@@ -238,27 +300,51 @@ const CACHE = CacheService.getScriptCache();
    ───────────────────────────────────────────────────────────────────────────── */
 
 /**
- * Gets the current price of a token in USD from DexTools API.
- * Supports specifying a particular liquidity pool for more precise pricing.
+ * Gets the current price of a token in USD.
  *
- * @param {string} blockchain - Chain identifier (e.g. "pulse", "ether" for Ethereum, "bsc")
- * @param {string} tokenAddress - Token contract address
+ * Routes by `blockchain`:
+ *   - `"x1"`  → x1.ninja `/v1/pools/{poolAddress}` — returns the pool's
+ *               current `priceUsd`. The pool address must be supplied
+ *               via the third argument (`poolAddresses`), example-C
+ *               style. The free tier does not include token→pool
+ *               resolution.
+ *   - other   → DexTools (token endpoint, or pool endpoint when poolAddresses given)
+ *
+ * Design note: DexTools (as of January 2026) does not list X1 among its
+ * supported chains. The X1 branch is intentionally folded into this
+ * function so end-user spreadsheet formulas stay uniform across chains
+ * — only the chain slug changes. If DexTools later adds X1 natively,
+ * the X1 branch here can be deleted in one step with no spreadsheet
+ * impact. See the "X1 BLOCKCHAIN ROUTING – DESIGN NOTE" section in
+ * this file's header doc for the full rationale.
+ *
+ * For X1, the call pattern is example-C style: pass the token mint as
+ * `tokenAddress` (for documentation/cache-key clarity) and the pool
+ * address as the third argument: `[[poolAddress, 0]]`. The fetcher
+ * uses the pool address to query `/v1/pools/{poolAddress}`.
+ *
+ * @param {string} blockchain - Chain identifier (e.g. "pulse", "ether", "bsc", "x1")
+ * @param {string} tokenAddress - Token contract address (or pool address for X1)
  * @param {Array<Array<string>>} [poolAddresses=[]] - Optional [[poolAddress, unused]]
  *                                 Use when you want price from specific pool
  * @param {number} [cacheSeconds=CONFIG.CACHE_SECONDS] - Override cache duration
  * @return {number|string} Price in USD, or 0 (for math) / friendly string on timeout
  */
 function dexToolsGetTokenPrice(blockchain, tokenAddress, poolAddresses = [], cacheSeconds = CONFIG.CACHE_SECONDS) {
+  const isX1 = String(blockchain || '').toLowerCase() === 'x1';
   const pool = Array.isArray(poolAddresses) && poolAddresses[0]?.[0];
   const address = pool || tokenAddress;
   const isPool = !!pool;
-  const cacheKey = `dt_price_${blockchain}_${address}_${isPool ? 'pool' : 'token'}`;
+  const provider = isX1 ? 'x1' : 'dt';
+  const cacheKey = `${provider}_price_${blockchain}_${address}_${isPool ? 'pool' : 'token'}`;
 
   const cached = CACHE.get(cacheKey);
   if (cached) return Number(cached);
 
-  const price = withRateLimitProtection(() => 
-    fetchDexToolsPrice(blockchain, address, isPool)
+  const price = withRateLimitProtection(() =>
+    isX1
+      ? fetchX1NinjaPrice(address)
+      : fetchDexToolsPrice(blockchain, address, isPool)
   );
 
   if (typeof price === 'number' && price > 0) {
@@ -431,6 +517,60 @@ function getOptions() {
   };
 }
 
+/**
+ * Fetches current USD price for an X1 pool from the x1.ninja API.
+ *
+ * Endpoint: GET /v1/pools/{poolAddress}   (free tier)
+ * Returns the pool's current `priceUsd` field.
+ *
+ * Pool-spec required: pass the pool address via the public function's
+ * third argument (the `poolAddresses` slot, example-C style). x1.ninja
+ * does not let free-tier callers resolve token-mint → pool, so the
+ * caller must know which pool to query.
+ *
+ * @param {string} poolAddress - Pool/pair address on X1 (e.g. an XDEX LP)
+ * @return {number} Price in USD or 0
+ */
+function fetchX1NinjaPrice(poolAddress) {
+  const url = `${X1_BASE_URL}/pools/${poolAddress}`;
+  console.log(`[X1 PRICE] Fetching: ${url}`);
+
+  try {
+    const response = UrlFetchApp.fetch(url, getX1Options());
+    const code = response.getResponseCode();
+    console.log(`[X1 PRICE] HTTP: ${code}`);
+
+    if (code !== 200) {
+      console.error(`[X1 PRICE] HTTP Error ${code}: ${response.getContentText().substring(0, 300)}`);
+      return 0;
+    }
+
+    const json = JSON.parse(response.getContentText());
+    const price = Number(json?.pool?.priceUsd) || 0;
+    console.log(`[X1 PRICE] Pool ${json?.pool?.address}: priceUsd=${price}`);
+    return price;
+  } catch (err) {
+    console.error(`[X1 PRICE] Exception: ${err.message}`);
+    return 0;
+  }
+}
+
+/**
+ * Returns standardized fetch options for the x1.ninja API (Bearer token auth).
+ *
+ * @return {Object} UrlFetchApp options
+ */
+function getX1Options() {
+  return {
+    method: "GET",
+    headers: {
+      "Authorization": `Bearer ${X1_CONFIG.API_KEY}`,
+      "Accept": "application/json"
+    },
+    muteHttpExceptions: true
+  };
+}
+
 /* ─────────────────────────────────────────────────────────────────────────────
    SHEET MENU – "DexTools Price/FDV" with "Refresh" option
    ───────────────────────────────────────────────────────────────────────────── */
@@ -481,6 +621,7 @@ function testDexToolsFunctions(verbose = false) {
     { name: "USDC (Ethereum) price – expected ~1.00 USD (stablecoin)", fn: () => dexToolsGetTokenPrice("ether", "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48") },
     { name: "USDC (Ethereum) FDV – expected very large number (billions)", fn: () => dexToolsGetTokenFDV("ether", "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48") },
     { name: "HEX (Ethereum) price with specific LP (> $1M pool)", fn: () => dexToolsGetTokenPrice("ether", "0x2b591e99afe9f32eaa6214f7b7629768c40eeb39", [["0x69d91b94f0aaf8e8a2586909fa77a5c2c89818d5", 0]]) },
+    { name: "X1 wXNT (wrapped XNT) price via x1.ninja – wXNT/USDC.X pool", fn: () => dexToolsGetTokenPrice("x1", "So11111111111111111111111111111111111111112", [["CAJeVEoSm1QQZccnCqYu9cnNF7TTD2fcUA3E5HQoxRvR", 0]]) },
   ];
 
   let passes = 0;
@@ -516,9 +657,10 @@ function testDexToolsFunctions(verbose = false) {
       if (isNumber) {
         console.log("[VERBOSE] Numeric value:", result);
       }
-      console.log("[VERBOSE] Cache key likely used:", 
-        test.name.includes('FDV') ? `dt_fdv_${test.name.split(' ')[0].toLowerCase()}_...` : 
-                                    `dt_price_${test.name.split(' ')[0].toLowerCase()}_...`);
+      const cachePrefix = test.name.toUpperCase().startsWith('X1') ? 'x1' : 'dt';
+      console.log("[VERBOSE] Cache key likely used:",
+        test.name.includes('FDV') ? `${cachePrefix}_fdv_${test.name.split(' ')[0].toLowerCase()}_...` :
+                                    `${cachePrefix}_price_${test.name.split(' ')[0].toLowerCase()}_...`);
       console.log("[VERBOSE] Finished this test case");
     }
 
