@@ -12,18 +12,18 @@
  * first test drives the real provider chain (`getCryptoPrice`, then MEXC, then
  * CoinGecko) over that file, with only the http layer, `fetchWithRetry`,
  * standing in for the services. The Sheets script keeps its own table,
- * `TOKEN_TO_ID`, so the second test loads
- * `getCryptoPriceFromCentralizedExchange.gs` unchanged into a Node `vm`
- * context, with stand-ins for the Apps Script services it calls, and runs its
- * provider chain the same way.
+ * `TOKEN_TO_ID`, so the second test runs
+ * `getCryptoPriceFromCentralizedExchange.gs` unchanged under Node, with
+ * stand-ins for the Apps Script services it calls, and drives its provider
+ * chain the same way. Both stand-ins are in `tests/helpers/`.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import fs from 'fs';
 import path from 'path';
-import vm from 'vm';
 import { getCryptoPrice } from '../sources/price.js';
 import * as fetchUtils from '../utils/fetch.js';
+import { answeringFetchWithRetry } from './helpers/fetch-with-retry.js';
+import { loadSheetsScript } from './helpers/sheets-script.js';
 
 vi.mock('../utils/fetch.js', () => {
   const mockFn = vi.fn();
@@ -64,59 +64,10 @@ function answerWithoutMexcCandle(url) {
   return null;
 }
 
-/**
- * Loads the Sheets script, unchanged, into a fresh Node `vm` context and
- * returns that context, whose globals are the script's top-level functions.
- * The Apps Script services the script calls are stand-ins: `UrlFetchApp`
- * answers each url from `answer`, where null reads as a 404; the cache starts
- * empty; the lock is always free; and sleeps return at once.
- *
- * @param {function(string): (Object|Array|null)} answer - The json body for a url, or null
- * @returns {Object} The context holding the script's functions
- */
-function loadSheetsScript(answer) {
-  const cache = new Map();
-  const pad = (n) => String(n).padStart(2, '0');
-  const context = vm.createContext({
-    Logger: { log() {} },
-    LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock() {} }) },
-    CacheService: {
-      getScriptCache: () => ({
-        get: (key) => cache.get(key) ?? null,
-        put: (key, value) => { cache.set(key, value); },
-        remove: (key) => { cache.delete(key); }
-      })
-    },
-    Utilities: {
-      sleep() {},
-      formatDate: (date, zone, format) => {
-        if (zone !== 'UTC' || format !== 'dd-MM-yyyy') {
-          throw new Error(`The stand-in formatDate has no ${zone} ${format}`);
-        }
-        return `${pad(date.getUTCDate())}-${pad(date.getUTCMonth() + 1)}-${date.getUTCFullYear()}`;
-      }
-    },
-    UrlFetchApp: {
-      fetch: (url) => {
-        const body = answer(url);
-        return {
-          getResponseCode: () => (body === null ? 404 : 200),
-          getContentText: () => JSON.stringify(body)
-        };
-      }
-    }
-  });
-  vm.runInContext(fs.readFileSync(SHEETS_SCRIPT_PATH, 'utf8'), context);
-  return context;
-}
-
 describe("XTM priced from CoinGecko under Minotari's id", () => {
   beforeEach(() => {
     mockFetchWithRetry.mockReset();
-    mockFetchWithRetry.mockImplementation(async (url) => {
-      const body = answerWithoutMexcCandle(url);
-      return body === null ? null : { ok: true, status: 200, json: async () => body };
-    });
+    mockFetchWithRetry.mockImplementation(answeringFetchWithRetry(answerWithoutMexcCandle));
   });
 
   it('the Node tool prices an XTM row from CoinGecko when MEXC has no candle', async () => {
@@ -131,7 +82,7 @@ describe("XTM priced from CoinGecko under Minotari's id", () => {
 
   it('the Sheets script prices an XTM row from CoinGecko when MEXC has no candle', () => {
     const asked = [];
-    const sheets = loadSheetsScript((url) => {
+    const sheets = loadSheetsScript(SHEETS_SCRIPT_PATH, (url) => {
       asked.push(url);
       return answerWithoutMexcCandle(url);
     });
