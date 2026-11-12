@@ -72,7 +72,7 @@ npm ci
 ### Command line
 
 ```bash
-node crypto-price-fetchers.js price ether 0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48
+node crypto-price-fetchers.js price ether 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48
 node crypto-price-fetchers.js fdv x1 So11111111111111111111111111111111111111112 --pool CAJeVEoSm1QQZccnCqYu9cnNF7TTD2fcUA3E5HQoxRvR
 node fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.js xtm "2026-01-15 14:30:00" --tz CST --mode low
 ```
