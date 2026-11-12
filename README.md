@@ -10,13 +10,12 @@ The need for this arises out of the proliferation of crypto tokens, such that
 most tracking services simply cannot fetch the price of many of the great tokens out
 there.
 
-Note: For the files that are for Google Sheets, Google Sheets does not use the
-now-standard `fetch` API.  So, to convert these scripts to work under Web or NodeJS,
-you will need to use `fetch` with `async` and `await` as per normal for those platforms.
-Also, Google Apps Script differs from standard JS and NodeJS in how it handles concurrency
-and recursion (creates a brand-new execution context for recursion), leading to the
-need to use Google Apps Script process lock to implement back-off timeouts for
-async operations, etc.
+Each Google Sheets script here (`.gs`) has a Node version beside it, with the
+same name ending in `.js`, for Node programs and the command line. The Node
+version runs the same `.gs` file, unchanged, so the two always give the same
+answers, and a fix to the script is a fix to both. See
+[Node versions of the Sheets scripts](#node-versions-of-the-sheets-scripts)
+below.
 
 ### Options
 
@@ -37,6 +36,64 @@ so calls at a time.
 `fetch-from-centralized-exchage/crypto-price-filler/index.js` is like
 `getCryptoPriceFromCentralizedExchange.gs` but, as a NodeJS script, can
 handle any load in terms of numbers of price points to fetch.
+
+`crypto-price-fetchers.js` and
+`fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.js`
+are the Node versions of the two Sheets scripts.
+
+## Node versions of the Sheets scripts
+
+A Node version answers as its Sheets function does, because it runs the
+Sheets script itself. The runner in `apps-script-runner/` loads the `.gs`
+file under Node in a worker thread and supplies the Apps Script services the
+script calls: web requests, cache, lock, script properties, sleep, date
+formatting and logs.
+
+What differs from the sheet:
+
+- It runs on your computer, so there is no 30-second limit per call and no
+  daily cap on web requests.
+- Keys come from `config.json` beside the Node version, which git ignores,
+  instead of from the script. Copy `config-example.json` beside it to
+  `config.json` and fill it in. A key the script reads as it sends each
+  request takes effect this way; a value the script works out as it loads,
+  such as a url, keeps the value written in the script.
+- The cache lasts while the script is open: for the command line, one run.
+- The sheet's menu is not there.
+
+### Install
+
+Node 22 or later. From the repo's top folder:
+
+```bash
+npm ci
+```
+
+### Command line
+
+```bash
+node crypto-price-fetchers.js price ether 0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48
+node crypto-price-fetchers.js fdv x1 So11111111111111111111111111111111111111112 --pool CAJeVEoSm1QQZccnCqYu9cnNF7TTD2fcUA3E5HQoxRvR
+node fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.js xtm "2026-01-15 14:30:00" --tz CST --mode low
+```
+
+Each prints the number, with exit code 0, or the script's message on
+stderr, with exit code 1. `--help` lists the options, `--config <file>`
+reads another config file, and `--verbose` shows the script's log on stderr.
+
+### From Node
+
+```js
+import { openCentralizedExchangePrices } from './fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.js';
+
+const prices = await openCentralizedExchangePrices();
+const high = await prices.getCryptoPrice('xtm', '2026-01-15 14:30:00', 'CST', 'high');
+await prices.close();
+```
+
+The functions take the Sheets arguments and return what the cell would show.
+Other repos install this one to use the runner, as
+`crypto-price-fetchers/apps-script-runner`.
 
 ## Install
 
@@ -61,3 +118,11 @@ and all other scripts in other sub-directories here, see the
 `README.md` in that directory.
 
 For `./crypto-price-fetchers.gs`, see the file-header doc in that file.
+
+For the runner and the Node versions, from the repo's top folder:
+
+```bash
+npm ci
+npm run lint
+npm test
+```
