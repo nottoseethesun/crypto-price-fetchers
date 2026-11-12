@@ -17,12 +17,13 @@ APIs like MEXC, with fallbacks to CoinGecko and CoinPaprika.
 ## Tools
 
 This directory contains two separate implementations for
-different use cases:
+different use cases, and a Node version of the first:
 
-| Tool                   | Use Case                | Capacity             |
-|------------------------|-------------------------|----------------------|
-| **Google Apps Script** | Google Sheets           | ~100 calls per run   |
-| **Node.js CLI**        | Batch processing CSVs   | Thousands of rows    |
+| Tool                                | Use Case                          | Capacity              |
+|-------------------------------------|-----------------------------------|-----------------------|
+| **Google Apps Script**              | Google Sheets                     | ~100 calls per run    |
+| **Node.js CLI**                     | Batch processing CSVs             | Thousands of rows     |
+| **Node version of the Apps Script** | Node programs and one-off lookups | No Apps Script limits |
 
 ---
 
@@ -48,6 +49,25 @@ For detailed documentation, see the file header in
 [`crypto-price-filler/index.js`](./crypto-price-filler/index.js)
 and
 [`crypto-price-filler/README.md`](./crypto-price-filler/README.md).
+
+---
+
+### 3. Node version of the Apps Script (`getCryptoPriceFromCentralizedExchange.js`)
+
+Runs `getCryptoPriceFromCentralizedExchange.gs` itself, unchanged, under
+Node, so it answers as `=getCryptoPrice()` does, from a Node program or the
+command line:
+
+```bash
+node getCryptoPriceFromCentralizedExchange.js xtm "2026-01-15 14:30:00" --tz CST --mode low
+```
+
+The CoinGecko demo key can go in `config.json` here, which git ignores;
+`config-example.json` shows the shape. Install and the rest are in the
+[repo's README](../README.md#node-versions-of-the-sheets-scripts), and the
+file header in
+[`getCryptoPriceFromCentralizedExchange.js`](./getCryptoPriceFromCentralizedExchange.js)
+says what differs from the sheet.
 
 ---
 

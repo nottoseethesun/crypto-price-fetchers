@@ -1,0 +1,28 @@
+{
+  "name": "crypto-price-fetchers",
+  "version": "1.0.0",
+  "description": "Node versions of the crypto price Sheets scripts, and the runner that runs a Sheets script under Node, unchanged",
+  "type": "module",
+  "exports": {
+    "./apps-script-runner": "./apps-script-runner/index.js"
+  },
+  "files": [
+    "apps-script-runner/"
+  ],
+  "scripts": {
+    "lint": "eslint . --max-warnings 0",
+    "test": "node --test \"test/*.test.js\""
+  },
+  "author": "Christopher M. Balz with Grok and Claude",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "eslint": "^9.39.2"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

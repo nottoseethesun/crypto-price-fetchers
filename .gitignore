@@ -1,6 +1,11 @@
 # Editor
 .vscode
 
+# The config files of the Node versions of the Sheets scripts, which hold
+# api keys (each has a committed config-example.json beside it)
+/config.json
+/fetch-from-centralized-exchange/config.json
+
 # Logs
 logs
 *.log
