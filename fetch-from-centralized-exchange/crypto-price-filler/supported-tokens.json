@@ -9,7 +9,7 @@
     },
     "xtm": {
       "name": "Tari",
-      "coingecko_id": "tari",
+      "coingecko_id": "minotari",
       "mexc_symbol": "XTM",
       "note": "Listed on MEXC as XTMUSDT"
     },

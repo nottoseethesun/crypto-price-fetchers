@@ -195,7 +195,7 @@ const TOKEN_TO_ID = {
   'btc': { gecko: 'bitcoin', paprika: 'btc-bitcoin' },
   'xmr': { gecko: 'monero', paprika: 'xmr-monero' },
   'grc': { gecko: 'gridcoin-research', paprika: 'grc-gridcoin' },
-  'xtm': { gecko: 'minotari-tari', paprika: 'xtm-tari' }
+  'xtm': { gecko: 'minotari', paprika: 'xtm-tari' }
 };
 
 /** ============================================================================
