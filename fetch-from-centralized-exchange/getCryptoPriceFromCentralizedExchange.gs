@@ -5,8 +5,8 @@
  * @fileoverview Fetches historical high or low cryptocurrency prices (USD)
  *   from centralized exchanges for use directly in Google Sheets.
  * @author Christopher M. Balz, with Grok and Claude
- * @version 2.12.0
- * @lastModified February 10, 2026
+ * @version 2.13.0
+ * @lastModified November 16, 2026
  *
  * OVERVIEW
  * --------
@@ -48,15 +48,16 @@
  *   MEXC: Tries a 1-minute candle first (the single minute containing
  *     the requested timestamp). If no trades occurred in that minute, it
  *     falls back to a 60-minute candle. Returns the real OHLCV high or
- *     low from whichever candle matched.
+ *     low from whichever candle matched. A coin MEXC trades only against
+ *     BTC is priced in USD with BTC/USDT's candle at the same time.
  *
  *   CoinGecko market_chart/range: Fetches hourly data points over a
  *     24-hour window centered on the requested time (12 hours before to
  *     12 hours after), then returns Math.max (high) or Math.min (low)
  *     across all of those points.
  *
- *   CoinGecko tickers/history: These endpoints return only a single spot
- *     price with no time-range high/low data. A +/-1.5% spread is
+ *   CoinGecko history: This endpoint returns only the day's single
+ *     price, with no time-range high/low data. A +/-1.5% spread is
  *     applied as an approximation (high = price * 1.015,
  *     low = price * 0.985).
  *
@@ -72,11 +73,13 @@
  *                   fallback). Queries exchangeInfo to verify the trading
  *                   pair exists. Skip list: grc (not listed on MEXC).
  *
- *   2. CoinGecko  - Tries three sub-endpoints in order:
+ *   2. CoinGecko  - Tries two sub-endpoints in order, both dated:
  *                   a) market_chart/range (24h window, hourly data points)
- *                   b) tickers (current spot from highest-volume pair)
- *                   c) history (historical snapshot for a specific date)
- *                   Requires a demo API key (set in CONFIG.COINGECKO_API_KEY).
+ *                   b) history (the price of the requested UTC day)
+ *                   It never asks for the current price, which would put
+ *                   today's price on a past date.
+ *                   market_chart/range needs a demo API key (paste yours
+ *                   into CONFIG.COINGECKO_API_KEY).
  *                   Retries on 429 (rate limit) up to 3 times with 5s sleep.
  *
  *   3. CoinPaprika - OHLCV fallback. Skip list: grc-gridcoin (is_active is
@@ -105,16 +108,15 @@
  *   CACHE_EXPIRY_SECONDS
  *     DAILY_PRICE        - TTL for successful price lookups (86400 = 24h)
  *     NEGATIVE_CACHE     - TTL for "no data" results (300 = 5min)
- *     BTC_PRICE          - TTL for BTC spot price cache (300 = 5min)
  *
  *   COINGECKO_BASE       - CoinGecko API v3 base URL
- *   COINGECKO_API_KEY    - Demo API key for market_chart/range endpoint
+ *   COINGECKO_API_KEY    - Demo API key for market_chart/range endpoint.
+ *                          The repo holds a placeholder: paste your own key
+ *                          here in Apps Script, never in the repo.
  *   COINPAPRIKA_BASE     - CoinPaprika API v1 base URL
  *
  *   Endpoint templates (use {base}, {id}, {date}, {from}, {to}, {key},
  *   {start}, {end} placeholders):
- *     COINGECKO_SIMPLE_PRICE_TEMPLATE
- *     COINGECKO_TICKERS_TEMPLATE
  *     COINGECKO_HISTORY_TEMPLATE
  *     COINGECKO_MARKET_CHART_RANGE_TEMPLATE
  *     COINPAPRIKA_TICKERS_TEMPLATE
@@ -131,7 +133,9 @@
  * UTC, GMT, EST, EDT, CST, CDT, MST, MDT, PST, PDT
  *
  * Use the correct abbreviation accounting for Daylight Saving Time
- * (e.g., CDT in summer, CST in winter for US Central).
+ * (e.g., CDT in summer, CST in winter for US Central). Any other value
+ * shows a message in the cell instead of a price, so a misspelt zone is
+ * never read as UTC. An empty one means UTC.
  *
  * TESTING
  * -------
@@ -161,18 +165,15 @@ const CONFIG = {
   },
   CACHE_EXPIRY_SECONDS: {
     DAILY_PRICE: 86400,   // 24 hours
-    NEGATIVE_CACHE: 300,  // 5 min for failures
-    BTC_PRICE: 300        // 5 min
+    NEGATIVE_CACHE: 300   // 5 min for failures
   },
 
   // API URL bases
   COINGECKO_BASE: 'https://api.coingecko.com/api/v3',
-  COINGECKO_API_KEY: 'CG-v44h5wBkTFVwwBqDGAhXzbg7',
+  COINGECKO_API_KEY: 'paste_your_coingecko_demo_api_key_here',
   COINPAPRIKA_BASE: 'https://api.coinpaprika.com/v1',
 
   // Endpoint templates
-  COINGECKO_SIMPLE_PRICE_TEMPLATE: '{base}/simple/price?ids=bitcoin&vs_currencies=usd',
-  COINGECKO_TICKERS_TEMPLATE: '{base}/coins/{id}/tickers',
   COINGECKO_HISTORY_TEMPLATE: '{base}/coins/{id}/history?date={date}',
   COINGECKO_MARKET_CHART_RANGE_TEMPLATE: '{base}/coins/{id}/market_chart/range?vs_currency=usd&from={from}&to={to}&x_cg_demo_api_key={key}',
 
@@ -242,7 +243,12 @@ function getCryptoPrice(token, dateStr, tz, highOrLow = 'high', apiDelayMs = CON
   const safeDateStr = normalizeDateStr(dateStr);
   if (typeof safeDateStr !== 'string') return safeDateStr.error;
 
-  const utcMs = parseInputToUtcMs(safeDateStr, getTimezoneOffsetHours(tz));
+  const offsetHours = getTimezoneOffsetHours(tz);
+  if (offsetHours === null) {
+    return `Unknown time zone "${tz}": use one of ${Object.keys(CONFIG.TIMEZONE_OFFSETS).join(', ')}`;
+  }
+
+  const utcMs = parseInputToUtcMs(safeDateStr, offsetHours);
   if (typeof utcMs === 'string') return utcMs;
   if (utcMs > Date.now()) return 'No data available for future dates';
 
@@ -342,11 +348,16 @@ function cacheAndReturn(cacheKey, price) {
  *                            HELPER FUNCTIONS
  * ========================================================================== */
 
+/** The UTC offset in hours of a time zone abbreviation; UTC when none is given; null when the abbreviation is unknown */
 function getTimezoneOffsetHours(tz) {
-  const key = (tz || 'UTC').toUpperCase();
+  const key = String(tz || 'UTC').trim().toUpperCase();
   const offset = CONFIG.TIMEZONE_OFFSETS[key];
-  Logger.log(`Timezone ${tz} → offset: ${offset || 0} hours`);
-  return offset !== undefined ? offset : 0;
+  if (offset === undefined) {
+    Logger.log(`Unknown time zone: ${tz}`);
+    return null;
+  }
+  Logger.log(`Timezone ${tz} → offset: ${offset} hours`);
+  return offset;
 }
 
 function parseInputToUtcMs(dateInput, offsetHours) {
@@ -464,35 +475,6 @@ function createUtcTimestampFromComponents(components) {
   return date.getTime();
 }
 
-function getBTCUSDTPrice() {
-  Logger.log('Fetching BTC/USDT price');
-
-  const cache = CacheService.getScriptCache();
-  const cached = cache.get('btc_usdt');
-  if (cached) {
-    Logger.log(`BTC/USDT cache hit: ${cached}`);
-    return parseFloat(cached);
-  }
-
-  const url = CONFIG.COINGECKO_SIMPLE_PRICE_TEMPLATE.replace('{base}', CONFIG.COINGECKO_BASE);
-  const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-  if (response.getResponseCode() !== 200) {
-    Logger.log(`BTC price fetch failed: HTTP ${response.getResponseCode()}`);
-    return null;
-  }
-
-  const data = JSON.parse(response.getContentText());
-  const price = data.bitcoin?.usd;
-  if (!price) {
-    Logger.log('BTC price not found in response');
-    return null;
-  }
-
-  cache.put('btc_usdt', price.toString(), CONFIG.CACHE_EXPIRY_SECONDS.BTC_PRICE);
-  Logger.log(`BTC/USDT price fetched and cached: ${price}`);
-  return price;
-}
-
 function applySpread(price, target) {
   const spread = 0.015; // 1.5%
   const result = target === 'low' ? price * (1 - spread) : price * (1 + spread);
@@ -521,7 +503,7 @@ function getPriceFromMEXC(token, utcMs, target) {
   const data = fetchMEXCKlineData(pairInfo.symbol, utcMs);
   if (!data) return null;
 
-  return extractMEXCPrice(data, target, pairInfo.useBTC);
+  return extractMEXCPrice(data, target, pairInfo.useBTC, utcMs);
 }
 
 /** Fetches MEXC exchange symbols list */
@@ -589,13 +571,21 @@ function isValidKlineData(data, utcMs) {
   return true;
 }
 
-/** Extracts price from kline data, converting BTC pair if needed */
-function extractMEXCPrice(data, target, useBTC) {
-  let price = target === 'low' ? parseFloat(data[0][3]) : parseFloat(data[0][2]);
+/** Reads the high or the low of a kline candle */
+function candlePrice(candle, target) {
+  return target === 'low' ? parseFloat(candle[3]) : parseFloat(candle[2]);
+}
+
+/**
+ * Extracts price from kline data. A BTC pair's price is converted to USD
+ * with BTC/USDT's candle at the same time, never the current BTC price.
+ */
+function extractMEXCPrice(data, target, useBTC, utcMs) {
+  let price = candlePrice(data[0], target);
   if (useBTC) {
-    const btcPrice = getBTCUSDTPrice();
-    if (btcPrice === null) return null;
-    price *= btcPrice;
+    const btcData = fetchMEXCKlineData('BTCUSDT', utcMs);
+    if (!btcData) return null;
+    price *= candlePrice(btcData[0], target);
   }
   Logger.log(`MEXC final price: ${price} (${target})`);
   return price;
@@ -610,7 +600,7 @@ function getPriceFromCoinGecko(id, utcMs, target) {
   let price = null;
   const dateStr = Utilities.formatDate(new Date(utcMs), 'UTC', 'dd-MM-yyyy');
 
-  // 1) Try market_chart/range with its own cache (independent of tickers/history)
+  // 1) Try market_chart/range with its own cache (independent of history)
   const rangeCacheKey = `gecko_range_${id}_${dateStr}_${target}`;
   const rangeCached = getCachedResult(rangeCacheKey);
   if (typeof rangeCached === 'number') return rangeCached;
@@ -625,20 +615,16 @@ function getPriceFromCoinGecko(id, utcMs, target) {
     setCachedResult(rangeCacheKey, 'NO_DATA', CONFIG.CACHE_EXPIRY_SECONDS.NEGATIVE_CACHE);
   }
 
-  // 2) Fall back to tickers/history with their own cache
+  // 2) Fall back to the day's price (history) with its own cache. Never the
+  //    current price (tickers): that would put today's price on a past date.
   const dailyCacheKey = `gecko_daily_${id}_${dateStr}`;
   const dailyCached = getCachedResult(dailyCacheKey);
   if (typeof dailyCached === 'number') return applySpread(dailyCached, target);
   if (typeof dailyCached === 'string') return null;
 
-  price = tryCoinGeckoTickers(id);
+  price = tryCoinGeckoHistory(id, dateStr);
   if (price !== null) {
-    Logger.log(`CoinGecko tickers success: ${price} USD`);
-  } else {
-    price = tryCoinGeckoHistory(id, dateStr);
-    if (price !== null) {
-      Logger.log(`CoinGecko history success: ${price} USD for ${dateStr}`);
-    }
+    Logger.log(`CoinGecko history success: ${price} USD for ${dateStr}`);
   }
 
   if (price !== null) {
@@ -648,32 +634,6 @@ function getPriceFromCoinGecko(id, utcMs, target) {
 
   setCachedResult(dailyCacheKey, 'NO_DATA', CONFIG.CACHE_EXPIRY_SECONDS.NEGATIVE_CACHE);
   return null;
-}
-
-function tryCoinGeckoTickers(id) {
-  const url = CONFIG.COINGECKO_TICKERS_TEMPLATE
-    .replace('{base}', CONFIG.COINGECKO_BASE)
-    .replace('{id}', id);
-
-  const response = fetchWithRateLimitRetry(url, 'tickers');
-  if (!response) return null;
-
-  const tickers = JSON.parse(response).tickers || [];
-  return selectBestTickerPrice(tickers);
-}
-
-/** Selects highest-volume non-stale ticker with USD price */
-function selectBestTickerPrice(tickers) {
-  let maxVol = 0;
-  let bestPrice = null;
-  for (const t of tickers) {
-    const isValid = !t.is_stale && t.converted_last?.usd;
-    if (isValid && t.volume > maxVol) {
-      maxVol = t.volume;
-      bestPrice = t.converted_last.usd;
-    }
-  }
-  return bestPrice;
 }
 
 /**
@@ -783,7 +743,7 @@ function getPriceFromCoinPaprika(id, utcMs, highOrLow) {
 function test() {
   console.log("══════════════════════════════════════════════════════════════");
   console.log("MASTER TEST SUITE - " + new Date().toISOString());
-  console.log("Script version: v2.12.0 (Provider chain cleanup)");
+  console.log("Script version: v2.13.0 (Dated prices only, unknown time zones refused)");
   console.log("══════════════════════════════════════════════════════════════\n");
 
   const results = [];

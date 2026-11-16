@@ -101,19 +101,12 @@ export default [
     }
   },
 
-  // Ignore patterns - files that use import attributes (with { type: 'json' })
-  // ESLint parser doesn't yet support import attributes syntax
+  // Ignore patterns - installed and generated files only; every source file is linted
   {
     ignores: [
       'node_modules/**',
       'coverage/**',
-      '*.json',
-      // Files using import attributes syntax (not yet supported by ESLint parser)
-      'sources/coingecko.js',
-      'sources/coinpaprika.js',
-      'sources/mexc.js',
-      'sources/utils/btc.js',
-      'utils/fetch.js'
+      '*.json'
     ]
   }
 ];

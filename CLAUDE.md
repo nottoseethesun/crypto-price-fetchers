@@ -31,8 +31,13 @@ from GitHub, pinned to a commit, for the runner
 (`crypto-price-fetchers/apps-script-runner`), so a change to the runner
 reaches it only when it moves the pin.
 
-Each Node version reads its keys from `config.json` beside it, which git
-ignores; `config-example.json` shows the shape.
+## Keys
+
+No api key is committed. Each Node version reads its keys from `config.json`
+beside it, which git ignores; `config-example.json` shows the shape.
+crypto-price-filler reads `config-example.json`, its committed settings,
+with its own `config.json`, which git ignores, laid over them. The Sheets
+scripts hold a placeholder, and the owner pastes the key into Apps Script.
 
 ## Tests
 
@@ -71,14 +76,9 @@ The Sheets scripts are tested there too, run unchanged under Node.
 
 ## Known bugs
 
-`tests/known-bugs.test.js` holds one test per known bug, declared with
-`it.fails`, so it passes while the bug is present. A bug's fix makes its test
-fail; change that test's `it.fails` to `it` in the same change.
-
-| Item | Bug |
-| --- | --- |
-| 1 | `--mode close` returns the MEXC candle's high |
-| 2 | A past date gets CoinGecko's live price when CoinGecko lists the coin against USD; the Sheets script too, once CoinGecko's hourly range is empty |
-| 3 | The day asked of CoinGecko comes from the computer's clock, not from UTC |
-| 4 | A time zone the tool doesn't know is read as UTC, and one fixed offset can't follow daylight saving |
-| 5 | The CoinGecko api key is committed, in `config.json` and in the Sheets script |
+None is known. A bug found gets a test in crypto-price-filler's
+`tests/known-bugs.test.js`, declared with `it.fails`, so it passes while the
+bug is present, and a row in a table here. Its fix makes the test fail; the
+same change declares the test with `it`, moves it to
+`tests/regressions.test.js`, which guards the fixed bugs, and removes the
+row.

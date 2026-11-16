@@ -1,91 +1,75 @@
 /**
  * Date utility functions for Crypto Price Filler
  * @module utils/date
- * @description Handles timezone offsets and date parsing to UTC milliseconds.
+ * @description Time zones, and reading a row's date to UTC milliseconds.
  * Used by getCryptoPrice to convert local time inputs into UTC timestamps.
- * 
- * @version 1.0.0
+ *
+ * A row's date is read in a time zone named in full, such as
+ * America/Chicago, or UTC, as LP Ranger's bookkeeping report takes them:
+ * the names Node's time zone database lists (`Intl.supportedValuesOf`),
+ * and UTC, which that list leaves out. Each row gets the offset its zone
+ * had at that moment, so a file that crosses a change to or from daylight
+ * saving time is read right on both sides of it. An abbreviation such as
+ * CDT is refused: it can name several clocks (CST is US Central, China and
+ * Cuba Standard Time), and a fixed offset cannot follow daylight saving.
+ * `Intl` itself would let some abbreviations through, the legacy EST among
+ * them, so names are checked against the list, never against `Intl`.
+ *
+ * @version 1.1.0
  * @author Christopher M. Balz with Grok and Claude.ai
  */
 
 import { DateTime } from 'luxon';
 
 /**
- * Returns the UTC offset in hours for a given timezone abbreviation.
- * @param {string} tz - Timezone abbreviation (e.g. 'CDT', 'UTC', 'PST')
- * @returns {number} Offset in hours (positive or negative). Defaults to 0 if unknown.
+ * Every time zone a row's date can be read in, sorted: the names Node's
+ * time zone database lists, each a region such as America/Chicago, and UTC.
+ *
+ * @returns {string[]} The zones
  */
-export function getTimezoneOffsetHours(tz) {
-  const knownOffsets = {
-    'UTC': 0,
-    'GMT': 0,
-    'EST': -5,
-    'EDT': -4,
-    'CST': -6,
-    'CDT': -5,
-    'MST': -7,
-    'MDT': -6,
-    'PST': -8,
-    'PDT': -7
-  };
-  return knownOffsets[tz?.toUpperCase()] ?? 0;
+export function validTimeZones() {
+  return [...Intl.supportedValuesOf('timeZone'), 'UTC'].sort();
+}
+
+/** Each valid time zone, by its name in lower case. */
+const VALID_BY_LOWER_CASE = new Map(validTimeZones().map((zone) => [zone.toLowerCase(), zone]));
+
+/**
+ * A time zone's name as the list spells it, matched in any letter case.
+ *
+ * @param {string} name - The name given
+ * @returns {string|null} The zone, or null when it is not on the list
+ */
+export function canonicalTimeZone(name) {
+  if (typeof name !== 'string') return null;
+  return VALID_BY_LOWER_CASE.get(name.trim().toLowerCase()) ?? null;
 }
 
 /**
- * Parses a date string with timezone offset into UTC milliseconds.
- * Parses as naive UTC to completely ignore system timezone (e.g., CST/CDT),
- * then applies the provided offset manually to get true UTC.
- * 
+ * Reads a date, written as the wall clock of a time zone, to UTC
+ * milliseconds, with the offset the zone had at that moment.
+ *
  * @param {string} dateStr - Date in format 'yyyy-MM-dd HH:mm:ss'
- * @param {number} offsetHours - Local offset from UTC (negative for west of UTC, e.g. -5 for CDT)
+ * @param {string} timeZone - A zone from `validTimeZones`, such as 'America/Chicago' or 'UTC'
  * @param {boolean} [verbose=false] - Enable verbose logging
- * @returns {number|null} UTC milliseconds or null if invalid/empty
+ * @returns {number|null} UTC milliseconds, or null if the date is empty or not in the format
+ * @throws {Error} When the time zone is not one from `validTimeZones`
  */
-export function parseInputToUtcMs(dateStr, offsetHours, verbose = false) {
-  const logv = (level, message, ...args) => {
-    if (!verbose || level < 1) return;
-    console.log(`[VERBOSE:${level}] ${message}`, ...args);
-  };
-
-  logv(1, `parseInputToUtcMs called with dateStr="${dateStr}", offsetHours=${offsetHours}`);
-
-  let safeStr = (dateStr ?? '').trim();
-  logv(2, `Input string after trim: "${safeStr}" (length ${safeStr.length})`);
-
-  if (!safeStr) {
-    logv(1, 'Empty date string - returning null');
+export function parseInputToUtcMs(dateStr, timeZone, verbose = false) {
+  const zone = canonicalTimeZone(timeZone);
+  if (zone === null) {
+    throw new Error(`Not a valid time zone: ${timeZone}. Use a full name such as America/Chicago, or UTC.`);
+  }
+  const safeStr = (dateStr ?? '').trim();
+  if (safeStr === '') {
+    if (verbose) console.log('[VERBOSE:1] Empty date string - returning null');
     return null;
   }
-
-  // Parse as naive UTC to prevent system timezone shift
-  const naiveDt = DateTime.fromFormat(safeStr, 'yyyy-MM-dd HH:mm:ss', { zone: 'utc' });
-  if (!naiveDt.isValid) {
-    logv(1, `Invalid date format: "${safeStr}" - ${naiveDt.invalidExplanation || 'unknown reason'}`);
+  const local = DateTime.fromFormat(safeStr, 'yyyy-MM-dd HH:mm:ss', { zone });
+  if (!local.isValid) {
+    if (verbose) console.log(`[VERBOSE:1] Invalid date format: "${safeStr}" - ${local.invalidExplanation || 'unknown reason'}`);
     return null;
   }
-
-  logv(2, `Parsed naive UTC DateTime object details:`);
-  logv(2, `  - isValid: ${naiveDt.isValid}`);
-  logv(2, `  - year: ${naiveDt.year}, month: ${naiveDt.month}, day: ${naiveDt.day}`);
-  logv(2, `  - hour: ${naiveDt.hour}, minute: ${naiveDt.minute}, second: ${naiveDt.second}, millisecond: ${naiveDt.millisecond}`);
-  logv(2, `  - offset: ${naiveDt.offset}, zoneName: ${naiveDt.zoneName}`);
-  logv(2, `  - toISO(): ${naiveDt.toISO()}`);
-  logv(2, `  - toMillis(): ${naiveDt.toMillis()}`);
-
-  // Apply offset: UTC = naive - offset (negative offset → add hours)
-  const utcDt = naiveDt.minus({ hours: offsetHours });
-
-  logv(2, `After offset adjustment (minus ${offsetHours} hours):`);
-  logv(2, `  - isValid: ${utcDt.isValid}`);
-  logv(2, `  - year: ${utcDt.year}, month: ${utcDt.month}, day: ${utcDt.day}`);
-  logv(2, `  - hour: ${utcDt.hour}, minute: ${utcDt.minute}, second: ${utcDt.second}, millisecond: ${utcDt.millisecond}`);
-  logv(2, `  - offset: ${utcDt.offset}, zoneName: ${utcDt.zoneName}`);
-  logv(2, `  - toISO(): ${utcDt.toISO()}`);
-  logv(2, `  - toMillis(): ${utcDt.toMillis()}`);
-
-  const ms = utcDt.toMillis();
-
-  logv(1, `Final UTC ms: ${ms} (${utcDt.toISO()})`);
-
-  return ms;
+  if (verbose) console.log(`[VERBOSE:1] "${safeStr}" in ${zone} is ${local.toUTC().toISO()}`);
+  return local.toMillis();
 }

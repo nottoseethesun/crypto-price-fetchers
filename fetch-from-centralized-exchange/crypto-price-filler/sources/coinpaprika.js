@@ -4,7 +4,7 @@
  */
 
 import { fetchWithRetry } from '../utils/fetch.js';
-import config from '../config.json' with { type: 'json' };
+import config from '../config.js';
 
 /**
  * Fetches historical high/low price from CoinPaprika.

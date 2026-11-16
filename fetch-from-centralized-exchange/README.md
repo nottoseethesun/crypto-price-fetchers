@@ -49,6 +49,8 @@ For detailed documentation, see the file header in
 [`crypto-price-filler/index.js`](./crypto-price-filler/index.js)
 and
 [`crypto-price-filler/README.md`](./crypto-price-filler/README.md).
+Its CoinGecko demo key goes in `crypto-price-filler/config.json`, which git
+ignores.
 
 ---
 

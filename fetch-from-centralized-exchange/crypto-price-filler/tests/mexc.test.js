@@ -6,19 +6,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { getPriceFromMEXC } from '../sources/mexc.js';
 import * as fetchModule from '../utils/fetch.js';
-import * as btcModule from '../sources/utils/btc.js';
 
-// Mock fetch and BTC modules
+// Mock fetch module
 vi.mock('../utils/fetch.js', () => ({
   fetchWithRetry: vi.fn()
 }));
 
-vi.mock('../sources/utils/btc.js', () => ({
-  getBTCUSDTPrice: vi.fn()
-}));
-
 const mockFetch = vi.mocked(fetchModule.fetchWithRetry);
-const mockGetBTCPrice = vi.mocked(btcModule.getBTCUSDTPrice);
 
 // Mock exchange info with BTC pair only (no USDT pair)
 const mockExchangeInfoBTCOnly = {
@@ -41,6 +35,7 @@ const _mockKlineData = [
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockFetch.mockReset();
 });
 
 afterEach(() => {
@@ -100,55 +95,57 @@ describe('MEXC Price Fetching', () => {
     });
 
     describe('BTC pair handling', () => {
-      it('converts BTC pair price to USD using BTC price', async () => {
+      /**
+       * Answers as MEXC does for a coin it trades only against BTC: the
+       * XTMBTC pair, an XTMBTC candle and a BTCUSDT candle, both at the time
+       * asked.
+       *
+       * @param {number} utcMs - The time asked, in UTC milliseconds
+       * @param {Array|null} btcCandle - The BTCUSDT candle, or null when MEXC has none
+       * @returns {void}
+       */
+      function answerBtcPair(utcMs, btcCandle) {
+        mockFetch.mockImplementation(async (url) => {
+          if (url.includes('/exchangeInfo')) {
+            return { ok: true, status: 200, json: async () => mockExchangeInfoBTCOnly };
+          }
+          if (url.includes('symbol=XTMBTC')) {
+            return { ok: true, status: 200, json: async () => [[utcMs, '0.00001', '0.000012', '0.000008', '0.000011', '1000']] };
+          }
+          return { ok: true, status: 200, json: async () => (btcCandle === null ? [] : [btcCandle]) };
+        });
+      }
+
+      it("converts a BTC pair's high to USD with BTC/USDT's high at the same time", async () => {
         const utcMs = new Date('2024-01-01T12:00:00Z').getTime();
-
-        // Mock exchange info returning only BTC pair
-        mockFetch
-          .mockResolvedValueOnce({
-            ok: true,
-            status: 200,
-            json: async () => mockExchangeInfoBTCOnly
-          })
-          .mockResolvedValueOnce({
-            ok: true,
-            status: 200,
-            json: async () => [[utcMs, '0.00001', '0.000012', '0.000008', '0.000011', '1000']]
-          });
-
-        // Mock BTC price
-        mockGetBTCPrice.mockResolvedValueOnce(50000);
+        answerBtcPair(utcMs, [utcMs, '49000', '50000', '48000', '49500', '10']);
 
         const price = await getPriceFromMEXC('xtm', utcMs, 'high', false);
 
-        // Price should be 0.000012 * 50000 = 0.6
-        expect(price).toBeCloseTo(0.6, 5);
-        expect(mockGetBTCPrice).toHaveBeenCalled();
+        // 0.000012 BTC at 50000 USD
+        expect(price).toBeCloseTo(0.6, 10);
+        const btcUrls = mockFetch.mock.calls.map(([url]) => url).filter((url) => url.includes('symbol=BTCUSDT'));
+        expect(btcUrls).toHaveLength(1);
+        expect(new URL(btcUrls[0]).searchParams.get('endTime')).toBe(String(utcMs));
       });
 
-      it('returns null when BTC price fetch fails', async () => {
+      it("converts a BTC pair's close to USD with BTC/USDT's close", async () => {
         const utcMs = new Date('2024-01-01T12:00:00Z').getTime();
+        answerBtcPair(utcMs, [utcMs, '49000', '50000', '48000', '49500', '10']);
 
-        // Mock exchange info returning only BTC pair
-        mockFetch
-          .mockResolvedValueOnce({
-            ok: true,
-            status: 200,
-            json: async () => mockExchangeInfoBTCOnly
-          })
-          .mockResolvedValueOnce({
-            ok: true,
-            status: 200,
-            json: async () => [[utcMs, '0.00001', '0.000012', '0.000008', '0.000011', '1000']]
-          });
+        const price = await getPriceFromMEXC('xtm', utcMs, 'close', false);
 
-        // Mock BTC price fetch failure
-        mockGetBTCPrice.mockResolvedValueOnce(null);
+        // 0.000011 BTC at 49500 USD
+        expect(price).toBeCloseTo(0.5445, 10);
+      });
+
+      it('returns null when MEXC has no BTC/USDT candle for the time', async () => {
+        const utcMs = new Date('2024-01-01T12:00:00Z').getTime();
+        answerBtcPair(utcMs, null);
 
         const price = await getPriceFromMEXC('xtm', utcMs, 'high', false);
 
         expect(price).toBeNull();
-        expect(mockGetBTCPrice).toHaveBeenCalled();
       });
     });
 
@@ -282,6 +279,33 @@ describe('MEXC Price Fetching', () => {
 
         expect(price).toBe(49500); // candle[3] is low
       });
+
+      it('returns close price when target is close', async () => {
+        const utcMs = new Date('2024-01-01T12:00:00Z').getTime();
+
+        mockFetch
+          .mockResolvedValueOnce({
+            ok: true,
+            status: 200,
+            json: async () => mockExchangeInfoUSDT
+          })
+          .mockResolvedValueOnce({
+            ok: true,
+            status: 200,
+            json: async () => [[utcMs, '50000', '50500', '49500', '50200', '1000']]
+          });
+
+        const price = await getPriceFromMEXC('btc', utcMs, 'close', false);
+
+        expect(price).toBe(50200); // candle[4] is close
+      });
+
+      it('returns null for a target it does not know, asking MEXC nothing', async () => {
+        const price = await getPriceFromMEXC('btc', Date.now(), 'open', false);
+
+        expect(price).toBeNull();
+        expect(mockFetch).not.toHaveBeenCalled();
+      });
     });
 
     describe('fallback interval', () => {
@@ -311,6 +335,34 @@ describe('MEXC Price Fetching', () => {
 
         expect(price).toBe(50500);
         expect(mockFetch).toHaveBeenCalledTimes(3);
+      });
+
+      it('passes over a 1-minute candle that opens more than two minutes from the time asked', async () => {
+        const utcMs = new Date('2024-01-01T12:00:00Z').getTime();
+
+        mockFetch
+          .mockResolvedValueOnce({
+            ok: true,
+            status: 200,
+            json: async () => mockExchangeInfoUSDT
+          })
+          // 1m klines gives a candle from three minutes before
+          .mockResolvedValueOnce({
+            ok: true,
+            status: 200,
+            json: async () => [[utcMs - 180000, '1', '2', '0.5', '1.5', '10']]
+          })
+          // 60m fallback klines returns data
+          .mockResolvedValueOnce({
+            ok: true,
+            status: 200,
+            json: async () => [[utcMs - 1800000, '50000', '50500', '49500', '50200', '1000']]
+          });
+
+        const price = await getPriceFromMEXC('btc', utcMs, 'high', false);
+
+        expect(price).toBe(50500);
+        expect(mockFetch.mock.calls[2][0]).toContain('interval=60m');
       });
 
       it('returns null when both intervals fail', async () => {

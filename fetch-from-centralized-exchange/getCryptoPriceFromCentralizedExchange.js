@@ -17,10 +17,11 @@
  * - `openCentralizedExchangePrices` opens the script once and returns
  *   `getCryptoPrice` as an async call, with the Sheets arguments, plus
  *   `close`. A Date passed as the time works as a date cell does.
- * - `config.json` beside this file, which git ignores, may set
+ * - `config.json` beside this file, which git ignores, sets
  *   `CONFIG.COINGECKO_API_KEY`, the CoinGecko demo key the script sends
  *   for hourly prices; `config-example.json` shows the shape. Without the
- *   file, the script uses the key written in it.
+ *   file, the script sends the placeholder written in it, which CoinGecko
+ *   refuses, so the script goes on to CoinGecko's price for the day.
  * - The command line, `node getCryptoPriceFromCentralizedExchange.js <token>
  *   "<date>"`, with `--tz` and `--mode`, prints the price (`--help` gives
  *   the rest).
