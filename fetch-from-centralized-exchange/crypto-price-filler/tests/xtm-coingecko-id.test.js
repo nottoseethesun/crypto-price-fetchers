@@ -41,10 +41,9 @@ const MINOTARI_PRICE = 0.0123;
 
 /**
  * Says what the price services answer for one url on a day MEXC has no XTM
- * candle. MEXC lists the XTMUSDT pair but returns no candles. CoinGecko lists
- * no USD ticker for Minotari, whose markets are USDT pairs, and gives its
- * price only under the id `minotari`. Any other url gets no answer, as a 404
- * gives none.
+ * candle. MEXC lists the XTMUSDT pair but returns no candles. CoinGecko gives
+ * Minotari's prices only under the id `minotari`. Any other url gets no
+ * answer, as a 404 gives none.
  *
  * @param {string} url - The requested url
  * @returns {Object|Array|null} The json body, or null for no answer
@@ -54,7 +53,6 @@ function answerWithoutMexcCandle(url) {
     return { symbols: [{ symbol: 'XTMUSDT', baseAsset: 'XTM', quoteAsset: 'USDT' }] };
   }
   if (url.includes('/klines')) return [];
-  if (url.includes('/coins/minotari/tickers')) return { tickers: [] };
   if (url.includes('/coins/minotari/history')) {
     return { market_data: { current_price: { usd: MINOTARI_PRICE } } };
   }

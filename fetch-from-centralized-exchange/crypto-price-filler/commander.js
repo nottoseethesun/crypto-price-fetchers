@@ -30,7 +30,26 @@
  */
 
 import fs from 'fs';
-import { program } from 'commander';
+import { InvalidArgumentError, program } from 'commander';
+import { canonicalTimeZone, validTimeZones } from './utils/date.js';
+
+/**
+ * Accepts a time zone named in full, such as America/Chicago, or UTC, in
+ * any letter case, and refuses anything else, an abbreviation such as CDT
+ * included, pointing to --list-valid-timezones.
+ *
+ * @param {string} value - The option's value
+ * @returns {string} The zone, as the list of valid zones spells it
+ * @throws {InvalidArgumentError} When it is not a valid zone
+ */
+export function parseTimeZone(value) {
+  const zone = canonicalTimeZone(value);
+  if (zone !== null) return zone;
+  throw new InvalidArgumentError(
+    `not a valid time zone: ${value}. Name it in full, such as America/Chicago, or UTC. ` +
+      'Run with --list-valid-timezones to see every valid one.'
+  );
+}
 
 /**
  * Loads the supported token symbols from supported-tokens.json.
@@ -100,9 +119,16 @@ export function setupCommander() {
             'close'
         )
         .option(
-            '--tz <timezone>',
-            'Timezone abbreviation for date parsing (e.g. UTC, CDT, PST)',
+            '--tz <zone>',
+            'Time zone the input dates are in, named in full (e.g. America/Chicago) or UTC; ' +
+                'each row gets the offset the zone had then, daylight saving included. ' +
+                'Abbreviations such as CDT are refused.',
+            parseTimeZone,
             'UTC'
+        )
+        .option(
+            '--list-valid-timezones',
+            'Print every name --tz takes, one per line, and exit'
         )
         .option(
             '--verbose',
@@ -127,7 +153,7 @@ Examples:
     $ node index.js --token=grc --input=mining.csv
 
   Full options:
-    $ node index.js --token=xtm --input=input.csv --output=prices.csv --mode=high --tz=CDT --verbose
+    $ node index.js --token=xtm --input=input.csv --output=prices.csv --mode=high --tz=America/Chicago --verbose
 
   Backfill empty prices (conservative tax estimates - use higher bracketing price):
     $ node index.js --token=grc --input=mining.csv --backfill-highest
@@ -141,6 +167,13 @@ Examples:
 
         // Make --help more visible
         .helpOption('-h, --help', 'display help for command');
+
+    // --list-valid-timezones works on its own, as --help does: it prints the
+    // list while the options are parsed, before the required ones are checked.
+    program.on('option:list-valid-timezones', () => {
+        console.log(validTimeZones().join('\n'));
+        process.exit(0);
+    });
 
     return program;
 }

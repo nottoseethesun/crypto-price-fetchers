@@ -32,6 +32,20 @@ NodeJS 21.1.0+
 
 `npm install`
 
+## Configuration
+
+`config-example.json` holds the tool's settings as committed, with no API key.
+Your own settings go in `config.json` beside it, which git ignores: each
+setting there takes the place of the same one in `config-example.json`, so it
+needs only those that differ. The CoinGecko demo key goes there:
+
+```json
+{ "COINGECKO_API_KEY": "your key" }
+```
+
+Without `config.json`, the tool asks CoinGecko without a key, at CoinGecko's
+lower rate limits. The file header in `./index.js` describes every setting.
+
 ### Usage
 
 #### index.js - Price Fetching
@@ -41,6 +55,11 @@ Refer to the file-header documentation in `./index.js` for complete usage detail
 ```bash
 node index.js --token=grc --input=mining.csv --output=filled.csv
 ```
+
+The dates are read in UTC unless `--tz` names another time zone in full, such
+as `America/Chicago`; each row gets the offset the zone had at that time,
+daylight saving included. `node index.js --list-valid-timezones` prints every
+name `--tz` takes.
 
 #### backfill.js - Backfill Existing CSV
 

@@ -176,6 +176,13 @@ describe('getCryptoPriceFromCentralizedExchange.js, the command line', () => {
     });
   });
 
+  it("prints the script's message for a time zone it does not know, never reading it as UTC", async () => {
+    const result = await run(['xtm', ROW_TIME, '--tz', 'CTS']);
+    assert.equal(result.exitCode, 1);
+    assert.equal(result.stdout, '');
+    assert.match(result.stderr, /^Unknown time zone "CTS": use one of UTC, GMT, /);
+  });
+
   it('refuses a mode other than high or low', async () => {
     const result = await run(['xtm', ROW_TIME, '--mode', 'middle']);
     assert.equal(result.exitCode, 1);

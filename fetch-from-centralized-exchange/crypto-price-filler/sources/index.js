@@ -12,4 +12,3 @@
 export { getPriceFromMEXC } from './mexc.js';
 export { getPriceFromCoinGecko } from './coingecko.js';
 export { getPriceFromCoinPaprika } from './coinpaprika.js';
-export { getBTCUSDTPrice } from './utils/btc.js';

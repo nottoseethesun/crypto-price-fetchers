@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { DateTime } from 'luxon';
 import {
-  getTimezoneOffsetHours,
-  parseInputToUtcMs
+  canonicalTimeZone,
+  parseInputToUtcMs,
+  validTimeZones
 } from '../utils/date.js';
 import { getCryptoPrice } from '../sources/price.js'; // the wrapper
 import { getCache, setCache, clearCache } from '../utils/cache.js';
@@ -47,25 +48,27 @@ afterEach(() => {
 });
 
 describe('Crypto Price Filler Helpers', () => {
-  describe('getTimezoneOffsetHours', () => {
-    it('returns correct offset for known timezones', () => {
-      expect(getTimezoneOffsetHours('CDT')).toBe(-5);
-      expect(getTimezoneOffsetHours('UTC')).toBe(0);
-      expect(getTimezoneOffsetHours('PST')).toBe(-8);
-      expect(getTimezoneOffsetHours('EDT')).toBe(-4);
+  describe('canonicalTimeZone', () => {
+    it('takes a zone named in full, or UTC, in any letter case, and spells it as the list does', () => {
+      expect(canonicalTimeZone('America/Chicago')).toBe('America/Chicago');
+      expect(canonicalTimeZone('america/chicago')).toBe('America/Chicago');
+      expect(canonicalTimeZone('utc')).toBe('UTC');
+      expect(validTimeZones()).toContain('Europe/London');
     });
 
-    it('returns 0 for unknown/empty timezone', () => {
-      expect(getTimezoneOffsetHours('INVALID')).toBe(0);
-      expect(getTimezoneOffsetHours('')).toBe(0);
-      expect(getTimezoneOffsetHours(null)).toBe(0);
+    it('refuses abbreviations, unknown names and non-strings', () => {
+      expect(canonicalTimeZone('CDT')).toBeNull();
+      expect(canonicalTimeZone('EST')).toBeNull();
+      expect(canonicalTimeZone('INVALID')).toBeNull();
+      expect(canonicalTimeZone('')).toBeNull();
+      expect(canonicalTimeZone(null)).toBeNull();
     });
   });
 
   describe('parseInputToUtcMs', () => {
-    it('parses valid date in UTC (offset 0)', () => {
-      if (verbose) console.log('[TEST] Starting UTC offset 0 parse test');
-      const result = parseInputToUtcMs('2025-12-19 00:17:00', 0, verbose);
+    it('parses valid date in UTC', () => {
+      if (verbose) console.log('[TEST] Starting UTC parse test');
+      const result = parseInputToUtcMs('2025-12-19 00:17:00', 'UTC', verbose);
       expect(result).toBeTypeOf('number');
       const dt = DateTime.fromMillis(result, { zone: 'utc' });
       if (verbose) console.log('[TEST] Parsed UTC time (offset 0):', dt.toISO());
@@ -76,20 +79,24 @@ describe('Crypto Price Filler Helpers', () => {
       expect(dt.minute).toBe(17);
     });
 
-    it('correctly applies negative offset (CDT = -5)', () => {
-      if (verbose) console.log('[TEST] Starting CDT offset -5 parse test');
-      const result = parseInputToUtcMs('2025-12-19 00:17:00', -5, verbose);
+    it("applies the offset the zone had then: Chicago is UTC-6 in December", () => {
+      if (verbose) console.log('[TEST] Starting Chicago winter parse test');
+      const result = parseInputToUtcMs('2025-12-19 00:17:00', 'America/Chicago', verbose);
       expect(result).toBeTypeOf('number');
       const dt = DateTime.fromMillis(result, { zone: 'utc' });
-      if (verbose) console.log('[TEST] Parsed UTC time (CDT adjusted):', dt.toISO());
-      expect(dt.hour).toBe(5);
+      if (verbose) console.log('[TEST] Parsed UTC time (Chicago, winter):', dt.toISO());
+      expect(dt.hour).toBe(6);
       expect(dt.minute).toBe(17);
     });
 
     it('returns null for invalid date', () => {
       if (verbose) console.log('[TEST] Testing invalid date');
-      expect(parseInputToUtcMs('invalid', 0, verbose)).toBeNull();
-      expect(parseInputToUtcMs('', 0, verbose)).toBeNull();
+      expect(parseInputToUtcMs('invalid', 'UTC', verbose)).toBeNull();
+      expect(parseInputToUtcMs('', 'UTC', verbose)).toBeNull();
+    });
+
+    it('refuses a time zone that is not named in full or UTC', () => {
+      expect(() => parseInputToUtcMs('2025-12-19 00:17:00', 'CDT')).toThrow(/Not a valid time zone: CDT/);
     });
   });
 
@@ -148,21 +155,12 @@ describe('Crypto Price Filler Helpers', () => {
           return { ok: false, status: 500 };
         }
 
-        if (url.includes('/tickers')) {
-          return { ok: false, status: 404 };
-        }
-
-        if (url.includes('/history')) {
+        if (url.includes('/market_chart/range')) {
+          const atRow = Date.UTC(2025, 11, 19, 0, 17, 0);
           return {
             ok: true,
             status: 200,
-            json: async () => ({
-              market_data: {
-                current_price: { usd: 42.7 },
-                high_24h: { usd: 42.7 },
-                low_24h: { usd: 40.0 }
-              }
-            })
+            json: async () => ({ prices: [[atRow - 3600000, 41.0], [atRow, 42.7], [atRow + 3600000, 40.0]] })
           };
         }
 
@@ -254,7 +252,7 @@ describe('Crypto Price Filler Helpers', () => {
       expect(price).toBe(40.0);
     });
 
-    it('handles BTC pair adjustment', async () => {
+    it("handles BTC pair adjustment, with BTC/USDT's candle at the same time", async () => {
       if (verbose) console.log('[TEST] Starting BTC pair adjustment test');
       mockFetchWithRetry
         .mockResolvedValueOnce({
@@ -270,7 +268,7 @@ describe('Crypto Price Filler Helpers', () => {
         .mockResolvedValueOnce({
           ok: true,
           status: 200,
-          json: async () => ({ bitcoin: { usd: 100000 } })
+          json: async () => [[1766103360000, 99500, 100000, 99000, 99800, 10]]
         });
 
       const price = await getCryptoPrice('xtm', '2025-12-19 00:17:00', 'UTC', 'high', verbose, null, null, null);
@@ -350,8 +348,8 @@ describe('Crypto Price Filler Helpers', () => {
       expect(mockFetchWithRetry).toHaveBeenCalledTimes(3); // 3 calls (fallback skipped)
     }, 30000); // 30s timeout - generous buffer
 
-    it('falls back to history when CoinGecko tickers have only stale or low-volume entries', async () => {
-      if (verbose) console.log('[TEST] Starting stale/low-volume tickers fallback test');
+    it("uses CoinGecko's price for the day when its hourly range is empty, in close mode", async () => {
+      if (verbose) console.log('[TEST] Starting day-price fallback test');
 
       mockFetchWithRetry.mockReset();
       mockFetchWithRetry.mockClear();
@@ -363,37 +361,22 @@ describe('Crypto Price Filler Helpers', () => {
           return { ok: false, status: 500 };
         }
 
-        if (url.includes('/tickers')) {
-          return {
-            ok: true,
-            status: 200,
-            json: async () => ({
-              tickers: [
-                { volume: 10, converted_last: { usd: 100 }, is_stale: true },
-                { volume: 5, converted_last: { usd: 90 }, is_stale: true }
-              ]
-            })
-          };
+        if (url.includes('/market_chart/range')) {
+          return { ok: true, status: 200, json: async () => ({ prices: [] }) };
         }
 
-        if (url.includes('/history')) {
+        if (url.includes('/history?date=19-12-2025')) {
           return {
             ok: true,
             status: 200,
-            json: async () => ({
-              market_data: {
-                current_price: { usd: 42.7 },
-                high_24h: { usd: 42.7 },
-                low_24h: { usd: 40.0 }
-              }
-            })
+            json: async () => ({ market_data: { current_price: { usd: 42.7 } } })
           };
         }
 
         return { ok: false, status: 404 };
       });
 
-      const price = await getCryptoPrice('xtm', '2025-12-19 00:17:00', 'UTC', 'high', verbose, null, null, null);
+      const price = await getCryptoPrice('xtm', '2025-12-19 00:17:00', 'UTC', 'close', verbose, null, null, null);
       if (verbose) console.log('[TEST] getCryptoPrice returned:', price);
       expect(price).toBe(42.7);
     });
@@ -401,31 +384,31 @@ describe('Crypto Price Filler Helpers', () => {
     it('returns null when both CoinGecko endpoints return 404', async () => {
       mockFetchWithRetry
         .mockResolvedValueOnce({ ok: false, status: 500 }) // MEXC fails
-        .mockResolvedValueOnce({ ok: false, status: 404 }) // tickers 404
+        .mockResolvedValueOnce({ ok: false, status: 404 }) // hourly range 404
         .mockResolvedValueOnce({ ok: false, status: 404 }); // history 404
 
-      const price = await getCryptoPrice('xtm', '2025-12-19 00:17:00', 'UTC', 'high', verbose, null, null, null);
+      const price = await getCryptoPrice('xtm', '2025-12-19 00:17:00', 'UTC', 'close', verbose, null, null, null);
       expect(price).toBeNull();
     });
 
     it('returns null when CoinGecko history is missing market_data key', async () => {
       mockFetchWithRetry
         .mockResolvedValueOnce({ ok: false, status: 500 }) // MEXC fails
-        .mockResolvedValueOnce({ ok: false, status: 404 }) // tickers fail
+        .mockResolvedValueOnce({ ok: false, status: 404 }) // hourly range fails
         .mockResolvedValueOnce({
           ok: true,
           status: 200,
           json: async () => ({ market_data: null }) // missing / null
         });
 
-      const price = await getCryptoPrice('xtm', '2025-12-19 00:17:00', 'UTC', 'high', verbose, null, null, null);
+      const price = await getCryptoPrice('xtm', '2025-12-19 00:17:00', 'UTC', 'close', verbose, null, null, null);
       expect(price).toBeNull();
     });
 
     it('returns null when CoinGecko history is missing current_price.usd', async () => {
       mockFetchWithRetry
         .mockResolvedValueOnce({ ok: false, status: 500 }) // MEXC fails
-        .mockResolvedValueOnce({ ok: false, status: 404 }) // tickers fail
+        .mockResolvedValueOnce({ ok: false, status: 404 }) // hourly range fails
         .mockResolvedValueOnce({
           ok: true,
           status: 200,
@@ -436,7 +419,7 @@ describe('Crypto Price Filler Helpers', () => {
           })
         }); // history missing usd
 
-      const price = await getCryptoPrice('xtm', '2025-12-19 00:17:00', 'UTC', 'high', verbose, null, null, null);
+      const price = await getCryptoPrice('xtm', '2025-12-19 00:17:00', 'UTC', 'close', verbose, null, null, null);
       expect(price).toBeNull();
     });
 
@@ -446,7 +429,7 @@ describe('Crypto Price Filler Helpers', () => {
         .mockResolvedValueOnce({}) // invalid response (no json)
         .mockResolvedValueOnce({}); // invalid again for history
 
-      const price = await getCryptoPrice('xtm', '2025-12-19 00:17:00', 'UTC', 'high', verbose, null, null, null);
+      const price = await getCryptoPrice('xtm', '2025-12-19 00:17:00', 'UTC', 'close', verbose, null, null, null);
       expect(price).toBeNull();
     });
 
@@ -457,14 +440,14 @@ describe('Crypto Price Filler Helpers', () => {
           ok: true,
           status: 200,
           json: async () => { throw new Error('Simulated parse error'); }
-        }) // tickers parse error
+        }) // hourly range parse error
         .mockResolvedValueOnce({
           ok: true,
           status: 200,
           json: async () => { throw new Error('Simulated parse error'); }
         }); // history parse error
 
-      const price = await getCryptoPrice('xtm', '2025-12-19 00:17:00', 'UTC', 'high', verbose, null, null, null);
+      const price = await getCryptoPrice('xtm', '2025-12-19 00:17:00', 'UTC', 'close', verbose, null, null, null);
       expect(price).toBeNull();
     });
   });
@@ -595,6 +578,6 @@ export {
   getCryptoPrice,
   getCache,
   setCache,
-  getTimezoneOffsetHours,
+  canonicalTimeZone,
   parseInputToUtcMs
 };

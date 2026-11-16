@@ -13,7 +13,7 @@ import { getPriceFromMEXC } from './mexc.js';
 import { getPriceFromCoinGecko } from './coingecko.js';
 import { getPriceFromCoinPaprika } from './coinpaprika.js';
 import { getCache, setCache } from '../utils/cache.js';
-import { parseInputToUtcMs, getTimezoneOffsetHours } from '../utils/date.js';
+import { parseInputToUtcMs } from '../utils/date.js';
 import fs from 'fs';
 
 /**
@@ -184,11 +184,12 @@ async function tryCoinPaprika(coinpaprikaId, utcMs, target, verbose) {
  *
  * @param {string} token - Token symbol (e.g. 'xtm', 'grc')
  * @param {string} dateStr - Date/time string in 'yyyy-MM-dd HH:mm:ss' format
- * @param {string} tz - Timezone abbreviation (e.g. 'UTC', 'CDT')
+ * @param {string} tz - Time zone the date is in, named in full (e.g. 'America/Chicago') or 'UTC'
  * @param {string} [target='high'] - Price target: 'high', 'low', 'close'
  * @param {boolean} [verbose=false] - Enable verbose logging
  * @param {Object} [testCache=null] - Optional test cache object (for unit tests)
  * @returns {Promise<number|null>} Price in USD, or null if unavailable
+ * @throws {Error} When the time zone is not a full name or UTC (see utils/date.js)
  */
 export async function getCryptoPrice(
   token,
@@ -206,9 +207,8 @@ export async function getCryptoPrice(
   const mexcStatus = mexcSymbol || 'skipped since set to null';
   logv(verbose, 1, `Resolved IDs - CoinGecko: ${coingeckoStatus}, CoinPaprika: ${coinpaprikaStatus}, MEXC: ${mexcStatus}`);
 
-  // Parse date
-  const offsetHours = getTimezoneOffsetHours(tz);
-  const utcMs = parseInputToUtcMs(dateStr, offsetHours);
+  // Parse date, at the offset the time zone had then
+  const utcMs = parseInputToUtcMs(dateStr, tz);
 
   if (utcMs === null) {
     logv(verbose, 1, `Invalid date/time: "${dateStr}"`);

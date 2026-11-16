@@ -3,7 +3,7 @@
  * @module utils/fetch
  */
 
-import config from '../config.json' with { type: 'json' };
+import config from '../config.js';
 
 /**
  * Fetches a URL with automatic retry on 429 (rate limit) errors.

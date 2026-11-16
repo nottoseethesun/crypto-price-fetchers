@@ -3,250 +3,235 @@
  * @module sources/mexc
  * @description Primary price source using MEXC API (exchangeInfo + klines).
  * Handles symbol lookup, 1m/60m klines, BTC pair adjustment, and 429 retry.
- * 
- * @version 1.0.0
+ *
+ * A kline (candle) is `[openTime, open, high, low, close, volume, ...]`;
+ * the price returned is the candle's field for the target asked: high, low
+ * or close. A coin MEXC trades only against BTC is priced in USD with
+ * BTC/USDT's candle at the same time and the same target, never with the
+ * current BTC price, which would put today's price on a past date.
+ *
+ * @version 1.1.0
  * @author Christopher M. Balz with Grok and Claude.ai
  */
 
 import { fetchWithRetry } from '../utils/fetch.js';
-import config from '../config.json' with { type: 'json' };
-import { getBTCUSDTPrice } from './utils/btc.js';
+import config from '../config.js';
+
+/** Where each price target sits in a MEXC kline. */
+const CANDLE_FIELD = Object.freeze({ high: 2, low: 3, close: 4 });
+
+/** How far a 1-minute candle may open from the time asked and still count, in milliseconds. */
+const MAX_CANDLE_DISTANCE_MS = 120000;
+
+/** Tokens MEXC does not list. */
+const SKIP_TOKENS = new Set(['grc']);
 
 /**
- * Fetches historical high/low price for a token from MEXC.
+ * Builds the verbose logger.
+ *
+ * @param {boolean} verbose - Whether to log
+ * @returns {function(number, string, ...*): void} The logger
+ */
+function makeLogger(verbose) {
+  return (level, message, ...args) => {
+    if (!verbose || level < 1) return;
+    console.log(`[VERBOSE:${level}] ${message}`, ...args);
+  };
+}
+
+/**
+ * The cache key of a price: token, UTC time as YYYYMMDDHHMMSS, and target.
+ *
+ * @param {string} token - Token symbol
+ * @param {number} utcMs - Time in UTC milliseconds
+ * @param {string} target - Price target
+ * @returns {string} The key
+ */
+function cacheKeyOf(token, utcMs, target) {
+  const dateNumeric = new Date(utcMs).toISOString().slice(0, 19).replace(/[-:T]/g, '');
+  return `price_${token.toLowerCase()}_${dateNumeric}_UTC_${target}`;
+}
+
+/**
+ * Waits out a backoff before the next attempt.
+ *
+ * @param {number} attempt - The attempt just made, from 1
+ * @returns {Promise<void>} Settles when the wait is over
+ */
+function backoff(attempt) {
+  const ms = config.RETRY_BACKOFF_MS[attempt - 1] || 5000;
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Fetches MEXC's list of trading pairs, retrying on no response or a 429.
+ *
+ * @param {boolean} verbose - Enable verbose logging
+ * @param {function} logv - The logger
+ * @returns {Promise<Array<Object>|null>} The pairs, or null when MEXC gives none
+ */
+async function fetchSymbols(verbose, logv) {
+  const url = config.EXCHANGE_BASE_URL + '/exchangeInfo';
+  for (let attempt = 1; attempt <= config.MAX_RETRIES; attempt++) {
+    logv(1, `Attempt ${attempt}/${config.MAX_RETRIES} fetching exchangeInfo`);
+    const res = await fetchWithRetry(url, {}, verbose);
+    if (res === null || res === undefined || res.status === 429) {
+      logv(1, `exchangeInfo gave ${res ? 'a 429' : 'no response'} on attempt ${attempt} - retrying`);
+      await backoff(attempt);
+      continue;
+    }
+    if (!res.ok) {
+      logv(1, `exchangeInfo failed with status ${res.status} - giving up`);
+      return null;
+    }
+    try {
+      return (await res.json()).symbols || [];
+    } catch (e) {
+      logv(1, `MEXC exchangeInfo JSON parse FAILED: ${e.message}`);
+      return null;
+    }
+  }
+  logv(1, 'All exchangeInfo retries failed - returning null');
+  return null;
+}
+
+/**
+ * Finds the token's USDT pair, or else its BTC pair.
+ *
+ * @param {Array<Object>} symbols - MEXC's pairs
+ * @param {string} token - Token symbol
+ * @returns {{symbol: string, useBTC: boolean}|null} The pair, or null when MEXC has neither
+ */
+function findPair(symbols, token) {
+  const upperToken = token.toUpperCase();
+  let btcPair = null;
+  for (const sym of symbols) {
+    if (sym.baseAsset !== upperToken) continue;
+    if (sym.quoteAsset === 'USDT') return { symbol: upperToken + 'USDT', useBTC: false };
+    if (sym.quoteAsset === 'BTC') btcPair = { symbol: upperToken + 'BTC', useBTC: true };
+  }
+  return btcPair;
+}
+
+/**
+ * Fetches the one kline of an interval that ends at the time asked.
+ *
+ * @param {string} symbol - The pair, such as XTMUSDT
+ * @param {string} interval - The interval, such as 1m
+ * @param {number} spanMs - The interval's length in milliseconds
+ * @param {number} utcMs - The time asked, in UTC milliseconds
+ * @param {boolean} verbose - Enable verbose logging
+ * @param {function} logv - The logger
+ * @returns {Promise<Array|null>} The kline, or null when there is none
+ */
+async function fetchKline(symbol, interval, spanMs, utcMs, verbose, logv) {
+  const url = config.EXCHANGE_BASE_URL +
+    `/klines?symbol=${symbol}&interval=${interval}&startTime=${utcMs - spanMs}&endTime=${utcMs}&limit=1`;
+  logv(2, `MEXC klines URL (${interval}): ${url}`);
+  const res = await fetchWithRetry(url, {}, verbose);
+  if (res === null || res === undefined) return null;
+  try {
+    const data = await res.json();
+    return Array.isArray(data) && data.length > 0 ? data[0] : null;
+  } catch (e) {
+    logv(1, `MEXC ${interval} klines JSON parse FAILED: ${e.message}`);
+    return null;
+  }
+}
+
+/**
+ * Fetches the candle for the time asked: the 1-minute candle that opens
+ * within two minutes of it, or else the 60-minute candle that ends at it.
+ *
+ * @param {string} symbol - The pair
+ * @param {number} utcMs - The time asked, in UTC milliseconds
+ * @param {boolean} verbose - Enable verbose logging
+ * @param {function} logv - The logger
+ * @returns {Promise<Array|null>} The candle, or null when MEXC has none
+ */
+async function fetchCandle(symbol, utcMs, verbose, logv) {
+  const minute = await fetchKline(symbol, config.DEFAULT_INTERVAL, 60000, utcMs, verbose, logv);
+  if (minute !== null && Math.abs(minute[0] - utcMs) <= MAX_CANDLE_DISTANCE_MS) return minute;
+  logv(1, `No 1m candle for ${symbol} near the time asked - trying ${config.FALLBACK_INTERVAL}`);
+  return fetchKline(symbol, config.FALLBACK_INTERVAL, 3600000, utcMs, verbose, logv);
+}
+
+/**
+ * Reads a candle's price for the target.
+ *
+ * @param {Array} candle - The candle
+ * @param {string} target - high, low or close
+ * @returns {number|null} The price, or null when it is not a number
+ */
+function candlePrice(candle, target) {
+  const price = parseFloat(candle[CANDLE_FIELD[target]]);
+  return Number.isNaN(price) ? null : price;
+}
+
+/**
+ * Prices the token from its pair's candle, in USD.
+ *
+ * @param {{symbol: string, useBTC: boolean}} pair - The pair
+ * @param {number} utcMs - The time asked, in UTC milliseconds
+ * @param {string} target - high, low or close
+ * @param {boolean} verbose - Enable verbose logging
+ * @param {function} logv - The logger
+ * @returns {Promise<number|null>} The price, or null when MEXC cannot give it
+ */
+async function priceFromPair(pair, utcMs, target, verbose, logv) {
+  const candle = await fetchCandle(pair.symbol, utcMs, verbose, logv);
+  if (candle === null) {
+    logv(1, `No klines data from MEXC for ${pair.symbol} - returning null`);
+    return null;
+  }
+  const price = candlePrice(candle, target);
+  if (price === null || !pair.useBTC) return price;
+  const btcCandle = await fetchCandle('BTCUSDT', utcMs, verbose, logv);
+  const btcPrice = btcCandle === null ? null : candlePrice(btcCandle, target);
+  if (btcPrice === null) {
+    logv(1, 'No BTC/USDT candle for the time asked - returning null');
+    return null;
+  }
+  logv(1, `BTC pair: ${price} BTC at ${btcPrice} USD`);
+  return price * btcPrice;
+}
+
+/**
+ * Fetches a token's historical high, low or close price from MEXC.
  * @param {string} token - Token symbol (e.g. 'xtm')
  * @param {number} utcMs - Target time in UTC milliseconds
- * @param {'high'|'low'} target - Which price to return ('high' or 'low')
+ * @param {'high'|'low'|'close'} target - Which price to return
  * @param {boolean} [verbose=false] - Enable verbose logging
  * @param {Map<string, number>} [providedCache=null] - Optional cache Map for testing (if null, no cache used)
  * @returns {Promise<number|null>} Price in USD or null if failed
  */
 export async function getPriceFromMEXC(token, utcMs, target, verbose = false, providedCache = null) {
-  const logv = (level, message, ...args) => {
-    if (!verbose || level < 1) return;
-    console.log(`[VERBOSE:${level}] ${message}`, ...args);
-  };
-
+  const logv = makeLogger(verbose);
   logv(1, `getPriceFromMEXC called with token=${token}, utcMs=${utcMs}, target=${target}`);
-
-  const skipTokens = new Set(['grc']);
-  if (skipTokens.has(token.toLowerCase())) {
+  if (SKIP_TOKENS.has(token.toLowerCase())) {
     logv(1, `Token ${token} skipped for MEXC`);
     return null;
   }
-
-  // FIXED: Generate human-readable YYYYMMDDHHMMSS format to match test expectation
-  const dt = new Date(utcMs);
-  const year = dt.getUTCFullYear().toString();
-  const month = (dt.getUTCMonth() + 1).toString().padStart(2, '0');
-  const day = dt.getUTCDate().toString().padStart(2, '0');
-  const hour = dt.getUTCHours().toString().padStart(2, '0');
-  const minute = dt.getUTCMinutes().toString().padStart(2, '0');
-  const second = dt.getUTCSeconds().toString().padStart(2, '0');
-  const dateNumeric = year + month + day + hour + minute + second;
-
-  const cacheKey = `price_${token.toLowerCase()}_${dateNumeric}_UTC_${target}`;
-  logv(1, `Generated cache key: "${cacheKey}" (length ${cacheKey.length})`);
-
-  let cache = providedCache;
-  logv(2, `Cache instance provided: ${cache ? 'yes' : 'no'}`);
-
-  if (cache) {
-    logv(2, `Current cache keys: ${Array.from(cache.keys()).join(', ') || 'empty'}`);
-    if (cache.has(cacheKey)) {
-      const cached = cache.get(cacheKey);
-      logv(1, `Cache HIT for key "${cacheKey}" - cached value type: ${typeof cached}, value: ${cached}`);
-      return cached;
-    }
-  } else {
-    logv(1, `No cache provided - skipping cache lookup`);
-  }
-
-  logv(1, `Cache MISS or no cache - proceeding to fetch from MEXC`);
-
-  const exchangeInfoUrl = config.EXCHANGE_BASE_URL + '/exchangeInfo';
-  logv(2, `MEXC exchangeInfo URL: ${exchangeInfoUrl}`);
-
-  let exchangeRes = null;
-  let attempts = 0;
-  while (attempts < config.MAX_RETRIES) {
-    attempts++;
-    logv(verbose, 1, `Attempt ${attempts}/${config.MAX_RETRIES} fetching exchangeInfo`);
-
-    exchangeRes = await fetchWithRetry(exchangeInfoUrl, {}, verbose);
-    logv(verbose, 2, `exchangeRes after attempt ${attempts}: ${exchangeRes ? 'received' : 'null'}`);
-
-    if (exchangeRes === null) {
-      logv(verbose, 1, `Fetch returned null on attempt ${attempts} - retrying`);
-      const backoff = config.RETRY_BACKOFF_MS[attempts - 1] || 5000;
-      logv(verbose, 2, `Waiting ${backoff}ms before retry`);
-      await new Promise(resolve => setTimeout(resolve, backoff));
-      continue;
-    }
-
-    logv(verbose, 3, `exchangeRes details: ok=${exchangeRes.ok}, status=${exchangeRes.status}, statusText=${exchangeRes.statusText || 'undefined'}`);
-    if (exchangeRes.headers) {
-      logv(verbose, 4, `exchangeRes headers: ${JSON.stringify(Array.from(exchangeRes.headers.entries()))}`);
-    }
-
-    if (exchangeRes.ok) {
-      logv(verbose, 1, `exchangeInfo succeeded on attempt ${attempts} (status ${exchangeRes.status})`);
-      break;
-    }
-
-    if (exchangeRes.status === 429) {
-      const backoff = config.RETRY_BACKOFF_MS[attempts - 1] || 5000;
-      logv(verbose, 1, `429 rate limit on exchangeInfo - waiting ${backoff}ms (attempt ${attempts})`);
-      await new Promise(resolve => setTimeout(resolve, backoff));
-      continue;
-    } else {
-      logv(verbose, 1, `exchangeInfo failed on attempt ${attempts} with status ${exchangeRes.status} - giving up`);
-      return null;
-    }
-  }
-
-  if (!exchangeRes || !exchangeRes.ok) {
-    logv(1, 'All exchangeInfo retries failed - returning null');
+  if (CANDLE_FIELD[target] === undefined) {
+    logv(1, `Unknown price target "${target}" - returning null`);
     return null;
   }
-
-  let exchangeData;
-  try {
-    exchangeData = await exchangeRes.json();
-    logv(3, `MEXC exchangeInfo raw data length: ${JSON.stringify(exchangeData).length} chars`);
-    logv(3, `MEXC exchangeInfo symbols count: ${exchangeData.symbols?.length || 0}`);
-    if (exchangeData.symbols?.length > 0) {
-      logv(4, `exchangeData.symbols first item: ${JSON.stringify(exchangeData.symbols[0])}`);
-    }
-  } catch (e) {
-    logv(1, `MEXC exchangeInfo JSON parse FAILED: ${e.message}`);
-    return null;
+  const cacheKey = cacheKeyOf(token, utcMs, target);
+  if (providedCache && providedCache.has(cacheKey)) {
+    logv(1, `Cache HIT for key "${cacheKey}"`);
+    return providedCache.get(cacheKey);
   }
-
-  const symbols = exchangeData.symbols || [];
-  logv(2, `MEXC symbols loaded: ${symbols.length} symbols`);
-
-  const upperToken = token.toUpperCase();
-  let symbol = null;
-  let useBTC = false;
-
-  for (const sym of symbols) {
-    const symStr = sym.symbol || 'missing';
-    const base = sym.baseAsset || 'missing';
-    const quote = sym.quoteAsset || 'missing';
-    logv(3, `Checking symbol: symbol=${symStr}, base=${base}, quote=${quote}`);
-    if (base === upperToken) {
-      if (quote === 'USDT') {
-        symbol = upperToken + 'USDT';
-        logv(2, `Found USDT pair: ${symbol}`);
-        break;
-      } else if (quote === 'BTC') {
-        symbol = upperToken + 'BTC';
-        useBTC = true;
-        logv(2, `Found BTC pair: ${symbol}`);
-      }
-    }
-  }
-
-  if (!symbol) {
+  const symbols = await fetchSymbols(verbose, logv);
+  if (symbols === null) return null;
+  const pair = findPair(symbols, token);
+  if (pair === null) {
     logv(1, `No matching symbol found for ${token} in MEXC - returning null`);
     return null;
   }
-
-  logv(1, `Using symbol: ${symbol} (BTC pair: ${useBTC})`);
-
-  let interval = config.DEFAULT_INTERVAL;
-  let klineUrl = config.EXCHANGE_BASE_URL + `/klines?symbol=${symbol}&interval=${interval}&startTime=${utcMs - 60000}&endTime=${utcMs}&limit=1`;
-  logv(2, `MEXC klines URL (${interval}): ${klineUrl}`);
-  let klineRes = await fetchWithRetry(klineUrl, {}, verbose);
-  logv(2, `MEXC klines response (1m): ${klineRes ? 'received' : 'null'}`);
-
-  let data = null;
-
-  if (klineRes) {
-    logv(2, `MEXC klines (1m) response ok: ${klineRes.ok}, status: ${klineRes.status}`);
-    try {
-      data = await klineRes.json();
-      logv(2, `MEXC ${interval} klines data length: ${JSON.stringify(data).length} chars`);
-      if (data.length > 0) {
-        logv(3, `MEXC klines first candle: ${JSON.stringify(data[0])}`);
-      }
-    } catch (e) {
-      logv(1, `MEXC ${interval} klines JSON parse FAILED: ${e.message}`);
-      data = null;
-    }
-  }
-
-  if (data && data.length > 0) {
-    const candleTime = data[0][0];
-    logv(2, `MEXC candle time: ${candleTime} (diff from target: ${Math.abs(candleTime - utcMs)}ms)`);
-    if (Math.abs(candleTime - utcMs) > 120000) {
-      logv(1, '1m candle time too far from target - discarding and trying fallback');
-      data = null;
-    } else {
-      logv(2, '1m candle time acceptable');
-    }
-  } else {
-    logv(1, 'No data or empty data from 1m klines - trying fallback');
-  }
-
-  if (!data || data.length === 0) {
-    interval = config.FALLBACK_INTERVAL;
-    klineUrl = config.EXCHANGE_BASE_URL + `/klines?symbol=${symbol}&interval=${interval}&startTime=${utcMs - 3600000}&endTime=${utcMs}&limit=1`;
-    logv(2, `MEXC klines fallback URL (${interval}): ${klineUrl}`);
-    klineRes = await fetchWithRetry(klineUrl, {}, verbose);
-    logv(2, `MEXC klines response (fallback): ${klineRes ? 'received' : 'null'}`);
-
-    if (klineRes) {
-      logv(2, `MEXC klines (fallback) response ok: ${klineRes.ok}, status: ${klineRes.status}`);
-      try {
-        data = await klineRes.json();
-        logv(2, `MEXC fallback ${interval} klines data length: ${JSON.stringify(data).length} chars`);
-        if (data.length > 0) {
-          logv(3, `MEXC fallback klines first candle: ${JSON.stringify(data[0])}`);
-        }
-      } catch (e) {
-        logv(1, `MEXC fallback ${interval} klines JSON parse FAILED: ${e.message}`);
-        data = null;
-      }
-    }
-  }
-
-  if (!data || data.length === 0) {
-    logv(1, 'No klines data from MEXC after fallback attempt - returning null');
-    return null;
-  }
-
-  const candle = data[0];
-  logv(2, `MEXC final candle data: ${JSON.stringify(candle)}`);
-
-  let price = target === 'low' ? parseFloat(candle[3]) : parseFloat(candle[2]);
-  logv(2, `Extracted price from candle[${target === 'low' ? 3 : 2}]: ${price} (raw string: ${target === 'low' ? candle[3] : candle[2]})`);
-
-  if (isNaN(price)) {
-    logv(1, 'MEXC price parse FAILED - NaN from candle - returning null');
-    return null;
-  }
-
-  if (useBTC) {
-    logv(1, 'Using BTC pair - fetching BTC/USDT price');
-    const btcPrice = await getBTCUSDTPrice(verbose);
-    logv(1, `BTC/USDT price fetched: ${btcPrice}`);
-    if (btcPrice === null) {
-      logv(1, 'BTC price fetch FAILED - returning null');
-      return null;
-    }
-    price *= btcPrice;
-    logv(1, `BTC adjusted price: ${price} (BTC price was ${btcPrice})`);
-  }
-
+  logv(1, `Using symbol: ${pair.symbol} (BTC pair: ${pair.useBTC})`);
+  const price = await priceFromPair(pair, utcMs, target, verbose, logv);
+  if (price === null) return null;
   logv(1, `MEXC final price returning: ${price}`);
-
-  // Only cache if a cache was provided (test mode)
-  if (providedCache) {
-    providedCache.set(cacheKey, price);
-    logv(1, `Cached price ${price} for key "${cacheKey}" in provided cache`);
-  }
-
+  if (providedCache) providedCache.set(cacheKey, price);
   return price;
 }
