@@ -7,6 +7,10 @@
  * fetch (`helpers/stand-in-web.js`) that answers as MEXC and CoinGecko
  * answer, so the tests ask nothing outside the computer. The script waits
  * its 200 milliseconds before each lookup, as in the sheet.
+ *
+ * The command line's key file is one in a temp folder, removed afterwards,
+ * so no test opens the owner's saved key or asks for its password; the
+ * password prompt answers from the test.
  */
 
 import { after, before, describe, it } from 'node:test';
@@ -16,6 +20,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { saveEncryptedKey } from '../api-key-store/index.js';
 import {
   openCentralizedExchangePrices,
   runCommandLine
@@ -47,17 +52,33 @@ function answerMexcCandle({ url }) {
 
 /**
  * Answers for when MEXC lists no XTM pair and CoinGecko's hourly prices
- * around the time are 2.00 and 2.50.
+ * around the time are 2.00 and 2.50. CoinGecko's ping takes the key
+ * `gecko-key` alone.
  *
- * @param {{url: string}} request - The request
- * @returns {Object|null} The json body, or null for a 404
+ * @param {{url: string, headers: Object<string, string>}} request - The request
+ * @returns {*} The response (`standInFetch`)
  */
-function answerCoinGeckoRange({ url }) {
+function answerCoinGeckoRange({ url, headers }) {
   if (url === `${MEXC}/exchangeInfo`) return { symbols: [] };
+  if (url === `${COINGECKO}/ping`) {
+    return headers['x-cg-demo-api-key'] === 'gecko-key' ? { gecko_says: '(V3) To the Moon!' } : { status: 401, text: '{}' };
+  }
   if (url.startsWith(`${COINGECKO}/coins/minotari/market_chart/range?`)) {
     return { prices: [[ROW_UTC_MS - 3600000, 2.0], [ROW_UTC_MS + 3600000, 2.5]] };
   }
   return null;
+}
+
+/**
+ * The CoinGecko key each request to CoinGecko carried, by its path.
+ *
+ * @param {function} fetch - The stand-in fetch
+ * @returns {Array<Array<string>>} Each request's path and key (null when it had none)
+ */
+function coinGeckoKeysSent(fetch) {
+  return fetch.requests
+    .filter((request) => request.url.startsWith(COINGECKO))
+    .map((request) => [new URL(request.url).pathname, request.headers['x-cg-demo-api-key'] ?? null]);
 }
 
 /**
@@ -66,12 +87,12 @@ function answerCoinGeckoRange({ url }) {
  *
  * @param {function({url: string}): *} answer - The stand-in's answers
  * @param {function(Object, function): Promise<void>} use - Takes the open function and the stand-in fetch
- * @param {Object} [config={}] - The config values
+ * @param {Object} [options={}] - More options for `openCentralizedExchangePrices`, such as the CoinGecko key
  * @returns {Promise<void>} Settles once closed
  */
-async function withPrices(answer, use, config = {}) {
+async function withPrices(answer, use, options = {}) {
   const fetch = standInFetch(answer);
-  const prices = await openCentralizedExchangePrices({ config, fetch });
+  const prices = await openCentralizedExchangePrices({ config: {}, ...options, fetch });
   try {
     await use(prices, fetch);
   } finally {
@@ -98,17 +119,23 @@ describe('openCentralizedExchangePrices', () => {
     });
   });
 
-  it("falls back to CoinGecko's hourly prices, sending the CoinGecko key from the config", async () => {
-    const config = { CONFIG: { COINGECKO_API_KEY: 'gecko-key' } };
+  it("falls back to CoinGecko's hourly prices, sending the key it is given in CoinGecko's header and in no url", async () => {
     await withPrices(
       answerCoinGeckoRange,
       async (prices, fetch) => {
         assert.equal(await prices.getCryptoPrice('xtm', ROW_TIME, 'UTC', 'high'), 2.5);
-        const range = fetch.requests.find((request) => request.url.includes('/market_chart/range?'));
-        assert.match(range.url, /&x_cg_demo_api_key=gecko-key$/);
+        assert.deepEqual(coinGeckoKeysSent(fetch), [['/api/v3/coins/minotari/market_chart/range', 'gecko-key']]);
+        assert.ok(fetch.requests.every((request) => !request.url.includes('gecko-key')), 'a url holds the key');
       },
-      config
+      { coinGeckoApiKey: 'gecko-key' }
     );
+  });
+
+  it('asks CoinGecko without a key when it is given none', async () => {
+    await withPrices(answerCoinGeckoRange, async (prices, fetch) => {
+      assert.equal(await prices.getCryptoPrice('xtm', ROW_TIME, 'UTC', 'high'), 2.5);
+      assert.deepEqual(coinGeckoKeysSent(fetch), [['/api/v3/coins/minotari/market_chart/range', null]]);
+    });
   });
 
   it('gives the message the cell would show when no source has a price', async () => {
@@ -120,21 +147,27 @@ describe('openCentralizedExchangePrices', () => {
     );
   });
 
-  it("opens with config-example.json, whose fields are all the script's", async () => {
-    const example = fileURLToPath(new URL('../fetch-from-centralized-exchange/config-example.json', import.meta.url));
-    const prices = await openCentralizedExchangePrices({ configFile: example, fetch: standInFetch(() => null) });
-    await prices.close();
+  it('refuses a config that sets a CoinGecko key, which the script reads from its Script Properties', async () => {
+    await assert.rejects(
+      openCentralizedExchangePrices({ config: { CONFIG: { COINGECKO_API_KEY: 'gecko-key' } }, fetch: standInFetch(() => null) }),
+      /The script's CONFIG has no field COINGECKO_API_KEY/
+    );
   });
 });
 
 describe('getCryptoPriceFromCentralizedExchange.js, the command line', () => {
   let folder;
   let configFile;
+  let noKeysFile;
+  let savedKeyFile;
 
-  before(() => {
+  before(async () => {
     folder = fs.mkdtempSync(path.join(os.tmpdir(), 'crypto-price-fetchers-test-cex-'));
     configFile = path.join(folder, 'config.json');
-    fs.writeFileSync(configFile, JSON.stringify({ CONFIG: { COINGECKO_API_KEY: 'gecko-key' } }));
+    fs.writeFileSync(configFile, JSON.stringify({ CONFIG: {} }));
+    noKeysFile = path.join(folder, 'no-api-keys.json');
+    savedKeyFile = path.join(folder, 'api-keys.json');
+    await saveEncryptedKey(savedKeyFile, 'coingecko', 'gecko-key', 'pw');
   });
 
   after(() => {
@@ -142,26 +175,48 @@ describe('getCryptoPriceFromCentralizedExchange.js, the command line', () => {
   });
 
   /**
+   * A password prompt that must not be shown.
+   *
+   * @param {string} prompt - The prompt
+   * @returns {Promise<string>} Never: it fails the test
+   */
+  async function askNothing(prompt) {
+    assert.fail(`Asked ${prompt}`);
+  }
+
+  /**
    * Runs the command line with a stand-in fetch.
    *
    * @param {string[]} args - The arguments after the file's name
    * @param {function({url: string}): *} [answer=answerMexcCandle] - The stand-in's answers
-   * @returns {Promise<{exitCode: number, stdout: string, stderr: string}>} What it did
+   * @param {Object} [keys] - The key file and the password prompt: by default, a file with no key, and no prompt
+   * @returns {Promise<{exitCode: number, stdout: string, stderr: string, fetch: function}>} What it did, and the stand-in fetch
    */
-  async function run(args, answer = answerMexcCandle) {
+  async function run(args, answer = answerMexcCandle, keys = { apiKeysFile: noKeysFile, ask: askNothing }) {
     const stdout = capturedOutput();
     const stderr = capturedOutput();
+    const fetch = standInFetch(answer);
     const argv = ['node', 'getCryptoPriceFromCentralizedExchange.js', ...args, '--config', configFile];
-    const exitCode = await runCommandLine(argv, { fetch: standInFetch(answer), stdout, stderr });
-    return { exitCode, stdout: stdout.text, stderr: stderr.text };
+    const exitCode = await runCommandLine(argv, { fetch, stdout, stderr, ...keys });
+    return { exitCode, stdout: stdout.text, stderr: stderr.text, fetch };
+  }
+
+  /**
+   * What a run did, without its stand-in fetch.
+   *
+   * @param {{exitCode: number, stdout: string, stderr: string}} result - What `run` gave
+   * @returns {{exitCode: number, stdout: string, stderr: string}} The exit code and what it printed
+   */
+  function printed({ exitCode, stdout, stderr }) {
+    return { exitCode, stdout, stderr };
   }
 
   it('prints the high in UTC unless told otherwise, with exit code 0', async () => {
-    assert.deepEqual(await run(['xtm', ROW_TIME]), { exitCode: 0, stdout: '1.5\n', stderr: '' });
+    assert.deepEqual(printed(await run(['xtm', ROW_TIME])), { exitCode: 0, stdout: '1.5\n', stderr: '' });
   });
 
   it('prints the low with --mode low', async () => {
-    assert.deepEqual(await run(['xtm', ROW_TIME, '--mode', 'low', '--tz', 'UTC']), {
+    assert.deepEqual(printed(await run(['xtm', ROW_TIME, '--mode', 'low', '--tz', 'UTC'])), {
       exitCode: 0,
       stdout: '0.8\n',
       stderr: ''
@@ -169,11 +224,42 @@ describe('getCryptoPriceFromCentralizedExchange.js, the command line', () => {
   });
 
   it("prints the script's message on stderr when there is no price, with exit code 1", async () => {
-    assert.deepEqual(await run(['xtm', ROW_TIME], () => null), {
+    assert.deepEqual(printed(await run(['xtm', ROW_TIME], () => null)), {
       exitCode: 1,
       stdout: '',
       stderr: 'No data available from any source\n'
     });
+  });
+
+  it('asks for the password of the saved CoinGecko key, has CoinGecko check it, and sends it', async () => {
+    const asked = [];
+    const ask = async (prompt) => {
+      asked.push(prompt);
+      return 'pw';
+    };
+    const result = await run(['xtm', ROW_TIME], answerCoinGeckoRange, { apiKeysFile: savedKeyFile, ask });
+    assert.deepEqual(printed(result), { exitCode: 0, stdout: '2.5\n', stderr: '' });
+    assert.deepEqual(asked, ['Password for the CoinGecko api key: ']);
+    assert.deepEqual(coinGeckoKeysSent(result.fetch), [
+      ['/api/v3/ping', 'gecko-key'],
+      ['/api/v3/coins/minotari/market_chart/range', 'gecko-key']
+    ]);
+  });
+
+  it('stops before asking a price, with exit code 1, when the password does not open the saved key', async () => {
+    const result = await run(['xtm', ROW_TIME], answerCoinGeckoRange, { apiKeysFile: savedKeyFile, ask: async () => 'wrong' });
+    assert.equal(result.exitCode, 1);
+    assert.equal(result.stdout, '');
+    assert.match(result.stderr, /^Could not open the CoinGecko api key saved in .*api-keys\.json: The password does not open/);
+    assert.deepEqual(result.fetch.requests, []);
+  });
+
+  it('stops before asking a price, with exit code 1, when CoinGecko refuses the saved key', async () => {
+    const refusing = (request) => (request.url.endsWith('/ping') ? { status: 401, text: '{}' } : answerMexcCandle(request));
+    const result = await run(['xtm', ROW_TIME], refusing, { apiKeysFile: savedKeyFile, ask: async () => 'pw' });
+    assert.equal(result.exitCode, 1);
+    assert.match(result.stderr, /^CoinGecko refused the api key saved in .*api-keys\.json\. Save a new one: node ".*save-api-key\.js" coingecko\n$/);
+    assert.deepEqual(result.fetch.requests.map((request) => new URL(request.url).pathname), ['/api/v3/ping']);
   });
 
   it("prints the script's message for a time zone it does not know, never reading it as UTC", async () => {
@@ -189,10 +275,11 @@ describe('getCryptoPriceFromCentralizedExchange.js, the command line', () => {
     assert.match(result.stderr, /Allowed choices are high, low/);
   });
 
-  it('answers --help on stdout, with exit code 0', async () => {
-    const result = await run(['--help']);
+  it('answers --help on stdout, with exit code 0, asking no password', async () => {
+    const result = await run(['--help'], answerMexcCandle, { apiKeysFile: savedKeyFile, ask: askNothing });
     assert.equal(result.exitCode, 0);
     assert.match(result.stdout, /Usage: getCryptoPriceFromCentralizedExchange \[options\] <token> <date>/);
+    assert.match(result.stdout, /CoinGecko api key:/);
     assert.match(result.stdout, /Exit codes:/);
   });
 

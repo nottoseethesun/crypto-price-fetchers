@@ -49,8 +49,8 @@ For detailed documentation, see the file header in
 [`crypto-price-filler/index.js`](./crypto-price-filler/index.js)
 and
 [`crypto-price-filler/README.md`](./crypto-price-filler/README.md).
-Its CoinGecko demo key goes in `crypto-price-filler/config.json`, which git
-ignores.
+It sends the CoinGecko demo key saved, encrypted, in the repo's key file:
+see [Api keys](../README.md#api-keys) in the repo's README.
 
 ---
 
@@ -64,8 +64,9 @@ command line:
 node getCryptoPriceFromCentralizedExchange.js xtm "2026-01-15 14:30:00" --tz CST --mode low
 ```
 
-The CoinGecko demo key can go in `config.json` here, which git ignores;
-`config-example.json` shows the shape. Install and the rest are in the
+It sends the CoinGecko demo key saved, encrypted, in the repo's key file
+([Api keys](../README.md#api-keys)), asking for its password first. Install
+and the rest are in the
 [repo's README](../README.md#node-versions-of-the-sheets-scripts), and the
 file header in
 [`getCryptoPriceFromCentralizedExchange.js`](./getCryptoPriceFromCentralizedExchange.js)

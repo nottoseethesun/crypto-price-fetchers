@@ -32,14 +32,15 @@ import { openAppsScript } from './run-apps-script.js';
  * @param {string} [options.configFile] - A config file to read in place of the default; it must exist
  * @param {function(string, Object): Promise<Response>} [options.fetch] - Does the script's web requests, in place of Node's fetch
  * @param {?function({level: string, text: string}): void} [options.onLog] - Takes each line the script logs
+ * @param {Object<string, string>} [options.scriptProperties] - The script's Script Properties as it opens, such as an api key it reads
  * @returns {Promise<Object<string, function(...*): Promise<*>>>} The functions by name, and `close`
  * @throws {Error} When the config file cannot be read, or the script cannot be opened (`openAppsScript`)
  */
 export async function openScriptFunctions(scriptPath, names, options) {
-  const { defaultConfigFile, config, configFile, fetch, onLog } = options;
+  const { defaultConfigFile, config, configFile, fetch, onLog, scriptProperties } = options;
   const values =
     config ?? readConfigFile(configFile ?? defaultConfigFile, { required: configFile !== undefined && configFile !== null });
-  const script = await openAppsScript(scriptPath, { config: values, fetch, onLog });
+  const script = await openAppsScript(scriptPath, { config: values, fetch, onLog, scriptProperties });
   const functions = { close: script.close };
   for (const name of names) {
     functions[name] = (...args) => script.call(name, ...args);

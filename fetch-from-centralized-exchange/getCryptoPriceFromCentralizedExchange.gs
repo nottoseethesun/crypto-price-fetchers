@@ -5,8 +5,8 @@
  * @fileoverview Fetches historical high or low cryptocurrency prices (USD)
  *   from centralized exchanges for use directly in Google Sheets.
  * @author Christopher M. Balz, with Grok and Claude
- * @version 2.13.0
- * @lastModified November 16, 2026
+ * @version 2.14.0
+ * @lastModified November 17, 2026
  *
  * OVERVIEW
  * --------
@@ -19,6 +19,20 @@
  * 1. Open Google Sheet -> Extensions -> Apps Script
  * 2. Paste this file's contents
  * 3. Save and refresh the sheet
+ * 4. Optional: set the CoinGecko api key (see API KEY below)
+ *
+ * API KEY
+ * -------
+ * The CoinGecko demo api key is kept in the project's Script Properties,
+ * never in this file, so the file is shared and committed without it. In
+ * the Apps Script editor: Project Settings (the gear on the left) ->
+ * Script Properties -> Add script property. Property: COINGECKO_API_KEY.
+ * Value: the key. Then Save script properties.
+ *
+ * The script sends the key to CoinGecko in the x-cg-demo-api-key header,
+ * never in a url, so no url the log quotes holds it. Without the property,
+ * the script asks CoinGecko without a key, which CoinGecko answers at a
+ * lower rate.
  *
  * USAGE
  * -----
@@ -78,8 +92,8 @@
  *                   b) history (the price of the requested UTC day)
  *                   It never asks for the current price, which would put
  *                   today's price on a past date.
- *                   market_chart/range needs a demo API key (paste yours
- *                   into CONFIG.COINGECKO_API_KEY).
+ *                   Both send the demo api key when the Script Property
+ *                   COINGECKO_API_KEY holds one (see API KEY above).
  *                   Retries on 429 (rate limit) up to 3 times with 5s sleep.
  *
  *   3. CoinPaprika - OHLCV fallback. Skip list: grc-gridcoin (is_active is
@@ -110,13 +124,16 @@
  *     NEGATIVE_CACHE     - TTL for "no data" results (300 = 5min)
  *
  *   COINGECKO_BASE       - CoinGecko API v3 base URL
- *   COINGECKO_API_KEY    - Demo API key for market_chart/range endpoint.
- *                          The repo holds a placeholder: paste your own key
- *                          here in Apps Script, never in the repo.
+ *   COINGECKO_API_KEY_PROPERTY
+ *                        - The Script Property holding the CoinGecko demo
+ *                          api key ("COINGECKO_API_KEY"; see API KEY)
+ *   COINGECKO_API_KEY_HEADER
+ *                        - The header the key is sent in
+ *                          ("x-cg-demo-api-key")
  *   COINPAPRIKA_BASE     - CoinPaprika API v1 base URL
  *
- *   Endpoint templates (use {base}, {id}, {date}, {from}, {to}, {key},
- *   {start}, {end} placeholders):
+ *   Endpoint templates (use {base}, {id}, {date}, {from}, {to}, {start},
+ *   {end} placeholders):
  *     COINGECKO_HISTORY_TEMPLATE
  *     COINGECKO_MARKET_CHART_RANGE_TEMPLATE
  *     COINPAPRIKA_TICKERS_TEMPLATE
@@ -170,12 +187,15 @@ const CONFIG = {
 
   // API URL bases
   COINGECKO_BASE: 'https://api.coingecko.com/api/v3',
-  COINGECKO_API_KEY: 'paste_your_coingecko_demo_api_key_here',
   COINPAPRIKA_BASE: 'https://api.coinpaprika.com/v1',
+
+  // The CoinGecko demo api key: read from this Script Property, sent in this header
+  COINGECKO_API_KEY_PROPERTY: 'COINGECKO_API_KEY',
+  COINGECKO_API_KEY_HEADER: 'x-cg-demo-api-key',
 
   // Endpoint templates
   COINGECKO_HISTORY_TEMPLATE: '{base}/coins/{id}/history?date={date}',
-  COINGECKO_MARKET_CHART_RANGE_TEMPLATE: '{base}/coins/{id}/market_chart/range?vs_currency=usd&from={from}&to={to}&x_cg_demo_api_key={key}',
+  COINGECKO_MARKET_CHART_RANGE_TEMPLATE: '{base}/coins/{id}/market_chart/range?vs_currency=usd&from={from}&to={to}',
 
   COINPAPRIKA_TICKERS_TEMPLATE: '{base}/tickers/{id}',
   COINPAPRIKA_OHLCV_TEMPLATE: '{base}/coins/{id}/ohlcv/historical?start={start}&end={end}&quote=usd',
@@ -639,7 +659,7 @@ function getPriceFromCoinGecko(id, utcMs, target) {
 /**
  * Fetches time-series prices from CoinGecko market_chart/range for a 24h window,
  * then returns the max (high) or min (low) from actual data points.
- * Requires demo API key. Returns null on failure.
+ * Returns null on failure.
  */
 function tryCoinGeckoMarketChartRange(id, utcMs, target) {
   const fromSec = Math.floor((utcMs - 43200000) / 1000);  // 12h before
@@ -650,8 +670,7 @@ function tryCoinGeckoMarketChartRange(id, utcMs, target) {
     .replace('{base}', CONFIG.COINGECKO_BASE)
     .replace('{id}', id)
     .replace('{from}', fromSec)
-    .replace('{to}', toSec)
-    .replace('{key}', CONFIG.COINGECKO_API_KEY);
+    .replace('{to}', toSec);
 
   const response = fetchWithRateLimitRetry(url, 'market_chart/range');
   if (!response) return null;
@@ -680,10 +699,21 @@ function tryCoinGeckoHistory(id, dateStr) {
   return data.market_data?.current_price?.usd || null;
 }
 
-/** Fetches URL with retry on 429 rate limit (up to 3 attempts) */
+/**
+ * The headers of a request to CoinGecko: the demo api key's, when the
+ * Script Property holds a key, else none.
+ */
+function coinGeckoHeaders() {
+  const key = PropertiesService.getScriptProperties().getProperty(CONFIG.COINGECKO_API_KEY_PROPERTY);
+  if (key === null || key.trim() === '') return {};
+  return { [CONFIG.COINGECKO_API_KEY_HEADER]: key.trim() };
+}
+
+/** Fetches a CoinGecko URL, with the api key's header, retrying on 429 rate limit (up to 3 attempts) */
 function fetchWithRateLimitRetry(url, label) {
+  const headers = coinGeckoHeaders();
   for (let attempt = 1; attempt <= 3; attempt++) {
-    const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true, headers: headers });
     const code = res.getResponseCode();
 
     if (code === 200) return res.getContentText();
@@ -743,7 +773,7 @@ function getPriceFromCoinPaprika(id, utcMs, highOrLow) {
 function test() {
   console.log("══════════════════════════════════════════════════════════════");
   console.log("MASTER TEST SUITE - " + new Date().toISOString());
-  console.log("Script version: v2.13.0 (Dated prices only, unknown time zones refused)");
+  console.log("Script version: v2.14.0 (CoinGecko key from the Script Properties, sent in a header)");
   console.log("══════════════════════════════════════════════════════════════\n");
 
   const results = [];

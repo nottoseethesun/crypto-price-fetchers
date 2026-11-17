@@ -17,15 +17,22 @@
  * date of the row. The day asked of history is the UTC day, whatever the
  * computer's clock is set to.
  *
+ * Each request carries the CoinGecko demo api key the run opened, in the
+ * `x-cg-demo-api-key` header, when it opened one (`index.js`, through
+ * `../../coingecko-api-key.js` at the repo's top); without one, CoinGecko
+ * is asked without a key.
+ *
  * Handles rate-limit retry (in `fetchWithRetry`) and verbose logging.
  *
  * @module coingecko
- * @version 1.1.0
+ * @version 1.2.0
  * @author Christopher M. Balz with Grok and Claude.ai
  */
 
 import { fetchWithRetry } from '../utils/fetch.js';
 import config from '../config.js';
+import { getApiKey } from '../../../api-key-store/index.js';
+import { COINGECKO_KEY_HEADER, COINGECKO_SERVICE } from '../../../coingecko-api-key.js';
 
 /** Half the window of prices asked around the time, in milliseconds. */
 const HALF_WINDOW_MS = 12 * 60 * 60 * 1000;
@@ -133,9 +140,8 @@ export async function getPriceFromCoinGecko(
   coingeckoId = token.toLowerCase()
 ) {
   const logv = makeLogger(verbose);
-  const options = config.COINGECKO_API_KEY
-    ? { headers: { 'x-cg-demo-api-key': config.COINGECKO_API_KEY } }
-    : {};
+  const key = getApiKey(COINGECKO_SERVICE);
+  const options = key === null ? {} : { headers: { [COINGECKO_KEY_HEADER]: key } };
 
   const fromSec = Math.floor((utcMs - HALF_WINDOW_MS) / 1000);
   const toSec = Math.floor(Math.min(utcMs + HALF_WINDOW_MS, Date.now()) / 1000);

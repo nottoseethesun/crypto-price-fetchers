@@ -90,6 +90,10 @@ function rememberAndRecall(key, value) {
   return PropertiesService.getScriptProperties().getProperty(key);
 }
 
+function recall(key) {
+  return PropertiesService.getScriptProperties().getProperty(key);
+}
+
 function giveFunction() {
   return function () {};
 }

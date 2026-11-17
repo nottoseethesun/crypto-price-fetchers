@@ -33,18 +33,34 @@ reaches it only when it moves the pin.
 
 ## Keys
 
-No api key is committed. Each Node version reads its keys from `config.json`
-beside it, which git ignores; `config-example.json` shows the shape.
-crypto-price-filler reads `config-example.json`, its committed settings,
-with its own `config.json`, which git ignores, laid over them. The Sheets
-scripts hold a placeholder, and the owner pastes the key into Apps Script.
+No api key is committed. The CoinGecko key is kept in `api-keys.json` at the
+repo's top, which git ignores, encrypted with a password the owner types:
+LP Ranger's design, built as a module any project can use, `api-key-store/`
+(its README shows how). `coingecko-api-key.js` fills it in for CoinGecko,
+and `npm run save-api-key -- coingecko` saves a key. crypto-price-filler and
+the Node version of `getCryptoPriceFromCentralizedExchange.gs` ask for the
+password as a run starts, and keep the key only in memory. A test names a
+key file of its own, never the owner's: crypto-price-filler's
+`vitest.config.js` names one that does not exist (`API_KEYS_FILE_PATH`).
+
+In Apps Script, the CoinGecko key is the Script Property `COINGECKO_API_KEY`,
+which the owner sets. The Node version hands the script the key it opened as
+that property, through the runner's `scriptProperties`.
+
+`crypto-price-fetchers.js` reads its DexTools and x1.ninja keys from
+`config.json` beside it, which git ignores; `config-example.json` shows the
+shape, and the Sheets script holds placeholders the owner replaces in Apps
+Script. crypto-price-filler reads `config-example.json`, its committed
+settings, with its own `config.json`, which git ignores, laid over them.
 
 ## Tests
 
-The runner and the Node versions are tested from the repo's top folder, on
-Node's own test runner. The tests ask no outside service: the scripts'
-requests go to a stand-in fetch or a stand-in server on the computer
-(`test/helpers/stand-in-web.js`).
+The runner, the Node versions and the key store are tested from the repo's
+top folder, on Node's own test runner. The tests ask no outside service: the
+scripts' requests go to a stand-in fetch or a stand-in server on the computer
+(`test/helpers/stand-in-web.js`). The key store's tests save keys in temp
+folders of their own; `test/fixtures/lp-ranger-api-keys.json`, written by LP
+Ranger's own code, checks that the store opens LP Ranger's files.
 
 ```bash
 npm ci
@@ -72,7 +88,8 @@ The Sheets scripts are tested there too, run unchanged under Node.
 - `fetch-with-retry.js` stands in for `fetchWithRetry`, the http layer of the
   Node tool's price sources.
 - `stand-in-fetch-preload.js` runs the real command line, `index.js`, in a
-  child process against a stand-in MEXC.
+  child process against a stand-in MEXC, and a stand-in CoinGecko ping that
+  takes the one key in `stand-in-coingecko-key.js`.
 
 ## Known bugs
 

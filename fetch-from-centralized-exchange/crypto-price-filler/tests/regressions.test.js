@@ -13,6 +13,8 @@
  * http layer (see `tests/helpers/`): `fetchWithRetry` for the Node tool's
  * functions, a preloaded fetch for its command line, run in a child process,
  * and `UrlFetchApp` for the Sheets script, which runs unchanged under Node.
+ * The Node tool's functions run on the committed settings, whatever a
+ * `config.json` on this computer holds.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -23,6 +25,7 @@ import path from 'path';
 import { pathToFileURL } from 'url';
 import { getPriceFromMEXC } from '../sources/mexc.js';
 import { getPriceFromCoinGecko } from '../sources/coingecko.js';
+import { getPriceFromCoinPaprika } from '../sources/coinpaprika.js';
 import { getCryptoPrice } from '../sources/price.js';
 import { canonicalTimeZone, parseInputToUtcMs } from '../utils/date.js';
 import * as fetchUtils from '../utils/fetch.js';
@@ -35,6 +38,12 @@ vi.mock('../utils/fetch.js', () => {
     fetchWithRetry: mockFn,
     default: mockFn
   };
+});
+
+// The committed settings, read afresh for this file, whatever a config.json holds
+vi.mock('../config.js', async () => {
+  const { readFileSync } = await import('node:fs');
+  return { default: JSON.parse(readFileSync(new URL('../config-example.json', import.meta.url), 'utf8')) };
 });
 
 const mockFetchWithRetry = vi.mocked(fetchUtils.fetchWithRetry);
@@ -258,15 +267,42 @@ describe('fixed bugs', () => {
       expect(fs.readFileSync(SHEETS_SCRIPT_PATH, 'utf8')).not.toMatch(COINGECKO_KEY_PATTERN);
     });
 
-    it("the Node tool's committed settings carry no key", () => {
+    it("the Node tool's committed settings carry no key, nor a place for one", () => {
       const committed = fs.readFileSync(path.join(FILLER_DIR, 'config-example.json'), 'utf8');
       expect(committed).not.toMatch(COINGECKO_KEY_PATTERN);
-      expect(JSON.parse(committed).COINGECKO_API_KEY).toBe('');
+      expect(Object.keys(JSON.parse(committed))).not.toContain('COINGECKO_API_KEY');
     });
 
-    it('git ignores the config.json files that hold the keys', () => {
+    it('git ignores the files that hold keys: the encrypted key file, and the config.json files', () => {
+      expect(gitIgnores('../../api-keys.json')).toBe(true);
+      expect(gitIgnores('../../api-keys.json.tmp')).toBe(true);
       expect(gitIgnores('config.json')).toBe(true);
       expect(gitIgnores('../config.json')).toBe(true);
+    });
+  });
+
+  describe("CoinPaprika's candles are asked at its OHLCV address", () => {
+    it('the Node tool asks /coins/{id}/ohlcv/historical', async () => {
+      mockFetchWithRetry.mockImplementation(answeringFetchWithRetry((url) => (url.includes('/ohlcv/') ? [] : null)));
+      await getPriceFromCoinPaprika('xtm-tari', ROW_UTC_MS, 'high', false);
+      const asked = mockFetchWithRetry.mock.calls.map(([url]) => url);
+      expect(asked[0]).toMatch(/^https:\/\/api\.coinpaprika\.com\/v1\/coins\/xtm-tari\/ohlcv\/historical\?start=\d+&end=\d+$/);
+    });
+
+    it('the Sheets script asks the same address', () => {
+      const asked = [];
+      const script = loadSheetsScript(SHEETS_SCRIPT_PATH, (url) => {
+        asked.push(url);
+        if (url.includes('/exchangeInfo')) return { symbols: [] };
+        if (url.includes('/market_chart/range')) return { prices: [] };
+        if (url.includes('/tickers/')) return { quotes: { USD: { price: 1 } } };
+        if (url.includes('/ohlcv/')) return [{ high: '2.5', low: '2.0' }];
+        return null;
+      });
+      expect(script.getCryptoPrice('xtm', '2025-06-15 12:30:00', 'UTC', 'high', 0)).toBe(2.5);
+      expect(asked.find((url) => url.includes('/ohlcv/'))).toMatch(
+        /^https:\/\/api\.coinpaprika\.com\/v1\/coins\/xtm-tari\/ohlcv\/historical\?start=\d+&end=\d+&quote=usd$/
+      );
     });
   });
 });

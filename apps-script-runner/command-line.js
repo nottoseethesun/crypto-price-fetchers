@@ -9,6 +9,8 @@
  * - `runScriptCommandLine` builds the program with commander, with the
  *   options every Node version has, `--config` and `--verbose`; lets the
  *   Node version add its own arguments or commands; parses the arguments;
+ *   asks the Node version for the script's Script Properties, such as an
+ *   api key it unlocks then, so that `--help` never asks for a password;
  *   runs the call; and returns the exit code. A number the script returns
  *   is printed on stdout, with exit code 0. Anything else it returns, such
  *   as the message a cell would show, goes to stderr with exit code 1, and
@@ -63,16 +65,19 @@ function messageOf(thrown) {
  * @param {Array} call.args - Its arguments
  * @param {Command} call.command - The parsed command, for `--config` and `--verbose`
  * @param {function|undefined} call.fetch - The fetch to do the script's requests, or undefined for Node's own
+ * @param {function(Object): Promise<Object<string, string>>} call.scriptProperties - Gives the script's Script Properties, handed where output goes
  * @param {{stdout: {write: function}, stderr: {write: function}}} call.io - Where output goes
  * @returns {Promise<number>} The exit code
  */
-async function printCall({ scriptPath, name, args, command, fetch, io }) {
+async function printCall({ scriptPath, name, args, command, fetch, scriptProperties, io }) {
   const options = command.optsWithGlobals();
   const required = command.getOptionValueSourceWithGlobals('config') !== 'default';
+  const config = readConfigFile(options.config, { required });
   const script = await openAppsScript(scriptPath, {
-    config: readConfigFile(options.config, { required }),
+    config,
     fetch,
-    onLog: options.verbose === true ? (line) => io.stderr.write(`${line.level}: ${line.text}\n`) : null
+    onLog: options.verbose === true ? (line) => io.stderr.write(`${line.level}: ${line.text}\n`) : null,
+    scriptProperties: await scriptProperties(io)
   });
   try {
     const value = await script.call(name, ...args);
@@ -95,13 +100,14 @@ async function printCall({ scriptPath, name, args, command, fetch, io }) {
  * @param {string|URL} spec.scriptPath - The `.gs` file
  * @param {string} spec.defaultConfigFile - The config file used when `--config` names none
  * @param {function(Command, function(string, Array, Command): Promise<void>): void} spec.describe - Gives the program its name, description, arguments or commands; each action calls the function it is handed with the script function's name, its arguments, and the action's command
+ * @param {function({stdout: Object, stderr: Object}): Promise<Object<string, string>>} [spec.scriptProperties] - Gives the Script Properties the script opens with, once the arguments are parsed and before the call, handed where output goes; none when absent
  * @param {Object} [deps] - What a test replaces
  * @param {function} [deps.fetch] - Does the script's web requests, in place of Node's fetch
  * @param {{write: function(string): void}} [deps.stdout=process.stdout] - Where output goes
  * @param {{write: function(string): void}} [deps.stderr=process.stderr] - Where messages go
  * @returns {Promise<number>} The exit code
  */
-export async function runScriptCommandLine({ argv, scriptPath, defaultConfigFile, describe }, deps = {}) {
+export async function runScriptCommandLine({ argv, scriptPath, defaultConfigFile, describe, scriptProperties }, deps = {}) {
   const io = { stdout: deps.stdout ?? process.stdout, stderr: deps.stderr ?? process.stderr };
   let exitCode = 0;
   const program = new Command()
@@ -110,7 +116,15 @@ export async function runScriptCommandLine({ argv, scriptPath, defaultConfigFile
     .option('-c, --config <file>', "JSON file of values for the script's config objects, such as api keys", defaultConfigFile)
     .option('-v, --verbose', "show the script's log on stderr");
   const runCall = async (name, args, command) => {
-    exitCode = await printCall({ scriptPath, name, args, command, fetch: deps.fetch, io });
+    exitCode = await printCall({
+      scriptPath,
+      name,
+      args,
+      command,
+      fetch: deps.fetch,
+      scriptProperties: scriptProperties ?? (async () => ({})),
+      io
+    });
   };
   describe(program, runCall);
   program.addHelpText('after', EXIT_CODES_HELP);

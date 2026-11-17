@@ -167,9 +167,20 @@ describe('PropertiesService', () => {
     const properties = services.PropertiesService.getScriptProperties();
     assert.equal(properties.getProperty('last'), null);
     assert.equal(properties.setProperty('last', 42), properties);
-    assert.equal(services.PropertiesService.getUserProperties().getProperty('last'), '42');
+    assert.equal(services.PropertiesService.getScriptProperties().getProperty('last'), '42');
     properties.deleteProperty('last');
-    assert.equal(services.PropertiesService.getDocumentProperties().getProperty('last'), null);
+    assert.equal(properties.getProperty('last'), null);
+  });
+
+  it("keeps the script's, the user's and the document's properties apart, the script's starting with those given", () => {
+    const { services } = servicesAnswering(OK, { scriptProperties: { API_KEY: 'from-the-owner' } });
+    const { PropertiesService } = services;
+    assert.equal(PropertiesService.getScriptProperties().getProperty('API_KEY'), 'from-the-owner');
+    assert.equal(PropertiesService.getUserProperties().getProperty('API_KEY'), null);
+    assert.equal(PropertiesService.getDocumentProperties().getProperty('API_KEY'), null);
+    PropertiesService.getUserProperties().setProperty('mine', 'user');
+    assert.equal(PropertiesService.getScriptProperties().getProperty('mine'), null);
+    assert.equal(PropertiesService.getDocumentProperties().getProperty('mine'), null);
   });
 });
 

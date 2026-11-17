@@ -124,6 +124,13 @@ describe("openAppsScript, with a fetch of the caller's", () => {
 });
 
 describe('openAppsScript, the script and its calls', () => {
+  it("opens the script with the Script Properties given, as Apps Script opens it with its owner's", async () => {
+    await withScript({ scriptProperties: { API_KEY: 'from-the-owner' } }, async (script) => {
+      assert.equal(await script.call('recall', 'API_KEY'), 'from-the-owner');
+      assert.equal(await script.call('recall', 'OTHER'), null);
+    });
+  });
+
   it("keeps the caller's thread free while the script sleeps", async () => {
     await withScript({}, async (script) => {
       let ticks = 0;
@@ -224,5 +231,9 @@ describe('openAppsScript, refusing to open', () => {
     await assert.rejects(openAppsScript(RUNNER_CHECK, { onLog: 'not a function' }), /onLog must be a function/);
     await assert.rejects(openAppsScript(RUNNER_CHECK, { config: ['not', 'an', 'object'] }), /config must be an object/);
     await assert.rejects(openAppsScript(RUNNER_CHECK, { requestTimeoutMs: 0 }), /requestTimeoutMs must be/);
+    await assert.rejects(
+      openAppsScript(RUNNER_CHECK, { scriptProperties: { API_KEY: 42 } }),
+      /scriptProperties must be an object of strings/
+    );
   });
 });

@@ -4,13 +4,15 @@
  *
  * CoinGecko stands in at the http layer, `fetchWithRetry`, and the settings
  * are the committed ones in `config-example.json`, whatever a `config.json`
- * on this computer holds.
+ * on this computer holds. The api key is the one a test puts in memory for
+ * the run, as `index.js` does once it opens the saved key.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { getPriceFromCoinGecko, pickFromPrices, utcDay } from '../sources/coingecko.js';
-import config from '../config.js';
 import * as fetchUtils from '../utils/fetch.js';
+import { setApiKey } from '../../../api-key-store/index.js';
+import { COINGECKO_SERVICE } from '../../../coingecko-api-key.js';
 
 // Mock fetchWithRetry
 vi.mock('../utils/fetch.js', () => {
@@ -21,7 +23,7 @@ vi.mock('../utils/fetch.js', () => {
   };
 });
 
-// The committed settings, read afresh for this file, so a test may set a key
+// The committed settings, read afresh for this file, whatever a config.json holds
 vi.mock('../config.js', async () => {
   const { readFileSync } = await import('node:fs');
   return { default: JSON.parse(readFileSync(new URL('../config-example.json', import.meta.url), 'utf8')) };
@@ -34,7 +36,6 @@ const TEST_TOKEN = 'GRC';
 const TEST_COINGECKO_ID = 'gridcoin-research';
 const TEST_UTC_MS = Date.UTC(2024, 0, 1, 12, 0, 0); // 2024-01-01 12:00:00 UTC
 const HOUR_MS = 3600000;
-const COMMITTED_KEY = config.COINGECKO_API_KEY;
 
 // CoinGecko's hourly prices around the time: lowest 0.0058, highest 0.0066,
 // and 0.0061 nearest the time, 20 minutes after it
@@ -78,7 +79,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  config.COINGECKO_API_KEY = COMMITTED_KEY;
+  setApiKey(COINGECKO_SERVICE, null);
   vi.clearAllMocks();
 });
 
@@ -228,8 +229,8 @@ describe('CoinGecko Price Fetching', () => {
     });
 
     describe('api key', () => {
-      it("sends the demo key in CoinGecko's header when the settings have one", async () => {
-        config.COINGECKO_API_KEY = 'test-demo-key';
+      it("sends the demo key in CoinGecko's header when the run has opened one", async () => {
+        setApiKey(COINGECKO_SERVICE, 'test-demo-key');
         mockFetchWithRetry
           .mockResolvedValueOnce(okResponse({ prices: [] }))
           .mockResolvedValueOnce(okResponse(HISTORY_ANSWER));
@@ -243,8 +244,7 @@ describe('CoinGecko Price Fetching', () => {
         ]);
       });
 
-      it('sends no key when the settings have none, as the committed ones do', async () => {
-        expect(COMMITTED_KEY).toBe('');
+      it('sends no key when the run has none', async () => {
         mockFetchWithRetry.mockResolvedValueOnce(okResponse({ prices: RANGE_PRICES }));
 
         await getPriceFromCoinGecko(TEST_TOKEN, TEST_UTC_MS, 'close', false, TEST_COINGECKO_ID);

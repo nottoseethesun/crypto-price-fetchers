@@ -12,7 +12,8 @@
  *   functions as async calls (`run-apps-script.js`), and
  *   `openScriptFunctions` returns the named ones under their Sheets names,
  *   with the config read from the Node version's config file
- *   (`open-script-functions.js`).
+ *   (`open-script-functions.js`). Either can open the script with Script
+ *   Properties set, such as an api key the script reads from them.
  * - `readConfigFile` reads a Node version's `config.json`, the values it
  *   sets in the script's config objects, such as api keys
  *   (`config-file.js`).

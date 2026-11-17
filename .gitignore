@@ -1,9 +1,14 @@
 # Editor
 .vscode
 
-# The config files that hold api keys: those of the Node versions of the
-# Sheets scripts, and crypto-price-filler's (each has a committed
-# config-example.json beside it)
+# The api keys, each encrypted with a password (api-key-store/), and the
+# temp file the key file is written through
+api-keys.json
+api-keys.json.tmp
+
+# The config files of the Node versions of the Sheets scripts, which may
+# hold api keys (crypto-price-fetchers.js's does), and crypto-price-filler's
+# own settings
 /config.json
 /fetch-from-centralized-exchange/config.json
 /fetch-from-centralized-exchange/crypto-price-filler/config.json

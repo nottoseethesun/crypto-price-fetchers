@@ -77,10 +77,26 @@ export async function answerRequest(request, fetchFunction, timeoutMs) {
 }
 
 /**
+ * Says whether a value is an object whose every value is a string, as
+ * Script Properties are.
+ *
+ * @param {*} value - The value
+ * @returns {boolean} Whether it is
+ */
+function isTextByName(value) {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    Object.values(value).every((text) => typeof text === 'string')
+  );
+}
+
+/**
  * Checks `openAppsScript`'s options and fills in the defaults.
  *
  * @param {Object} options - The options given
- * @returns {{config: Object, fetchFunction: function, onLog: ?function, requestTimeoutMs: number}} The options to use
+ * @returns {{config: Object, fetchFunction: function, onLog: ?function, requestTimeoutMs: number, scriptProperties: Object<string, string>}} The options to use
  * @throws {TypeError} When an option is of the wrong kind
  */
 function readOptions(options) {
@@ -88,13 +104,15 @@ function readOptions(options) {
   const fetchFunction = options.fetch ?? globalThis.fetch;
   const onLog = options.onLog ?? null;
   const requestTimeoutMs = options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+  const scriptProperties = options.scriptProperties ?? {};
   if (typeof config !== 'object' || Array.isArray(config)) throw new TypeError('config must be an object');
   if (typeof fetchFunction !== 'function') throw new TypeError('fetch must be a function');
   if (onLog !== null && typeof onLog !== 'function') throw new TypeError('onLog must be a function');
   if (typeof requestTimeoutMs !== 'number' || !Number.isFinite(requestTimeoutMs) || requestTimeoutMs <= 0) {
     throw new TypeError('requestTimeoutMs must be a number of milliseconds above zero');
   }
-  return { config, fetchFunction, onLog, requestTimeoutMs };
+  if (!isTextByName(scriptProperties)) throw new TypeError('scriptProperties must be an object of strings');
+  return { config, fetchFunction, onLog, requestTimeoutMs, scriptProperties };
 }
 
 /**
@@ -206,6 +224,7 @@ function startCall(session, name, args) {
  * @param {function(string, Object): Promise<Response>} [options.fetch=globalThis.fetch] - Does the script's web requests; shaped as Node's own fetch
  * @param {?function({level: string, text: string}): void} [options.onLog=null] - Takes each line the script logs, or null to drop them
  * @param {number} [options.requestTimeoutMs=60000] - How long a request may take before it counts as having no response
+ * @param {Object<string, string>} [options.scriptProperties={}] - The script's Script Properties as it opens, such as an api key it reads with `PropertiesService.getScriptProperties().getProperty(...)`
  * @returns {Promise<{call: function(string, ...*): Promise<*>, close: function(): Promise<void>}>} The open script: `call(name, ...args)` calls a function, `close()` stops the script
  * @throws {Error} When the script cannot be read, does not compile, throws as it loads, or the config names an object or field the script lacks
  */
@@ -222,6 +241,7 @@ export async function openAppsScript(scriptPath, options = {}) {
     workerData: {
       scriptPath: scriptPath instanceof URL ? fileURLToPath(scriptPath) : String(scriptPath),
       config: settings.config,
+      scriptProperties: settings.scriptProperties,
       requestTimeoutMs: settings.requestTimeoutMs,
       logging: settings.onLog !== null,
       answerCounter: answerCounter.buffer,

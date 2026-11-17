@@ -16,15 +16,19 @@
  *
  * - `openCentralizedExchangePrices` opens the script once and returns
  *   `getCryptoPrice` as an async call, with the Sheets arguments, plus
- *   `close`. A Date passed as the time works as a date cell does.
- * - `config.json` beside this file, which git ignores, sets
- *   `CONFIG.COINGECKO_API_KEY`, the CoinGecko demo key the script sends
- *   for hourly prices; `config-example.json` shows the shape. Without the
- *   file, the script sends the placeholder written in it, which CoinGecko
- *   refuses, so the script goes on to CoinGecko's price for the day.
+ *   `close`. A Date passed as the time works as a date cell does. A
+ *   CoinGecko demo api key passed to it goes to the script as the Script
+ *   Property the script reads the key from, as in Apps Script.
  * - The command line, `node getCryptoPriceFromCentralizedExchange.js <token>
  *   "<date>"`, with `--tz` and `--mode`, prints the price (`--help` gives
- *   the rest).
+ *   the rest). Before it asks for a price, it asks for the password of the
+ *   CoinGecko key saved in the repo's key file, opens the key, and hands it
+ *   to the script (`../coingecko-api-key.js`); with no key saved, the
+ *   script asks CoinGecko without one. `npm run save-api-key -- coingecko`,
+ *   in the repo's top folder, saves a key.
+ * - `config.json` beside this file, which git ignores, may set other
+ *   fields of the script's `CONFIG`; without it, the script runs on the
+ *   values written in it.
  *
  * What differs from the sheet: it runs on this computer, so there is no
  * 30-second limit per call and no daily cap on requests. The cache lasts
@@ -45,6 +49,7 @@ import {
   openScriptFunctions,
   runScriptCommandLine
 } from '../apps-script-runner/index.js';
+import { unlockCoinGeckoKey } from '../coingecko-api-key.js';
 
 /** The Sheets script this runs. */
 export const SHEETS_SCRIPT = new URL('./getCryptoPriceFromCentralizedExchange.gs', import.meta.url);
@@ -52,19 +57,45 @@ export const SHEETS_SCRIPT = new URL('./getCryptoPriceFromCentralizedExchange.gs
 /** The config file read when none is named. */
 export const DEFAULT_CONFIG_FILE = fileURLToPath(new URL('./config.json', import.meta.url));
 
+/** The Script Property the script reads the CoinGecko key from: its `CONFIG.COINGECKO_API_KEY_PROPERTY`. */
+export const COINGECKO_KEY_PROPERTY = 'COINGECKO_API_KEY';
+
+/**
+ * The Script Properties that hand the script a CoinGecko key.
+ *
+ * @param {?string} key - The key, or null for none
+ * @returns {Object<string, string>} The properties: the key's, or none
+ */
+function coinGeckoKeyProperties(key) {
+  return key === null ? {} : { [COINGECKO_KEY_PROPERTY]: key };
+}
+
 /**
  * Opens the script and returns its Sheets function as an async call.
  *
  * @param {Object} [options] - How to open it (`openScriptFunctions`)
  * @param {Object<string, Object>} [options.config] - Values for the script's config objects, in place of the config file
  * @param {string} [options.configFile] - A config file in place of `config.json` beside this file
+ * @param {?string} [options.coinGeckoApiKey=null] - The CoinGecko demo api key the script sends, such as one `unlockCoinGeckoKey` opened; none when null
  * @param {function(string, Object): Promise<Response>} [options.fetch] - Does the script's web requests, in place of Node's fetch
  * @param {?function({level: string, text: string}): void} [options.onLog] - Takes each line the script logs
  * @returns {Promise<{getCryptoPrice: function(string, (string|Date), string, string=, number=): Promise<number|string>, close: function(): Promise<void>}>} The function, with the Sheets arguments
  */
 export function openCentralizedExchangePrices(options = {}) {
-  return openScriptFunctions(SHEETS_SCRIPT, ['getCryptoPrice'], { ...options, defaultConfigFile: DEFAULT_CONFIG_FILE });
+  const { coinGeckoApiKey = null, ...rest } = options;
+  return openScriptFunctions(SHEETS_SCRIPT, ['getCryptoPrice'], {
+    ...rest,
+    defaultConfigFile: DEFAULT_CONFIG_FILE,
+    scriptProperties: coinGeckoKeyProperties(coinGeckoApiKey)
+  });
 }
+
+/** What the help says of the CoinGecko key. */
+const KEY_HELP = `
+CoinGecko api key:
+  When one is saved (npm run save-api-key -- coingecko, in the repo's top
+  folder), the command asks for its password, on stderr, and sends the key.
+  Without one, it asks CoinGecko without a key.`;
 
 /**
  * Checks that an argument is not empty.
@@ -100,7 +131,27 @@ function describeCommandLine(program, runCall) {
         .choices(['high', 'low'])
         .default('high')
     )
+    .addHelpText('after', KEY_HELP)
     .action((token, date, options, command) => runCall('getCryptoPrice', [token, date, options.tz, options.mode], command));
+}
+
+/**
+ * Opens the saved CoinGecko key for the command line's call, and gives the
+ * Script Properties that hand it to the script.
+ *
+ * @param {Object} deps - What a test replaces (`runCommandLine`)
+ * @param {{stderr: {write: function(string): void}}} io - Where messages go
+ * @returns {Promise<Object<string, string>>} The properties: the key's, or none when no key is saved
+ * @throws {Error} With `keyRefused` set, when the password does not open the key or CoinGecko refuses it
+ */
+async function unlockedKeyProperties(deps, io) {
+  const key = await unlockCoinGeckoKey({
+    file: deps.apiKeysFile,
+    ask: deps.ask,
+    fetch: deps.fetch,
+    say: (line) => io.stderr.write(`${line}\n`)
+  });
+  return coinGeckoKeyProperties(key);
 }
 
 /**
@@ -108,11 +159,19 @@ function describeCommandLine(program, runCall) {
  *
  * @param {string[]} argv - The arguments, shaped as `process.argv`
  * @param {Object} [deps] - What a test replaces: `fetch`, `stdout`, `stderr` (`runScriptCommandLine`)
+ * @param {string} [deps.apiKeysFile] - The key file, in place of `apiKeysFile()`
+ * @param {function(string): Promise<string>} [deps.ask] - Answers the password prompt, in place of the terminal
  * @returns {Promise<number>} The exit code
  */
 export function runCommandLine(argv, deps = {}) {
   return runScriptCommandLine(
-    { argv, scriptPath: SHEETS_SCRIPT, defaultConfigFile: DEFAULT_CONFIG_FILE, describe: describeCommandLine },
+    {
+      argv,
+      scriptPath: SHEETS_SCRIPT,
+      defaultConfigFile: DEFAULT_CONFIG_FILE,
+      describe: describeCommandLine,
+      scriptProperties: (io) => unlockedKeyProperties(deps, io)
+    },
     deps
   );
 }

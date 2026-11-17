@@ -53,11 +53,14 @@ What differs from the sheet:
 
 - It runs on your computer, so there is no 30-second limit per call and no
   daily cap on web requests.
-- Keys come from `config.json` beside the Node version, which git ignores,
-  instead of from the script. Copy `config-example.json` beside it to
-  `config.json` and fill it in. A key the script reads as it sends each
+- `crypto-price-fetchers.js` reads its keys from `config.json` beside it,
+  which git ignores, instead of from the script. Copy `config-example.json`
+  to `config.json` and fill it in. A key the script reads as it sends each
   request takes effect this way; a value the script works out as it loads,
   such as a url, keeps the value written in the script.
+- `getCryptoPriceFromCentralizedExchange.js` sends the CoinGecko key saved,
+  encrypted, in the repo's key file (see [Api keys](#api-keys)), and hands
+  it to the script as the Script Property the script reads in Apps Script.
 - The cache lasts while the script is open: for the command line, one run.
 - The sheet's menu is not there.
 
@@ -68,6 +71,30 @@ Node 22 or later. From the repo's top folder:
 ```bash
 npm ci
 ```
+
+### Api keys
+
+The CoinGecko demo api key is kept in `api-keys.json` at the repo's top,
+which git ignores, encrypted with a password you choose, as LP Ranger keeps
+its keys. To save it, from the repo's top folder:
+
+```bash
+npm run save-api-key -- coingecko
+```
+
+It asks for the key, then the password, twice, showing nothing of what is
+typed; asks CoinGecko whether it takes the key; and saves it only if it
+does. Each run of a tool that sends the key then asks for the password, opens
+the key, and keeps it in memory for that run only. The password is kept
+nowhere. Without a saved key, the tools ask CoinGecko without one, at its
+lower rate limit.
+
+Both `getCryptoPriceFromCentralizedExchange.js` and crypto-price-filler send
+the key. In Apps Script, the key is a Script Property instead: see the
+`API KEY` section of the `.gs` file's header.
+
+The store itself is `api-key-store/`, a module any Node project can use:
+see [its README](./api-key-store/README.md).
 
 ### Command line
 
@@ -92,8 +119,11 @@ await prices.close();
 ```
 
 The functions take the Sheets arguments and return what the cell would show.
+`openCentralizedExchangePrices({ coinGeckoApiKey })` sends a CoinGecko key,
+such as the one `unlockCoinGeckoKey()` (`coingecko-api-key.js`) opens.
 Other repos install this one to use the runner, as
-`crypto-price-fetchers/apps-script-runner`.
+`crypto-price-fetchers/apps-script-runner`, and the key store, as
+`crypto-price-fetchers/api-key-store`.
 
 ## Install
 
