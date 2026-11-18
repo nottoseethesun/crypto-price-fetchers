@@ -116,6 +116,60 @@ coverage run below 80% of lines. `tests/helpers/` holds the stand-ins:
 Code written to check something goes into the tests, so it is kept and run
 again rather than written again.
 
+### How the Sheets Scripts (`.gs`) Are Tested
+
+A Sheets script runs in Google's Apps Script, which no test can reach, and
+it is unlike the repo's other code in three ways:
+
+- It is a plain script, not a module. It imports nothing, and reaches the
+  world through Apps Script's services, which are globals: `UrlFetchApp`
+  for web requests, `CacheService`, `LockService` and the rest.
+- Apps Script loads all of a project's files into one scope, so the files
+  of a split script call each other with no import:
+  `getCryptoPriceFromCentralizedExchange.gs` calls the price sources in
+  its `-sources.gs`.
+- `UrlFetchApp.fetch` returns the response at once, where Node's `fetch`
+  returns a promise.
+
+So the tests run the real `.gs` files under Node, unchanged, with the
+runner's Node versions of the services
+(`apps-script-runner/apps-script-services.js`) and a stand-in for each
+service on the web. No test keeps a copy of a script's logic, so what
+passes is the code the owner pastes into Apps Script. A script runs in one
+of three ways:
+
+| Tests | How the script runs | What they check |
+| ----- | ------------------- | --------------- |
+| `test/crypto-price-fetchers.test.js`, `test/get-crypto-price-from-centralized-exchange.test.js` | Through its Node version, as a program runs it. The runner loads the files in a worker thread, which waits on each web request while the test's thread answers it from `standInFetch` (`test/helpers/stand-in-web.js`), as DexTools, x1.ninja, MEXC and CoinGecko answer. | What each function returns, as its cell would show it, and the command lines. |
+| crypto-price-filler's `tests/regressions.test.js`, `tests/xtm-coingecko-id.test.js` | In the test's own thread (`tests/helpers/sheets-script.js`). The files load, in Apps Script's order, into one `vm` context; `UrlFetchApp.fetch` answers at once from the test's function, and sleeps return at once. | That each fixed bug stays fixed in the script as in the Node tool, and that no file of the exchange script holds a CoinGecko api key. |
+| `test/load-apps-script.test.js`, `test/run-apps-script.test.js`, `test/apps-script-services.test.js` | Small scripts in `test/fixtures/`: `runner-check.gs`, whose functions each use one service, or pass one kind of value, and return what they saw; a script split into two files that share names; and one that throws as it loads. | That the runner loads, configures and calls a script as Apps Script does, and that its services act as Apps Script's do. |
+
+Three things follow from running the scripts this way:
+
+- Node's coverage report lists the `.gs` files, since the runner compiles
+  each under its own path, so they count toward the top folder's 80%
+  floor. crypto-price-filler's coverage does not count them.
+- The runner's services hold only the methods the Sheets scripts call,
+  here and in pulsechain-analytics. A script that calls another fails
+  under Node with "is not a function", naming the method; the fix is to
+  add it to `apps-script-services.js`, with a test.
+- The stand-ins answer as each service answered when its tests were
+  written. A change in a service's answers shows only when a script runs
+  against the real service: in the sheet, in a Node version run by hand,
+  or in the tests in `getCryptoPriceFromCentralizedExchange-tests.gs`.
+
+Those tests run in Apps Script itself, against the real services. The
+owner pastes the file into the same Apps Script project as the other two
+and runs `test`, which runs them all, from the editor's "Run" button. No
+Node test runs them, and the sheet needs the file for nothing else.
+
+The lint reads the `.gs` files as the plain scripts Apps Script loads, with
+its services as globals, under LP Ranger's rules (see [Lint](#lint)), and
+the security lint reads them too. A name one file uses from another is
+declared in a `/* global */` comment, so the lint knows it, and
+`no-unused-vars` leaves top-level names alone, since a cell or another file
+calls a script's top-level functions, where ESLint cannot see the call.
+
 ---
 
 ## Security Audits

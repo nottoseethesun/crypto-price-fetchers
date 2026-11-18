@@ -2,6 +2,10 @@
 
 ![Crypto Price Fetchers: a green-winged fairy in a sunlit forest holds out a glowing scroll that reads "Hex $0.042" above a rising price line, with gold coins in the air and a white city on the cliffs behind her.](./assets/images/fairy-sprite-price-fetcher_github-social-share-img.jpeg "Crypto Price Fetchers")
 
+[![Lint (JS+Apps Script+MD)](https://img.shields.io/github/actions/workflow/status/nottoseethesun/crypto-price-fetchers/ci.yml?branch=main&label=lint)](https://github.com/nottoseethesun/crypto-price-fetchers/actions/workflows/ci.yml)
+[![Tests (Node 22/24)](https://img.shields.io/github/actions/workflow/status/nottoseethesun/crypto-price-fetchers/ci.yml?branch=main&label=tests)](https://github.com/nottoseethesun/crypto-price-fetchers/actions/workflows/ci.yml)
+[![Security Audit](https://img.shields.io/github/actions/workflow/status/nottoseethesun/crypto-price-fetchers/security-audit.yml?branch=main&label=security)](https://github.com/nottoseethesun/crypto-price-fetchers/actions/workflows/security-audit.yml)
+
 ## Overview
 
 A collection of scripts useful for fetching the current price and also the price at
