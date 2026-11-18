@@ -1,5 +1,7 @@
 # Crypto Price Fetchers
 
+![Crypto Price Fetchers: a green-winged fairy in a sunlit forest holds out a glowing scroll that reads "Hex $0.042" above a rising price line, with gold coins in the air and a white city on the cliffs behind her.](./assets/images/fairy-sprite-price-fetcher_github-social-share-img.jpeg "Crypto Price Fetchers")
+
 ## Overview
 
 A collection of scripts useful for fetching the current price and also the price at
