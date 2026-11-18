@@ -1,0 +1,3 @@
+{
+  "overrides": [{ "files": "*.gs", "options": { "parser": "babel" } }]
+}

@@ -26,14 +26,16 @@ here as well, in addition to the blockchains that DexTools already covers — X1
 calls are routed through the x1.ninja API since DexTools does not list X1 yet.
 See the file's header documentation for details.
 
-`fetch-from-centralized-exchage/getCryptoPriceFromCentralizedExchange.gs` is
-a Google Apps Script currently fetches the price only at a point in time in
+`fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.gs`,
+with the price sources in `getCryptoPriceFromCentralizedExchange-sources.gs`
+beside it, is a Google Apps Script that currently fetches the price only at
+a point in time in
 the past, although "the past" can be just one minute in the past.  It is limited
 to tokens traded on the API of the Centralized Exchanges that it currently
 supports and also, as a Google Apps Script, cannot handle more than 100 or
 so calls at a time.
 
-`fetch-from-centralized-exchage/crypto-price-filler/index.js` is like
+`fetch-from-centralized-exchange/crypto-price-filler/index.js` is like
 `getCryptoPriceFromCentralizedExchange.gs` but, as a NodeJS script, can
 handle any load in terms of numbers of price points to fetch.
 
@@ -130,15 +132,15 @@ await prices.close();
 ```
 
 The functions take the Sheets arguments and return what the cell would show.
-`openCentralizedExchangePrices({ coinGeckoApiKey })` sends a CoinGecko key,
-such as the one `unlockCoinGeckoKey()` (`coingecko-api-key.js`) opens.
-Other repos install this one to use the runner, as
+`openCentralizedExchangePrices({ apiKeys: { coingecko } })` sends a
+CoinGecko key, such as the one `unlockProjectKeys` (`api-key-store/`)
+opens. Other repos install this one to use the runner, as
 `crypto-price-fetchers/apps-script-runner`, and the key store, as
 `crypto-price-fetchers/api-key-store`.
 
 ## Install
 
-For `./fetch-from-centralized-exchage/getCryptoPriceFromCentralizedExchange.gs`,
+For `./fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.gs`,
 and all other scripts in other sub-directories here, see the
 `README.md` in that directory.
 
@@ -146,7 +148,7 @@ For `./crypto-price-fetchers.gs`, see the file-header doc in that file.
 
 ## Usage
 
-For `./fetch-from-centralized-exchage/getCryptoPriceFromCentralizedExchange.gs`,
+For `./fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.gs`,
 and all other scripts in other sub-directories here, see the
 `README.md` in that directory.
 
@@ -154,16 +156,27 @@ For `./crypto-price-fetchers.gs`, see the file-header doc in that file.
 
 ## Test
 
-For `./fetch-from-centralized-exchage/getCryptoPriceFromCentralizedExchange.gs`,
+For `./fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.gs`,
 and all other scripts in other sub-directories here, see the
 `README.md` in that directory.
 
 For `./crypto-price-fetchers.gs`, see the file-header doc in that file.
 
-For the runner and the Node versions, from the repo's top folder:
+For everything else, from the repo's top folder, the one gate that must
+pass before a commit, LP Ranger's: the lint, the tests of the runner, the
+Node versions and the key store, crypto-price-filler's tests, and the
+security audits:
 
 ```bash
 npm ci
-npm run lint
-npm test
+npm ci --prefix fetch-from-centralized-exchange/crypto-price-filler
+npm run check
 ```
+
+## Documentation
+
+- [`docs/architecture.md`](docs/architecture.md): how the parts fit.
+- [`docs/engineering.md`](docs/engineering.md): the files, the gates, the
+  tests and CI.
+- [`docs/npm-project-commands.md`](docs/npm-project-commands.md): every npm
+  command.

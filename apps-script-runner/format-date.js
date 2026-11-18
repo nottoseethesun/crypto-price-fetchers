@@ -24,13 +24,13 @@
 
 /** The fields a pattern letter writes, by letter. */
 const FIELD_OF_LETTER = Object.freeze({
-  y: 'year',
-  M: 'month',
-  d: 'day',
-  H: 'hour',
-  m: 'minute',
-  s: 'second',
-  S: 'millisecond'
+  y: "year",
+  M: "month",
+  d: "day",
+  H: "hour",
+  m: "minute",
+  s: "second",
+  S: "millisecond",
 });
 
 /**
@@ -74,7 +74,7 @@ export function readPattern(pattern) {
  */
 function readQuoted(pattern, start) {
   if (pattern[start + 1] === "'") return { text: "'", end: start + 2 };
-  let text = '';
+  let text = "";
   let at = start + 1;
   while (at < pattern.length) {
     if (pattern[at] !== "'") {
@@ -87,7 +87,9 @@ function readQuoted(pattern, start) {
       return { text, end: at + 1 };
     }
   }
-  throw new Error(`Utilities.formatDate: the pattern "${pattern}" leaves a quote open`);
+  throw new Error(
+    `Utilities.formatDate: the pattern "${pattern}" leaves a quote open`,
+  );
 }
 
 /**
@@ -99,19 +101,19 @@ function readQuoted(pattern, start) {
  * @throws {RangeError} When `Intl` does not know the time zone
  */
 function fieldsInZone(moment, timeZone) {
-  const formatter = new Intl.DateTimeFormat('en-US', {
+  const formatter = new Intl.DateTimeFormat("en-US", {
     timeZone,
-    hourCycle: 'h23',
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: 'numeric',
-    second: 'numeric'
+    hourCycle: "h23",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "numeric",
+    second: "numeric",
   });
   const fields = { millisecond: moment.getUTCMilliseconds() };
   for (const part of formatter.formatToParts(moment)) {
-    if (part.type !== 'literal') fields[part.type] = Number(part.value);
+    if (part.type !== "literal") fields[part.type] = Number(part.value);
   }
   return fields;
 }
@@ -126,14 +128,15 @@ function fieldsInZone(moment, timeZone) {
  */
 function writeField(piece, fields) {
   const field = FIELD_OF_LETTER[piece.letter];
-  if (field === undefined || (piece.letter === 'M' && piece.width > 2)) {
+  if (field === undefined || (piece.letter === "M" && piece.width > 2)) {
     throw new Error(
-      `Utilities.formatDate under Node writes numeric dates and times only, and has no "${piece.letter.repeat(piece.width)}"`
+      `Utilities.formatDate under Node writes numeric dates and times only, and has no "${piece.letter.repeat(piece.width)}"`,
     );
   }
   const value = fields[field];
-  if (piece.letter === 'y' && piece.width === 2) return String(value % 100).padStart(2, '0');
-  return String(value).padStart(piece.width, '0');
+  if (piece.letter === "y" && piece.width === 2)
+    return String(value % 100).padStart(2, "0");
+  return String(value).padStart(piece.width, "0");
 }
 
 /**
@@ -147,12 +150,19 @@ function writeField(piece, fields) {
  * @throws {Error} When the date is not a valid date, or the pattern has a letter this does not know
  */
 export function formatDate(date, timeZone, pattern) {
-  if (date === null || typeof date !== 'object' || typeof date.getTime !== 'function') {
-    throw new Error('Utilities.formatDate needs a date');
+  if (
+    date === null ||
+    typeof date !== "object" ||
+    typeof date.getTime !== "function"
+  ) {
+    throw new Error("Utilities.formatDate needs a date");
   }
   const moment = new Date(date.getTime());
-  if (Number.isNaN(moment.getTime())) throw new Error('Utilities.formatDate needs a valid date');
+  if (Number.isNaN(moment.getTime()))
+    throw new Error("Utilities.formatDate needs a valid date");
   const pieces = readPattern(String(pattern));
   const fields = fieldsInZone(moment, String(timeZone));
-  return pieces.map((piece) => ('text' in piece ? piece.text : writeField(piece, fields))).join('');
+  return pieces
+    .map((piece) => ("text" in piece ? piece.text : writeField(piece, fields)))
+    .join("");
 }

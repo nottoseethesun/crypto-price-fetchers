@@ -6,4 +6,4 @@
  */
 
 /** The key: made up, never a real one. */
-export const STAND_IN_GECKO_KEY = 'stand-in-gecko-key';
+export const STAND_IN_GECKO_KEY = "stand-in-gecko-key";

@@ -40,18 +40,25 @@
  * and the manager (`key-manager.js`) saves them through `enterApiKey`.
  */
 
-import { openSecretPrompt } from './ask-password.js';
-import { checkPasswordOpensKeys, hasEncryptedKey, loadEncryptedKey, saveEncryptedKey, savedServices } from './key-file.js';
-import { setApiKey } from './key-holder.js';
+import { timingSafeEqual } from "node:crypto";
+import { openSecretPrompt } from "./ask-password.js";
+import {
+  checkPasswordOpensKeys,
+  hasEncryptedKey,
+  loadEncryptedKey,
+  saveEncryptedKey,
+  savedServices,
+} from "./key-file.js";
+import { setApiKey } from "./key-holder.js";
 
-/** The environment variable a terminal keeps the password in. */
-export const PASSWORD_VARIABLE = 'API_KEYS_PASSWORD';
+/** The environment variable `unlock-api-keys.sh` keeps the password in. */
+export const UNLOCK_VARIABLE = "API_KEYS_PASSWORD";
 
 /** The command that keeps the password in a terminal, run in the project's top folder. */
-export const UNLOCK_COMMAND = 'source ./unlock-api-keys.sh';
+export const UNLOCK_COMMAND = "source ./unlock-api-keys.sh";
 
 /** The command that saves a key, run in the project's top folder. */
-export const MANAGE_COMMAND = 'npm run api-keys';
+export const MANAGE_COMMAND = "npm run api-keys";
 
 /**
  * Where the keys are kept and how to reach the person and the services:
@@ -96,8 +103,8 @@ function passwordRefused(message) {
  * @returns {?string} The password, or null when the variable is unset or empty
  */
 function environmentPassword(env) {
-  const password = env[PASSWORD_VARIABLE];
-  return typeof password === 'string' && password !== '' ? password : null;
+  const password = env[UNLOCK_VARIABLE];
+  return typeof password === "string" && password !== "" ? password : null;
 }
 
 /**
@@ -128,9 +135,12 @@ async function withAsk(spec, use) {
  */
 async function askService(spec, service, key) {
   try {
-    return { verdict: await service.check(key, spec.checkOptions ?? {}), reason: undefined };
+    return {
+      verdict: await service.check(key, spec.checkOptions ?? {}),
+      reason: undefined,
+    };
   } catch (error) {
-    return { verdict: 'unanswered', reason: error.message };
+    return { verdict: "unanswered", reason: error.message };
   }
 }
 
@@ -147,14 +157,18 @@ async function openSavedKeys(spec, saved, password) {
   const keys = {};
   for (const service of saved) {
     try {
-      keys[service.service] = await loadEncryptedKey(spec.file, service.service, password.password);
+      keys[service.service] = await loadEncryptedKey(
+        spec.file,
+        service.service,
+        password.password,
+      );
     } catch (error) {
-      const source = password.typed ? 'typed' : `in ${PASSWORD_VARIABLE}`;
+      const source = password.typed ? "typed" : `in ${UNLOCK_VARIABLE}`;
       const whatToDo = password.typed
-        ? 'Run again with the password the keys were saved with.'
+        ? "Run again with the password the keys were saved with."
         : `In the project's top folder, keep the right one with: ${UNLOCK_COMMAND}`;
       throw keyRefused(
-        `Could not open the ${service.name} api key saved in ${spec.file} with the password ${source}: ${error.message}. ${whatToDo}`
+        `Could not open the ${service.name} api key saved in ${spec.file} with the password ${source}: ${error.message}. ${whatToDo}`,
       );
     }
   }
@@ -172,13 +186,19 @@ async function openSavedKeys(spec, saved, password) {
  */
 async function checkSavedKeys(spec, saved, keys) {
   for (const service of saved) {
-    const { verdict, reason } = await askService(spec, service, keys[service.service]);
-    if (verdict === 'unanswered') {
-      spec.say(`${service.name} did not answer the check of its api key (${reason}), so the run uses the key unchecked.`);
-    } else if (verdict !== 'valid') {
+    const { verdict, reason } = await askService(
+      spec,
+      service,
+      keys[service.service],
+    );
+    if (verdict === "unanswered") {
+      spec.say(
+        `${service.name} did not answer the check of its api key (${reason}), so the run uses the key unchecked.`,
+      );
+    } else if (verdict !== "valid") {
       throw keyRefused(
         `${service.name} refused the api key saved in ${spec.file}. ` +
-          `Save a new one, in the project's top folder: ${MANAGE_COMMAND} -- set ${service.service}`
+          `Save a new one, in the project's top folder: ${MANAGE_COMMAND} -- set ${service.service}`,
       );
     }
   }
@@ -194,13 +214,22 @@ async function checkSavedKeys(spec, saved, keys) {
  * @throws {Error} With `keyRefused` set, when the password does not open the keys or a service refuses its key; or when the key file cannot be read
  */
 export async function unlockApiKeys(spec, services) {
-  const keys = Object.fromEntries(services.map((service) => [service.service, null]));
-  const saved = services.filter((service) => hasEncryptedKey(spec.file, service.service));
+  const keys = Object.fromEntries(
+    services.map((service) => [service.service, null]),
+  );
+  const saved = services.filter((service) =>
+    hasEncryptedKey(spec.file, service.service),
+  );
   if (saved.length === 0) return keys;
   const fromEnvironment = environmentPassword(spec.env ?? process.env);
   const password =
     fromEnvironment === null
-      ? { password: await withAsk(spec, (ask) => ask(`Password for the api keys in ${spec.file}: `)), typed: true }
+      ? {
+          password: await withAsk(spec, (ask) =>
+            ask(`Password for the api keys in ${spec.file}: `),
+          ),
+          typed: true,
+        }
       : { password: fromEnvironment, typed: false };
   const opened = await openSavedKeys(spec, saved, password);
   await checkSavedKeys(spec, saved, opened);
@@ -209,6 +238,20 @@ export async function unlockApiKeys(spec, services) {
     keys[service.service] = opened[service.service];
   }
   return keys;
+}
+
+/**
+ * Says whether two texts typed are the same, in a time that does not
+ * depend on where they differ, as a comparison of passwords should.
+ *
+ * @param {string} typed - One text
+ * @param {string} other - The other
+ * @returns {boolean} Whether they are the same
+ */
+function sameText(typed, other) {
+  const first = Buffer.from(typed);
+  const second = Buffer.from(other);
+  return first.length === second.length && timingSafeEqual(first, second);
 }
 
 /**
@@ -223,18 +266,25 @@ export async function unlockApiKeys(spec, services) {
 async function askSavingPassword(spec, ask) {
   const fromEnvironment = environmentPassword(spec.env ?? process.env);
   if (fromEnvironment === null && savedServices(spec.file).length === 0) {
-    const password = await ask('Password to encrypt the api keys with: ');
-    if (password === '') throw passwordRefused('No password was entered, so no key was saved.');
-    if ((await ask('That password again: ')) !== password) throw passwordRefused('The two passwords differ, so no key was saved.');
+    const password = await ask("Password to encrypt the api keys with: ");
+    if (password.length === 0)
+      throw passwordRefused("No password was entered, so no key was saved.");
+    if (!sameText(await ask("That password again: "), password))
+      throw passwordRefused("The two passwords differ, so no key was saved.");
     return password;
   }
-  const password = fromEnvironment ?? (await ask(`Password for the api keys in ${spec.file}: `));
+  const password =
+    fromEnvironment ??
+    (await ask(`Password for the api keys in ${spec.file}: `));
   try {
     await checkPasswordOpensKeys(spec.file, password);
   } catch {
-    const source = fromEnvironment === null ? 'That password' : `The password in ${PASSWORD_VARIABLE}`;
+    const source =
+      fromEnvironment === null
+        ? "That password"
+        : `The password in ${UNLOCK_VARIABLE}`;
     throw passwordRefused(
-      `${source} does not open the api keys saved in ${spec.file}, and every key there is saved with one password, so no key was saved.`
+      `${source} does not open the api keys saved in ${spec.file}, and every key there is saved with one password, so no key was saved.`,
     );
   }
   return password;
@@ -268,23 +318,31 @@ export function savingPassword(spec) {
  * @throws {Error} With `keyRefused` set, when nothing is saved for want of a password, or because the service refused the key or did not answer
  */
 export async function enterApiKey(spec, service, password, ask) {
-  const key = (await ask(`${service.name} api key (Enter alone skips it): `)).trim();
-  if (key === '') {
+  const key = (
+    await ask(`${service.name} api key (Enter alone skips it): `)
+  ).trim();
+  if (key === "") {
     spec.say(`No ${service.name} api key was entered, so none was saved.`);
     return null;
   }
   const saving = await password(ask);
   const { verdict, reason } = await askService(spec, service, key);
-  if (verdict === 'unanswered') {
-    throw keyRefused(`${service.name} did not answer the check of the api key (${reason}), so it was not saved. Try again later.`);
+  if (verdict === "unanswered") {
+    throw keyRefused(
+      `${service.name} did not answer the check of the api key (${reason}), so it was not saved. Try again later.`,
+    );
   }
-  if (verdict !== 'valid') {
-    throw keyRefused(`${service.name} refused the api key, so it was not saved. Enter the key as ${service.name} shows it.`);
+  if (verdict !== "valid") {
+    throw keyRefused(
+      `${service.name} refused the api key, so it was not saved. Enter the key as ${service.name} shows it.`,
+    );
   }
   try {
     await saveEncryptedKey(spec.file, service.service, key, saving);
   } catch (error) {
-    throw keyRefused(`The ${service.name} api key was not saved: ${error.message}`);
+    throw keyRefused(
+      `The ${service.name} api key was not saved: ${error.message}`,
+    );
   }
   setApiKey(service.service, key);
   spec.say(`The ${service.name} api key is saved, encrypted, in ${spec.file}.`);

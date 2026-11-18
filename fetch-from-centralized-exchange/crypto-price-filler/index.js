@@ -99,8 +99,6 @@
  *      - Add it to the fallback chain (after MEXC, CoinGecko, CoinPaprika)
  *      - Follow the existing pattern for null checks and logging
  *
- *   5. Export from `sources/index.js` (barrel file)
- *
  * API KEYS (kept encrypted in api-keys.json at the repo's top, never in a settings file):
  *
  *   CoinGecko            Your CoinGecko demo API key. Obtain from https://www.coingecko.com/en/api
@@ -154,9 +152,9 @@
  *   node index.js --token=<symbol> --input=<file.csv> --output=<output.csv>
  *
  * More Typical Command with Options:
- * 
+ *
  *   node index.js --token=<symbol> --input=<file.csv> --output=<output.csv> --backfill-highest
- * 
+ *
  * Command-Line Options:
  *   --token       {string}  Required. Token symbol (e.g. xtm, grc, btc). Case-insensitive.
  *   --input       {string}  Required. Path to input CSV. Supports ~ for home directory.
@@ -281,45 +279,48 @@
  *
  */
 
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
+import fs from "fs";
+import path from "path";
+import os from "os";
 
-import { parse as csvParse } from 'csv-parse/sync';
-import { createObjectCsvWriter } from 'csv-writer';
+import { parse as csvParse } from "csv-parse/sync";
+import { createObjectCsvWriter } from "csv-writer";
 
-import { parseInputToUtcMs } from './utils/date.js';
-import { getCryptoPrice } from './sources/price.js';
-import config from './config.js';
-import { getCache, setCache } from './utils/cache.js';
-import { getProgressBar } from './utils/progress.js';
-import { backfillPrices, logv } from './utils/backfill.js';
-import { fileURLToPath } from 'url';
-import { unlockProjectKeys } from '../../api-key-store/index.js';
+import { parseInputToUtcMs } from "./utils/date.js";
+import { getCryptoPrice } from "./sources/price.js";
+import config from "./config.js";
+import { getCache, setCache } from "./utils/cache.js";
+import { getProgressBar } from "./utils/progress.js";
+import { backfillPrices, logv } from "./utils/backfill.js";
+import { fileURLToPath } from "url";
+import { unlockProjectKeys } from "../../api-key-store/index.js";
 
 // Added missing luxon import (fixes DateTime is not defined)
-import { DateTime } from 'luxon';
+import { DateTime } from "luxon";
 
 // Import CLI setup from separate module
-import { parseArgs } from './commander.js';
+import { parseArgs } from "./commander.js";
 
 // Load the token list (the settings come from config.js)
-const supportedTokens = JSON.parse(fs.readFileSync('./supported-tokens.json', 'utf8'));
+const supportedTokens = JSON.parse(
+  fs.readFileSync("./supported-tokens.json", "utf8"),
+);
 
 // Parse CLI args using commander (moved to commander.js)
 const args = parseArgs();
 
 const token = args.token;
 let inputFile = args.input;
-const outputFile = args.output || 'output.csv';
+const outputFile = args.output || "output.csv";
 // commander gives the defaults: close, and UTC
 const mode = args.mode;
 const tz = args.tz;
-const verbose = args.verbose || process.env.VERBOSE === '1';
-const backfillHighest = args.backfillHighest || config.BACKFILL_HIGHEST || false;
+const verbose = args.verbose || process.env.VERBOSE === "1";
+const backfillHighest =
+  args.backfillHighest || config.BACKFILL_HIGHEST || false;
 const backfillLowest = args.backfillLowest || config.BACKFILL_LOWEST || false;
 
-if (inputFile?.startsWith('~')) {
+if (inputFile?.startsWith("~")) {
   inputFile = path.join(os.homedir(), inputFile.slice(1));
 }
 
@@ -328,31 +329,41 @@ const tokenConfig = supportedTokens.tokens?.[token.toLowerCase()] || {};
 const coingeckoId = tokenConfig.coingecko_id || token.toLowerCase();
 const coinpaprikaId = tokenConfig.coinpaprika_id || null;
 logv(verbose, 1, `Resolved CoinGecko ID for ${token}: ${coingeckoId}`);
-logv(verbose, 1, `Resolved CoinPaprika ID for ${token}: ${coinpaprikaId || 'none'}`);
+logv(
+  verbose,
+  1,
+  `Resolved CoinPaprika ID for ${token}: ${coinpaprikaId || "none"}`,
+);
 
 // No need for manual missing arg check — commander.requiredOption handles it
-console.log(`Starting price filler for token: ${token}, mode: ${mode}, tz: ${tz}`);
+console.log(
+  `Starting price filler for token: ${token}, mode: ${mode}, tz: ${tz}`,
+);
 console.log(`Input: ${inputFile}, Output: ${outputFile}`);
-logv(verbose, 1, 'Verbose mode ENABLED. Starting CLI logic');
+logv(verbose, 1, "Verbose mode ENABLED. Starting CLI logic");
 
-const csvContent = fs.readFileSync(inputFile, 'utf8');
-logv(verbose, 1, `Read CSV content from input file, length: ${csvContent.length}`);
+const csvContent = fs.readFileSync(inputFile, "utf8");
+logv(
+  verbose,
+  1,
+  `Read CSV content from input file, length: ${csvContent.length}`,
+);
 const records = csvParse(csvContent, {
   columns: true,
   skip_empty_lines: true,
   trim: true,
-  delimiter: ',',
+  delimiter: ",",
   quote: '"',
-  relax_column_count: true
+  relax_column_count: true,
 });
 
 const headers = Object.keys(records[0] || {});
-console.log(`Detected headers (${headers.length}): ${headers.join(', ')}`);
+console.log(`Detected headers (${headers.length}): ${headers.join(", ")}`);
 
 // Add new columns if not already present
-const priceColName = '$usd price';
-const usdAmountColName = '$usd amount';
-const grandTotalColName = 'grand total ($usd)';
+const priceColName = "$usd price";
+const usdAmountColName = "$usd amount";
+const grandTotalColName = "grand total ($usd)";
 
 if (!headers.includes(priceColName)) headers.push(priceColName);
 if (!headers.includes(usdAmountColName)) headers.push(usdAmountColName);
@@ -361,29 +372,38 @@ if (!headers.includes(grandTotalColName)) headers.push(grandTotalColName);
 const rows = records;
 console.log(`Read ${rows.length} rows from input CSV.`);
 
-logv(verbose, 1, 'First 5 rows:');
-rows.slice(0, 5).forEach((row, i) => logv(verbose, 1, `Row ${i + 1}: ${JSON.stringify(row)}`));
+logv(verbose, 1, "First 5 rows:");
+rows
+  .slice(0, 5)
+  .forEach((row, i) =>
+    logv(verbose, 1, `Row ${i + 1}: ${JSON.stringify(row)}`),
+  );
 
-let dateColName = headers.find(h => h.includes('date') && h.includes('UTC')) ||
-  headers.find(h => h.toLowerCase().includes('date'));
-logv(verbose, 1, `Searching for date column in headers: ${headers.join(', ')}`);
+const dateColName =
+  headers.find((h) => h.includes("date") && h.includes("UTC")) ||
+  headers.find((h) => h.toLowerCase().includes("date"));
+logv(verbose, 1, `Searching for date column in headers: ${headers.join(", ")}`);
 if (!dateColName) {
-  console.error('No date column found in CSV headers');
+  console.error("No date column found in CSV headers");
   process.exit(1);
 }
 console.log(`Using date column: "${dateColName}"`);
 
-const amountColName = headers.find(h => h.toLowerCase().includes('amount'));
+const amountColName = headers.find((h) => h.toLowerCase().includes("amount"));
 if (amountColName) console.log(`Using amount column: "${amountColName}"`);
 
 let lastValidDateIndex = -1;
 for (let i = rows.length - 1; i >= 0; i--) {
-  const dateStr = (rows[i][dateColName] || '').trim();
+  const dateStr = (rows[i][dateColName] || "").trim();
   logv(verbose, 2, `Checking row ${i + 1} date: "${dateStr}"`);
 
-  if (dateStr && !dateStr.includes(',,,,') && !dateStr.includes('Total')) {
-    const parsed = DateTime.fromFormat(dateStr, 'yyyy-MM-dd HH:mm:ss');
-    logv(verbose, 2, `Date parse result for "${dateStr}": valid=${parsed.isValid}`);
+  if (dateStr && !dateStr.includes(",,,,") && !dateStr.includes("Total")) {
+    const parsed = DateTime.fromFormat(dateStr, "yyyy-MM-dd HH:mm:ss");
+    logv(
+      verbose,
+      2,
+      `Date parse result for "${dateStr}": valid=${parsed.isValid}`,
+    );
     if (parsed.isValid) {
       lastValidDateIndex = i;
       console.log(`Last valid date row: index ${i + 1} (${dateStr})`);
@@ -392,7 +412,7 @@ for (let i = rows.length - 1; i >= 0; i--) {
   }
 }
 
-if (lastValidDateIndex === -1) console.warn('No valid date rows found');
+if (lastValidDateIndex === -1) console.warn("No valid date rows found");
 
 const outputRows = [];
 
@@ -402,7 +422,10 @@ let grandTotalUsd = 0;
 // the password in API_KEYS_PASSWORD, or else one asked for, then CoinGecko is
 // asked once whether it takes the key
 try {
-  await unlockProjectKeys({ projectTop: fileURLToPath(new URL('../..', import.meta.url)), services: ['coingecko'] });
+  await unlockProjectKeys({
+    projectTop: fileURLToPath(new URL("../..", import.meta.url)),
+    services: ["coingecko"],
+  });
 } catch (error) {
   console.error(error.message);
   process.exit(1);
@@ -414,30 +437,44 @@ progressBar.start();
 
 for (let i = 0; i < rows.length; i++) {
   const row = { ...rows[i] };
-  const dateStr = (row[dateColName] || '').trim();
+  const dateStr = (row[dateColName] || "").trim();
 
-  if (i > lastValidDateIndex || !dateStr || dateStr.includes(',,,,') || dateStr.includes('Total')) {
-    row[priceColName] = '';
-    row[usdAmountColName] = '';
+  if (
+    i > lastValidDateIndex ||
+    !dateStr ||
+    dateStr.includes(",,,,") ||
+    dateStr.includes("Total")
+  ) {
+    row[priceColName] = "";
+    row[usdAmountColName] = "";
     row[grandTotalColName] = grandTotalUsd.toFixed(6);
     outputRows.push(row);
     continue;
   }
 
-  const amountStr = amountColName ? (row[amountColName] || '').trim() : '';
+  const amountStr = amountColName ? (row[amountColName] || "").trim() : "";
   let price = null;
 
   logv(verbose, 1, `Processing row ${i + 1}: "${dateStr}"`);
 
   try {
-    price = await getCryptoPrice(token, dateStr, tz, mode, verbose, null, coingeckoId, coinpaprikaId);
+    price = await getCryptoPrice(
+      token,
+      dateStr,
+      tz,
+      mode,
+      verbose,
+      null,
+      coingeckoId,
+      coinpaprikaId,
+    );
     logv(verbose, 1, `Price fetched for row ${i + 1}: ${price}`);
   } catch (e) {
     logv(verbose, 1, `Error fetching price for row ${i + 1}: ${e.message}`);
     console.error(`Error fetching price for "${dateStr}": ${e.message}`);
   }
 
-  row[priceColName] = price ?? 'Error';
+  row[priceColName] = price ?? "Error";
 
   if (price !== null && amountStr) {
     const amount = parseFloat(amountStr);
@@ -462,26 +499,30 @@ progressBar.stop();
 
 // Apply backfill if requested (backfillHighest takes precedence if both are set)
 if (backfillHighest || backfillLowest) {
-    const useHighest = backfillHighest; // backfillHighest takes precedence
-    logv(verbose, 1, `Backfill mode: ${useHighest ? 'highest' : 'lowest'}`);
-    backfillPrices(outputRows, {
-        priceColName,
-        amountColName,
-        usdAmountColName,
-        grandTotalColName,
-        useHighest,
-        verbose
-    });
+  const useHighest = backfillHighest; // backfillHighest takes precedence
+  logv(verbose, 1, `Backfill mode: ${useHighest ? "highest" : "lowest"}`);
+  backfillPrices(outputRows, {
+    priceColName,
+    amountColName,
+    usdAmountColName,
+    grandTotalColName,
+    useHighest,
+    verbose,
+  });
 }
 
-logv(verbose, 1, `Preparing to write output CSV with ${outputRows.length} rows`);
+logv(
+  verbose,
+  1,
+  `Preparing to write output CSV with ${outputRows.length} rows`,
+);
 
 const csvWriter = createObjectCsvWriter({
   path: outputFile,
-  header: headers.map(h => ({ id: h, title: h })),
-  fieldDelimiter: ',',
+  header: headers.map((h) => ({ id: h, title: h })),
+  fieldDelimiter: ",",
   quote: '"',
-  escape: '"'
+  escape: '"',
 });
 
 await csvWriter.writeRecords(outputRows);
@@ -493,5 +534,5 @@ export {
   getCache,
   setCache,
   parseInputToUtcMs,
-  backfillPrices
+  backfillPrices,
 };

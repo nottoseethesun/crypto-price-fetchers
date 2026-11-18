@@ -9,12 +9,12 @@
  * @author Christopher M. Balz with Grok and Claude.ai
  */
 
-import { getPriceFromMEXC } from './mexc.js';
-import { getPriceFromCoinGecko } from './coingecko.js';
-import { getPriceFromCoinPaprika } from './coinpaprika.js';
-import { getCache, setCache } from '../utils/cache.js';
-import { parseInputToUtcMs } from '../utils/date.js';
-import fs from 'fs';
+import { getPriceFromMEXC } from "./mexc.js";
+import { getPriceFromCoinGecko } from "./coingecko.js";
+import { getPriceFromCoinPaprika } from "./coinpaprika.js";
+import { getCache, setCache } from "../utils/cache.js";
+import { parseInputToUtcMs } from "../utils/date.js";
+import fs from "fs";
 
 /**
  * Helper logging function.
@@ -34,13 +34,15 @@ function logv(shouldLog, level, message, ...args) {
  * @returns {Object} Token configuration with coingeckoId, coinpaprikaId, mexcSymbol
  */
 function loadTokenConfig(token) {
-  const supportedTokens = JSON.parse(fs.readFileSync('./supported-tokens.json', 'utf8'));
+  const supportedTokens = JSON.parse(
+    fs.readFileSync("./supported-tokens.json", "utf8"),
+  );
   const tokenConfig = supportedTokens.tokens?.[token.toLowerCase()] || {};
 
   return {
     coingeckoId: tokenConfig.coingecko_id || null,
     coinpaprikaId: tokenConfig.coinpaprika_id || null,
-    mexcSymbol: tokenConfig.mexc_symbol || null
+    mexcSymbol: tokenConfig.mexc_symbol || null,
   };
 }
 
@@ -52,7 +54,10 @@ function loadTokenConfig(token) {
  * @returns {string} Cache key
  */
 function generateCacheKey(token, utcMs, target) {
-  const dateKey = new Date(utcMs).toISOString().slice(0, 19).replace(/[-:T]/g, '');
+  const dateKey = new Date(utcMs)
+    .toISOString()
+    .slice(0, 19)
+    .replace(/[-:T]/g, "");
   return `price_${token.toLowerCase()}_${dateKey}_UTC_${target}`;
 }
 
@@ -102,7 +107,7 @@ function storeInCache(cacheKey, price, testCache) {
  */
 async function tryMEXC(mexcSymbol, utcMs, target, verbose) {
   if (mexcSymbol === null) {
-    logv(verbose, 1, 'MEXC skipped since set to null');
+    logv(verbose, 1, "MEXC skipped since set to null");
     return null;
   }
 
@@ -129,13 +134,19 @@ async function tryMEXC(mexcSymbol, utcMs, target, verbose) {
  */
 async function tryCoinGecko(token, coingeckoId, utcMs, target, verbose) {
   if (!coingeckoId) {
-    logv(verbose, 1, 'CoinGecko skipped since set to null');
+    logv(verbose, 1, "CoinGecko skipped since set to null");
     return null;
   }
 
-  logv(verbose, 1, 'Falling back to CoinGecko');
+  logv(verbose, 1, "Falling back to CoinGecko");
   try {
-    const price = await getPriceFromCoinGecko(token, utcMs, target, verbose, coingeckoId);
+    const price = await getPriceFromCoinGecko(
+      token,
+      utcMs,
+      target,
+      verbose,
+      coingeckoId,
+    );
     if (price !== null) {
       logv(verbose, 1, `CoinGecko success - price: ${price}`);
     }
@@ -156,13 +167,18 @@ async function tryCoinGecko(token, coingeckoId, utcMs, target, verbose) {
  */
 async function tryCoinPaprika(coinpaprikaId, utcMs, target, verbose) {
   if (!coinpaprikaId) {
-    logv(verbose, 1, 'CoinPaprika skipped since set to null');
+    logv(verbose, 1, "CoinPaprika skipped since set to null");
     return null;
   }
 
-  logv(verbose, 1, 'Falling back to CoinPaprika');
+  logv(verbose, 1, "Falling back to CoinPaprika");
   try {
-    const price = await getPriceFromCoinPaprika(coinpaprikaId, utcMs, target, verbose);
+    const price = await getPriceFromCoinPaprika(
+      coinpaprikaId,
+      utcMs,
+      target,
+      verbose,
+    );
     if (price !== null) {
       logv(verbose, 1, `CoinPaprika success - price: ${price}`);
     }
@@ -195,17 +211,21 @@ export async function getCryptoPrice(
   token,
   dateStr,
   tz,
-  target = 'high',
+  target = "high",
   verbose = false,
-  testCache = null
+  testCache = null,
 ) {
   const { coingeckoId, coinpaprikaId, mexcSymbol } = loadTokenConfig(token);
 
   // Log resolved IDs
-  const coingeckoStatus = coingeckoId || 'skipped since set to null';
-  const coinpaprikaStatus = coinpaprikaId || 'skipped since set to null';
-  const mexcStatus = mexcSymbol || 'skipped since set to null';
-  logv(verbose, 1, `Resolved IDs - CoinGecko: ${coingeckoStatus}, CoinPaprika: ${coinpaprikaStatus}, MEXC: ${mexcStatus}`);
+  const coingeckoStatus = coingeckoId || "skipped since set to null";
+  const coinpaprikaStatus = coinpaprikaId || "skipped since set to null";
+  const mexcStatus = mexcSymbol || "skipped since set to null";
+  logv(
+    verbose,
+    1,
+    `Resolved IDs - CoinGecko: ${coingeckoStatus}, CoinPaprika: ${coinpaprikaStatus}, MEXC: ${mexcStatus}`,
+  );
 
   // Parse date, at the offset the time zone had then
   const utcMs = parseInputToUtcMs(dateStr, tz);
@@ -216,7 +236,11 @@ export async function getCryptoPrice(
   }
 
   if (utcMs > Date.now()) {
-    logv(verbose, 1, `Skipping future date: ${dateStr} (${new Date(utcMs).toISOString()})`);
+    logv(
+      verbose,
+      1,
+      `Skipping future date: ${dateStr} (${new Date(utcMs).toISOString()})`,
+    );
     return null;
   }
 
@@ -242,7 +266,7 @@ export async function getCryptoPrice(
 
   // Cache and return
   storeInCache(cacheKey, price, testCache);
-  logv(verbose, 1, `[getCryptoPrice] Final price: ${price ?? 'null'}`);
+  logv(verbose, 1, `[getCryptoPrice] Final price: ${price ?? "null"}`);
 
   return price;
 }

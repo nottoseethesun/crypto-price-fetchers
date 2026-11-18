@@ -36,22 +36,29 @@
 const CHECK_TIMEOUT_MS = 15000;
 
 /** The header CoinGecko reads a demo api key from. */
-export const COINGECKO_KEY_HEADER = 'x-cg-demo-api-key';
+export const COINGECKO_KEY_HEADER = "x-cg-demo-api-key";
 
 /** CoinGecko's ping. */
-const COINGECKO_PING = 'https://api.coingecko.com/api/v3/ping';
+const COINGECKO_PING = "https://api.coingecko.com/api/v3/ping";
 
 /** DexTools' api, which serves each plan at its own path. */
-const DEXTOOLS_API = 'https://public-api.dextools.io';
+const DEXTOOLS_API = "https://public-api.dextools.io";
 
 /** DexTools' plans, in the order the check asks them: the one the projects use first. */
-const DEXTOOLS_PLANS = Object.freeze(['standard', 'trial', 'free', 'advanced', 'pro']);
+const DEXTOOLS_PLANS = Object.freeze([
+  "standard",
+  "trial",
+  "free",
+  "advanced",
+  "pro",
+]);
 
 /** The time between two of the check's requests to DexTools, in milliseconds. */
 const DEXTOOLS_SPACING_MS = 1100;
 
 /** x1.ninja's XNT / USDC.X pool, which a key must be able to read. */
-const X1_NINJA_POOL = 'https://api.x1.ninja/v1/pools/CAJeVEoSm1QQZccnCqYu9cnNF7TTD2fcUA3E5HQoxRvR';
+const X1_NINJA_POOL =
+  "https://api.x1.ninja/v1/pools/CAJeVEoSm1QQZccnCqYu9cnNF7TTD2fcUA3E5HQoxRvR";
 
 /**
  * Waits.
@@ -81,7 +88,10 @@ function wait(ms) {
  */
 async function statusOf(options, url, headers) {
   const fetchFunction = options.fetch ?? globalThis.fetch;
-  const response = await fetchFunction(url, { headers, signal: AbortSignal.timeout(CHECK_TIMEOUT_MS) });
+  const response = await fetchFunction(url, {
+    headers,
+    signal: AbortSignal.timeout(CHECK_TIMEOUT_MS),
+  });
   return response.status;
 }
 
@@ -94,9 +104,11 @@ async function statusOf(options, url, headers) {
  * @throws {Error} When CoinGecko does not answer, or answers with another status
  */
 async function checkCoinGecko(key, options = {}) {
-  const status = await statusOf(options, COINGECKO_PING, { [COINGECKO_KEY_HEADER]: key });
-  if (status === 200) return 'valid';
-  if (status === 400 || status === 401) return 'invalid';
+  const status = await statusOf(options, COINGECKO_PING, {
+    [COINGECKO_KEY_HEADER]: key,
+  });
+  if (status === 200) return "valid";
+  if (status === 400 || status === 401) return "invalid";
   throw new Error(`CoinGecko answered with status ${status}`);
 }
 
@@ -113,11 +125,15 @@ async function checkDexTools(key, options = {}) {
   for (const [index, plan] of DEXTOOLS_PLANS.entries()) {
     if (index > 0) await sleep(DEXTOOLS_SPACING_MS);
     const url = `${DEXTOOLS_API}/${plan}/v2/blockchain?sort=name&order=asc`;
-    const status = await statusOf(options, url, { 'X-API-Key': key, Accept: 'application/json' });
-    if (status === 200) return 'valid';
-    if (status !== 403) throw new Error(`DexTools answered with status ${status}`);
+    const status = await statusOf(options, url, {
+      "X-API-Key": key,
+      Accept: "application/json",
+    });
+    if (status === 200) return "valid";
+    if (status !== 403)
+      throw new Error(`DexTools answered with status ${status}`);
   }
-  return 'invalid';
+  return "invalid";
 }
 
 /**
@@ -129,9 +145,12 @@ async function checkDexTools(key, options = {}) {
  * @throws {Error} When x1.ninja does not answer, or answers with another status
  */
 async function checkX1Ninja(key, options = {}) {
-  const status = await statusOf(options, X1_NINJA_POOL, { Authorization: `Bearer ${key}`, Accept: 'application/json' });
-  if (status === 200) return 'valid';
-  if (status === 401) return 'invalid';
+  const status = await statusOf(options, X1_NINJA_POOL, {
+    Authorization: `Bearer ${key}`,
+    Accept: "application/json",
+  });
+  if (status === 200) return "valid";
+  if (status === 401) return "invalid";
   throw new Error(`x1.ninja answered with status ${status}`);
 }
 
@@ -146,9 +165,21 @@ async function checkX1Ninja(key, options = {}) {
 
 /** The services, by the name `config.json` lists them under. */
 export const SERVICES = Object.freeze({
-  coingecko: Object.freeze({ service: 'coingecko', name: 'CoinGecko', check: checkCoinGecko }),
-  dextools: Object.freeze({ service: 'dextools', name: 'DexTools', check: checkDexTools }),
-  x1ninja: Object.freeze({ service: 'x1ninja', name: 'x1.ninja', check: checkX1Ninja })
+  coingecko: Object.freeze({
+    service: "coingecko",
+    name: "CoinGecko",
+    check: checkCoinGecko,
+  }),
+  dextools: Object.freeze({
+    service: "dextools",
+    name: "DexTools",
+    check: checkDexTools,
+  }),
+  x1ninja: Object.freeze({
+    service: "x1ninja",
+    name: "x1.ninja",
+    check: checkX1Ninja,
+  }),
 });
 
 /**
@@ -160,8 +191,10 @@ export const SERVICES = Object.freeze({
  * @throws {Error} When no service known has that name
  */
 export function serviceNamed(name, services = SERVICES) {
-  if (typeof name !== 'string' || !Object.hasOwn(services, name)) {
-    throw new Error(`No service is named ${JSON.stringify(name)}; the services are ${Object.keys(services).join(', ')}`);
+  if (typeof name !== "string" || !Object.hasOwn(services, name)) {
+    throw new Error(
+      `No service is named ${JSON.stringify(name)}; the services are ${Object.keys(services).join(", ")}`,
+    );
   }
   return services[name];
 }

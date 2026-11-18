@@ -11,7 +11,10 @@ Work in this repo, never in a copy of it. Code written to check something goes
 into the tests, so that later sessions reuse it instead of writing it again.
 
 The Sheets scripts (`.gs`) change only here. The owner pastes them into Apps
-Script and deploys them.
+Script and deploys them. The exchange script is in three files, which Apps
+Script loads into one scope: `getCryptoPriceFromCentralizedExchange.gs`,
+its `-sources.gs` and its `-tests.gs`. A name one file uses from another is
+declared in a `/* global */` comment.
 
 ## Node versions of the Sheets scripts
 
@@ -23,8 +26,8 @@ A Node version runs its `.gs` unchanged, through the runner in
 Ranger's rules forbid a second copy. A fix belongs in the `.gs`, where it
 fixes both.
 
-The runner loads a script in a worker thread with Node versions of the Apps
-Script services, and does each web request on the caller's thread, with the
+The runner loads a script, one file or several in Apps Script's order, in a
+worker thread with Node versions of the Apps Script services, and does each web request on the caller's thread, with the
 caller's fetch, while the worker blocks; the file headers in
 `apps-script-runner/` explain how. pulsechain-analytics installs this repo
 from GitHub, pinned to a commit, for the runner
@@ -62,40 +65,68 @@ their scripts: as that Script Property, and as `CONFIG.API_KEY` and
 committed settings, with its own `config.json`, which git ignores, laid over
 them.
 
+## Docs
+
+`docs/architecture.md` says how the parts fit, `docs/engineering.md`
+covers the files, the gates, the tests and CI, and
+`docs/npm-project-commands.md` lists every npm command, as LP Ranger's
+`docs/` does. A change keeps them true.
+
+## Gates and CI
+
+`npm run check` is the one gate, LP Ranger's: the lint (ESLint with LP
+Ranger's rules, markdownlint, Prettier, actionlint, knip's unused files),
+the tests with at least 80% of lines covered, crypto-price-filler's tests
+with the same floor, and the security audits (npm audit, the security lint
+in `eslint-security.config.js`, secretlint). It must pass before a commit
+and a push; the husky pre-commit hook runs `npm run lint`. The repo has no
+`prepare`, `install` or `postinstall` script, since npm runs a git
+dependency's `prepare` in every project that installs it: `prelint`
+installs the hooks.
+
+CI runs `npm run check` on Node 22 and 24 (`ci.yml`) and each audit as a
+job of its own (`security-audit.yml`). `main` is protected: those five
+checks must pass on a pull request, never squashed, and no branch is
+deleted. LP Ranger's eight steps in `docs/claude/CLAUDE-CI.md` take a
+change to `main`.
+
+The security lint runs `eslint-rules/no-secret-logging.js`, which refuses
+printing a name that may hold a secret, through `console`, a stream's
+`write` or `say`. A name that sounds like a secret but holds none is
+renamed, never excused. pulsechain-analytics and x1-validator-analytics run
+the rule from this repo (`crypto-price-fetchers/eslint-rules/no-secret-logging`).
+
 ## Tests
 
-The runner, the Node versions and the key store are tested from the repo's
-top folder, on Node's own test runner. The tests ask no outside service: the
-scripts' requests go to a stand-in fetch or a stand-in server on the computer
-(`test/helpers/stand-in-web.js`). The key store's tests save keys in temp
-folders of their own; `test/fixtures/lp-ranger-api-keys.json`, written by LP
-Ranger's own code, checks that the store opens LP Ranger's files.
+The runner, the Node versions, the key store and the lint rule are tested
+from the repo's top folder, on Node's own test runner. The tests ask no
+outside service: the scripts' requests go to a stand-in fetch or a stand-in
+server on the computer (`test/helpers/stand-in-web.js`). The key store's
+tests save keys in temp folders of their own
+(`test/helpers/temp-folders.js`); `test/fixtures/lp-ranger-api-keys.json`,
+written by LP Ranger's own code, checks that the store opens LP Ranger's
+files.
 
 ```bash
 npm ci
-npm run lint
-npm test
+npm ci --prefix fetch-from-centralized-exchange/crypto-price-filler
+npm run check
 ```
 
 crypto-price-filler's tests are in
-`fetch-from-centralized-exchange/crypto-price-filler/tests/`, on vitest.
-They ask no outside service either.
-
-```bash
-cd fetch-from-centralized-exchange/crypto-price-filler
-npm ci
-npm run lint
-npm run test:strict
-```
+`fetch-from-centralized-exchange/crypto-price-filler/tests/`, on vitest,
+and `npm run test:filler` runs them from the top folder. They ask no
+outside service either. The top folder's lint covers the filler.
 
 The Sheets scripts are tested there too, run unchanged under Node.
 `tests/helpers/` holds the stand-ins:
 
-- `sheets-script.js` runs a Sheets script in the test's thread with the
-  runner's services. Its `UrlFetchApp` answers from a function the test
-  gives.
+- `sheets-script.js` runs a Sheets script, one file or several, in the
+  test's thread with the runner's services. Its `UrlFetchApp` answers from
+  a function the test gives.
 - `fetch-with-retry.js` stands in for `fetchWithRetry`, the http layer of the
-  Node tool's price sources.
+  Node tool's price sources, and holds the hooks the getCryptoPrice tests
+  share.
 - `stand-in-fetch-preload.js` runs the real command line, `index.js`, in a
   child process against a stand-in MEXC, and a stand-in CoinGecko ping that
   takes the one key in `stand-in-coingecko-key.js`.

@@ -28,8 +28,10 @@ export function setApiKey(service, key) {
     keys.delete(service);
     return;
   }
-  if (typeof key !== 'string' || key.length === 0) {
-    throw new TypeError('An api key is a string that is not empty, or null to forget one');
+  if (typeof key !== "string" || key.length === 0) {
+    throw new TypeError(
+      "An api key is a string that is not empty, or null to forget one",
+    );
   }
   keys.set(service, key);
 }

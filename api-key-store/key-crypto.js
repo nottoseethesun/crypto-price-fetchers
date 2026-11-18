@@ -29,7 +29,7 @@
  * Fit: `key-file.js` keeps the entries in a file.
  */
 
-import crypto from 'node:crypto';
+import crypto from "node:crypto";
 
 /** The entry format's version. */
 export const ENTRY_VERSION = 1;
@@ -38,13 +38,13 @@ export const ENTRY_VERSION = 1;
 export const PBKDF2_ITERATIONS = 600_000;
 
 /** PBKDF2's digest. */
-const PBKDF2_DIGEST = 'sha512';
+const PBKDF2_DIGEST = "sha512";
 
 /** The length of each part, in bytes. */
 const BYTES = Object.freeze({ salt: 16, key: 32, iv: 12, authTag: 16 });
 
 /** The cipher. */
-const CIPHER = 'aes-256-gcm';
+const CIPHER = "aes-256-gcm";
 
 /**
  * Makes an encryption key from a password and a salt.
@@ -55,8 +55,13 @@ const CIPHER = 'aes-256-gcm';
  */
 function deriveKey(password, salt) {
   return new Promise((resolve, reject) => {
-    crypto.pbkdf2(password, salt, PBKDF2_ITERATIONS, BYTES.key, PBKDF2_DIGEST, (error, key) =>
-      error ? reject(error) : resolve(key)
+    crypto.pbkdf2(
+      password,
+      salt,
+      PBKDF2_ITERATIONS,
+      BYTES.key,
+      PBKDF2_DIGEST,
+      (error, key) => (error ? reject(error) : resolve(key)),
     );
   });
 }
@@ -70,7 +75,8 @@ function deriveKey(password, salt) {
  * @throws {TypeError} When it is not
  */
 function requireText(value, what) {
-  if (typeof value !== 'string' || value.length === 0) throw new TypeError(`${what} must be a string that is not empty`);
+  if (typeof value !== "string" || value.length === 0)
+    throw new TypeError(`${what} must be a string that is not empty`);
 }
 
 /**
@@ -83,11 +89,16 @@ function requireText(value, what) {
  * @throws {Error} When it is not hex of that length
  */
 function hexPart(value, bytes, name) {
-  const fits = typeof value === 'string' && /^(?:[0-9a-f]{2})+$/i.test(value);
+  const fits =
+    typeof value === "string" &&
+    /^[0-9a-f]+$/i.test(value) &&
+    value.length % 2 === 0;
   if (!fits || (bytes !== null && value.length !== bytes * 2)) {
-    throw new Error(`The saved key's ${name} is not ${bytes === null ? 'hex' : `${bytes} bytes of hex`}`);
+    throw new Error(
+      `The saved key's ${name} is not ${bytes === null ? "hex" : `${bytes} bytes of hex`}`,
+    );
   }
-  return Buffer.from(value, 'hex');
+  return Buffer.from(value, "hex");
 }
 
 /**
@@ -97,7 +108,7 @@ function hexPart(value, bytes, name) {
  * @returns {boolean} Whether it is
  */
 function isPlainObject(value) {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 /**
@@ -116,14 +127,14 @@ function readEntry(entry) {
     params.iterations === PBKDF2_ITERATIONS;
   if (!fits) {
     throw new Error(
-      `The saved key is not in the format this reads: version ${ENTRY_VERSION}, PBKDF2-SHA512 at ${PBKDF2_ITERATIONS} rounds`
+      `The saved key is not in the format this reads: version ${ENTRY_VERSION}, PBKDF2-SHA512 at ${PBKDF2_ITERATIONS} rounds`,
     );
   }
   return {
-    salt: hexPart(params.saltHex, BYTES.salt, 'salt'),
-    iv: hexPart(entry.ivHex, BYTES.iv, 'IV'),
-    authTag: hexPart(entry.authTagHex, BYTES.authTag, 'auth tag'),
-    ciphertext: hexPart(entry.ciphertextHex, null, 'ciphertext')
+    salt: hexPart(params.saltHex, BYTES.salt, "salt"),
+    iv: hexPart(entry.ivHex, BYTES.iv, "IV"),
+    authTag: hexPart(entry.authTagHex, BYTES.authTag, "auth tag"),
+    ciphertext: hexPart(entry.ciphertextHex, null, "ciphertext"),
   };
 }
 
@@ -136,19 +147,26 @@ function readEntry(entry) {
  * @throws {TypeError} When either is not a string that is not empty
  */
 export async function encryptKey(apiKey, password) {
-  requireText(apiKey, 'The api key');
-  requireText(password, 'The password');
+  requireText(apiKey, "The api key");
+  requireText(password, "The password");
   const salt = crypto.randomBytes(BYTES.salt);
   const key = await deriveKey(password, salt);
   const iv = crypto.randomBytes(BYTES.iv);
   const cipher = crypto.createCipheriv(CIPHER, key, iv);
-  const ciphertext = Buffer.concat([cipher.update(apiKey, 'utf8'), cipher.final()]);
+  const ciphertext = Buffer.concat([
+    cipher.update(apiKey, "utf8"),
+    cipher.final(),
+  ]);
   return {
     version: ENTRY_VERSION,
-    kdfParams: { digest: PBKDF2_DIGEST, iterations: PBKDF2_ITERATIONS, saltHex: salt.toString('hex') },
-    ivHex: iv.toString('hex'),
-    authTagHex: cipher.getAuthTag().toString('hex'),
-    ciphertextHex: ciphertext.toString('hex')
+    kdfParams: {
+      digest: PBKDF2_DIGEST,
+      iterations: PBKDF2_ITERATIONS,
+      saltHex: salt.toString("hex"),
+    },
+    ivHex: iv.toString("hex"),
+    authTagHex: cipher.getAuthTag().toString("hex"),
+    ciphertextHex: ciphertext.toString("hex"),
   };
 }
 
@@ -161,14 +179,19 @@ export async function encryptKey(apiKey, password) {
  * @throws {Error} When the entry is not one this reads, or the password does not open it
  */
 export async function decryptKey(entry, password) {
-  requireText(password, 'The password');
+  requireText(password, "The password");
   const parts = readEntry(entry);
   const key = await deriveKey(password, parts.salt);
   const decipher = crypto.createDecipheriv(CIPHER, key, parts.iv);
   decipher.setAuthTag(parts.authTag);
   try {
-    return Buffer.concat([decipher.update(parts.ciphertext), decipher.final()]).toString('utf8');
+    return Buffer.concat([
+      decipher.update(parts.ciphertext),
+      decipher.final(),
+    ]).toString("utf8");
   } catch {
-    throw new Error('The password does not open the saved key, or the key was changed on disk');
+    throw new Error(
+      "The password does not open the saved key, or the key was changed on disk",
+    );
   }
 }

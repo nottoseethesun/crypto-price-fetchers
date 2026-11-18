@@ -3,9 +3,9 @@
  * @module apps-script-runner/script-worker
  *
  * What: this file is the entry point of the worker thread that
- * `openAppsScript` starts. It loads the script named in `workerData`, with
- * the Script Properties given there, applies the config, and then answers
- * each call the caller's thread posts.
+ * `openAppsScript` starts. It loads the script's files named in
+ * `workerData`, in order, with the Script Properties given there, applies
+ * the config, and then answers each call the caller's thread posts.
  *
  * How: a Sheets script calls `UrlFetchApp.fetch` and expects the response
  * back, synchronously, where Node's fetch returns a promise. So this thread
@@ -36,10 +36,18 @@
  * Fit: started by `openAppsScript` only; nothing imports this file.
  */
 
-import fs from 'node:fs';
-import { parentPort, receiveMessageOnPort, workerData } from 'node:worker_threads';
-import { createAppsScriptServices } from './apps-script-services.js';
-import { applyConfig, callScriptFunction, loadAppsScript } from './load-apps-script.js';
+import fs from "node:fs";
+import {
+  parentPort,
+  receiveMessageOnPort,
+  workerData,
+} from "node:worker_threads";
+import { createAppsScriptServices } from "./apps-script-services.js";
+import {
+  applyConfig,
+  callScriptFunction,
+  loadAppsScript,
+} from "./load-apps-script.js";
 
 /** How long past the request timeout to wait for an answer before giving up, in milliseconds. */
 const ANSWER_GRACE_MS = 5000;
@@ -60,7 +68,12 @@ let requestNumber = 0;
  * @returns {string} Its message
  */
 function messageOf(thrown) {
-  if (thrown !== null && typeof thrown === 'object' && typeof thrown.message === 'string') return thrown.message;
+  if (
+    thrown !== null &&
+    typeof thrown === "object" &&
+    typeof thrown.message === "string"
+  )
+    return thrown.message;
   return String(thrown);
 }
 
@@ -98,7 +111,8 @@ function fetchThroughCaller(request) {
     const answer = takeAnswer(number);
     if (answer !== undefined) return answer;
     const left = deadline - Date.now();
-    if (left <= 0) throw new Error(`No answer in time to the request for ${request.url}`);
+    if (left <= 0)
+      throw new Error(`No answer in time to the request for ${request.url}`);
     Atomics.wait(answerCounter, 0, seen, left);
     seen = Atomics.load(answerCounter, 0);
   }
@@ -111,7 +125,7 @@ function fetchThroughCaller(request) {
  * @returns {void}
  */
 function logToCaller(line) {
-  parentPort.postMessage({ type: 'log', level: line.level, text: line.text });
+  parentPort.postMessage({ type: "log", level: line.level, text: line.text });
 }
 
 /**
@@ -125,17 +139,21 @@ function logToCaller(line) {
 function answerCall(context, { id, name, args }) {
   let reply;
   try {
-    reply = { type: 'returned', id, value: callScriptFunction(context, name, args) };
+    reply = {
+      type: "returned",
+      id,
+      value: callScriptFunction(context, name, args),
+    };
   } catch (thrown) {
-    reply = { type: 'threw', id, message: messageOf(thrown) };
+    reply = { type: "threw", id, message: messageOf(thrown) };
   }
   try {
     parentPort.postMessage(reply);
   } catch (thrown) {
     parentPort.postMessage({
-      type: 'threw',
+      type: "threw",
       id,
-      message: `${name} returned a value that cannot be passed back to Node: ${messageOf(thrown)}`
+      message: `${name} returned a value that cannot be passed back to Node: ${messageOf(thrown)}`,
     });
   }
 }
@@ -151,15 +169,18 @@ function start() {
     const services = createAppsScriptServices({
       fetchSync: fetchThroughCaller,
       log: workerData.logging ? logToCaller : null,
-      scriptProperties: workerData.scriptProperties
+      scriptProperties: workerData.scriptProperties,
     });
-    const source = fs.readFileSync(workerData.scriptPath, 'utf8');
-    const context = loadAppsScript(source, workerData.scriptPath, services);
+    const files = workerData.scriptPaths.map((filename) => ({
+      source: fs.readFileSync(filename, "utf8"),
+      filename,
+    }));
+    const context = loadAppsScript(files, services);
     applyConfig(context, workerData.config);
-    parentPort.on('message', (call) => answerCall(context, call));
-    parentPort.postMessage({ type: 'ready' });
+    parentPort.on("message", (call) => answerCall(context, call));
+    parentPort.postMessage({ type: "ready" });
   } catch (thrown) {
-    parentPort.postMessage({ type: 'failed', message: messageOf(thrown) });
+    parentPort.postMessage({ type: "failed", message: messageOf(thrown) });
   }
 }
 

@@ -76,10 +76,12 @@ file the other wrote:
    npm script `"api-keys": "node manage-api-keys.js"`:
 
    ```js
-   import { fileURLToPath } from 'node:url';
-   import { runKeyManager } from 'crypto-price-fetchers/api-key-store';
+   import { fileURLToPath } from "node:url";
+   import { runKeyManager } from "crypto-price-fetchers/api-key-store";
 
-   process.exitCode = await runKeyManager(process.argv, { projectTop: fileURLToPath(new URL('.', import.meta.url)) });
+   process.exitCode = await runKeyManager(process.argv, {
+     projectTop: fileURLToPath(new URL(".", import.meta.url)),
+   });
    ```
 
 4. Copy `unlock-api-keys.sh` from this repo's top folder into the
@@ -87,9 +89,9 @@ file the other wrote:
 5. As a program starts, open the keys it uses:
 
    ```js
-   import { unlockProjectKeys } from 'crypto-price-fetchers/api-key-store';
+   import { unlockProjectKeys } from "crypto-price-fetchers/api-key-store";
 
-   const keys = await unlockProjectKeys({ projectTop, services: ['dextools'] });
+   const keys = await unlockProjectKeys({ projectTop, services: ["dextools"] });
    // keys.dextools is the key, or null when none is saved
    ```
 
@@ -98,4 +100,5 @@ the run with an error whose `keyRefused` is true and whose message says
 what to do.
 
 The tests are in `../test/api-key-store.test.js`,
-`../test/key-manager.test.js` and `../test/unlock-api-keys.test.js`.
+`../test/key-prompts.test.js`, `../test/key-manager.test.js` and
+`../test/unlock-api-keys.test.js`.

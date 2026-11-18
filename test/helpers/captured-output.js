@@ -11,11 +11,11 @@
  */
 export function capturedOutput() {
   const output = {
-    text: '',
+    text: "",
     write(chunk) {
       output.text += chunk;
       return true;
-    }
+    },
   };
   return output;
 }

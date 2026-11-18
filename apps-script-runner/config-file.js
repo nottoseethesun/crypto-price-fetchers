@@ -22,7 +22,7 @@
  * (`command-line.js`), and a program that imports a Node version can too.
  */
 
-import fs from 'node:fs';
+import fs from "node:fs";
 
 /**
  * Reads a config file.
@@ -36,18 +36,23 @@ import fs from 'node:fs';
 export function readConfigFile(file, { required = false } = {}) {
   let text;
   try {
-    text = fs.readFileSync(file, 'utf8');
+    text = fs.readFileSync(file, "utf8");
   } catch (error) {
-    if (error.code === 'ENOENT' && !required) return {};
-    throw new Error(`Cannot read the config file ${file}: ${error.message}`);
+    if (error.code === "ENOENT" && !required) return {};
+    throw new Error(`Cannot read the config file ${file}: ${error.message}`, {
+      cause: error,
+    });
   }
   let config;
   try {
     config = JSON.parse(text);
   } catch (error) {
-    throw new Error(`The config file ${file} is not valid JSON: ${error.message}`);
+    throw new Error(
+      `The config file ${file} is not valid JSON: ${error.message}`,
+      { cause: error },
+    );
   }
-  if (config === null || typeof config !== 'object' || Array.isArray(config)) {
+  if (config === null || typeof config !== "object" || Array.isArray(config)) {
     throw new Error(`The config file ${file} holds no JSON object`);
   }
   const values = { ...config };
@@ -65,6 +70,7 @@ export function readConfigFile(file, { required = false } = {}) {
  */
 export function layConfig(config, overlay) {
   const laid = { ...config };
-  for (const [name, fields] of Object.entries(overlay)) laid[name] = { ...(config[name] ?? {}), ...fields };
+  for (const [name, fields] of Object.entries(overlay))
+    laid[name] = { ...(config[name] ?? {}), ...fields };
   return laid;
 }

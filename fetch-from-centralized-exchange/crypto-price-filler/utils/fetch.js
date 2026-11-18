@@ -3,7 +3,7 @@
  * @module utils/fetch
  */
 
-import config from '../config.js';
+import config from "../config.js";
 
 /**
  * Fetches a URL with automatic retry on 429 (rate limit) errors.
@@ -21,7 +21,11 @@ export async function fetchWithRetry(url, options = {}, verbose = false) {
   let attempts = 0;
   while (attempts < config.MAX_RETRIES) {
     attempts++;
-    logv(verbose, 2, `Fetch attempt ${attempts}/${config.MAX_RETRIES} for ${url}`);
+    logv(
+      verbose,
+      2,
+      `Fetch attempt ${attempts}/${config.MAX_RETRIES} for ${url}`,
+    );
 
     try {
       const res = await fetch(url, options);
@@ -34,8 +38,12 @@ export async function fetchWithRetry(url, options = {}, verbose = false) {
 
       if (res.status === 429) {
         const backoff = config.RETRY_BACKOFF_MS[attempts - 1] || 5000;
-        logv(verbose, 1, `429 rate limit - backoff ${backoff}ms (attempt ${attempts}/${config.MAX_RETRIES})`);
-        await new Promise(resolve => setTimeout(resolve, backoff));
+        logv(
+          verbose,
+          1,
+          `429 rate limit - backoff ${backoff}ms (attempt ${attempts}/${config.MAX_RETRIES})`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, backoff));
         continue; // retry the same URL
       } else {
         logv(verbose, 1, `Fetch failed: HTTP ${res.status} for ${url}`);

@@ -33,7 +33,18 @@ A custom `=getCryptoPrice()` function for Google Sheets with
 multi-provider fallback (MEXC, CoinGecko, CoinPaprika),
 caching, and rate-limit protection.
 
-For detailed usage, configuration, and data-source
+The script is in three files, each pasted into a script file of its own in
+Apps Script, which loads a project's script files into one scope:
+
+- [`getCryptoPriceFromCentralizedExchange.gs`](./getCryptoPriceFromCentralizedExchange.gs):
+  `=getCryptoPrice()`, its settings, the cache and the menu.
+- [`getCryptoPriceFromCentralizedExchange-sources.gs`](./getCryptoPriceFromCentralizedExchange-sources.gs):
+  the price sources.
+- [`getCryptoPriceFromCentralizedExchange-tests.gs`](./getCryptoPriceFromCentralizedExchange-tests.gs):
+  the tests to run from the Apps Script editor, which the sheet does not
+  need.
+
+For detailed usage, installation, configuration, and data-source
 documentation, see the file header in
 [`getCryptoPriceFromCentralizedExchange.gs`](./getCryptoPriceFromCentralizedExchange.gs).
 
@@ -89,7 +100,7 @@ says what differs from the sheet.
 Both tools support the same set of tokens. Configuration is
 maintained in:
 
-- **GAS:** `TOKEN_TO_ID` constant in the `.gs` file
+- **GAS:** `TOKEN_TO_ID` constant in `getCryptoPriceFromCentralizedExchange.gs`
 - **Node.js:** `supported-tokens.json`
 
 Current tokens: BTC, XMR, GRC, XTM (and any token listed on

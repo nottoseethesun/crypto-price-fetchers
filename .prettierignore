@@ -1,0 +1,11 @@
+# Files Prettier neither checks nor rewrites, each with its reason.
+
+# Lockfiles: npm owns their format, and rewriting them breaks npm ci's checks.
+package-lock.json
+
+# Coverage reports: written by each test run, never committed.
+coverage/
+
+# The encrypted api keys: written by the key manager, gitignored, and holding
+# secrets, so nothing normalizes them.
+api-keys.json

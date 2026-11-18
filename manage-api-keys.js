@@ -13,7 +13,9 @@
  * run with this folder as the project's top folder.
  */
 
-import { fileURLToPath } from 'node:url';
-import { runKeyManager } from './api-key-store/index.js';
+import { fileURLToPath } from "node:url";
+import { runKeyManager } from "./api-key-store/index.js";
 
-process.exitCode = await runKeyManager(process.argv, { projectTop: fileURLToPath(new URL('.', import.meta.url)) });
+process.exitCode = await runKeyManager(process.argv, {
+  projectTop: fileURLToPath(new URL(".", import.meta.url)),
+});

@@ -32,11 +32,11 @@
  * own `runCommandLine`.
  */
 
-import fs from 'node:fs';
-import { pathToFileURL } from 'node:url';
-import { Command, CommanderError } from 'commander';
-import { layConfig, readConfigFile } from './config-file.js';
-import { openAppsScript } from './run-apps-script.js';
+import fs from "node:fs";
+import { pathToFileURL } from "node:url";
+import { Command, CommanderError } from "commander";
+import { layConfig, readConfigFile } from "./config-file.js";
+import { openAppsScript } from "./run-apps-script.js";
 
 /** What the help says about exit codes. */
 const EXIT_CODES_HELP = `
@@ -52,7 +52,12 @@ Exit codes:
  * @returns {string} Its message
  */
 function messageOf(thrown) {
-  if (thrown !== null && typeof thrown === 'object' && typeof thrown.message === 'string') return thrown.message;
+  if (
+    thrown !== null &&
+    typeof thrown === "object" &&
+    typeof thrown.message === "string"
+  )
+    return thrown.message;
   return String(thrown);
 }
 
@@ -61,7 +66,7 @@ function messageOf(thrown) {
  * and closes the script.
  *
  * @param {Object} call - The call
- * @param {string|URL} call.scriptPath - The `.gs` file
+ * @param {string|URL|Array<string|URL>} call.scriptPath - The `.gs` file, or a script's files in the order Apps Script loads them
  * @param {string} call.name - The script function's name
  * @param {Array} call.args - Its arguments
  * @param {Command} call.command - The parsed command, for `--config` and `--verbose`
@@ -70,20 +75,32 @@ function messageOf(thrown) {
  * @param {{stdout: {write: function}, stderr: {write: function}}} call.io - Where output goes
  * @returns {Promise<number>} The exit code
  */
-async function printCall({ scriptPath, name, args, command, fetch, apiKeys, io }) {
+async function printCall({
+  scriptPath,
+  name,
+  args,
+  command,
+  fetch,
+  apiKeys,
+  io,
+}) {
   const options = command.optsWithGlobals();
-  const required = command.getOptionValueSourceWithGlobals('config') !== 'default';
+  const required =
+    command.getOptionValueSourceWithGlobals("config") !== "default";
   const config = readConfigFile(options.config, { required });
   const keys = await apiKeys({ name, args, io });
   const script = await openAppsScript(scriptPath, {
     config: layConfig(config, keys.config ?? {}),
     fetch,
-    onLog: options.verbose === true ? (line) => io.stderr.write(`${line.level}: ${line.text}\n`) : null,
-    scriptProperties: keys.scriptProperties ?? {}
+    onLog:
+      options.verbose === true
+        ? (line) => io.stderr.write(`${line.level}: ${line.text}\n`)
+        : null,
+    scriptProperties: keys.scriptProperties ?? {},
   });
   try {
     const value = await script.call(name, ...args);
-    if (typeof value === 'number') {
+    if (typeof value === "number") {
       io.stdout.write(`${value}\n`);
       return 0;
     }
@@ -99,7 +116,7 @@ async function printCall({ scriptPath, name, args, command, fetch, apiKeys, io }
  *
  * @param {Object} spec - The command line
  * @param {string[]} spec.argv - The arguments, shaped as `process.argv`: node, the file, then the arguments
- * @param {string|URL} spec.scriptPath - The `.gs` file
+ * @param {string|URL|Array<string|URL>} spec.scriptPath - The `.gs` file, or a script's files in the order Apps Script loads them
  * @param {string} spec.defaultConfigFile - The config file used when `--config` names none
  * @param {function(Command, function(string, Array, Command): Promise<void>): void} spec.describe - Gives the program its name, description, arguments or commands; each action calls the function it is handed with the script function's name, its arguments, and the action's command
  * @param {function({name: string, args: Array, io: Object}): Promise<{config: (Object|undefined), scriptProperties: (Object|undefined)}>} [spec.apiKeys] - Opens the api keys the call sends, once the arguments are parsed and before the script opens, handed the call and where output goes; gives config values laid over the config file's, Script Properties, or both. None when absent
@@ -109,14 +126,27 @@ async function printCall({ scriptPath, name, args, command, fetch, apiKeys, io }
  * @param {{write: function(string): void}} [deps.stderr=process.stderr] - Where messages go
  * @returns {Promise<number>} The exit code
  */
-export async function runScriptCommandLine({ argv, scriptPath, defaultConfigFile, describe, apiKeys }, deps = {}) {
-  const io = { stdout: deps.stdout ?? process.stdout, stderr: deps.stderr ?? process.stderr };
+export async function runScriptCommandLine(
+  { argv, scriptPath, defaultConfigFile, describe, apiKeys },
+  deps = {},
+) {
+  const io = {
+    stdout: deps.stdout ?? process.stdout,
+    stderr: deps.stderr ?? process.stderr,
+  };
   let exitCode = 0;
   const program = new Command()
     .exitOverride()
-    .configureOutput({ writeOut: (text) => io.stdout.write(text), writeErr: (text) => io.stderr.write(text) })
-    .option('-c, --config <file>', "JSON file of values for the script's config objects", defaultConfigFile)
-    .option('-v, --verbose', "show the script's log on stderr");
+    .configureOutput({
+      writeOut: (text) => io.stdout.write(text),
+      writeErr: (text) => io.stderr.write(text),
+    })
+    .option(
+      "-c, --config <file>",
+      "JSON file of values for the script's config objects",
+      defaultConfigFile,
+    )
+    .option("-v, --verbose", "show the script's log on stderr");
   const runCall = async (name, args, command) => {
     exitCode = await printCall({
       scriptPath,
@@ -125,11 +155,11 @@ export async function runScriptCommandLine({ argv, scriptPath, defaultConfigFile
       command,
       fetch: deps.fetch,
       apiKeys: apiKeys ?? (async () => ({})),
-      io
+      io,
     });
   };
   describe(program, runCall);
-  program.addHelpText('after', EXIT_CODES_HELP);
+  program.addHelpText("after", EXIT_CODES_HELP);
   try {
     await program.parseAsync(argv);
   } catch (thrown) {
@@ -148,7 +178,7 @@ export async function runScriptCommandLine({ argv, scriptPath, defaultConfigFile
  */
 export function isEntryPoint(moduleUrl) {
   const started = process.argv[1];
-  if (typeof started !== 'string') return false;
+  if (typeof started !== "string") return false;
   try {
     return pathToFileURL(fs.realpathSync(started)).href === moduleUrl;
   } catch {

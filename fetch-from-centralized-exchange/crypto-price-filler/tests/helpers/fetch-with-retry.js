@@ -8,7 +8,40 @@
  * implementation answers each url from the test's `answer` function the way
  * the real `fetchWithRetry` answers: with a response whose `json()` gives
  * the body, or with null where a service answers 404.
+ *
+ * The getCryptoPrice tests, which answer each request in turn, run
+ * `useFetchStandIn` with their mock, for the hooks they share.
  */
+
+import { afterEach, beforeEach, vi } from "vitest";
+import { clearCache } from "../../utils/cache.js";
+
+/**
+ * Registers the hooks the getCryptoPrice tests share. Before each test:
+ * fake timers, for the waits between retries; an empty price cache; and a
+ * mock that fails any request the test has not answered, so none reaches
+ * the network. After each: real timers and an empty cache.
+ *
+ * @param {import('vitest').Mock} mockFetchWithRetry - The test file's mock of fetchWithRetry
+ */
+export function useFetchStandIn(mockFetchWithRetry) {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetchWithRetry.mockReset();
+    vi.useFakeTimers();
+    clearCache();
+    mockFetchWithRetry.mockImplementation(() => {
+      throw new Error(
+        "Unexpected real network call in test – check mock setup",
+      );
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    clearCache();
+  });
+}
 
 /**
  * Builds a `fetchWithRetry` stand-in.

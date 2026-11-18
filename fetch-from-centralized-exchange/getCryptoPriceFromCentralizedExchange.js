@@ -42,27 +42,38 @@
  * separate tool with code of its own.
  */
 
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath } from "node:url";
 import {
   InvalidArgumentError,
   Option,
   isEntryPoint,
   openScriptFunctions,
-  runScriptCommandLine
-} from '../apps-script-runner/index.js';
-import { unlockProjectKeys } from '../api-key-store/index.js';
+  runScriptCommandLine,
+} from "../apps-script-runner/index.js";
+import { unlockProjectKeys } from "../api-key-store/index.js";
 
-/** The Sheets script this runs. */
-export const SHEETS_SCRIPT = new URL('./getCryptoPriceFromCentralizedExchange.gs', import.meta.url);
+/**
+ * The Sheets script this runs: its two files the function needs, in the
+ * order Apps Script loads them. The third, its in-sheet tests, is left out.
+ */
+export const SHEETS_SCRIPT = [
+  new URL("./getCryptoPriceFromCentralizedExchange.gs", import.meta.url),
+  new URL(
+    "./getCryptoPriceFromCentralizedExchange-sources.gs",
+    import.meta.url,
+  ),
+];
 
 /** The config file read when none is named. */
-export const DEFAULT_CONFIG_FILE = fileURLToPath(new URL('./config.json', import.meta.url));
+export const DEFAULT_CONFIG_FILE = fileURLToPath(
+  new URL("./config.json", import.meta.url),
+);
 
 /** The project's top folder, which holds its key file. */
-const PROJECT_TOP = fileURLToPath(new URL('..', import.meta.url));
+const PROJECT_TOP = fileURLToPath(new URL("..", import.meta.url));
 
 /** The Script Property the script reads the CoinGecko key from: its `CONFIG.COINGECKO_API_KEY_PROPERTY`. */
-export const COINGECKO_KEY_PROPERTY = 'COINGECKO_API_KEY';
+export const COINGECKO_KEY_PROPERTY = "COINGECKO_API_KEY";
 
 /**
  * The Script Properties that hand the script a CoinGecko key.
@@ -71,7 +82,7 @@ export const COINGECKO_KEY_PROPERTY = 'COINGECKO_API_KEY';
  * @returns {Object<string, string>} The properties: the key's, or none
  */
 function coinGeckoKeyProperties(key) {
-  return typeof key === 'string' ? { [COINGECKO_KEY_PROPERTY]: key } : {};
+  return typeof key === "string" ? { [COINGECKO_KEY_PROPERTY]: key } : {};
 }
 
 /**
@@ -87,10 +98,10 @@ function coinGeckoKeyProperties(key) {
  */
 export function openCentralizedExchangePrices(options = {}) {
   const { apiKeys = {}, ...rest } = options;
-  return openScriptFunctions(SHEETS_SCRIPT, ['getCryptoPrice'], {
+  return openScriptFunctions(SHEETS_SCRIPT, ["getCryptoPrice"], {
     ...rest,
     defaultConfigFile: DEFAULT_CONFIG_FILE,
-    scriptProperties: coinGeckoKeyProperties(apiKeys.coingecko)
+    scriptProperties: coinGeckoKeyProperties(apiKeys.coingecko),
   });
 }
 
@@ -111,7 +122,7 @@ CoinGecko api key:
  * @throws {InvalidArgumentError} When it is empty
  */
 function notEmpty(value) {
-  if (value.trim() === '') throw new InvalidArgumentError('It is empty.');
+  if (value.trim() === "") throw new InvalidArgumentError("It is empty.");
   return value;
 }
 
@@ -124,21 +135,42 @@ function notEmpty(value) {
  */
 function describeCommandLine(program, runCall) {
   program
-    .name('getCryptoPriceFromCentralizedExchange')
+    .name("getCryptoPriceFromCentralizedExchange")
     .description(
       "A coin's USD price at a past time, from centralized exchanges (MEXC, then CoinGecko, then CoinPaprika), " +
-        'worked out by getCryptoPriceFromCentralizedExchange.gs run under Node.'
+        "worked out by getCryptoPriceFromCentralizedExchange.gs run under Node.",
     )
-    .argument('<token>', 'the ticker symbol, such as btc, grc, xmr or xtm', notEmpty)
-    .argument('<date>', 'the time, as "YYYY-MM-DD HH:MM:SS" on a 24-hour clock, in quotes', notEmpty)
-    .option('-z, --tz <abbreviation>', 'the time zone the date is in, as an abbreviation the script knows, such as UTC or CST', 'UTC')
+    .argument(
+      "<token>",
+      "the ticker symbol, such as btc, grc, xmr or xtm",
+      notEmpty,
+    )
+    .argument(
+      "<date>",
+      'the time, as "YYYY-MM-DD HH:MM:SS" on a 24-hour clock, in quotes',
+      notEmpty,
+    )
+    .option(
+      "-z, --tz <abbreviation>",
+      "the time zone the date is in, as an abbreviation the script knows, such as UTC or CST",
+      "UTC",
+    )
     .addOption(
-      new Option('-m, --mode <mode>', 'the high or the low of the period the price comes from')
-        .choices(['high', 'low'])
-        .default('high')
+      new Option(
+        "-m, --mode <mode>",
+        "the high or the low of the period the price comes from",
+      )
+        .choices(["high", "low"])
+        .default("high"),
     )
-    .addHelpText('after', KEY_HELP)
-    .action((token, date, options, command) => runCall('getCryptoPrice', [token, date, options.tz, options.mode], command));
+    .addHelpText("after", KEY_HELP)
+    .action((token, date, options, command) =>
+      runCall(
+        "getCryptoPrice",
+        [token, date, options.tz, options.mode],
+        command,
+      ),
+    );
 }
 
 /**
@@ -153,11 +185,11 @@ function describeCommandLine(program, runCall) {
 async function openCallKey(deps, { io }) {
   const keys = await unlockProjectKeys({
     projectTop: PROJECT_TOP,
-    services: ['coingecko'],
+    services: ["coingecko"],
     env: deps.env,
     ask: deps.ask,
     say: (line) => io.stderr.write(`${line}\n`),
-    checkOptions: { fetch: deps.fetch }
+    checkOptions: { fetch: deps.fetch },
   });
   return { scriptProperties: coinGeckoKeyProperties(keys.coingecko) };
 }
@@ -178,9 +210,9 @@ export function runCommandLine(argv, deps = {}) {
       scriptPath: SHEETS_SCRIPT,
       defaultConfigFile: DEFAULT_CONFIG_FILE,
       describe: describeCommandLine,
-      apiKeys: (call) => openCallKey(deps, call)
+      apiKeys: (call) => openCallKey(deps, call),
     },
-    deps
+    deps,
   );
 }
 

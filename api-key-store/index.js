@@ -33,25 +33,36 @@
  * beside this file shows the calls.
  */
 
-export { askPassword, openSecretPrompt } from './ask-password.js';
-export { decryptKey, encryptKey, ENTRY_VERSION, PBKDF2_ITERATIONS } from './key-crypto.js';
+export { askPassword, openSecretPrompt } from "./ask-password.js";
+export {
+  decryptKey,
+  encryptKey,
+  ENTRY_VERSION,
+  PBKDF2_ITERATIONS,
+} from "./key-crypto.js";
 export {
   checkPasswordOpensKeys,
   hasEncryptedKey,
   loadEncryptedKey,
   saveEncryptedKey,
-  savedServices
-} from './key-file.js';
-export { getApiKey, setApiKey } from './key-holder.js';
-export { runKeyManager } from './key-manager.js';
+  savedServices,
+} from "./key-file.js";
+export { getApiKey, setApiKey } from "./key-holder.js";
+export { runKeyManager } from "./key-manager.js";
 export {
   enterApiKey,
   keyRefused,
   MANAGE_COMMAND,
-  PASSWORD_VARIABLE,
+  UNLOCK_VARIABLE,
   savingPassword,
   UNLOCK_COMMAND,
-  unlockApiKeys
-} from './key-prompts.js';
-export { KEY_FILE, keyFileFor, PROJECT_CONFIG_FILE, readNeededKeys, unlockProjectKeys } from './project-keys.js';
-export { COINGECKO_KEY_HEADER, SERVICES, serviceNamed } from './services.js';
+  unlockApiKeys,
+} from "./key-prompts.js";
+export {
+  KEY_FILE,
+  keyFileFor,
+  PROJECT_CONFIG_FILE,
+  readNeededKeys,
+  unlockProjectKeys,
+} from "./project-keys.js";
+export { COINGECKO_KEY_HEADER, SERVICES, serviceNamed } from "./services.js";

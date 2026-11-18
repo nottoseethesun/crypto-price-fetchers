@@ -42,26 +42,31 @@
  * logic, so a fix to it is a fix to both.
  */
 
-import { fileURLToPath } from 'node:url';
-import { unlockProjectKeys } from './api-key-store/index.js';
+import { fileURLToPath } from "node:url";
+import { unlockProjectKeys } from "./api-key-store/index.js";
 import {
   InvalidArgumentError,
   isEntryPoint,
   openScriptFunctions,
-  runScriptCommandLine
-} from './apps-script-runner/index.js';
+  runScriptCommandLine,
+} from "./apps-script-runner/index.js";
 
 /** The Sheets script this runs. */
-export const SHEETS_SCRIPT = new URL('./crypto-price-fetchers.gs', import.meta.url);
+export const SHEETS_SCRIPT = new URL(
+  "./crypto-price-fetchers.gs",
+  import.meta.url,
+);
 
 /** The config file read when none is named. */
-export const DEFAULT_CONFIG_FILE = fileURLToPath(new URL('./config.json', import.meta.url));
+export const DEFAULT_CONFIG_FILE = fileURLToPath(
+  new URL("./config.json", import.meta.url),
+);
 
 /** The project's top folder, which holds its key file. */
-const PROJECT_TOP = fileURLToPath(new URL('.', import.meta.url));
+const PROJECT_TOP = fileURLToPath(new URL(".", import.meta.url));
 
 /** The script's Sheets functions. */
-const FUNCTION_NAMES = ['dexToolsGetTokenPrice', 'dexToolsGetTokenFDV'];
+const FUNCTION_NAMES = ["dexToolsGetTokenPrice", "dexToolsGetTokenFDV"];
 
 /**
  * The config values that hand the script the keys given.
@@ -71,8 +76,10 @@ const FUNCTION_NAMES = ['dexToolsGetTokenPrice', 'dexToolsGetTokenFDV'];
  */
 function keyConfig(keys) {
   const config = {};
-  if (typeof keys.dextools === 'string') config.CONFIG = { API_KEY: keys.dextools };
-  if (typeof keys.x1ninja === 'string') config.X1_CONFIG = { API_KEY: keys.x1ninja };
+  if (typeof keys.dextools === "string")
+    config.CONFIG = { API_KEY: keys.dextools };
+  if (typeof keys.x1ninja === "string")
+    config.X1_CONFIG = { API_KEY: keys.x1ninja };
   return config;
 }
 
@@ -92,7 +99,7 @@ export function openCryptoPriceFetchers(options = {}) {
   return openScriptFunctions(SHEETS_SCRIPT, FUNCTION_NAMES, {
     ...rest,
     defaultConfigFile: DEFAULT_CONFIG_FILE,
-    configOverlay: keyConfig(apiKeys)
+    configOverlay: keyConfig(apiKeys),
   });
 }
 
@@ -113,7 +120,7 @@ Api keys:
  * @throws {InvalidArgumentError} When it is empty
  */
 function notEmpty(value) {
-  if (value.trim() === '') throw new InvalidArgumentError('It is empty.');
+  if (value.trim() === "") throw new InvalidArgumentError("It is empty.");
   return value;
 }
 
@@ -137,24 +144,40 @@ function poolCells(pool) {
  */
 function describeCommandLine(program, runCall) {
   program
-    .name('crypto-price-fetchers')
+    .name("crypto-price-fetchers")
     .description(
       "A token's price or fully diluted value (FDV) in USD, from DexTools, or from x1.ninja for X1, " +
-        'worked out by crypto-price-fetchers.gs run under Node.'
+        "worked out by crypto-price-fetchers.gs run under Node.",
     )
-    .addHelpText('after', KEY_HELP);
+    .addHelpText("after", KEY_HELP);
   const commands = [
-    ['price', 'dexToolsGetTokenPrice', "the token's price in USD", 'a pool to price the token in; required for x1'],
-    ['fdv', 'dexToolsGetTokenFDV', "the token's fully diluted value in USD", 'the pool to read; required for x1, unused elsewhere']
+    [
+      "price",
+      "dexToolsGetTokenPrice",
+      "the token's price in USD",
+      "a pool to price the token in; required for x1",
+    ],
+    [
+      "fdv",
+      "dexToolsGetTokenFDV",
+      "the token's fully diluted value in USD",
+      "the pool to read; required for x1, unused elsewhere",
+    ],
   ];
   for (const [commandName, functionName, description, poolHelp] of commands) {
     program
       .command(commandName)
       .description(description)
-      .argument('<chain>', "the chain's DexTools slug, such as ether, pulse or bsc; or x1", notEmpty)
-      .argument('<token>', "the token's address", notEmpty)
-      .option('-p, --pool <address>', poolHelp, notEmpty)
-      .action((chain, token, options, command) => runCall(functionName, [chain, token, poolCells(options.pool)], command));
+      .argument(
+        "<chain>",
+        "the chain's DexTools slug, such as ether, pulse or bsc; or x1",
+        notEmpty,
+      )
+      .argument("<token>", "the token's address", notEmpty)
+      .option("-p, --pool <address>", poolHelp, notEmpty)
+      .action((chain, token, options, command) =>
+        runCall(functionName, [chain, token, poolCells(options.pool)], command),
+      );
   }
 }
 
@@ -170,11 +193,11 @@ function describeCommandLine(program, runCall) {
 async function openCallKey(deps, { args, io }) {
   const keys = await unlockProjectKeys({
     projectTop: PROJECT_TOP,
-    services: [String(args[0]).toLowerCase() === 'x1' ? 'x1ninja' : 'dextools'],
+    services: [String(args[0]).toLowerCase() === "x1" ? "x1ninja" : "dextools"],
     env: deps.env,
     ask: deps.ask,
     say: (line) => io.stderr.write(`${line}\n`),
-    checkOptions: { fetch: deps.fetch, sleep: deps.sleep }
+    checkOptions: { fetch: deps.fetch, sleep: deps.sleep },
   });
   return { config: keyConfig(keys) };
 }
@@ -196,9 +219,9 @@ export function runCommandLine(argv, deps = {}) {
       scriptPath: SHEETS_SCRIPT,
       defaultConfigFile: DEFAULT_CONFIG_FILE,
       describe: describeCommandLine,
-      apiKeys: (call) => openCallKey(deps, call)
+      apiKeys: (call) => openCallKey(deps, call),
     },
-    deps
+    deps,
   );
 }
 

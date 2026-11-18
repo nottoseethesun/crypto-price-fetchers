@@ -14,8 +14,8 @@
  * asked for.
  */
 
-import fs from 'fs';
-import { STAND_IN_GECKO_KEY } from './stand-in-coingecko-key.js';
+import fs from "fs";
+import { STAND_IN_GECKO_KEY } from "./stand-in-coingecko-key.js";
 
 const asked = [];
 
@@ -40,20 +40,24 @@ function respond(status, body) {
 globalThis.fetch = async (url, init = {}) => {
   const href = String(url);
   asked.push(href);
-  if (href.endsWith('/ping')) {
-    const key = init.headers?.['x-cg-demo-api-key'];
-    return key === STAND_IN_GECKO_KEY ? respond(200, { gecko_says: '(V3) To the Moon!' }) : respond(401, {});
+  if (href.endsWith("/ping")) {
+    const key = init.headers?.["x-cg-demo-api-key"];
+    return key === STAND_IN_GECKO_KEY
+      ? respond(200, { gecko_says: "(V3) To the Moon!" })
+      : respond(401, {});
   }
-  if (href.includes('/exchangeInfo')) {
-    return respond(200, { symbols: [{ symbol: 'XTMUSDT', baseAsset: 'XTM', quoteAsset: 'USDT' }] });
+  if (href.includes("/exchangeInfo")) {
+    return respond(200, {
+      symbols: [{ symbol: "XTMUSDT", baseAsset: "XTM", quoteAsset: "USDT" }],
+    });
   }
-  const end = Number(new URL(href).searchParams.get('endTime'));
-  return respond(200, [[end - 30000, '1.00', '1.50', '0.80', '1.10', '10']]);
+  const end = Number(new URL(href).searchParams.get("endTime"));
+  return respond(200, [[end - 30000, "1.00", "1.50", "0.80", "1.10", "10"]]);
 };
 
-process.on('exit', () => {
+process.on("exit", () => {
   const askedPath = process.env.STAND_IN_ASKED;
-  if (askedPath !== undefined && askedPath !== '') {
+  if (askedPath !== undefined && askedPath !== "") {
     fs.writeFileSync(askedPath, JSON.stringify(asked));
   }
 });

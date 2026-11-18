@@ -16,7 +16,7 @@
  *   the runner with Node's own fetch.
  */
 
-import http from 'node:http';
+import http from "node:http";
 
 /**
  * Turns what `answer` returned into a status and text.
@@ -25,8 +25,12 @@ import http from 'node:http';
  * @returns {{status: number, text: string}} The response
  */
 function toResponse(answered) {
-  if (answered === null) return { status: 404, text: 'Not found' };
-  if (typeof answered === 'object' && typeof answered.status === 'number' && typeof answered.text === 'string') {
+  if (answered === null) return { status: 404, text: "Not found" };
+  if (
+    typeof answered === "object" &&
+    typeof answered.status === "number" &&
+    typeof answered.text === "string"
+  ) {
     return answered;
   }
   return { status: 200, text: JSON.stringify(answered) };
@@ -43,10 +47,18 @@ export function standInFetch(answer) {
   const fetch = async (url, init = {}) => {
     init.signal?.throwIfAborted();
     const headers = Object.fromEntries(new Headers(init.headers ?? {}));
-    const request = { url, method: init.method ?? 'GET', headers, body: init.body ?? undefined };
+    const request = {
+      url,
+      method: init.method ?? "GET",
+      headers,
+      body: init.body ?? undefined,
+    };
     requests.push(request);
     const { status, text } = toResponse(answer(request));
-    return new Response(text, { status, headers: { 'content-type': 'application/json' } });
+    return new Response(text, {
+      status,
+      headers: { "content-type": "application/json" },
+    });
   };
   fetch.requests = requests;
   return fetch;
@@ -61,20 +73,28 @@ export function standInFetch(answer) {
 export async function startStandInWeb(answer) {
   const requests = [];
   const server = http.createServer((incoming, outgoing) => {
-    let body = '';
-    incoming.setEncoding('utf8');
-    incoming.on('data', (chunk) => {
+    let body = "";
+    incoming.setEncoding("utf8");
+    incoming.on("data", (chunk) => {
       body += chunk;
     });
-    incoming.on('end', () => {
-      const request = { url: incoming.url, method: incoming.method, headers: incoming.headers, body };
+    incoming.on("end", () => {
+      const request = {
+        url: incoming.url,
+        method: incoming.method,
+        headers: incoming.headers,
+        body,
+      };
       requests.push(request);
       const { status, text } = toResponse(answer(request));
-      outgoing.writeHead(status, { 'content-type': 'application/json', 'x-stand-in': 'yes' });
+      outgoing.writeHead(status, {
+        "content-type": "application/json",
+        "x-stand-in": "yes",
+      });
       outgoing.end(text);
     });
   });
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   return {
     url: `http://127.0.0.1:${server.address().port}`,
     requests,
@@ -82,6 +102,6 @@ export async function startStandInWeb(answer) {
       new Promise((resolve) => {
         server.closeAllConnections();
         server.close(() => resolve());
-      })
+      }),
   };
 }

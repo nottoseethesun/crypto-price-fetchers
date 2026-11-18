@@ -21,16 +21,16 @@
  * the same `config.json`.
  */
 
-import fs from 'node:fs';
-import path from 'node:path';
-import { unlockApiKeys } from './key-prompts.js';
-import { SERVICES, serviceNamed } from './services.js';
+import fs from "node:fs";
+import path from "node:path";
+import { unlockApiKeys } from "./key-prompts.js";
+import { SERVICES, serviceNamed } from "./services.js";
 
 /** The file, in a project's top folder, that lists the services it uses. */
-export const PROJECT_CONFIG_FILE = 'config.json';
+export const PROJECT_CONFIG_FILE = "config.json";
 
 /** The key file, in a project's top folder. */
-export const KEY_FILE = 'api-keys.json';
+export const KEY_FILE = "api-keys.json";
 
 /**
  * Names a project's key file.
@@ -41,7 +41,9 @@ export const KEY_FILE = 'api-keys.json';
  */
 export function keyFileFor(projectTop, env = process.env) {
   const named = env.API_KEYS_FILE_PATH;
-  return typeof named === 'string' && named !== '' ? named : path.join(projectTop, KEY_FILE);
+  return typeof named === "string" && named !== ""
+    ? named
+    : path.join(projectTop, KEY_FILE);
 }
 
 /**
@@ -56,15 +58,22 @@ export function readNeededKeys(projectTop, services = SERVICES) {
   const file = path.join(projectTop, PROJECT_CONFIG_FILE);
   let config;
   try {
-    config = JSON.parse(fs.readFileSync(file, 'utf8'));
+    config = JSON.parse(fs.readFileSync(file, "utf8"));
   } catch (error) {
-    throw new Error(`Cannot read the api keys the project uses from ${file}: ${error.message}`);
+    throw new Error(
+      `Cannot read the api keys the project uses from ${file}: ${error.message}`,
+      { cause: error },
+    );
   }
-  const listed = config !== null && typeof config === 'object' ? config.apiKeys : undefined;
+  const listed =
+    config !== null && typeof config === "object" ? config.apiKeys : undefined;
   if (!Array.isArray(listed)) {
-    throw new Error(`${file} lists no apiKeys: give the services the project's programs use, such as "apiKeys": ["coingecko"]`);
+    throw new Error(
+      `${file} lists no apiKeys: give the services the project's programs use, such as "apiKeys": ["coingecko"]`,
+    );
   }
-  if (new Set(listed).size !== listed.length) throw new Error(`${file} lists a service twice under apiKeys`);
+  if (new Set(listed).size !== listed.length)
+    throw new Error(`${file} lists a service twice under apiKeys`);
   return listed.map((name) => serviceNamed(name, services));
 }
 
@@ -85,11 +94,13 @@ export function readNeededKeys(projectTop, services = SERVICES) {
  */
 export function unlockProjectKeys(options) {
   const known = options.known ?? SERVICES;
-  const listed = new Set(readNeededKeys(options.projectTop, known).map((service) => service.service));
+  const listed = new Set(
+    readNeededKeys(options.projectTop, known).map((service) => service.service),
+  );
   const unlisted = options.services.filter((name) => !listed.has(name));
   if (unlisted.length > 0) {
     throw new Error(
-      `${path.join(options.projectTop, PROJECT_CONFIG_FILE)} does not list ${unlisted.join(', ')} under apiKeys, which a program uses`
+      `${path.join(options.projectTop, PROJECT_CONFIG_FILE)} does not list ${unlisted.join(", ")} under apiKeys, which a program uses`,
     );
   }
   const env = options.env ?? process.env;
@@ -99,8 +110,8 @@ export function unlockProjectKeys(options) {
       env,
       ask: options.ask,
       say: options.say ?? ((line) => console.error(line)),
-      checkOptions: options.checkOptions
+      checkOptions: options.checkOptions,
     },
-    options.services.map((name) => serviceNamed(name, known))
+    options.services.map((name) => serviceNamed(name, known)),
   );
 }

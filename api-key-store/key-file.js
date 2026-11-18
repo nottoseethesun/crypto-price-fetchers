@@ -28,12 +28,12 @@
  * Fit: `key-prompts.js` asks for keys and passwords and keeps them here.
  */
 
-import fs from 'node:fs';
-import path from 'node:path';
-import { decryptKey, encryptKey } from './key-crypto.js';
+import fs from "node:fs";
+import path from "node:path";
+import { decryptKey, encryptKey } from "./key-crypto.js";
 
 /** The ending of each entry's name, as LP Ranger names them. */
-const ENTRY_SUFFIX = 'Encrypted';
+const ENTRY_SUFFIX = "Encrypted";
 
 /** Only the owner may read or write the file. */
 const FILE_MODE = 0o600;
@@ -46,8 +46,10 @@ const FILE_MODE = 0o600;
  * @throws {TypeError} When the service is not a name of letters and digits
  */
 function entryName(service) {
-  if (typeof service !== 'string' || !/^[A-Za-z][A-Za-z0-9]*$/.test(service)) {
-    throw new TypeError(`A service's name is letters and digits, such as coingecko, not ${JSON.stringify(service)}`);
+  if (typeof service !== "string" || !/^[A-Za-z][A-Za-z0-9]*$/.test(service)) {
+    throw new TypeError(
+      `A service's name is letters and digits, such as coingecko, not ${JSON.stringify(service)}`,
+    );
   }
   return `${service}${ENTRY_SUFFIX}`;
 }
@@ -62,18 +64,22 @@ function entryName(service) {
 function readKeyFile(file) {
   let text;
   try {
-    text = fs.readFileSync(file, 'utf8');
+    text = fs.readFileSync(file, "utf8");
   } catch (error) {
-    if (error.code === 'ENOENT') return {};
-    throw new Error(`Cannot read ${file}: ${error.message}`);
+    if (error.code === "ENOENT") return {};
+    throw new Error(`Cannot read ${file}: ${error.message}`, { cause: error });
   }
   let store;
   try {
     store = JSON.parse(text);
   } catch (error) {
-    throw new Error(`${file} is not valid JSON, so no key in it can be read: ${error.message}`);
+    throw new Error(
+      `${file} is not valid JSON, so no key in it can be read: ${error.message}`,
+      { cause: error },
+    );
   }
-  if (store === null || typeof store !== 'object' || Array.isArray(store)) throw new Error(`${file} holds no JSON object`);
+  if (store === null || typeof store !== "object" || Array.isArray(store))
+    throw new Error(`${file} holds no JSON object`);
   return store;
 }
 
@@ -88,7 +94,9 @@ function readKeyFile(file) {
 function writeKeyFile(file, store) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const temp = `${file}.tmp`;
-  fs.writeFileSync(temp, `${JSON.stringify(store, null, 2)}\n`, { mode: FILE_MODE });
+  fs.writeFileSync(temp, `${JSON.stringify(store, null, 2)}\n`, {
+    mode: FILE_MODE,
+  });
   fs.chmodSync(temp, FILE_MODE);
   fs.renameSync(temp, file);
 }
@@ -101,7 +109,10 @@ function writeKeyFile(file, store) {
  */
 function servicesIn(store) {
   return Object.keys(store)
-    .filter((name) => name.endsWith(ENTRY_SUFFIX) && name.length > ENTRY_SUFFIX.length)
+    .filter(
+      (name) =>
+        name.endsWith(ENTRY_SUFFIX) && name.length > ENTRY_SUFFIX.length,
+    )
     .map((name) => name.slice(0, -ENTRY_SUFFIX.length));
 }
 
@@ -139,7 +150,8 @@ export function hasEncryptedKey(file, service) {
 export async function checkPasswordOpensKeys(file, password) {
   const store = readKeyFile(file);
   const services = servicesIn(store);
-  for (const service of services) await decryptKey(store[entryName(service)], password);
+  for (const service of services)
+    await decryptKey(store[entryName(service)], password);
   return services.length;
 }
 
@@ -178,7 +190,7 @@ export async function saveEncryptedKey(file, service, apiKey, password) {
       await decryptKey(store[entryName(other)], password);
     } catch {
       throw new Error(
-        `That password does not open the other keys saved in ${file}, and every key there is saved with one password`
+        `That password does not open the other keys saved in ${file}, and every key there is saved with one password`,
       );
     }
   }

@@ -20,13 +20,13 @@
  * Fit: the Node versions' open functions call this.
  */
 
-import { layConfig, readConfigFile } from './config-file.js';
-import { openAppsScript } from './run-apps-script.js';
+import { layConfig, readConfigFile } from "./config-file.js";
+import { openAppsScript } from "./run-apps-script.js";
 
 /**
  * Opens a Sheets script and returns the named functions as async calls.
  *
- * @param {string|URL} scriptPath - The `.gs` file
+ * @param {string|URL|Array<string|URL>} scriptPath - The `.gs` file, or a script's files in the order Apps Script loads them
  * @param {string[]} names - The script's functions to return
  * @param {Object} options - How to open it
  * @param {string} options.defaultConfigFile - The Node version's config file, used when neither `config` nor `configFile` is given; it may be missing
@@ -40,10 +40,26 @@ import { openAppsScript } from './run-apps-script.js';
  * @throws {Error} When the config file cannot be read, or the script cannot be opened (`openAppsScript`)
  */
 export async function openScriptFunctions(scriptPath, names, options) {
-  const { defaultConfigFile, config, configFile, configOverlay = {}, fetch, onLog, scriptProperties } = options;
+  const {
+    defaultConfigFile,
+    config,
+    configFile,
+    configOverlay = {},
+    fetch,
+    onLog,
+    scriptProperties,
+  } = options;
   const values =
-    config ?? readConfigFile(configFile ?? defaultConfigFile, { required: configFile !== undefined && configFile !== null });
-  const script = await openAppsScript(scriptPath, { config: layConfig(values, configOverlay), fetch, onLog, scriptProperties });
+    config ??
+    readConfigFile(configFile ?? defaultConfigFile, {
+      required: configFile !== undefined && configFile !== null,
+    });
+  const script = await openAppsScript(scriptPath, {
+    config: layConfig(values, configOverlay),
+    fetch,
+    onLog,
+    scriptProperties,
+  });
   const functions = { close: script.close };
   for (const name of names) {
     functions[name] = (...args) => script.call(name, ...args);

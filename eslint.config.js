@@ -1,45 +1,130 @@
 /**
- * ESLint configuration for the repo's root package: the runner that runs a
- * Sheets script under Node, the Node versions of the Sheets scripts, and
- * their tests.
+ * ESLint's settings for crypto-price-fetchers, with LP Ranger's rules: no
+ * function above cyclomatic complexity 17, no file above 500 lines of code,
+ * no line above 80 characters but strings, urls and comments, `===` always,
+ * no unused name, no comment that tells Prettier to skip code, and no
+ * `Math.random`.
  * @file eslint.config.js
  *
- * The limits are LP Ranger's: no function above cyclomatic complexity 17,
- * no file above 500 lines of code, and `===` always. crypto-price-filler,
- * in its own folder, is a package of its own with its own configuration
- * and its own lint run, so this one leaves it to that.
+ * Every JavaScript file in the repo is linted, crypto-price-filler's among
+ * them, and so are the Sheets scripts, as the scripts they are:
+ *
+ * - The Node code, its tests and crypto-price-filler's are ES modules on
+ *   Node, whose imports must resolve (`n/no-missing-import`).
+ * - A Sheets script (`.gs`) is a plain script that Apps Script loads, with
+ *   the Apps Script services as globals. Sheets calls its functions by
+ *   name, so a function declared at its top is never unused, and no
+ *   `'use strict'` is asked of it: the directive would change how the code
+ *   the owner pastes into Apps Script runs.
+ *
+ * `npm run lint` runs it with `--max-warnings 0`, so a warning fails too.
+ * The security rules are in `eslint-security.config.js`, which
+ * `npm run audit:security` runs.
  */
 
-import js from '@eslint/js';
+import js from "@eslint/js";
+import prettierConfig from "eslint-config-prettier";
+import nPlugin from "eslint-plugin-n";
+import globals from "globals";
 
-/** The Node globals the code uses. */
-const NODE_GLOBALS = {
-  AbortSignal: 'readonly',
-  Buffer: 'readonly',
-  URL: 'readonly',
-  URLSearchParams: 'readonly',
-  clearInterval: 'readonly',
-  clearTimeout: 'readonly',
-  console: 'readonly',
-  fetch: 'readonly',
-  Headers: 'readonly',
-  process: 'readonly',
-  Response: 'readonly',
-  setInterval: 'readonly',
-  setTimeout: 'readonly'
+/** The rules every file is held to: LP Ranger's. */
+const SHARED_RULES = {
+  ...js.configs.recommended.rules,
+  complexity: ["error", { max: 17 }],
+  "max-len": [
+    "error",
+    {
+      code: 80,
+      ignoreUrls: true,
+      ignoreStrings: true,
+      ignoreTemplateLiterals: true,
+      ignoreRegExpLiterals: true,
+      ignoreComments: true,
+    },
+  ],
+  "max-lines": [
+    "error",
+    { max: 500, skipBlankLines: true, skipComments: true },
+  ],
+  "no-var": "error",
+  "prefer-const": ["error", { destructuring: "all" }],
+  eqeqeq: ["error", "always"],
+  strict: ["error", "global"],
+  "no-extend-native": "error",
+  "no-unused-vars": [
+    "error",
+    {
+      vars: "all",
+      args: "after-used",
+      argsIgnorePattern: "^_",
+      caughtErrors: "all",
+      caughtErrorsIgnorePattern: "^_",
+    },
+  ],
+  "no-warning-comments": [
+    "error",
+    { terms: ["prettier-ignore"], location: "anywhere" },
+  ],
+  "no-restricted-syntax": [
+    "error",
+    {
+      selector:
+        'CallExpression[callee.object.name="Math"][callee.property.name="random"]',
+      message:
+        "Use crypto.randomBytes() instead of Math.random(): it is not cryptographically secure.",
+    },
+  ],
+};
+
+/** The services Apps Script gives a Sheets script, as globals. */
+const APPS_SCRIPT_GLOBALS = {
+  CacheService: "readonly",
+  LockService: "readonly",
+  Logger: "readonly",
+  PropertiesService: "readonly",
+  Session: "readonly",
+  SpreadsheetApp: "readonly",
+  UrlFetchApp: "readonly",
+  Utilities: "readonly",
 };
 
 export default [
-  { ignores: ['node_modules/**', 'fetch-from-centralized-exchange/crypto-price-filler/**'] },
-  js.configs.recommended,
+  { ignores: ["**/node_modules/**", "**/coverage/**"] },
   {
-    files: ['**/*.js'],
-    languageOptions: { ecmaVersion: 'latest', sourceType: 'module', globals: NODE_GLOBALS },
+    files: ["**/*.js"],
+    plugins: { n: nPlugin },
+    languageOptions: {
+      ecmaVersion: "latest",
+      sourceType: "module",
+      globals: { ...globals.node },
+    },
+    rules: { ...SHARED_RULES, "n/no-missing-import": "error" },
+  },
+  {
+    files: ["**/*.gs"],
+    languageOptions: {
+      ecmaVersion: "latest",
+      sourceType: "script",
+      globals: {
+        ...globals.es2021,
+        console: "readonly",
+        ...APPS_SCRIPT_GLOBALS,
+      },
+    },
     rules: {
-      complexity: ['error', 17],
-      'max-lines': ['error', { max: 500, skipBlankLines: true, skipComments: true }],
-      eqeqeq: ['error', 'always'],
-      'no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }]
-    }
-  }
+      ...SHARED_RULES,
+      strict: "off",
+      "no-unused-vars": [
+        "error",
+        {
+          vars: "local",
+          args: "after-used",
+          argsIgnorePattern: "^_",
+          caughtErrors: "all",
+          caughtErrorsIgnorePattern: "^_",
+        },
+      ],
+    },
+  },
+  prettierConfig,
 ];

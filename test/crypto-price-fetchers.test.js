@@ -15,25 +15,28 @@
  * owner's keys.
  */
 
-import { after, before, describe, it } from 'node:test';
-import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { saveEncryptedKey } from '../api-key-store/index.js';
-import { openCryptoPriceFetchers, runCommandLine } from '../crypto-price-fetchers.js';
-import { capturedOutput } from './helpers/captured-output.js';
-import { standInFetch } from './helpers/stand-in-web.js';
+import { after, before, describe, it } from "node:test";
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { saveEncryptedKey } from "../api-key-store/index.js";
+import {
+  openCryptoPriceFetchers,
+  runCommandLine,
+} from "../crypto-price-fetchers.js";
+import { capturedOutput } from "./helpers/captured-output.js";
+import { standInFetch } from "./helpers/stand-in-web.js";
+import { makeTempFolder, removeTempFolders } from "./helpers/temp-folders.js";
 
-const DEXTOOLS = 'https://public-api.dextools.io/standard/v2';
-const X1_NINJA = 'https://api.x1.ninja/v1';
-const TOKEN = '0x2b591e99afE9f32eAA6214f7B7629768c40Eeb39';
-const POOL = '0x69D91B94f0AaF8e8A2586909fA77A5c2c89818d5';
-const X1_POOL = 'CAJeVEoSm1QQZccnCqYu9cnNF7TTD2fcUA3E5HQoxRvR';
-const X1_MINT = 'So11111111111111111111111111111111111111112';
-const KEYS = { dextools: 'dextools-key', x1ninja: 'x1-ninja-key' };
+const DEXTOOLS = "https://public-api.dextools.io/standard/v2";
+const X1_NINJA = "https://api.x1.ninja/v1";
+const TOKEN = "0x2b591e99afE9f32eAA6214f7B7629768c40Eeb39";
+const POOL = "0x69D91B94f0AaF8e8A2586909fA77A5c2c89818d5";
+const X1_POOL = "CAJeVEoSm1QQZccnCqYu9cnNF7TTD2fcUA3E5HQoxRvR";
+const X1_MINT = "So11111111111111111111111111111111111111112";
+const KEYS = { dextools: "dextools-key", x1ninja: "x1-ninja-key" };
 
 /**
  * Answers as DexTools and x1.ninja do for the tests' token and pools. The
@@ -45,12 +48,18 @@ const KEYS = { dextools: 'dextools-key', x1ninja: 'x1-ninja-key' };
  */
 function answerAsDexToolsAndX1Ninja({ url, headers }) {
   if (url === `${DEXTOOLS}/blockchain?sort=name&order=asc`) {
-    return headers['x-api-key'] === 'dextools-key' ? { statusCode: 200, data: [] } : { status: 403, text: '{"message":"Forbidden"}' };
+    return headers["x-api-key"] === "dextools-key"
+      ? { statusCode: 200, data: [] }
+      : { status: 403, text: '{"message":"Forbidden"}' };
   }
-  if (url === `${DEXTOOLS}/token/ether/${TOKEN}/price`) return { statusCode: 200, data: { price: 1.23 } };
-  if (url === `${DEXTOOLS}/pool/ether/${POOL}/price`) return { statusCode: 200, data: { price: 4.56 } };
-  if (url === `${DEXTOOLS}/token/pulse/${TOKEN}/info`) return { statusCode: 200, data: { fdv: 5000000 } };
-  if (url === `${X1_NINJA}/pools/${X1_POOL}`) return { pool: { address: X1_POOL, priceUsd: '0.27', fdv: 123456 } };
+  if (url === `${DEXTOOLS}/token/ether/${TOKEN}/price`)
+    return { statusCode: 200, data: { price: 1.23 } };
+  if (url === `${DEXTOOLS}/pool/ether/${POOL}/price`)
+    return { statusCode: 200, data: { price: 4.56 } };
+  if (url === `${DEXTOOLS}/token/pulse/${TOKEN}/info`)
+    return { statusCode: 200, data: { fdv: 5000000 } };
+  if (url === `${X1_NINJA}/pools/${X1_POOL}`)
+    return { pool: { address: X1_POOL, priceUsd: "0.27", fdv: 123456 } };
   return null;
 }
 
@@ -64,7 +73,11 @@ function answerAsDexToolsAndX1Ninja({ url, headers }) {
  */
 async function withFetchers(use, apiKeys = KEYS) {
   const fetch = standInFetch(answerAsDexToolsAndX1Ninja);
-  const fetchers = await openCryptoPriceFetchers({ config: {}, apiKeys, fetch });
+  const fetchers = await openCryptoPriceFetchers({
+    config: {},
+    apiKeys,
+    fetch,
+  });
   try {
     await use(fetchers, fetch);
   } finally {
@@ -72,69 +85,81 @@ async function withFetchers(use, apiKeys = KEYS) {
   }
 }
 
-describe('openCryptoPriceFetchers', () => {
-  it('prices a token from DexTools, sending the DexTools key it is given', async () => {
+describe("openCryptoPriceFetchers", () => {
+  it("prices a token from DexTools, sending the DexTools key it is given", async () => {
     await withFetchers(async (fetchers, fetch) => {
-      assert.equal(await fetchers.dexToolsGetTokenPrice('ether', TOKEN), 1.23);
-      assert.equal(fetch.requests[0].headers['x-api-key'], 'dextools-key');
+      assert.equal(await fetchers.dexToolsGetTokenPrice("ether", TOKEN), 1.23);
+      assert.equal(fetch.requests[0].headers["x-api-key"], "dextools-key");
     });
   });
 
-  it('prices a token in the pool given, as a Sheets range gives it', async () => {
+  it("prices a token in the pool given, as a Sheets range gives it", async () => {
     await withFetchers(async (fetchers) => {
-      assert.equal(await fetchers.dexToolsGetTokenPrice('ether', TOKEN, [[POOL, 0]]), 4.56);
+      assert.equal(
+        await fetchers.dexToolsGetTokenPrice("ether", TOKEN, [[POOL, 0]]),
+        4.56,
+      );
     });
   });
 
   it("gives a token's FDV from DexTools", async () => {
     await withFetchers(async (fetchers) => {
-      assert.equal(await fetchers.dexToolsGetTokenFDV('pulse', TOKEN), 5000000);
+      assert.equal(await fetchers.dexToolsGetTokenFDV("pulse", TOKEN), 5000000);
     });
   });
 
-  it('prices an X1 pool through x1.ninja, sending the x1.ninja key it is given', async () => {
+  it("prices an X1 pool through x1.ninja, sending the x1.ninja key it is given", async () => {
     await withFetchers(async (fetchers, fetch) => {
-      assert.equal(await fetchers.dexToolsGetTokenPrice('x1', X1_MINT, [[X1_POOL, 0]]), 0.27);
-      assert.equal(fetch.requests[0].headers.authorization, 'Bearer x1-ninja-key');
+      assert.equal(
+        await fetchers.dexToolsGetTokenPrice("x1", X1_MINT, [[X1_POOL, 0]]),
+        0.27,
+      );
+      assert.equal(
+        fetch.requests[0].headers.authorization,
+        "Bearer x1-ninja-key",
+      );
     });
   });
 
-  it('gives 0 when DexTools has no price for the token, as the sheet does', async () => {
+  it("gives 0 when DexTools has no price for the token, as the sheet does", async () => {
     await withFetchers(async (fetchers) => {
-      assert.equal(await fetchers.dexToolsGetTokenPrice('bsc', TOKEN), 0);
+      assert.equal(await fetchers.dexToolsGetTokenPrice("bsc", TOKEN), 0);
     });
   });
 
-  it('sends the placeholder written in the script when it is given no key', async () => {
+  it("sends the placeholder written in the script when it is given no key", async () => {
     await withFetchers(async (fetchers, fetch) => {
-      await fetchers.dexToolsGetTokenPrice('ether', TOKEN);
-      assert.equal(fetch.requests[0].headers['x-api-key'], 'paste_your_dextools_api_key_here');
+      await fetchers.dexToolsGetTokenPrice("ether", TOKEN);
+      assert.equal(
+        fetch.requests[0].headers["x-api-key"],
+        "paste_your_dextools_api_key_here",
+      );
     }, {});
   });
 
   it("opens with this project's config.json, which lists the keys and sets no field of the script", async () => {
-    const fetchers = await openCryptoPriceFetchers({ fetch: standInFetch(() => null) });
+    const fetchers = await openCryptoPriceFetchers({
+      fetch: standInFetch(() => null),
+    });
     await fetchers.close();
   });
 });
 
-describe('crypto-price-fetchers.js, the command line', () => {
+describe("crypto-price-fetchers.js, the command line", () => {
   let folder;
   let configFile;
   let keyFile;
 
   before(async () => {
-    folder = fs.mkdtempSync(path.join(os.tmpdir(), 'crypto-price-fetchers-test-cli-'));
-    configFile = path.join(folder, 'config.json');
+    folder = makeTempFolder("cli");
+    configFile = path.join(folder, "config.json");
     fs.writeFileSync(configFile, JSON.stringify({}));
-    keyFile = path.join(folder, 'api-keys.json');
-    await saveEncryptedKey(keyFile, 'dextools', KEYS.dextools, 'pw');
-    await saveEncryptedKey(keyFile, 'x1ninja', KEYS.x1ninja, 'pw');
+    keyFile = path.join(folder, "api-keys.json");
+    await saveEncryptedKey(keyFile, "dextools", KEYS.dextools, "pw");
+    await saveEncryptedKey(keyFile, "x1ninja", KEYS.x1ninja, "pw");
   });
 
-  after(() => {
-    fs.rmSync(folder, { recursive: true, force: true });
-  });
+  after(removeTempFolders);
 
   /**
    * A password prompt that must not be shown.
@@ -159,14 +184,20 @@ describe('crypto-price-fetchers.js, the command line', () => {
     const stdout = capturedOutput();
     const stderr = capturedOutput();
     const fetch = standInFetch(answer);
-    const exitCode = await runCommandLine(['node', 'crypto-price-fetchers.js', ...args], {
-      fetch,
-      stdout,
-      stderr,
-      env: keys.env ?? { API_KEYS_FILE_PATH: keyFile, API_KEYS_PASSWORD: 'pw' },
-      ask: keys.ask ?? askNothing,
-      sleep: async () => {}
-    });
+    const exitCode = await runCommandLine(
+      ["node", "crypto-price-fetchers.js", ...args],
+      {
+        fetch,
+        stdout,
+        stderr,
+        env: keys.env ?? {
+          API_KEYS_FILE_PATH: keyFile,
+          API_KEYS_PASSWORD: "pw",
+        },
+        ask: keys.ask ?? askNothing,
+        sleep: async () => {},
+      },
+    );
     return { exitCode, stdout: stdout.text, stderr: stderr.text, fetch };
   }
 
@@ -180,90 +211,164 @@ describe('crypto-price-fetchers.js, the command line', () => {
     return { exitCode, stdout, stderr };
   }
 
-  it('prints the price, with exit code 0, sending the DexTools key it opened with API_KEYS_PASSWORD', async () => {
-    const result = await run(['price', 'ether', TOKEN, '--config', configFile]);
-    assert.deepEqual(printed(result), { exitCode: 0, stdout: '1.23\n', stderr: '' });
+  it("prints the price, with exit code 0, sending the DexTools key it opened with API_KEYS_PASSWORD", async () => {
+    const result = await run(["price", "ether", TOKEN, "--config", configFile]);
+    assert.deepEqual(printed(result), {
+      exitCode: 0,
+      stdout: "1.23\n",
+      stderr: "",
+    });
     assert.deepEqual(
-      result.fetch.requests.map((request) => [new URL(request.url).pathname, request.headers['x-api-key']]),
+      result.fetch.requests.map((request) => [
+        new URL(request.url).pathname,
+        request.headers["x-api-key"],
+      ]),
       [
-        ['/standard/v2/blockchain', 'dextools-key'],
-        [`/standard/v2/token/ether/${TOKEN}/price`, 'dextools-key']
-      ]
+        ["/standard/v2/blockchain", "dextools-key"],
+        [`/standard/v2/token/ether/${TOKEN}/price`, "dextools-key"],
+      ],
     );
   });
 
-  it('asks for the password when API_KEYS_PASSWORD is not set', async () => {
+  it("asks for the password when API_KEYS_PASSWORD is not set", async () => {
     const asked = [];
     const ask = async (prompt) => {
       asked.push(prompt);
-      return 'pw';
+      return "pw";
     };
-    const result = await run(['price', 'ether', TOKEN, '--config', configFile], { env: { API_KEYS_FILE_PATH: keyFile }, ask });
-    assert.equal(result.stdout, '1.23\n');
+    const result = await run(
+      ["price", "ether", TOKEN, "--config", configFile],
+      { env: { API_KEYS_FILE_PATH: keyFile }, ask },
+    );
+    assert.equal(result.stdout, "1.23\n");
     assert.deepEqual(asked, [`Password for the api keys in ${keyFile}: `]);
   });
 
-  it('stops before asking a price, with exit code 1, when DexTools refuses the saved key', async () => {
+  it("stops before asking a price, with exit code 1, when DexTools refuses the saved key", async () => {
     const refusing = (request) =>
-      request.url.includes('/blockchain?') ? { status: 403, text: '{"message":"Forbidden"}' } : answerAsDexToolsAndX1Ninja(request);
-    const result = await run(['price', 'ether', TOKEN, '--config', configFile], {}, refusing);
+      request.url.includes("/blockchain?")
+        ? { status: 403, text: '{"message":"Forbidden"}' }
+        : answerAsDexToolsAndX1Ninja(request);
+    const result = await run(
+      ["price", "ether", TOKEN, "--config", configFile],
+      {},
+      refusing,
+    );
     assert.equal(result.exitCode, 1);
-    assert.match(result.stderr, /^DexTools refused the api key saved in .*api-keys\.json\. Save a new one, in the project's top folder: npm run api-keys -- set dextools\n$/);
-    assert.ok(result.fetch.requests.every((request) => request.url.includes('/blockchain?')));
+    assert.match(
+      result.stderr,
+      /^DexTools refused the api key saved in .*api-keys\.json\. Save a new one, in the project's top folder: npm run api-keys -- set dextools\n$/,
+    );
+    assert.ok(
+      result.fetch.requests.every((request) =>
+        request.url.includes("/blockchain?"),
+      ),
+    );
   });
 
-  it('sends the placeholder written in the script, asking nothing, when no key is saved', async () => {
-    const env = { API_KEYS_FILE_PATH: path.join(folder, 'no-such-api-keys.json') };
-    const result = await run(['price', 'ether', TOKEN, '--config', configFile], { env });
-    assert.equal(result.fetch.requests[0].headers['x-api-key'], 'paste_your_dextools_api_key_here');
+  it("sends the placeholder written in the script, asking nothing, when no key is saved", async () => {
+    const env = {
+      API_KEYS_FILE_PATH: path.join(folder, "no-such-api-keys.json"),
+    };
+    const result = await run(
+      ["price", "ether", TOKEN, "--config", configFile],
+      { env },
+    );
+    assert.equal(
+      result.fetch.requests[0].headers["x-api-key"],
+      "paste_your_dextools_api_key_here",
+    );
   });
 
   it("prints an X1 pool's FDV, sending x1.ninja's key and opening no DexTools key", async () => {
-    const result = await run(['fdv', 'x1', X1_MINT, '--pool', X1_POOL, '--config', configFile]);
-    assert.equal(result.stdout, '123456\n');
+    const result = await run([
+      "fdv",
+      "x1",
+      X1_MINT,
+      "--pool",
+      X1_POOL,
+      "--config",
+      configFile,
+    ]);
+    assert.equal(result.stdout, "123456\n");
     assert.equal(result.exitCode, 0);
-    assert.ok(result.fetch.requests.every((request) => request.url.startsWith(X1_NINJA)));
-    assert.ok(result.fetch.requests.every((request) => request.headers.authorization === 'Bearer x1-ninja-key'));
+    assert.ok(
+      result.fetch.requests.every((request) =>
+        request.url.startsWith(X1_NINJA),
+      ),
+    );
+    assert.ok(
+      result.fetch.requests.every(
+        (request) => request.headers.authorization === "Bearer x1-ninja-key",
+      ),
+    );
   });
 
   it("shows the script's log on stderr with --verbose", async () => {
-    const result = await run(['price', 'ether', TOKEN, '--config', configFile, '--verbose']);
-    assert.match(result.stderr, /^log: \[PRICE\] Fetching: https:\/\/public-api\.dextools\.io/m);
-    assert.equal(result.stdout, '1.23\n');
+    const result = await run([
+      "price",
+      "ether",
+      TOKEN,
+      "--config",
+      configFile,
+      "--verbose",
+    ]);
+    assert.match(
+      result.stderr,
+      /^log: \[PRICE\] Fetching: https:\/\/public-api\.dextools\.io/m,
+    );
+    assert.equal(result.stdout, "1.23\n");
   });
 
-  it('answers --help on stdout, with exit code 0, asking no password', async () => {
-    const result = await run(['--help'], { env: { API_KEYS_FILE_PATH: keyFile }, ask: askNothing });
+  it("answers --help on stdout, with exit code 0, asking no password", async () => {
+    const result = await run(["--help"], {
+      env: { API_KEYS_FILE_PATH: keyFile },
+      ask: askNothing,
+    });
     assert.equal(result.exitCode, 0);
     assert.match(result.stdout, /Usage: crypto-price-fetchers/);
     assert.match(result.stdout, /price .*<chain> <token>/);
     assert.match(result.stdout, /fdv .*<chain> <token>/);
     assert.match(result.stdout, /Api keys:/);
     assert.match(result.stdout, /Exit codes:/);
-    assert.equal(result.stderr, '');
+    assert.equal(result.stderr, "");
   });
 
-  it('refuses a missing argument on stderr, with exit code 1', async () => {
-    const result = await run(['price', 'ether', '--config', configFile]);
+  it("refuses a missing argument on stderr, with exit code 1", async () => {
+    const result = await run(["price", "ether", "--config", configFile]);
     assert.equal(result.exitCode, 1);
     assert.match(result.stderr, /missing required argument 'token'/);
   });
 
-  it('refuses an empty argument, naming it', async () => {
-    const result = await run(['price', ' ', TOKEN, '--config', configFile]);
+  it("refuses an empty argument, naming it", async () => {
+    const result = await run(["price", " ", TOKEN, "--config", configFile]);
     assert.equal(result.exitCode, 1);
-    assert.match(result.stderr, /is invalid for argument 'chain'\. It is empty\./);
+    assert.match(
+      result.stderr,
+      /is invalid for argument 'chain'\. It is empty\./,
+    );
   });
 
-  it('refuses a config file named on purpose that is missing', async () => {
-    const result = await run(['price', 'ether', TOKEN, '--config', path.join(folder, 'missing.json')]);
+  it("refuses a config file named on purpose that is missing", async () => {
+    const result = await run([
+      "price",
+      "ether",
+      TOKEN,
+      "--config",
+      path.join(folder, "missing.json"),
+    ]);
     assert.equal(result.exitCode, 1);
     assert.match(result.stderr, /Cannot read the config file/);
   });
 
-  it('runs as a program: node crypto-price-fetchers.js --help', () => {
-    const file = fileURLToPath(new URL('../crypto-price-fetchers.js', import.meta.url));
-    const output = execFileSync(process.execPath, [file, '--help'], { encoding: 'utf8', timeout: 15000 });
+  it("runs as a program: node crypto-price-fetchers.js --help", () => {
+    const file = fileURLToPath(
+      new URL("../crypto-price-fetchers.js", import.meta.url),
+    );
+    const output = execFileSync(process.execPath, [file, "--help"], {
+      encoding: "utf8",
+      timeout: 15000,
+    });
     assert.match(output, /Usage: crypto-price-fetchers/);
   });
 });

@@ -1,77 +1,41 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { DateTime } from 'luxon';
+import { describe, it, expect, vi } from "vitest";
+import { DateTime } from "luxon";
 import {
   canonicalTimeZone,
   parseInputToUtcMs,
-  validTimeZones
-} from '../utils/date.js';
-import { getCryptoPrice } from '../sources/price.js'; // the wrapper
-import { getCache, setCache, clearCache } from '../utils/cache.js';
-import * as fetchUtils from '../utils/fetch.js'; // for mocking fetchWithRetry
-import fs from 'fs';
-import { parse as csvParse } from 'csv-parse/sync';
+  validTimeZones,
+} from "../utils/date.js";
+import fs from "fs";
+import { parse as csvParse } from "csv-parse/sync";
 
-const verbose = process.env.VERBOSE === '1';
+const verbose = process.env.VERBOSE === "1";
 
-// Mock supports BOTH named and default import styles
-vi.mock('../utils/fetch.js', () => {
-  const mockFn = vi.fn();
-  return {
-    fetchWithRetry: mockFn,           // for named import { fetchWithRetry }
-    default: mockFn                   // for default import fetchWithRetry from ...
-  };
-});
-
-const mockFetchWithRetry = vi.mocked(fetchUtils.fetchWithRetry);  // works for named
-// If needed for default: vi.mocked(fetchUtils.default)
-
-beforeEach(() => {
-  vi.clearAllMocks();
-  mockFetchWithRetry.mockReset(); // Reset mock implementation queue
-  vi.useFakeTimers(); // Fake timers for backoff simulation
-
-  // Clear the cache between tests to prevent cache pollution
-  clearCache();
-
-  // Debug: confirm keys right after clear
-  console.log('[TEST CACHE] Keys after clear:', Array.from(getCache().keys()));
-
-  // Safety net: fail loudly on unexpected real network call in test
-  mockFetchWithRetry.mockImplementation(() => {
-    throw new Error('Unexpected real network call in test – check mock setup');
-  });
-});
-
-afterEach(() => {
-  vi.useRealTimers();
-  clearCache(); // Clean up after each test
-});
-
-describe('Crypto Price Filler Helpers', () => {
-  describe('canonicalTimeZone', () => {
-    it('takes a zone named in full, or UTC, in any letter case, and spells it as the list does', () => {
-      expect(canonicalTimeZone('America/Chicago')).toBe('America/Chicago');
-      expect(canonicalTimeZone('america/chicago')).toBe('America/Chicago');
-      expect(canonicalTimeZone('utc')).toBe('UTC');
-      expect(validTimeZones()).toContain('Europe/London');
+describe("Crypto Price Filler Helpers", () => {
+  describe("canonicalTimeZone", () => {
+    it("takes a zone named in full, or UTC, in any letter case, and spells it as the list does", () => {
+      expect(canonicalTimeZone("America/Chicago")).toBe("America/Chicago");
+      expect(canonicalTimeZone("america/chicago")).toBe("America/Chicago");
+      expect(canonicalTimeZone("utc")).toBe("UTC");
+      expect(validTimeZones()).toContain("Europe/London");
     });
 
-    it('refuses abbreviations, unknown names and non-strings', () => {
-      expect(canonicalTimeZone('CDT')).toBeNull();
-      expect(canonicalTimeZone('EST')).toBeNull();
-      expect(canonicalTimeZone('INVALID')).toBeNull();
-      expect(canonicalTimeZone('')).toBeNull();
+    it("refuses abbreviations, unknown names and non-strings", () => {
+      expect(canonicalTimeZone("CDT")).toBeNull();
+      expect(canonicalTimeZone("EST")).toBeNull();
+      expect(canonicalTimeZone("INVALID")).toBeNull();
+      expect(canonicalTimeZone("")).toBeNull();
       expect(canonicalTimeZone(null)).toBeNull();
     });
   });
 
-  describe('parseInputToUtcMs', () => {
-    it('parses valid date in UTC', () => {
-      if (verbose) console.log('[TEST] Starting UTC parse test');
-      const result = parseInputToUtcMs('2025-12-19 00:17:00', 'UTC', verbose);
-      expect(result).toBeTypeOf('number');
-      const dt = DateTime.fromMillis(result, { zone: 'utc' });
-      if (verbose) console.log('[TEST] Parsed UTC time (offset 0):', dt.toISO());
+  describe("parseInputToUtcMs", () => {
+    it("parses valid date in UTC", () => {
+      if (verbose) console.log("[TEST] Starting UTC parse test");
+      const result = parseInputToUtcMs("2025-12-19 00:17:00", "UTC", verbose);
+      expect(result).toBeTypeOf("number");
+      const dt = DateTime.fromMillis(result, { zone: "utc" });
+      if (verbose)
+        console.log("[TEST] Parsed UTC time (offset 0):", dt.toISO());
       expect(dt.year).toBe(2025);
       expect(dt.month).toBe(12);
       expect(dt.day).toBe(19);
@@ -80,420 +44,75 @@ describe('Crypto Price Filler Helpers', () => {
     });
 
     it("applies the offset the zone had then: Chicago is UTC-6 in December", () => {
-      if (verbose) console.log('[TEST] Starting Chicago winter parse test');
-      const result = parseInputToUtcMs('2025-12-19 00:17:00', 'America/Chicago', verbose);
-      expect(result).toBeTypeOf('number');
-      const dt = DateTime.fromMillis(result, { zone: 'utc' });
-      if (verbose) console.log('[TEST] Parsed UTC time (Chicago, winter):', dt.toISO());
+      if (verbose) console.log("[TEST] Starting Chicago winter parse test");
+      const result = parseInputToUtcMs(
+        "2025-12-19 00:17:00",
+        "America/Chicago",
+        verbose,
+      );
+      expect(result).toBeTypeOf("number");
+      const dt = DateTime.fromMillis(result, { zone: "utc" });
+      if (verbose)
+        console.log("[TEST] Parsed UTC time (Chicago, winter):", dt.toISO());
       expect(dt.hour).toBe(6);
       expect(dt.minute).toBe(17);
     });
 
-    it('returns null for invalid date', () => {
-      if (verbose) console.log('[TEST] Testing invalid date');
-      expect(parseInputToUtcMs('invalid', 'UTC', verbose)).toBeNull();
-      expect(parseInputToUtcMs('', 'UTC', verbose)).toBeNull();
+    it("returns null for invalid date", () => {
+      if (verbose) console.log("[TEST] Testing invalid date");
+      expect(parseInputToUtcMs("invalid", "UTC", verbose)).toBeNull();
+      expect(parseInputToUtcMs("", "UTC", verbose)).toBeNull();
     });
 
-    it('refuses a time zone that is not named in full or UTC', () => {
-      expect(() => parseInputToUtcMs('2025-12-19 00:17:00', 'CDT')).toThrow(/Not a valid time zone: CDT/);
-    });
-  });
-
-  describe('getCryptoPrice', () => {
-    it('returns cached price if available', async () => {
-      if (verbose) console.log('[TEST] Setting cache for cached price test');
-
-      // Create and set cache explicitly for this test
-      const testCache = new Map();
-      testCache.set('price_xtm_20251219001700_UTC_high', 42.5);
-
-      // Debug: confirm set worked in this scope
-      console.log('[TEST CACHE] Keys in test scope:', Array.from(testCache.keys()));
-
-      mockFetchWithRetry.mockResolvedValue({ ok: false });
-
-      if (verbose) console.log('[TEST] Calling getCryptoPrice with explicit cache');
-
-      const price = await getCryptoPrice('xtm', '2025-12-19 00:17:00', 'UTC', 'high', verbose, testCache, null, null);
-
-      if (verbose) console.log('[TEST] getCryptoPrice returned:', price);
-
-      expect(price).toBe(42.5);
-    });
-
-    it('tries MEXC first and returns price when successful', async () => {
-      if (verbose) console.log('[TEST] Starting MEXC success test');
-      mockFetchWithRetry
-        .mockResolvedValueOnce({
-          ok: true,
-          status: 200,
-          json: async () => ({ symbols: [{ baseAsset: 'XTM', quoteAsset: 'USDT' }] })
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          status: 200,
-          json: async () => [[1766103360000, 0, 50.0, 40.0, 45.0, 1000]]
-        });
-
-      const price = await getCryptoPrice('xtm', '2025-12-19 00:17:00', 'UTC', 'high', verbose, null, null, null);
-      if (verbose) console.log('[TEST] getCryptoPrice returned:', price);
-      expect(price).toBe(50.0);
-      expect(mockFetchWithRetry).toHaveBeenCalledTimes(2);
-    });
-
-    it('falls back to CoinGecko when MEXC fails', async () => {
-      if (verbose) console.log('[TEST] Starting CoinGecko fallback test');
-
-      mockFetchWithRetry.mockReset();
-      mockFetchWithRetry.mockClear();
-
-      mockFetchWithRetry.mockImplementation(async (url) => {
-        if (verbose) console.log('[MOCK] Fetch called for URL:', url);
-
-        if (url.includes('mexc.com')) {
-          return { ok: false, status: 500 };
-        }
-
-        if (url.includes('/market_chart/range')) {
-          const atRow = Date.UTC(2025, 11, 19, 0, 17, 0);
-          return {
-            ok: true,
-            status: 200,
-            json: async () => ({ prices: [[atRow - 3600000, 41.0], [atRow, 42.7], [atRow + 3600000, 40.0]] })
-          };
-        }
-
-        return { ok: false, status: 404 };
-      });
-
-      const price = await getCryptoPrice('xtm', '2025-12-19 00:17:00', 'UTC', 'high', verbose, null, null, null);
-      if (verbose) console.log('[TEST] getCryptoPrice returned:', price);
-      expect(price).toBe(42.7);
-    });
-
-    it('returns null when all sources fail', async () => {
-      if (verbose) console.log('[TEST] Starting all-sources-fail test');
-      mockFetchWithRetry.mockResolvedValue({ ok: false, status: 500 });
-      const price = await getCryptoPrice('xtm', '2025-12-19 00:17:00', 'UTC', 'high', verbose, null, null, null);
-      if (verbose) console.log('[TEST] getCryptoPrice returned:', price);
-      expect(price).toBeNull();
-    });
-
-    it('skips future dates', async () => {
-      if (verbose) console.log('[TEST] Starting future date skip test');
-      const future = DateTime.now().plus({ days: 1 }).toFormat('yyyy-MM-dd HH:mm:ss');
-      const price = await getCryptoPrice('xtm', future, 'UTC', 'high', verbose, null, null, null);
-      if (verbose) console.log('[TEST] getCryptoPrice returned:', price);
-      expect(price).toBeNull();
-    });
-
-    it('handles invalid token (no symbol in MEXC + no fallback)', async () => {
-      if (verbose) console.log('[TEST] Starting invalid token test');
-      mockFetchWithRetry
-        .mockResolvedValueOnce({
-          ok: true,
-          status: 200,
-          json: async () => ({ symbols: [] })
-        })
-        .mockResolvedValueOnce({ ok: false, status: 500 })
-        .mockResolvedValueOnce({ ok: false, status: 500 })
-        .mockResolvedValueOnce({ ok: false, status: 500 });
-
-      const price = await getCryptoPrice('unknown_token', '2025-12-19 00:17:00', 'UTC', 'high', verbose, null, null, null);
-      if (verbose) console.log('[TEST] getCryptoPrice returned:', price);
-      expect(price).toBeNull();
-    });
-
-    it('handles low price mode correctly', async () => {
-      if (verbose) console.log('[TEST] Starting low price mode test');
-
-      // Reset mocks completely for this test
-      mockFetchWithRetry.mockReset();
-      mockFetchWithRetry.mockClear();
-
-      mockFetchWithRetry.mockImplementation(async (url) => {
-        if (verbose) console.log('[MOCK] Fetch called for URL:', url); // debug to see order
-
-        if (url.includes('exchangeInfo')) {
-          return {
-            ok: true,
-            status: 200,
-            json: async () => {
-              return {
-                symbols: [
-                  { baseAsset: 'XTM', quoteAsset: 'USDT' }
-                ]
-              };
-            }
-          };
-        }
-
-        if (url.includes('klines')) {
-          return {
-            ok: true,
-            status: 200,
-            json: async () => {
-              return [[1766103360000, 0, 60.0, 40.0, 50.0, 1000]];
-            }
-          };
-        }
-
-        return {
-          ok: false,
-          status: 404,
-          json: async () => ({ error: 'Not mocked' })
-        };
-      });
-
-      const price = await getCryptoPrice('xtm', '2025-12-19 00:17:00', 'UTC', 'low', verbose, null, null, null);
-      if (verbose) console.log('[TEST] getCryptoPrice returned:', price);
-
-      expect(price).toBe(40.0);
-    });
-
-    it("handles BTC pair adjustment, with BTC/USDT's candle at the same time", async () => {
-      if (verbose) console.log('[TEST] Starting BTC pair adjustment test');
-      mockFetchWithRetry
-        .mockResolvedValueOnce({
-          ok: true,
-          status: 200,
-          json: async () => ({ symbols: [{ baseAsset: 'XTM', quoteAsset: 'BTC' }] })
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          status: 200,
-          json: async () => [[1766103360000, 0, 0.0005, 0.0004, 0.00045, 1000]]
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          status: 200,
-          json: async () => [[1766103360000, 99500, 100000, 99000, 99800, 10]]
-        });
-
-      const price = await getCryptoPrice('xtm', '2025-12-19 00:17:00', 'UTC', 'high', verbose, null, null, null);
-      if (verbose) console.log('[TEST] getCryptoPrice returned:', price);
-      expect(price).toBeCloseTo(50.0, 2);
-    });
-
-    it('handles rate limit retry (mock 429)', async () => {
-      mockFetchWithRetry
-        .mockImplementationOnce(async (url, verbose) => {
-          if (verbose) console.log('[DEBUG] Mock call 1 - initial failure with status 429 - URL:', url);
-          return new Response(null, { status: 429, ok: false });
-        })
-        .mockImplementationOnce(async (url, verbose) => {
-          if (verbose) console.log('[DEBUG] Mock call 2 - retry exchangeInfo success - URL:', url);
-          return {
-            ok: true,
-            status: 200,
-            json: async () => ({ symbols: [{ baseAsset: 'XTM', quoteAsset: 'USDT' }] })
-          };
-        })
-        .mockImplementationOnce(async (url, verbose) => {
-          if (verbose) console.log('[DEBUG] Mock call 3 - retry klines success - URL:', url);
-          return {
-            ok: true,
-            status: 200,
-            json: async () => [[1766103360000, 0, 50.0, 40.0, 45.0, 1000]]
-          };
-        })
-        .mockImplementationOnce(async (url, verbose) => {
-          if (verbose) console.log('[DEBUG] Mock call 4 - CoinPaprika fallback failure - URL:', url);
-          return { ok: false, status: 500 };
-        });
-
-      if (verbose) console.log('[VERBOSE] Starting rate limit test promise...');
-
-      const pricePromise = getCryptoPrice('xtm', '2025-12-19 00:17:00', 'UTC', 'high', verbose, null, null, null);
-
-      if (verbose) {
-        console.log('[DEBUG] Pending timers before flush:', vi.getTimerCount());
-        console.log('[DEBUG] Mock calls before flush:', mockFetchWithRetry.mock.calls.length);
-      }
-
-      if (verbose) console.log('[VERBOSE] Running all timers to flush backoff (step 1)');
-      vi.runAllTimers();
-      await Promise.resolve(); // Flush microtasks
-
-      if (verbose) {
-        console.log('[DEBUG] Pending timers after flush 1:', vi.getTimerCount());
-        console.log('[DEBUG] Mock calls after flush 1:', mockFetchWithRetry.mock.calls.length);
-      }
-
-      if (verbose) console.log('[VERBOSE] Running all timers to flush backoff (step 2)');
-      vi.runAllTimers();
-      await Promise.resolve();
-
-      if (verbose) {
-        console.log('[DEBUG] Pending timers after flush 2:', vi.getTimerCount());
-        console.log('[DEBUG] Mock calls after flush 2:', mockFetchWithRetry.mock.calls.length);
-      }
-
-      if (verbose) console.log('[VERBOSE] Running all timers to flush backoff (step 3)');
-      vi.runAllTimers();
-      await Promise.resolve();
-
-      if (verbose) {
-        console.log('[DEBUG] Pending timers after flush 3:', vi.getTimerCount());
-        console.log('[DEBUG] Mock calls after flush 3:', mockFetchWithRetry.mock.calls.length);
-      }
-
-      if (verbose) console.log('[VERBOSE] All timers flushed - awaiting price...');
-      const price = await pricePromise;
-
-      if (verbose) console.log(`[VERBOSE] Rate limit test completed with price: ${price}`);
-
-      expect(price).toBe(50.0);
-      expect(mockFetchWithRetry).toHaveBeenCalledTimes(3); // 3 calls (fallback skipped)
-    }, 30000); // 30s timeout - generous buffer
-
-    it("uses CoinGecko's price for the day when its hourly range is empty, in close mode", async () => {
-      if (verbose) console.log('[TEST] Starting day-price fallback test');
-
-      mockFetchWithRetry.mockReset();
-      mockFetchWithRetry.mockClear();
-
-      mockFetchWithRetry.mockImplementation(async (url) => {
-        if (verbose) console.log('[MOCK] Fetch called for URL:', url);
-
-        if (url.includes('mexc.com')) {
-          return { ok: false, status: 500 };
-        }
-
-        if (url.includes('/market_chart/range')) {
-          return { ok: true, status: 200, json: async () => ({ prices: [] }) };
-        }
-
-        if (url.includes('/history?date=19-12-2025')) {
-          return {
-            ok: true,
-            status: 200,
-            json: async () => ({ market_data: { current_price: { usd: 42.7 } } })
-          };
-        }
-
-        return { ok: false, status: 404 };
-      });
-
-      const price = await getCryptoPrice('xtm', '2025-12-19 00:17:00', 'UTC', 'close', verbose, null, null, null);
-      if (verbose) console.log('[TEST] getCryptoPrice returned:', price);
-      expect(price).toBe(42.7);
-    });
-
-    it('returns null when both CoinGecko endpoints return 404', async () => {
-      mockFetchWithRetry
-        .mockResolvedValueOnce({ ok: false, status: 500 }) // MEXC fails
-        .mockResolvedValueOnce({ ok: false, status: 404 }) // hourly range 404
-        .mockResolvedValueOnce({ ok: false, status: 404 }); // history 404
-
-      const price = await getCryptoPrice('xtm', '2025-12-19 00:17:00', 'UTC', 'close', verbose, null, null, null);
-      expect(price).toBeNull();
-    });
-
-    it('returns null when CoinGecko history is missing market_data key', async () => {
-      mockFetchWithRetry
-        .mockResolvedValueOnce({ ok: false, status: 500 }) // MEXC fails
-        .mockResolvedValueOnce({ ok: false, status: 404 }) // hourly range fails
-        .mockResolvedValueOnce({
-          ok: true,
-          status: 200,
-          json: async () => ({ market_data: null }) // missing / null
-        });
-
-      const price = await getCryptoPrice('xtm', '2025-12-19 00:17:00', 'UTC', 'close', verbose, null, null, null);
-      expect(price).toBeNull();
-    });
-
-    it('returns null when CoinGecko history is missing current_price.usd', async () => {
-      mockFetchWithRetry
-        .mockResolvedValueOnce({ ok: false, status: 500 }) // MEXC fails
-        .mockResolvedValueOnce({ ok: false, status: 404 }) // hourly range fails
-        .mockResolvedValueOnce({
-          ok: true,
-          status: 200,
-          json: async () => ({
-            market_data: {
-              current_price: { eur: 39.5 } // usd missing
-            }
-          })
-        }); // history missing usd
-
-      const price = await getCryptoPrice('xtm', '2025-12-19 00:17:00', 'UTC', 'close', verbose, null, null, null);
-      expect(price).toBeNull();
-    });
-
-    it('handles invalid response object from CoinGecko (no .json method)', async () => {
-      mockFetchWithRetry
-        .mockResolvedValueOnce({ ok: false, status: 500 }) // MEXC fails
-        .mockResolvedValueOnce({}) // invalid response (no json)
-        .mockResolvedValueOnce({}); // invalid again for history
-
-      const price = await getCryptoPrice('xtm', '2025-12-19 00:17:00', 'UTC', 'close', verbose, null, null, null);
-      expect(price).toBeNull();
-    });
-
-    it('handles JSON parse error in CoinGecko responses', async () => {
-      mockFetchWithRetry
-        .mockResolvedValueOnce({ ok: false, status: 500 }) // MEXC fails
-        .mockResolvedValueOnce({
-          ok: true,
-          status: 200,
-          json: async () => { throw new Error('Simulated parse error'); }
-        }) // hourly range parse error
-        .mockResolvedValueOnce({
-          ok: true,
-          status: 200,
-          json: async () => { throw new Error('Simulated parse error'); }
-        }); // history parse error
-
-      const price = await getCryptoPrice('xtm', '2025-12-19 00:17:00', 'UTC', 'close', verbose, null, null, null);
-      expect(price).toBeNull();
+    it("refuses a time zone that is not named in full or UTC", () => {
+      expect(() => parseInputToUtcMs("2025-12-19 00:17:00", "CDT")).toThrow(
+        /Not a valid time zone: CDT/,
+      );
     });
   });
 
-  describe('CSV Parsing', () => {
-    it('parses tests/mock-input.csv correctly', () => {
-      const csvContent = fs.readFileSync('tests/mock-input.csv', 'utf8');
+  describe("CSV Parsing", () => {
+    it("parses tests/mock-input.csv correctly", () => {
+      const csvContent = fs.readFileSync("tests/mock-input.csv", "utf8");
       const records = csvParse(csvContent, {
         columns: true,
         skip_empty_lines: true,
         trim: true,
-        delimiter: ',',
+        delimiter: ",",
         quote: '"',
-        relax_column_count: true
+        relax_column_count: true,
       });
 
       expect(records.length).toBeGreaterThan(0);
-      expect(records[0]['date (UTC)']).toBe('2025-02-01 00:00:00');
-      expect(records[0]['amount']).toBe('10.5');
+      expect(records[0]["date (UTC)"]).toBe("2025-02-01 00:00:00");
+      expect(records[0]["amount"]).toBe("10.5");
     });
   });
 
   // Smoke/integration test for the CLI entry point (index.js)
-  describe('CLI entry point (index.js) smoke/integration test', () => {
-    const { execSync } = require('child_process');
-    const path = require('path');
+  describe("CLI entry point (index.js) smoke/integration test", () => {
+    const { execSync } = require("child_process");
+    const path = require("path");
 
-    const indexPath = path.resolve(__dirname, '../index.js');
+    const indexPath = path.resolve(__dirname, "../index.js");
 
-    it('parses and runs --help without crashing (exit 0 expected)', () => {
+    it("parses and runs --help without crashing (exit 0 expected)", () => {
       const output = execSync(`node ${indexPath} --help`, {
-        encoding: 'utf8',
-        stdio: 'pipe',
+        encoding: "utf8",
+        stdio: "pipe",
         timeout: 2000,
       });
 
-      expect(output).toContain('crypto-price-filler');
-      expect(output).toContain('--token');
+      expect(output).toContain("crypto-price-filler");
+      expect(output).toContain("--token");
     });
 
-    it('fails gracefully on missing required args (exit 1 expected)', () => {
+    it("fails gracefully on missing required args (exit 1 expected)", () => {
       let exitedWithError = false;
       let exitCode = 0;
 
       try {
-        execSync(`node ${indexPath}`, { stdio: 'ignore', timeout: 2000 });
+        execSync(`node ${indexPath}`, { stdio: "ignore", timeout: 2000 });
       } catch (err) {
         exitedWithError = true;
         exitCode = err.status;
@@ -503,7 +122,7 @@ describe('Crypto Price Filler Helpers', () => {
       expect(exitCode).toBe(1);
     });
 
-    it('parses minimal valid args without crashing (quick smoke)', () => {
+    it("parses minimal valid args without crashing (quick smoke)", () => {
       let exitedWithError = false;
       let exitCode = 0;
 
@@ -511,9 +130,9 @@ describe('Crypto Price Filler Helpers', () => {
         execSync(
           `node ${indexPath} --token=xtm --input=/dev/null --output=/dev/null`,
           {
-            stdio: 'ignore',
+            stdio: "ignore",
             timeout: 1500,
-          }
+          },
         );
       } catch (err) {
         exitedWithError = true;
@@ -526,8 +145,8 @@ describe('Crypto Price Filler Helpers', () => {
   });
 
   // Coverage collection for index.js (CLI entry point)
-  describe('index.js coverage collection (CLI entry point)', () => {
-    it('loads index.js without crashing (basic coverage)', async () => {
+  describe("index.js coverage collection (CLI entry point)", () => {
+    it("loads index.js without crashing (basic coverage)", async () => {
       // Mock process.exit to prevent Commander from killing the test runner
       const originalExit = process.exit;
       process.exit = vi.fn();
@@ -535,36 +154,36 @@ describe('Crypto Price Filler Helpers', () => {
       // Mock valid argv to avoid commander error on missing token/input
       const originalArgv = process.argv;
       process.argv = [
-        'node',
-        'index.js',
-        '--token=test',
-        '--input=/dev/null',
-        '--output=/dev/null',
+        "node",
+        "index.js",
+        "--token=test",
+        "--input=/dev/null",
+        "--output=/dev/null",
       ];
 
       try {
-        await import('../index.js');
+        await import("../index.js");
       } finally {
         process.argv = originalArgv;
         process.exit = originalExit;
       }
     }, 5000);
 
-    it('parses mocked CLI args without crashing (coverage boost)', async () => {
+    it("parses mocked CLI args without crashing (coverage boost)", async () => {
       const originalArgv = process.argv;
       const originalExit = process.exit;
 
       process.argv = [
-        'node',
-        'index.js',
-        '--token=xtm',
-        '--input=/dev/null',
-        '--output=/dev/null',
+        "node",
+        "index.js",
+        "--token=xtm",
+        "--input=/dev/null",
+        "--output=/dev/null",
       ];
       process.exit = vi.fn();
 
       try {
-        await import('../index.js');
+        await import("../index.js");
       } finally {
         process.argv = originalArgv;
         process.exit = originalExit;
@@ -572,12 +191,3 @@ describe('Crypto Price Filler Helpers', () => {
     }, 5000);
   });
 });
-
-// Export everything needed for tests
-export {
-  getCryptoPrice,
-  getCache,
-  setCache,
-  canonicalTimeZone,
-  parseInputToUtcMs
-};
