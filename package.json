@@ -9,11 +9,12 @@
   },
   "files": [
     "api-key-store/",
-    "apps-script-runner/"
+    "apps-script-runner/",
+    "unlock-api-keys.sh"
   ],
   "scripts": {
+    "api-keys": "node manage-api-keys.js",
     "lint": "eslint . --max-warnings 0",
-    "save-api-key": "node save-api-key.js",
     "test": "node --test \"test/*.test.js\""
   },
   "author": "Christopher M. Balz with Grok and Claude",

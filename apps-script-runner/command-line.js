@@ -9,9 +9,10 @@
  * - `runScriptCommandLine` builds the program with commander, with the
  *   options every Node version has, `--config` and `--verbose`; lets the
  *   Node version add its own arguments or commands; parses the arguments;
- *   asks the Node version for the script's Script Properties, such as an
- *   api key it unlocks then, so that `--help` never asks for a password;
- *   runs the call; and returns the exit code. A number the script returns
+ *   has the Node version open the api keys the call sends, handed to the
+ *   script as config values or Script Properties, only once the arguments
+ *   are parsed, so that `--help` never asks for a password; runs the call;
+ *   and returns the exit code. A number the script returns
  *   is printed on stdout, with exit code 0. Anything else it returns, such
  *   as the message a cell would show, goes to stderr with exit code 1, and
  *   so does a call that fails. Help goes to stdout with exit code 0, and a
@@ -34,7 +35,7 @@
 import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { Command, CommanderError } from 'commander';
-import { readConfigFile } from './config-file.js';
+import { layConfig, readConfigFile } from './config-file.js';
 import { openAppsScript } from './run-apps-script.js';
 
 /** What the help says about exit codes. */
@@ -65,19 +66,20 @@ function messageOf(thrown) {
  * @param {Array} call.args - Its arguments
  * @param {Command} call.command - The parsed command, for `--config` and `--verbose`
  * @param {function|undefined} call.fetch - The fetch to do the script's requests, or undefined for Node's own
- * @param {function(Object): Promise<Object<string, string>>} call.scriptProperties - Gives the script's Script Properties, handed where output goes
+ * @param {function(Object): Promise<{config: (Object|undefined), scriptProperties: (Object|undefined)}>} call.apiKeys - Opens the api keys the call sends (`runScriptCommandLine`)
  * @param {{stdout: {write: function}, stderr: {write: function}}} call.io - Where output goes
  * @returns {Promise<number>} The exit code
  */
-async function printCall({ scriptPath, name, args, command, fetch, scriptProperties, io }) {
+async function printCall({ scriptPath, name, args, command, fetch, apiKeys, io }) {
   const options = command.optsWithGlobals();
   const required = command.getOptionValueSourceWithGlobals('config') !== 'default';
   const config = readConfigFile(options.config, { required });
+  const keys = await apiKeys({ name, args, io });
   const script = await openAppsScript(scriptPath, {
-    config,
+    config: layConfig(config, keys.config ?? {}),
     fetch,
     onLog: options.verbose === true ? (line) => io.stderr.write(`${line.level}: ${line.text}\n`) : null,
-    scriptProperties: await scriptProperties(io)
+    scriptProperties: keys.scriptProperties ?? {}
   });
   try {
     const value = await script.call(name, ...args);
@@ -100,20 +102,20 @@ async function printCall({ scriptPath, name, args, command, fetch, scriptPropert
  * @param {string|URL} spec.scriptPath - The `.gs` file
  * @param {string} spec.defaultConfigFile - The config file used when `--config` names none
  * @param {function(Command, function(string, Array, Command): Promise<void>): void} spec.describe - Gives the program its name, description, arguments or commands; each action calls the function it is handed with the script function's name, its arguments, and the action's command
- * @param {function({stdout: Object, stderr: Object}): Promise<Object<string, string>>} [spec.scriptProperties] - Gives the Script Properties the script opens with, once the arguments are parsed and before the call, handed where output goes; none when absent
+ * @param {function({name: string, args: Array, io: Object}): Promise<{config: (Object|undefined), scriptProperties: (Object|undefined)}>} [spec.apiKeys] - Opens the api keys the call sends, once the arguments are parsed and before the script opens, handed the call and where output goes; gives config values laid over the config file's, Script Properties, or both. None when absent
  * @param {Object} [deps] - What a test replaces
  * @param {function} [deps.fetch] - Does the script's web requests, in place of Node's fetch
  * @param {{write: function(string): void}} [deps.stdout=process.stdout] - Where output goes
  * @param {{write: function(string): void}} [deps.stderr=process.stderr] - Where messages go
  * @returns {Promise<number>} The exit code
  */
-export async function runScriptCommandLine({ argv, scriptPath, defaultConfigFile, describe, scriptProperties }, deps = {}) {
+export async function runScriptCommandLine({ argv, scriptPath, defaultConfigFile, describe, apiKeys }, deps = {}) {
   const io = { stdout: deps.stdout ?? process.stdout, stderr: deps.stderr ?? process.stderr };
   let exitCode = 0;
   const program = new Command()
     .exitOverride()
     .configureOutput({ writeOut: (text) => io.stdout.write(text), writeErr: (text) => io.stderr.write(text) })
-    .option('-c, --config <file>', "JSON file of values for the script's config objects, such as api keys", defaultConfigFile)
+    .option('-c, --config <file>', "JSON file of values for the script's config objects", defaultConfigFile)
     .option('-v, --verbose', "show the script's log on stderr");
   const runCall = async (name, args, command) => {
     exitCode = await printCall({
@@ -122,7 +124,7 @@ export async function runScriptCommandLine({ argv, scriptPath, defaultConfigFile
       args,
       command,
       fetch: deps.fetch,
-      scriptProperties: scriptProperties ?? (async () => ({})),
+      apiKeys: apiKeys ?? (async () => ({})),
       io
     });
   };

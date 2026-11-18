@@ -7,7 +7,8 @@
  * stand-in MEXC and CoinGecko of `helpers/stand-in-fetch-preload.js`, whose
  * ping takes one key alone. The key files are in a temp folder, removed
  * afterwards, and `API_KEYS_FILE_PATH` names the one a run reads. The
- * password is typed on the child's stdin, as at a terminal.
+ * password is typed on the child's stdin, as at a terminal, or kept in
+ * `API_KEYS_PASSWORD`, as `unlock-api-keys.sh` keeps it.
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -54,9 +55,10 @@ afterAll(() => {
  *
  * @param {string} keyFile - The key file, which need not exist
  * @param {string} typed - What is typed at the prompts
+ * @param {string} [kept=''] - The password kept in `API_KEYS_PASSWORD`; none when empty
  * @returns {{status: number, stdout: string, stderr: string, asked: string[], written: boolean}} How it ended, what it printed, the urls it asked for, and whether it wrote the output
  */
-function runReading(keyFile, typed) {
+function runReading(keyFile, typed, kept = '') {
   runs += 1;
   const output = path.join(folder, `out-${runs}.csv`);
   const askedPath = path.join(folder, `asked-${runs}.json`);
@@ -65,7 +67,13 @@ function runReading(keyFile, typed) {
     ['--import', PRELOAD_URL, 'index.js', '--token=xtm', `--input=${input}`, `--output=${output}`],
     {
       cwd: FILLER_DIR,
-      env: { ...process.env, NODE_ENV: 'test', API_KEYS_FILE_PATH: keyFile, STAND_IN_ASKED: askedPath },
+      env: {
+        ...process.env,
+        NODE_ENV: 'test',
+        API_KEYS_FILE_PATH: keyFile,
+        API_KEYS_PASSWORD: kept,
+        STAND_IN_ASKED: askedPath
+      },
       input: typed,
       encoding: 'utf8',
       timeout: RUN_TIMEOUT_MS
@@ -86,7 +94,7 @@ describe('the command line and the saved CoinGecko api key', () => {
     () => {
       const run = runReading(takenKeyFile, `${PASSWORD}\n`);
       expect(run.status).toBe(0);
-      expect(run.stderr).toContain('Password for the CoinGecko api key: ');
+      expect(run.stderr).toContain(`Password for the api keys in ${takenKeyFile}: `);
       expect(run.stderr).not.toContain(PASSWORD);
       expect(run.asked.filter((url) => url.endsWith('/ping'))).toEqual(['https://api.coingecko.com/api/v3/ping']);
       expect(run.written).toBe(true);
@@ -99,7 +107,9 @@ describe('the command line and the saved CoinGecko api key', () => {
     () => {
       const run = runReading(takenKeyFile, 'wrong\n');
       expect(run.status).toBe(1);
-      expect(run.stderr).toMatch(/Could not open the CoinGecko api key saved in .*taken-api-keys\.json: The password does not open/);
+      expect(run.stderr).toMatch(
+        /Could not open the CoinGecko api key saved in .*taken-api-keys\.json with the password typed: The password does not open/
+      );
       expect(run.asked).toEqual([]);
       expect(run.written).toBe(false);
     },
@@ -111,9 +121,23 @@ describe('the command line and the saved CoinGecko api key', () => {
     () => {
       const run = runReading(refusedKeyFile, `${PASSWORD}\n`);
       expect(run.status).toBe(1);
-      expect(run.stderr).toMatch(/CoinGecko refused the api key saved in .*refused-api-keys\.json\. Save a new one: node ".*save-api-key\.js" coingecko/);
+      expect(run.stderr).toMatch(
+        /CoinGecko refused the api key saved in .*refused-api-keys\.json\. Save a new one, in the project's top folder: npm run api-keys -- set coingecko/
+      );
       expect(run.asked).toEqual(['https://api.coingecko.com/api/v3/ping']);
       expect(run.written).toBe(false);
+    },
+    RUN_TIMEOUT_MS
+  );
+
+  it(
+    'opens the key with the password in API_KEYS_PASSWORD, asking for none',
+    () => {
+      const run = runReading(takenKeyFile, '', PASSWORD);
+      expect(run.status).toBe(0);
+      expect(run.stderr).not.toContain('Password');
+      expect(run.asked.filter((url) => url.endsWith('/ping'))).toEqual(['https://api.coingecko.com/api/v3/ping']);
+      expect(run.written).toBe(true);
     },
     RUN_TIMEOUT_MS
   );

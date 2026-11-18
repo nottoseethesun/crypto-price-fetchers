@@ -33,25 +33,34 @@ reaches it only when it moves the pin.
 
 ## Keys
 
-No api key is committed. The CoinGecko key is kept in `api-keys.json` at the
-repo's top, which git ignores, encrypted with a password the owner types:
-LP Ranger's design, built as a module any project can use, `api-key-store/`
-(its README shows how). `coingecko-api-key.js` fills it in for CoinGecko,
-and `npm run save-api-key -- coingecko` saves a key. crypto-price-filler and
-the Node version of `getCryptoPriceFromCentralizedExchange.gs` ask for the
-password as a run starts, and keep the key only in memory. A test names a
-key file of its own, never the owner's: crypto-price-filler's
-`vitest.config.js` names one that does not exist (`API_KEYS_FILE_PATH`).
+**Never show any character of an api key once it is entered**: not in a
+reply, a log line, an error message, a test's output, or a listing. The key
+manager says only whether each key is saved.
+
+No api key is committed. The keys the programs send (CoinGecko's,
+DexTools' and x1.ninja's, as the top `config.json` lists them under
+`apiKeys`) are kept in `api-keys.json` at the repo's top, which git ignores,
+encrypted with one password the owner types: LP Ranger's design, built as a
+module any project can use, `api-key-store/` (its README shows how).
+`npm run api-keys` runs the key manager, `manage-api-keys.js`. A program
+opens its keys with the password in `API_KEYS_PASSWORD`, which
+`source ./unlock-api-keys.sh` keeps for a terminal, or else asks for it, and
+keeps the keys only in memory. pulsechain-analytics and
+x1-validator-analytics install the module from GitHub and keep a copy of
+`unlock-api-keys.sh`, which their tests hold to this one.
+
+A test names a key file of its own, never the owner's, and passes no
+`API_KEYS_PASSWORD` it did not set: crypto-price-filler's
+`vitest.config.js` names a key file that does not exist and empties the
+password.
 
 In Apps Script, the CoinGecko key is the Script Property `COINGECKO_API_KEY`,
-which the owner sets. The Node version hands the script the key it opened as
-that property, through the runner's `scriptProperties`.
-
-`crypto-price-fetchers.js` reads its DexTools and x1.ninja keys from
-`config.json` beside it, which git ignores; `config-example.json` shows the
-shape, and the Sheets script holds placeholders the owner replaces in Apps
-Script. crypto-price-filler reads `config-example.json`, its committed
-settings, with its own `config.json`, which git ignores, laid over them.
+which the owner sets, and the DexTools and x1.ninja keys are pasted into
+`crypto-price-fetchers.gs`. The Node versions hand the keys they open to
+their scripts: as that Script Property, and as `CONFIG.API_KEY` and
+`X1_CONFIG.API_KEY`. crypto-price-filler reads `config-example.json`, its
+committed settings, with its own `config.json`, which git ignores, laid over
+them.
 
 ## Tests
 

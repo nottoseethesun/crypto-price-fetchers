@@ -53,14 +53,12 @@ What differs from the sheet:
 
 - It runs on your computer, so there is no 30-second limit per call and no
   daily cap on web requests.
-- `crypto-price-fetchers.js` reads its keys from `config.json` beside it,
-  which git ignores, instead of from the script. Copy `config-example.json`
-  to `config.json` and fill it in. A key the script reads as it sends each
-  request takes effect this way; a value the script works out as it loads,
-  such as a url, keeps the value written in the script.
-- `getCryptoPriceFromCentralizedExchange.js` sends the CoinGecko key saved,
-  encrypted, in the repo's key file (see [Api keys](#api-keys)), and hands
-  it to the script as the Script Property the script reads in Apps Script.
+- The api keys come from the repo's encrypted key file (see
+  [Api keys](#api-keys)), not from the script. `crypto-price-fetchers.js`
+  hands the DexTools or x1.ninja key to the script's config, which the
+  script reads as it sends each request, and
+  `getCryptoPriceFromCentralizedExchange.js` hands the CoinGecko key to the
+  script as the Script Property it reads in Apps Script.
 - The cache lasts while the script is open: for the command line, one run.
 - The sheet's menu is not there.
 
@@ -74,24 +72,37 @@ npm ci
 
 ### Api keys
 
-The CoinGecko demo api key is kept in `api-keys.json` at the repo's top,
+The keys the tools send (CoinGecko's, DexTools' and x1.ninja's, as the top
+`config.json` lists them) are kept in `api-keys.json` at the repo's top,
 which git ignores, encrypted with a password you choose, as LP Ranger keeps
-its keys. To save it, from the repo's top folder:
+its keys. To save them, from the repo's top folder:
 
 ```bash
-npm run save-api-key -- coingecko
+npm run api-keys
 ```
 
-It asks for the key, then the password, twice, showing nothing of what is
-typed; asks CoinGecko whether it takes the key; and saves it only if it
-does. Each run of a tool that sends the key then asks for the password, opens
-the key, and keeps it in memory for that run only. The password is kept
-nowhere. Without a saved key, the tools ask CoinGecko without one, at its
-lower rate limit.
+It lists each key, saved or not, never showing its characters, and asks for
+each one not saved: the key, then the password, twice the first time,
+showing nothing of what is typed. Each key is saved only once its service
+takes it; Enter alone skips one. `npm run api-keys -- set dextools`
+replaces one.
 
-Both `getCryptoPriceFromCentralizedExchange.js` and crypto-price-filler send
-the key. In Apps Script, the key is a Script Property instead: see the
-`API KEY` section of the `.gs` file's header.
+To keep the password for a terminal, so the tools open their keys without
+asking:
+
+```bash
+source ./unlock-api-keys.sh
+```
+
+It asks for the password once, checks that it opens the keys, and keeps it in
+`API_KEYS_PASSWORD` until the terminal closes. Without it, each tool asks for
+the password as it starts. The password is kept nowhere on disk, and the keys
+only in memory, for one run. Without a saved CoinGecko key, the tools ask
+CoinGecko without one, at its lower rate limit.
+
+In Apps Script, the keys are not read from the file: the CoinGecko key is a
+Script Property (see the `API KEY` section of the exchange script's header),
+and the DexTools and x1.ninja keys are pasted into `crypto-price-fetchers.gs`.
 
 The store itself is `api-key-store/`, a module any Node project can use:
 see [its README](./api-key-store/README.md).

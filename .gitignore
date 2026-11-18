@@ -6,10 +6,10 @@
 api-keys.json
 api-keys.json.tmp
 
-# The config files of the Node versions of the Sheets scripts, which may
-# hold api keys (crypto-price-fetchers.js's does), and crypto-price-filler's
-# own settings
-/config.json
+# The local settings of the exchange script's Node version and of
+# crypto-price-filler, each laid over the committed ones. The top
+# config.json is committed: it lists the services whose keys the project
+# keeps, and holds no key.
 /fetch-from-centralized-exchange/config.json
 /fetch-from-centralized-exchange/crypto-price-filler/config.json
 

@@ -22,6 +22,7 @@ import { PassThrough } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import {
   askPassword,
+  checkPasswordOpensKeys,
   decryptKey,
   encryptKey,
   enterApiKey,
@@ -33,8 +34,9 @@ import {
   PBKDF2_ITERATIONS,
   saveEncryptedKey,
   savedServices,
+  savingPassword,
   setApiKey,
-  unlockApiKey
+  unlockApiKeys
 } from '../api-key-store/index.js';
 
 /** The key file LP Ranger's own code wrote, for its service `moralis`. */
@@ -256,142 +258,258 @@ describe('setApiKey and getApiKey', () => {
   });
 });
 
-describe('unlockApiKey and enterApiKey', () => {
+/**
+ * A stand-in service, whose check records each key it is asked about and
+ * answers `verdict`, or throws it when it is an Error.
+ *
+ * @param {string} service - Its name in the key file
+ * @param {Array<Array<string>>} checked - Where each check is recorded, as [service, key]
+ * @param {string|Error} [verdict='valid'] - What it says of every key
+ * @returns {import('../api-key-store/services.js').Service} The service
+ */
+function standInService(service, checked, verdict = 'valid') {
+  return {
+    service,
+    name: `Service ${service}`,
+    check: async (key) => {
+      checked.push([service, key]);
+      if (verdict instanceof Error) throw verdict;
+      return verdict;
+    }
+  };
+}
+
+/**
+ * A key store spec whose prompts answer in turn from `answers`.
+ *
+ * @param {string} file - The key file
+ * @param {Object} [options] - The answers, and the environment
+ * @param {string[]} [options.answers=[]] - What is typed at each prompt
+ * @param {Object<string, string>} [options.env={}] - The environment
+ * @returns {Object} The spec, with what it said in `said` and the prompts it asked in `asked`
+ */
+function standInSpec(file, { answers = [], env = {} } = {}) {
+  const queue = [...answers];
+  const spec = {
+    file,
+    env,
+    said: [],
+    asked: [],
+    ask: async (prompt) => {
+      spec.asked.push(prompt);
+      if (queue.length === 0) assert.fail(`Asked ${prompt} with no answer left`);
+      return queue.shift();
+    }
+  };
+  spec.say = (line) => spec.said.push(line);
+  return spec;
+}
+
+describe('unlockApiKeys', () => {
   let file;
-  let said;
   let checked;
+  let alpha;
+  let beta;
 
-  /**
-   * Builds a key spec for the service `example`, whose prompts answer in
-   * turn from `answers` and whose check answers `verdict`, or throws when
-   * the verdict is an Error.
-   *
-   * @param {string[]} answers - What is typed at each prompt
-   * @param {string|Error} [verdict='valid'] - What the service says of the key
-   * @returns {Object} The spec, with the prompts it asked in `asked`
-   */
-  function exampleSpec(answers, verdict = 'valid') {
-    const asked = [];
-    const queue = [...answers];
-    return {
-      file,
-      service: 'example',
-      name: 'Example',
-      saveCommand: 'npm run save-api-key -- example',
-      check: async (key) => {
-        checked.push(key);
-        if (verdict instanceof Error) throw verdict;
-        return verdict;
-      },
-      ask: async (prompt) => {
-        asked.push(prompt);
-        if (queue.length === 0) assert.fail(`Asked ${prompt} with no answer left`);
-        return queue.shift();
-      },
-      say: (line) => said.push(line),
-      asked
-    };
-  }
-
-  beforeEach(() => {
+  beforeEach(async () => {
     file = path.join(makeFolder(), 'api-keys.json');
-    said = [];
     checked = [];
-    setApiKey('example', null);
+    alpha = standInService('alpha', checked);
+    beta = standInService('beta', checked);
+    setApiKey('alpha', null);
+    setApiKey('beta', null);
   });
 
-  it('unlockApiKey answers null and asks nothing when no key is saved', async () => {
-    const spec = exampleSpec([]);
-    assert.equal(await unlockApiKey(spec), null);
+  it('answers null for each service, and asks nothing, when no key is saved', async () => {
+    const spec = standInSpec(file);
+    assert.deepEqual(await unlockApiKeys(spec, [alpha, beta]), { alpha: null, beta: null });
     assert.deepEqual(spec.asked, []);
     assert.deepEqual(checked, []);
   });
 
-  it('unlockApiKey opens the saved key with its password, asks the service once, and keeps the key for the run', async () => {
-    await saveEncryptedKey(file, 'example', 'saved-key', 'pw');
-    const spec = exampleSpec(['pw']);
-    assert.equal(await unlockApiKey(spec), 'saved-key');
-    assert.deepEqual(spec.asked, ['Password for the Example api key: ']);
-    assert.deepEqual(checked, ['saved-key']);
-    assert.equal(getApiKey('example'), 'saved-key');
-    assert.deepEqual(said, []);
+  it('opens every saved key with one typed password, has each service check its key once, and keeps them', async () => {
+    await saveEncryptedKey(file, 'alpha', 'a-key', 'pw');
+    await saveEncryptedKey(file, 'beta', 'b-key', 'pw');
+    const spec = standInSpec(file, { answers: ['pw'] });
+    assert.deepEqual(await unlockApiKeys(spec, [alpha, beta]), { alpha: 'a-key', beta: 'b-key' });
+    assert.deepEqual(spec.asked, [`Password for the api keys in ${file}: `]);
+    assert.deepEqual(checked, [
+      ['alpha', 'a-key'],
+      ['beta', 'b-key']
+    ]);
+    assert.equal(getApiKey('alpha'), 'a-key');
+    assert.equal(getApiKey('beta'), 'b-key');
   });
 
-  it('unlockApiKey stops the run, saying what to do, when the password does not open the key', async () => {
-    await saveEncryptedKey(file, 'example', 'saved-key', 'pw');
-    const failure = await unlockApiKey(exampleSpec(['wrong'])).then(
+  it('opens the keys with the password in API_KEYS_PASSWORD, asking nothing', async () => {
+    await saveEncryptedKey(file, 'alpha', 'a-key', 'pw');
+    const spec = standInSpec(file, { env: { API_KEYS_PASSWORD: 'pw' } });
+    assert.deepEqual(await unlockApiKeys(spec, [alpha, beta]), { alpha: 'a-key', beta: null });
+    assert.deepEqual(spec.asked, []);
+  });
+
+  it('stops the run, saying how to unlock again, when API_KEYS_PASSWORD does not open the keys', async () => {
+    await saveEncryptedKey(file, 'alpha', 'a-key', 'pw');
+    const failure = await unlockApiKeys(standInSpec(file, { env: { API_KEYS_PASSWORD: 'other' } }), [alpha]).then(
       () => assert.fail('It opened the key with a wrong password'),
       (error) => error
     );
     assert.equal(failure.keyRefused, true);
-    assert.match(failure.message, /^Could not open the Example api key saved in .*: The password does not open/);
-    assert.match(failure.message, /or save the key again: npm run save-api-key -- example$/);
-    assert.equal(getApiKey('example'), null);
+    assert.match(failure.message, /^Could not open the Service alpha api key saved in .* with the password in API_KEYS_PASSWORD: /);
+    assert.match(failure.message, /In the project's top folder, keep the right one with: source \.\/unlock-api-keys\.sh$/);
+    assert.equal(getApiKey('alpha'), null);
   });
 
-  it('unlockApiKey stops the run when the service refuses the saved key', async () => {
-    await saveEncryptedKey(file, 'example', 'saved-key', 'pw');
-    await assert.rejects(unlockApiKey(exampleSpec(['pw'], 'invalid')), {
+  it('stops the run when a typed password does not open the keys', async () => {
+    await saveEncryptedKey(file, 'alpha', 'a-key', 'pw');
+    await assert.rejects(unlockApiKeys(standInSpec(file, { answers: ['other'] }), [alpha]), {
       keyRefused: true,
-      message: `Example refused the api key saved in ${file}. Save a new one: npm run save-api-key -- example`
+      message: /with the password typed: The password does not open the saved key.*Run again with the password the keys were saved with\.$/
     });
-    assert.equal(getApiKey('example'), null);
   });
 
-  it('unlockApiKey uses the saved key, saying so, when the service does not answer', async () => {
-    await saveEncryptedKey(file, 'example', 'saved-key', 'pw');
-    assert.equal(await unlockApiKey(exampleSpec(['pw'], new Error('timed out'))), 'saved-key');
-    assert.deepEqual(said, ['Example did not answer the check of its api key (timed out), so the run uses the key unchecked.']);
+  it('stops the run, keeping no key, when a service refuses its key', async () => {
+    await saveEncryptedKey(file, 'alpha', 'a-key', 'pw');
+    await saveEncryptedKey(file, 'beta', 'b-key', 'pw');
+    const refusing = standInService('beta', checked, 'invalid');
+    await assert.rejects(unlockApiKeys(standInSpec(file, { answers: ['pw'] }), [alpha, refusing]), {
+      keyRefused: true,
+      message: `Service beta refused the api key saved in ${file}. Save a new one, in the project's top folder: npm run api-keys -- set beta`
+    });
+    assert.equal(getApiKey('alpha'), null);
   });
 
-  it('enterApiKey asks for the key, then the password twice, and saves the key once the service takes it', async () => {
-    const spec = exampleSpec(['  typed-key  ', 'pw', 'pw']);
-    assert.equal(await enterApiKey(spec), 'typed-key');
-    assert.deepEqual(spec.asked, ['Example api key: ', 'Password to encrypt the Example api key with: ', 'That password again: ']);
-    assert.deepEqual(checked, ['typed-key']);
-    assert.equal(await loadEncryptedKey(file, 'example', 'pw'), 'typed-key');
-    assert.equal(getApiKey('example'), 'typed-key');
-    assert.deepEqual(said, [`The Example api key is saved in ${file}, encrypted with that password.`]);
+  it('uses a key unchecked, saying so, when its service does not answer', async () => {
+    await saveEncryptedKey(file, 'alpha', 'a-key', 'pw');
+    const silent = standInService('alpha', checked, new Error('timed out'));
+    const spec = standInSpec(file, { answers: ['pw'] });
+    assert.deepEqual(await unlockApiKeys(spec, [silent]), { alpha: 'a-key' });
+    assert.deepEqual(spec.said, ['Service alpha did not answer the check of its api key (timed out), so the run uses the key unchecked.']);
+  });
+});
+
+describe('enterApiKey and savingPassword', () => {
+  let file;
+  let checked;
+
+  beforeEach(() => {
+    file = path.join(makeFolder(), 'api-keys.json');
+    checked = [];
+    setApiKey('alpha', null);
   });
 
-  it('enterApiKey saves nothing for an empty key or password, or passwords that differ', async () => {
+  /**
+   * Enters keys for the services given, in turn, as the manager does.
+   *
+   * @param {Object} spec - The spec (`standInSpec`)
+   * @param {Array<Object>} services - The services
+   * @returns {Promise<Array<?string>>} What each `enterApiKey` gave
+   */
+  async function enterAll(spec, services) {
+    const password = savingPassword(spec);
+    const entered = [];
+    for (const service of services) entered.push(await enterApiKey(spec, service, password, spec.ask));
+    return entered;
+  }
+
+  it('asks for the key, then a new password twice, and saves the key once the service takes it', async () => {
+    const spec = standInSpec(file, { answers: ['  typed-key  ', 'pw', 'pw'] });
+    assert.deepEqual(await enterAll(spec, [standInService('alpha', checked)]), ['typed-key']);
+    assert.deepEqual(spec.asked, [
+      'Service alpha api key (Enter alone skips it): ',
+      'Password to encrypt the api keys with: ',
+      'That password again: '
+    ]);
+    assert.deepEqual(checked, [['alpha', 'typed-key']]);
+    assert.equal(await loadEncryptedKey(file, 'alpha', 'pw'), 'typed-key');
+    assert.equal(getApiKey('alpha'), 'typed-key');
+    assert.deepEqual(spec.said, [`The Service alpha api key is saved, encrypted, in ${file}.`]);
+  });
+
+  it('asks for the password once in a run that enters several keys', async () => {
+    const spec = standInSpec(file, { answers: ['a-key', 'pw', 'pw', 'b-key'] });
+    await enterAll(spec, [standInService('alpha', checked), standInService('beta', checked)]);
+    assert.equal(spec.asked.filter((prompt) => prompt.startsWith('Password')).length, 1);
+    assert.equal(await loadEncryptedKey(file, 'beta', 'pw'), 'b-key');
+  });
+
+  it('asks for the password once, and checks that it opens the keys saved, when the file holds keys', async () => {
+    await saveEncryptedKey(file, 'beta', 'b-key', 'pw');
+    const spec = standInSpec(file, { answers: ['a-key', 'pw'] });
+    await enterAll(spec, [standInService('alpha', checked)]);
+    assert.deepEqual(spec.asked, ['Service alpha api key (Enter alone skips it): ', `Password for the api keys in ${file}: `]);
+    assert.equal(await loadEncryptedKey(file, 'alpha', 'pw'), 'a-key');
+  });
+
+  it('saves with the password in API_KEYS_PASSWORD, asking for none', async () => {
+    const spec = standInSpec(file, { answers: ['a-key'], env: { API_KEYS_PASSWORD: 'pw' } });
+    await enterAll(spec, [standInService('alpha', checked)]);
+    assert.deepEqual(spec.asked, ['Service alpha api key (Enter alone skips it): ']);
+    assert.equal(await loadEncryptedKey(file, 'alpha', 'pw'), 'a-key');
+  });
+
+  it('skips a key left empty, saving nothing and asking for no password', async () => {
+    const spec = standInSpec(file, { answers: ['   '] });
+    assert.deepEqual(await enterAll(spec, [standInService('alpha', checked)]), [null]);
+    assert.deepEqual(spec.said, ['No Service alpha api key was entered, so none was saved.']);
+    assert.equal(fs.existsSync(file), false);
+  });
+
+  it('saves nothing for want of a password: empty, typed two ways, or not opening the keys saved', async () => {
     const cases = [
-      [['  ', 'pw', 'pw'], 'No Example api key was entered, so none was saved.'],
-      [['typed-key', '', ''], 'No password was entered, so the key was not saved.'],
-      [['typed-key', 'pw', 'pw2'], 'The two passwords differ, so the key was not saved.']
+      [{ answers: ['a-key', ''] }, 'No password was entered, so no key was saved.'],
+      [{ answers: ['a-key', 'pw', 'pw2'] }, 'The two passwords differ, so no key was saved.']
     ];
-    for (const [answers, message] of cases) {
-      await assert.rejects(enterApiKey(exampleSpec(answers)), { keyRefused: true, message });
+    for (const [options, message] of cases) {
+      await assert.rejects(enterAll(standInSpec(file, options), [standInService('alpha', checked)]), {
+        keyRefused: true,
+        passwordRefused: true,
+        message
+      });
     }
+    await saveEncryptedKey(file, 'beta', 'b-key', 'pw');
+    await assert.rejects(
+      enterAll(standInSpec(file, { answers: ['a-key'], env: { API_KEYS_PASSWORD: 'other' } }), [standInService('alpha', checked)]),
+      { passwordRefused: true, message: /^The password in API_KEYS_PASSWORD does not open the api keys saved in .*, so no key was saved\.$/ }
+    );
+    assert.equal(hasEncryptedKey(file, 'alpha'), false);
     assert.deepEqual(checked, []);
-    assert.equal(hasEncryptedKey(file, 'example'), false);
   });
 
-  it('enterApiKey saves nothing when the service refuses the key or does not answer', async () => {
-    await assert.rejects(enterApiKey(exampleSpec(['typed-key', 'pw', 'pw'], 'invalid')), {
-      keyRefused: true,
-      message: 'Example refused the api key, so it was not saved. Enter the key as Example shows it.'
-    });
-    await assert.rejects(enterApiKey(exampleSpec(['typed-key', 'pw', 'pw'], new Error('timed out'))), {
-      keyRefused: true,
-      message: 'Example did not answer the check of the api key (timed out), so it was not saved. Try again later.'
-    });
-    assert.equal(hasEncryptedKey(file, 'example'), false);
-    assert.equal(getApiKey('example'), null);
-  });
-
-  it('enterApiKey saves nothing under a password other than that of the keys already saved', async () => {
-    await saveEncryptedKey(file, 'other', 'other-key', 'pw');
-    await assert.rejects(enterApiKey(exampleSpec(['typed-key', 'pw2', 'pw2'])), {
-      keyRefused: true,
-      message: /^The Example api key was not saved: That password does not open the other keys saved in/
-    });
-    assert.equal(hasEncryptedKey(file, 'example'), false);
+  it('saves nothing when the service refuses the key or does not answer', async () => {
+    const cases = [
+      ['invalid', 'Service alpha refused the api key, so it was not saved. Enter the key as Service alpha shows it.'],
+      [new Error('timed out'), 'Service alpha did not answer the check of the api key (timed out), so it was not saved. Try again later.']
+    ];
+    for (const [verdict, message] of cases) {
+      const failure = await enterAll(standInSpec(file, { answers: ['a-key', 'pw', 'pw'] }), [
+        standInService('alpha', checked, verdict)
+      ]).then(
+        () => assert.fail('It saved a key the service did not take'),
+        (error) => error
+      );
+      assert.equal(failure.keyRefused, true);
+      assert.equal(failure.passwordRefused, undefined);
+      assert.equal(failure.message, message);
+    }
+    assert.equal(fs.existsSync(file), false);
+    assert.equal(getApiKey('alpha'), null);
   });
 
   it('keyRefused builds an error that says what to do and marks the key refused', () => {
     const error = keyRefused('Save a new key.');
     assert.equal(error.message, 'Save a new key.');
     assert.equal(error.keyRefused, true);
+  });
+});
+
+describe('checkPasswordOpensKeys', () => {
+  it('counts the keys a password opens: none for a file with no key', async () => {
+    const file = path.join(makeFolder(), 'api-keys.json');
+    assert.equal(await checkPasswordOpensKeys(file, 'pw'), 0);
+    await saveEncryptedKey(file, 'alpha', 'a-key', 'pw');
+    await saveEncryptedKey(file, 'beta', 'b-key', 'pw');
+    assert.equal(await checkPasswordOpensKeys(file, 'pw'), 2);
+    await assert.rejects(checkPasswordOpensKeys(file, 'other'), /does not open the saved key/);
   });
 });

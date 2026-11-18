@@ -12,7 +12,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { getPriceFromCoinGecko, pickFromPrices, utcDay } from '../sources/coingecko.js';
 import * as fetchUtils from '../utils/fetch.js';
 import { setApiKey } from '../../../api-key-store/index.js';
-import { COINGECKO_SERVICE } from '../../../coingecko-api-key.js';
 
 // Mock fetchWithRetry
 vi.mock('../utils/fetch.js', () => {
@@ -79,7 +78,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  setApiKey(COINGECKO_SERVICE, null);
+  setApiKey('coingecko', null);
   vi.clearAllMocks();
 });
 
@@ -230,7 +229,7 @@ describe('CoinGecko Price Fetching', () => {
 
     describe('api key', () => {
       it("sends the demo key in CoinGecko's header when the run has opened one", async () => {
-        setApiKey(COINGECKO_SERVICE, 'test-demo-key');
+        setApiKey('coingecko', 'test-demo-key');
         mockFetchWithRetry
           .mockResolvedValueOnce(okResponse({ prices: [] }))
           .mockResolvedValueOnce(okResponse(HISTORY_ANSWER));

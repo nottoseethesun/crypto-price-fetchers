@@ -1,5 +1,6 @@
 /**
- * Tests for reading a Node version's config file.
+ * Tests for reading a Node version's config file, and laying opened keys
+ * over its values.
  * @module test/config-file.test
  */
 
@@ -8,7 +9,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { readConfigFile } from '../apps-script-runner/config-file.js';
+import { layConfig, readConfigFile } from '../apps-script-runner/config-file.js';
 
 describe('readConfigFile', () => {
   let folder;
@@ -35,8 +36,13 @@ describe('readConfigFile', () => {
   }
 
   it('reads the values for the config objects', () => {
-    const file = write('config.json', '{ "CONFIG": { "API_KEY": "k" } }');
-    assert.deepEqual(readConfigFile(file), { CONFIG: { API_KEY: 'k' } });
+    const file = write('config.json', '{ "CONFIG": { "CACHE_SECONDS": 60 } }');
+    assert.deepEqual(readConfigFile(file), { CONFIG: { CACHE_SECONDS: 60 } });
+  });
+
+  it("leaves out the project's list of api keys, which is no config object of the script", () => {
+    const file = write('with-keys.json', '{ "apiKeys": ["dextools"], "CONFIG": { "CACHE_SECONDS": 60 } }');
+    assert.deepEqual(readConfigFile(file), { CONFIG: { CACHE_SECONDS: 60 } });
   });
 
   it('reads a missing optional file as no values', () => {
@@ -56,5 +62,17 @@ describe('readConfigFile', () => {
   it('refuses JSON that is not an object', () => {
     assert.throws(() => readConfigFile(write('list.json', '["k"]')), /holds no JSON object/);
     assert.throws(() => readConfigFile(write('null.json', 'null')), /holds no JSON object/);
+  });
+});
+
+describe('layConfig', () => {
+  it('lays values over a config, object by object, keeping its other fields', () => {
+    const config = { CONFIG: { CACHE_SECONDS: 60, API_KEY: 'placeholder' }, OTHER: { A: 1 } };
+    assert.deepEqual(layConfig(config, { CONFIG: { API_KEY: 'opened-key' }, X1_CONFIG: { API_KEY: 'x1-key' } }), {
+      CONFIG: { CACHE_SECONDS: 60, API_KEY: 'opened-key' },
+      OTHER: { A: 1 },
+      X1_CONFIG: { API_KEY: 'x1-key' }
+    });
+    assert.deepEqual(config.CONFIG.API_KEY, 'placeholder');
   });
 });

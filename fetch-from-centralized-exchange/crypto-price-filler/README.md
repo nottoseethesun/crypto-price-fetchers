@@ -44,12 +44,13 @@ repo's top, encrypted with a password you choose. To save it, from the repo's
 top folder:
 
 ```bash
-npm run save-api-key -- coingecko
+npm run api-keys
 ```
 
-Each run then asks for the password before it prices anything, and asks
-CoinGecko once whether it takes the key. Without a saved key, the tool asks
-CoinGecko without one, at CoinGecko's lower rate limits. See
+Each run then opens it before it prices anything, with the password
+`source ./unlock-api-keys.sh` keeps for the terminal, or else one it asks
+for, and asks CoinGecko once whether it takes the key. Without a saved key,
+the tool asks CoinGecko without one, at CoinGecko's lower rate limits. See
 [Api keys](../../README.md#api-keys) in the repo's README.
 
 ### Usage

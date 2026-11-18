@@ -39,10 +39,12 @@
  * The CoinGecko api key is no setting: it is kept encrypted, with a password you
  * choose, in `api-keys.json` at the repo's top, which git ignores. To save one, in
  * the repo's top folder:
- *   npm run save-api-key -- coingecko
- * Each run then asks for the password before it prices anything, and asks
- * CoinGecko once whether it takes the key. Without a saved key, the tool asks
- * CoinGecko without one.
+ *   npm run api-keys
+ * Each run opens it before it prices anything, with the password in the
+ * environment variable API_KEYS_PASSWORD, which `source ./unlock-api-keys.sh`
+ * (in the repo's top folder) keeps for a terminal, or else with one it asks for,
+ * and asks CoinGecko once whether it takes the key. Without a saved key, the
+ * tool asks CoinGecko without one.
  *
  * ADDING A NEW COIN (supported-tokens.json):
  *
@@ -85,9 +87,9 @@
  *   2. Add API configuration to `config-example.json`:
  *      - Base URL (e.g., "CRYPTOOMPARE_BASE": "https://...")
  *      - Rate limit delay (e.g., "CRYPTOOMPARE_RATE_LIMIT_MS": 1000)
- *      An api key, if the service needs one, is no setting: keep it encrypted
- *      in the repo's key file, as `coingecko-api-key.js` at the repo's top does
- *      CoinGecko's (`api-key-store/`).
+ *      An api key, if the service needs one, is no setting: list the service in
+ *      the repo's top `config.json` under `apiKeys`, with its check in
+ *      `api-key-store/services.js`, and open it as `index.js` opens CoinGecko's.
  *
  *   3. Add the source ID field to `supported-tokens.json` schema:
  *      - Add "cryptoCompare_id" field to relevant tokens
@@ -103,9 +105,9 @@
  *
  *   CoinGecko            Your CoinGecko demo API key. Obtain from https://www.coingecko.com/en/api
  *                        The free "Demo" tier provides 30 requests/minute and 365 days of
- *                        historical data. Save it with `npm run save-api-key -- coingecko`,
- *                        in the repo's top folder. Without one, CoinGecko is asked without
- *                        a key (stricter rate limits).
+ *                        historical data. Save it with `npm run api-keys`, in the repo's
+ *                        top folder. Without one, CoinGecko is asked without a key
+ *                        (stricter rate limits).
  *
  * RATE LIMITING (config-example.json, or config.json to override):
  *
@@ -274,7 +276,7 @@
  * - Check API status of MEXC, CoinGecko, CoinPaprika if fetches fail
  * - Review rate-limit handling in logs if many requests are made
  * - For unexpected errors, check stack traces in verbose output
- * - If CoinGecko answers 401, save its key again (npm run save-api-key -- coingecko,
+ * - If CoinGecko answers 401, save its key again (npm run api-keys -- set coingecko,
  *   in the repo's top folder), and check its plan's limits (e.g., 365-day limit)
  *
  */
@@ -292,7 +294,8 @@ import config from './config.js';
 import { getCache, setCache } from './utils/cache.js';
 import { getProgressBar } from './utils/progress.js';
 import { backfillPrices, logv } from './utils/backfill.js';
-import { unlockCoinGeckoKey } from '../../coingecko-api-key.js';
+import { fileURLToPath } from 'url';
+import { unlockProjectKeys } from '../../api-key-store/index.js';
 
 // Added missing luxon import (fixes DateTime is not defined)
 import { DateTime } from 'luxon';
@@ -395,10 +398,11 @@ const outputRows = [];
 
 let grandTotalUsd = 0;
 
-// Open the CoinGecko api key, when one is saved, before pricing anything: this
-// asks for its password and asks CoinGecko once whether it takes the key
+// Open the CoinGecko api key, when one is saved, before pricing anything: with
+// the password in API_KEYS_PASSWORD, or else one asked for, then CoinGecko is
+// asked once whether it takes the key
 try {
-  await unlockCoinGeckoKey({ baseUrl: config.COINGECKO_BASE });
+  await unlockProjectKeys({ projectTop: fileURLToPath(new URL('../..', import.meta.url)), services: ['coingecko'] });
 } catch (error) {
   console.error(error.message);
   process.exit(1);

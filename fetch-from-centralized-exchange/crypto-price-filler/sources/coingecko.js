@@ -19,8 +19,8 @@
  *
  * Each request carries the CoinGecko demo api key the run opened, in the
  * `x-cg-demo-api-key` header, when it opened one (`index.js`, through
- * `../../coingecko-api-key.js` at the repo's top); without one, CoinGecko
- * is asked without a key.
+ * `api-key-store/` at the repo's top); without one, CoinGecko is asked
+ * without a key.
  *
  * Handles rate-limit retry (in `fetchWithRetry`) and verbose logging.
  *
@@ -31,8 +31,7 @@
 
 import { fetchWithRetry } from '../utils/fetch.js';
 import config from '../config.js';
-import { getApiKey } from '../../../api-key-store/index.js';
-import { COINGECKO_KEY_HEADER, COINGECKO_SERVICE } from '../../../coingecko-api-key.js';
+import { COINGECKO_KEY_HEADER, getApiKey } from '../../../api-key-store/index.js';
 
 /** Half the window of prices asked around the time, in milliseconds. */
 const HALF_WINDOW_MS = 12 * 60 * 60 * 1000;
@@ -140,7 +139,7 @@ export async function getPriceFromCoinGecko(
   coingeckoId = token.toLowerCase()
 ) {
   const logv = makeLogger(verbose);
-  const key = getApiKey(COINGECKO_SERVICE);
+  const key = getApiKey('coingecko');
   const options = key === null ? {} : { headers: { [COINGECKO_KEY_HEADER]: key } };
 
   const fromSec = Math.floor((utcMs - HALF_WINDOW_MS) / 1000);

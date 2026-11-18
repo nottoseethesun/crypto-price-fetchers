@@ -7,9 +7,10 @@
  * `<service>Encrypted`, such as `coingeckoEncrypted`, as an entry
  * `key-crypto.js` makes. `saveEncryptedKey` adds or replaces one,
  * `loadEncryptedKey` opens one with the password, `hasEncryptedKey` says
- * whether one is saved, and `savedServices` lists them. It is LP Ranger's
- * `api-keys.json`, in the same format, so each reads a file the other
- * wrote.
+ * whether one is saved, `savedServices` lists them, and
+ * `checkPasswordOpensKeys` says whether a password opens every one. It is
+ * LP Ranger's `api-keys.json`, in the same format, so each reads a file
+ * the other wrote.
  *
  * How:
  *
@@ -125,6 +126,21 @@ export function savedServices(file) {
  */
 export function hasEncryptedKey(file, service) {
   return Object.hasOwn(readKeyFile(file), entryName(service));
+}
+
+/**
+ * Checks that a password opens every key saved in the file.
+ *
+ * @param {string} file - The file
+ * @param {string} password - The password
+ * @returns {Promise<number>} How many keys it opened: 0 when none is saved
+ * @throws {Error} When the file cannot be read, or the password does not open a key
+ */
+export async function checkPasswordOpensKeys(file, password) {
+  const store = readKeyFile(file);
+  const services = servicesIn(store);
+  for (const service of services) await decryptKey(store[entryName(service)], password);
+  return services.length;
 }
 
 /**
