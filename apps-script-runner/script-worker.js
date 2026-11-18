@@ -3,8 +3,9 @@
  * @module apps-script-runner/script-worker
  *
  * What: this file is the entry point of the worker thread that
- * `openAppsScript` starts. It loads the script named in `workerData`,
- * applies the config, and then answers each call the caller's thread posts.
+ * `openAppsScript` starts. It loads the script named in `workerData`, with
+ * the Script Properties given there, applies the config, and then answers
+ * each call the caller's thread posts.
  *
  * How: a Sheets script calls `UrlFetchApp.fetch` and expects the response
  * back, synchronously, where Node's fetch returns a promise. So this thread
@@ -149,7 +150,8 @@ function start() {
   try {
     const services = createAppsScriptServices({
       fetchSync: fetchThroughCaller,
-      log: workerData.logging ? logToCaller : null
+      log: workerData.logging ? logToCaller : null,
+      scriptProperties: workerData.scriptProperties
     });
     const source = fs.readFileSync(workerData.scriptPath, 'utf8');
     const context = loadAppsScript(source, workerData.scriptPath, services);

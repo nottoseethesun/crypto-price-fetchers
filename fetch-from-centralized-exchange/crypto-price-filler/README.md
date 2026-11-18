@@ -34,17 +34,23 @@ NodeJS 21.1.0+
 
 ## Configuration
 
-`config-example.json` holds the tool's settings as committed, with no API key.
-Your own settings go in `config.json` beside it, which git ignores: each
-setting there takes the place of the same one in `config-example.json`, so it
-needs only those that differ. The CoinGecko demo key goes there:
+`config-example.json` holds the tool's settings as committed. Your own
+settings go in `config.json` beside it, which git ignores: each setting there
+takes the place of the same one in `config-example.json`, so it needs only
+those that differ. The file header in `./index.js` describes every setting.
 
-```json
-{ "COINGECKO_API_KEY": "your key" }
+The CoinGecko demo key is no setting: it is kept in `api-keys.json` at the
+repo's top, encrypted with a password you choose. To save it, from the repo's
+top folder:
+
+```bash
+npm run save-api-key -- coingecko
 ```
 
-Without `config.json`, the tool asks CoinGecko without a key, at CoinGecko's
-lower rate limits. The file header in `./index.js` describes every setting.
+Each run then asks for the password before it prices anything, and asks
+CoinGecko once whether it takes the key. Without a saved key, the tool asks
+CoinGecko without one, at CoinGecko's lower rate limits. See
+[Api keys](../../README.md#api-keys) in the repo's README.
 
 ### Usage
 

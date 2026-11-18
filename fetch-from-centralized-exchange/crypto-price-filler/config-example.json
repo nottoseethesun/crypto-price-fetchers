@@ -1,5 +1,4 @@
 {
-  "COINGECKO_API_KEY": "",
   "EXCHANGE_BASE_URL": "https://api.mexc.com/api/v3",
   "QUOTE_CURRENCY": "USDT",
   "DEFAULT_INTERVAL": "1m",
@@ -8,7 +7,7 @@
   "COINPAPRIKA_BASE": "https://api.coinpaprika.com/v1",
   "COINGECKO_MARKET_CHART_RANGE_TEMPLATE": "{base}/coins/{id}/market_chart/range?vs_currency=usd&from={from}&to={to}",
   "COINGECKO_HISTORY_TEMPLATE": "{base}/coins/{id}/history?date={date}",
-  "COINPAPRIKA_OHLCV_TEMPLATE": "{base}/ohlcv/{id}/historical?start={start}&end={end}",
+  "COINPAPRIKA_OHLCV_TEMPLATE": "{base}/coins/{id}/ohlcv/historical?start={start}&end={end}",
   "RETRY_BACKOFF_MS": [5000, 10000, 20000],
   "MAX_RETRIES": 3,
   "REQUEST_DELAY_MS": 1200,

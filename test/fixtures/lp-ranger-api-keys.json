@@ -1,0 +1,13 @@
+{
+  "moralisEncrypted": {
+    "version": 1,
+    "kdfParams": {
+      "digest": "sha512",
+      "iterations": 600000,
+      "saltHex": "dd2a9e660e6ae49f83a7e7b17c73f6b7"
+    },
+    "ivHex": "146b0f97216b152df167c4ab",
+    "authTagHex": "0d9e29aad80d22790dac29608f0f0715",
+    "ciphertextHex": "29e052b9544c023862f7c05da4b8bfb3d710a2b79cf593110d"
+  }
+}

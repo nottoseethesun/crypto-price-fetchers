@@ -25,7 +25,11 @@
  *   Script's limit of 21,600 seconds (six hours).
  * - `LockService`'s locks are always free, since one script answers one
  *   call at a time, so nothing else can hold them.
- * - `PropertiesService`'s properties live in memory.
+ * - `PropertiesService`'s three stores, the script's, the user's and the
+ *   document's, each live in memory, apart from the others. The script's
+ *   starts with the properties the services are built with, as a
+ *   project's Script Properties hold what its owner set there, such as an
+ *   api key the script reads rather than holds.
  * - `Utilities.sleep` blocks the thread for the time asked, and
  *   `Utilities.formatDate` writes a date in a time zone (`format-date.js`).
  * - `Logger.log` and `console` hand each line, with its level, to the `log`
@@ -198,10 +202,11 @@ function createLock() {
 /**
  * Builds a store of properties held in memory.
  *
+ * @param {Object<string, string>} [initial={}] - The properties it starts with
  * @returns {{getProperty: function(string): ?string, setProperty: function(string, *): Object, deleteProperty: function(string): Object}} The properties
  */
-function createProperties() {
-  const values = new Map();
+function createProperties(initial = {}) {
+  const values = new Map(Object.entries(initial).map(([key, value]) => [key, String(value)]));
   const properties = {
     getProperty: (key) => values.get(key) ?? null,
     setProperty(key, value) {
@@ -250,20 +255,21 @@ function createLogging(log) {
  * @param {function(number): void} [options.sleep=sleepSync] - Blocks for a number of milliseconds
  * @param {?function({level: string, text: string}): void} [options.log=null] - Takes each line the script logs, or null to drop them
  * @param {function(): number} [options.now=Date.now] - The time now, in milliseconds, for the cache's expiry
+ * @param {Object<string, string>} [options.scriptProperties={}] - The Script Properties the script starts with, such as an api key it reads
  * @returns {Object} The services, by their Apps Script names
  */
-export function createAppsScriptServices({ fetchSync, sleep = sleepSync, log = null, now = Date.now }) {
+export function createAppsScriptServices({ fetchSync, sleep = sleepSync, log = null, now = Date.now, scriptProperties = {} }) {
   const cache = createCache(now);
-  const properties = createProperties();
+  const properties = { script: createProperties(scriptProperties), user: createProperties(), document: createProperties() };
   const { Logger, console } = createLogging(log);
   return {
     UrlFetchApp: createUrlFetchApp(fetchSync),
     CacheService: { getScriptCache: () => cache, getUserCache: () => cache, getDocumentCache: () => cache },
     LockService: { getScriptLock: createLock, getUserLock: createLock, getDocumentLock: createLock },
     PropertiesService: {
-      getScriptProperties: () => properties,
-      getUserProperties: () => properties,
-      getDocumentProperties: () => properties
+      getScriptProperties: () => properties.script,
+      getUserProperties: () => properties.user,
+      getDocumentProperties: () => properties.document
     },
     Utilities: { sleep, formatDate },
     Logger,
