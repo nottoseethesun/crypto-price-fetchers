@@ -14,8 +14,8 @@
  * @author Christopher M. Balz with Grok and Claude.ai
  */
 
-import { fetchWithRetry } from '../utils/fetch.js';
-import config from '../config.js';
+import { fetchWithRetry } from "../utils/fetch.js";
+import config from "../config.js";
 
 /** Where each price target sits in a MEXC kline. */
 const CANDLE_FIELD = Object.freeze({ high: 2, low: 3, close: 4 });
@@ -24,7 +24,7 @@ const CANDLE_FIELD = Object.freeze({ high: 2, low: 3, close: 4 });
 const MAX_CANDLE_DISTANCE_MS = 120000;
 
 /** Tokens MEXC does not list. */
-const SKIP_TOKENS = new Set(['grc']);
+const SKIP_TOKENS = new Set(["grc"]);
 
 /**
  * Builds the verbose logger.
@@ -48,7 +48,10 @@ function makeLogger(verbose) {
  * @returns {string} The key
  */
 function cacheKeyOf(token, utcMs, target) {
-  const dateNumeric = new Date(utcMs).toISOString().slice(0, 19).replace(/[-:T]/g, '');
+  const dateNumeric = new Date(utcMs)
+    .toISOString()
+    .slice(0, 19)
+    .replace(/[-:T]/g, "");
   return `price_${token.toLowerCase()}_${dateNumeric}_UTC_${target}`;
 }
 
@@ -71,12 +74,15 @@ function backoff(attempt) {
  * @returns {Promise<Array<Object>|null>} The pairs, or null when MEXC gives none
  */
 async function fetchSymbols(verbose, logv) {
-  const url = config.EXCHANGE_BASE_URL + '/exchangeInfo';
+  const url = config.EXCHANGE_BASE_URL + "/exchangeInfo";
   for (let attempt = 1; attempt <= config.MAX_RETRIES; attempt++) {
     logv(1, `Attempt ${attempt}/${config.MAX_RETRIES} fetching exchangeInfo`);
     const res = await fetchWithRetry(url, {}, verbose);
     if (res === null || res === undefined || res.status === 429) {
-      logv(1, `exchangeInfo gave ${res ? 'a 429' : 'no response'} on attempt ${attempt} - retrying`);
+      logv(
+        1,
+        `exchangeInfo gave ${res ? "a 429" : "no response"} on attempt ${attempt} - retrying`,
+      );
       await backoff(attempt);
       continue;
     }
@@ -91,7 +97,7 @@ async function fetchSymbols(verbose, logv) {
       return null;
     }
   }
-  logv(1, 'All exchangeInfo retries failed - returning null');
+  logv(1, "All exchangeInfo retries failed - returning null");
   return null;
 }
 
@@ -107,8 +113,10 @@ function findPair(symbols, token) {
   let btcPair = null;
   for (const sym of symbols) {
     if (sym.baseAsset !== upperToken) continue;
-    if (sym.quoteAsset === 'USDT') return { symbol: upperToken + 'USDT', useBTC: false };
-    if (sym.quoteAsset === 'BTC') btcPair = { symbol: upperToken + 'BTC', useBTC: true };
+    if (sym.quoteAsset === "USDT")
+      return { symbol: upperToken + "USDT", useBTC: false };
+    if (sym.quoteAsset === "BTC")
+      btcPair = { symbol: upperToken + "BTC", useBTC: true };
   }
   return btcPair;
 }
@@ -125,7 +133,8 @@ function findPair(symbols, token) {
  * @returns {Promise<Array|null>} The kline, or null when there is none
  */
 async function fetchKline(symbol, interval, spanMs, utcMs, verbose, logv) {
-  const url = config.EXCHANGE_BASE_URL +
+  const url =
+    config.EXCHANGE_BASE_URL +
     `/klines?symbol=${symbol}&interval=${interval}&startTime=${utcMs - spanMs}&endTime=${utcMs}&limit=1`;
   logv(2, `MEXC klines URL (${interval}): ${url}`);
   const res = await fetchWithRetry(url, {}, verbose);
@@ -150,10 +159,28 @@ async function fetchKline(symbol, interval, spanMs, utcMs, verbose, logv) {
  * @returns {Promise<Array|null>} The candle, or null when MEXC has none
  */
 async function fetchCandle(symbol, utcMs, verbose, logv) {
-  const minute = await fetchKline(symbol, config.DEFAULT_INTERVAL, 60000, utcMs, verbose, logv);
-  if (minute !== null && Math.abs(minute[0] - utcMs) <= MAX_CANDLE_DISTANCE_MS) return minute;
-  logv(1, `No 1m candle for ${symbol} near the time asked - trying ${config.FALLBACK_INTERVAL}`);
-  return fetchKline(symbol, config.FALLBACK_INTERVAL, 3600000, utcMs, verbose, logv);
+  const minute = await fetchKline(
+    symbol,
+    config.DEFAULT_INTERVAL,
+    60000,
+    utcMs,
+    verbose,
+    logv,
+  );
+  if (minute !== null && Math.abs(minute[0] - utcMs) <= MAX_CANDLE_DISTANCE_MS)
+    return minute;
+  logv(
+    1,
+    `No 1m candle for ${symbol} near the time asked - trying ${config.FALLBACK_INTERVAL}`,
+  );
+  return fetchKline(
+    symbol,
+    config.FALLBACK_INTERVAL,
+    3600000,
+    utcMs,
+    verbose,
+    logv,
+  );
 }
 
 /**
@@ -186,10 +213,10 @@ async function priceFromPair(pair, utcMs, target, verbose, logv) {
   }
   const price = candlePrice(candle, target);
   if (price === null || !pair.useBTC) return price;
-  const btcCandle = await fetchCandle('BTCUSDT', utcMs, verbose, logv);
+  const btcCandle = await fetchCandle("BTCUSDT", utcMs, verbose, logv);
   const btcPrice = btcCandle === null ? null : candlePrice(btcCandle, target);
   if (btcPrice === null) {
-    logv(1, 'No BTC/USDT candle for the time asked - returning null');
+    logv(1, "No BTC/USDT candle for the time asked - returning null");
     return null;
   }
   logv(1, `BTC pair: ${price} BTC at ${btcPrice} USD`);
@@ -205,9 +232,18 @@ async function priceFromPair(pair, utcMs, target, verbose, logv) {
  * @param {Map<string, number>} [providedCache=null] - Optional cache Map for testing (if null, no cache used)
  * @returns {Promise<number|null>} Price in USD or null if failed
  */
-export async function getPriceFromMEXC(token, utcMs, target, verbose = false, providedCache = null) {
+export async function getPriceFromMEXC(
+  token,
+  utcMs,
+  target,
+  verbose = false,
+  providedCache = null,
+) {
   const logv = makeLogger(verbose);
-  logv(1, `getPriceFromMEXC called with token=${token}, utcMs=${utcMs}, target=${target}`);
+  logv(
+    1,
+    `getPriceFromMEXC called with token=${token}, utcMs=${utcMs}, target=${target}`,
+  );
   if (SKIP_TOKENS.has(token.toLowerCase())) {
     logv(1, `Token ${token} skipped for MEXC`);
     return null;

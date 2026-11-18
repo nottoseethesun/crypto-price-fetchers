@@ -29,9 +29,9 @@
  * @license MIT (or your project's license)
  */
 
-import fs from 'fs';
-import { InvalidArgumentError, program } from 'commander';
-import { canonicalTimeZone, validTimeZones } from './utils/date.js';
+import fs from "fs";
+import { InvalidArgumentError, program } from "commander";
+import { canonicalTimeZone, validTimeZones } from "./utils/date.js";
 
 /**
  * Accepts a time zone named in full, such as America/Chicago, or UTC, in
@@ -47,7 +47,7 @@ export function parseTimeZone(value) {
   if (zone !== null) return zone;
   throw new InvalidArgumentError(
     `not a valid time zone: ${value}. Name it in full, such as America/Chicago, or UTC. ` +
-      'Run with --list-valid-timezones to see every valid one.'
+      "Run with --list-valid-timezones to see every valid one.",
   );
 }
 
@@ -56,8 +56,8 @@ export function parseTimeZone(value) {
  * @returns {Object} The tokens object keyed by lowercase symbol
  */
 function loadSupportedTokens() {
-    const data = JSON.parse(fs.readFileSync('./supported-tokens.json', 'utf8'));
-    return data.tokens || {};
+  const data = JSON.parse(fs.readFileSync("./supported-tokens.json", "utf8"));
+  return data.tokens || {};
 }
 
 /**
@@ -71,83 +71,81 @@ function loadSupportedTokens() {
  * @returns {import('commander').Command} Configured Commander program
  */
 export function setupCommander() {
-    program
-        .name('crypto-price-filler')
-        .description('Fetch historical crypto prices from centralized exchanges and fill CSV with USD values')
-        .version('1.0.0', '-v, --version', 'output the version number')
+  program
+    .name("crypto-price-filler")
+    .description(
+      "Fetch historical crypto prices from centralized exchanges and fill CSV with USD values",
+    )
+    .version("1.0.0", "-v, --version", "output the version number")
 
-        // Required options
-        .requiredOption(
-            '--token <symbol>',
-            'Crypto token symbol (e.g. grc, xtm, btc)',
-            (value) => {
-                const symbol = value.toLowerCase();
-                const tokens = loadSupportedTokens();
-                if (!tokens[symbol]) {
-                    const supported = Object.entries(tokens)
-                        .map(([sym, cfg]) => `  ${sym}\t${cfg.name}`)
-                        .join('\n');
-                    console.error(`\nError: Unknown token symbol "${value}".`);
-                    console.error(`\nSupported tokens:\n${supported}`);
-                    console.error(`\nTo add a new token, edit supported-tokens.json. See --help for details.`);
-                    process.exit(1);
-                }
-                return symbol;
-            }
-        )
-        .requiredOption(
-            '--input <path>',
-            'Path to input CSV file (must contain "date (UTC)" column in format yyyy-MM-dd HH:mm:ss)'
-        )
+    // Required options
+    .requiredOption(
+      "--token <symbol>",
+      "Crypto token symbol (e.g. grc, xtm, btc)",
+      (value) => {
+        const symbol = value.toLowerCase();
+        const tokens = loadSupportedTokens();
+        if (!tokens[symbol]) {
+          const supported = Object.entries(tokens)
+            .map(([sym, cfg]) => `  ${sym}\t${cfg.name}`)
+            .join("\n");
+          console.error(`\nError: Unknown token symbol "${value}".`);
+          console.error(`\nSupported tokens:\n${supported}`);
+          console.error(
+            `\nTo add a new token, edit supported-tokens.json. See --help for details.`,
+          );
+          process.exit(1);
+        }
+        return symbol;
+      },
+    )
+    .requiredOption(
+      "--input <path>",
+      'Path to input CSV file (must contain "date (UTC)" column in format yyyy-MM-dd HH:mm:ss)',
+    )
 
-        // Optional options with defaults
-        .option(
-            '--output <path>',
-            'Path to output CSV file',
-            'output.csv'
-        )
-        .option(
-            '--mode <mode>',
-            'Price target to fetch: high, low, or close',
-            (value) => {
-                const valid = ['high', 'low', 'close'];
-                if (!valid.includes(value.toLowerCase())) {
-                    throw new Error(`--mode must be one of: high, low, close`);
-                }
-                return value.toLowerCase();
-            },
-            'close'
-        )
-        .option(
-            '--tz <zone>',
-            'Time zone the input dates are in, named in full (e.g. America/Chicago) or UTC; ' +
-                'each row gets the offset the zone had then, daylight saving included. ' +
-                'Abbreviations such as CDT are refused.',
-            parseTimeZone,
-            'UTC'
-        )
-        .option(
-            '--list-valid-timezones',
-            'Print every name --tz takes, one per line, and exit'
-        )
-        .option(
-            '--verbose',
-            'Enable detailed logging during processing',
-            false
-        )
-        .option(
-            '--backfill-highest',
-            'Fill empty prices with highest bracketing price (conservative tax estimates)',
-            false
-        )
-        .option(
-            '--backfill-lowest',
-            'Fill empty prices with lowest bracketing price (budgeting: avoid over-estimating income)',
-            false
-        )
+    // Optional options with defaults
+    .option("--output <path>", "Path to output CSV file", "output.csv")
+    .option(
+      "--mode <mode>",
+      "Price target to fetch: high, low, or close",
+      (value) => {
+        const valid = ["high", "low", "close"];
+        if (!valid.includes(value.toLowerCase())) {
+          throw new Error(`--mode must be one of: high, low, close`);
+        }
+        return value.toLowerCase();
+      },
+      "close",
+    )
+    .option(
+      "--tz <zone>",
+      "Time zone the input dates are in, named in full (e.g. America/Chicago) or UTC; " +
+        "each row gets the offset the zone had then, daylight saving included. " +
+        "Abbreviations such as CDT are refused.",
+      parseTimeZone,
+      "UTC",
+    )
+    .option(
+      "--list-valid-timezones",
+      "Print every name --tz takes, one per line, and exit",
+    )
+    .option("--verbose", "Enable detailed logging during processing", false)
+    .option(
+      "--backfill-highest",
+      "Fill empty prices with highest bracketing price (conservative tax estimates)",
+      false,
+    )
+    .option(
+      "--backfill-lowest",
+      "Fill empty prices with lowest bracketing price (budgeting: avoid over-estimating income)",
+      false,
+    )
 
-        // Custom help formatting
-        .addHelpText('after', `
+    // Custom help formatting
+    .addHelpText(
+      "after",
+      `
 Examples:
   Basic usage:
     $ node index.js --token=grc --input=mining.csv
@@ -163,19 +161,20 @@ Examples:
 
   Show help:
     $ node index.js --help
-    `)
+    `,
+    )
 
-        // Make --help more visible
-        .helpOption('-h, --help', 'display help for command');
+    // Make --help more visible
+    .helpOption("-h, --help", "display help for command");
 
-    // --list-valid-timezones works on its own, as --help does: it prints the
-    // list while the options are parsed, before the required ones are checked.
-    program.on('option:list-valid-timezones', () => {
-        console.log(validTimeZones().join('\n'));
-        process.exit(0);
-    });
+  // --list-valid-timezones works on its own, as --help does: it prints the
+  // list while the options are parsed, before the required ones are checked.
+  program.on("option:list-valid-timezones", () => {
+    console.log(validTimeZones().join("\n"));
+    process.exit(0);
+  });
 
-    return program;
+  return program;
 }
 
 /**
@@ -190,9 +189,9 @@ Examples:
  * @throws {Error} If parsing fails (Commander already prints error + exits in most cases)
  */
 export function parseArgs() {
-    const cmd = setupCommander();
-    cmd.parse(process.argv);
-    return cmd.opts();
+  const cmd = setupCommander();
+  cmd.parse(process.argv);
+  return cmd.opts();
 }
 
 // Optional: export the program itself for advanced testing / extension

@@ -16,14 +16,14 @@
  * return at once. The script's log lines are dropped.
  */
 
-import fs from 'fs';
-import { createAppsScriptServices } from '../../../../apps-script-runner/apps-script-services.js';
-import { loadAppsScript } from '../../../../apps-script-runner/load-apps-script.js';
+import fs from "fs";
+import { createAppsScriptServices } from "../../../../apps-script-runner/apps-script-services.js";
+import { loadAppsScript } from "../../../../apps-script-runner/load-apps-script.js";
 
 /**
  * Loads a Sheets script whose web requests answer from `answer`.
  *
- * @param {string} scriptPath - Path of the `.gs` file
+ * @param {string|string[]} scriptPath - Path of the `.gs` file, or of a script's files in the order Apps Script loads them
  * @param {function(string): (Object|Array|null)} answer - The json body for a url, or null for a 404
  * @returns {Object} The context holding the script's top-level functions
  */
@@ -31,9 +31,17 @@ export function loadSheetsScript(scriptPath, answer) {
   const services = createAppsScriptServices({
     fetchSync: (request) => {
       const body = answer(request.url);
-      return { status: body === null ? 404 : 200, headers: {}, text: JSON.stringify(body) };
+      return {
+        status: body === null ? 404 : 200,
+        headers: {},
+        text: JSON.stringify(body),
+      };
     },
-    sleep: () => {}
+    sleep: () => {},
   });
-  return loadAppsScript(fs.readFileSync(scriptPath, 'utf8'), scriptPath, services);
+  const files = [scriptPath].flat().map((filename) => ({
+    source: fs.readFileSync(filename, "utf8"),
+    filename,
+  }));
+  return loadAppsScript(files, services);
 }

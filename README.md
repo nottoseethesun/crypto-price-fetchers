@@ -26,14 +26,16 @@ here as well, in addition to the blockchains that DexTools already covers — X1
 calls are routed through the x1.ninja API since DexTools does not list X1 yet.
 See the file's header documentation for details.
 
-`fetch-from-centralized-exchage/getCryptoPriceFromCentralizedExchange.gs` is
-a Google Apps Script currently fetches the price only at a point in time in
+`fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.gs`,
+with the price sources in `getCryptoPriceFromCentralizedExchange-sources.gs`
+beside it, is a Google Apps Script that currently fetches the price only at
+a point in time in
 the past, although "the past" can be just one minute in the past.  It is limited
 to tokens traded on the API of the Centralized Exchanges that it currently
 supports and also, as a Google Apps Script, cannot handle more than 100 or
 so calls at a time.
 
-`fetch-from-centralized-exchage/crypto-price-filler/index.js` is like
+`fetch-from-centralized-exchange/crypto-price-filler/index.js` is like
 `getCryptoPriceFromCentralizedExchange.gs` but, as a NodeJS script, can
 handle any load in terms of numbers of price points to fetch.
 
@@ -53,14 +55,12 @@ What differs from the sheet:
 
 - It runs on your computer, so there is no 30-second limit per call and no
   daily cap on web requests.
-- `crypto-price-fetchers.js` reads its keys from `config.json` beside it,
-  which git ignores, instead of from the script. Copy `config-example.json`
-  to `config.json` and fill it in. A key the script reads as it sends each
-  request takes effect this way; a value the script works out as it loads,
-  such as a url, keeps the value written in the script.
-- `getCryptoPriceFromCentralizedExchange.js` sends the CoinGecko key saved,
-  encrypted, in the repo's key file (see [Api keys](#api-keys)), and hands
-  it to the script as the Script Property the script reads in Apps Script.
+- The api keys come from the repo's encrypted key file (see
+  [Api keys](#api-keys)), not from the script. `crypto-price-fetchers.js`
+  hands the DexTools or x1.ninja key to the script's config, which the
+  script reads as it sends each request, and
+  `getCryptoPriceFromCentralizedExchange.js` hands the CoinGecko key to the
+  script as the Script Property it reads in Apps Script.
 - The cache lasts while the script is open: for the command line, one run.
 - The sheet's menu is not there.
 
@@ -74,24 +74,37 @@ npm ci
 
 ### Api keys
 
-The CoinGecko demo api key is kept in `api-keys.json` at the repo's top,
+The keys the tools send (CoinGecko's, DexTools' and x1.ninja's, as the top
+`config.json` lists them) are kept in `api-keys.json` at the repo's top,
 which git ignores, encrypted with a password you choose, as LP Ranger keeps
-its keys. To save it, from the repo's top folder:
+its keys. To save them, from the repo's top folder:
 
 ```bash
-npm run save-api-key -- coingecko
+npm run api-keys
 ```
 
-It asks for the key, then the password, twice, showing nothing of what is
-typed; asks CoinGecko whether it takes the key; and saves it only if it
-does. Each run of a tool that sends the key then asks for the password, opens
-the key, and keeps it in memory for that run only. The password is kept
-nowhere. Without a saved key, the tools ask CoinGecko without one, at its
-lower rate limit.
+It lists each key, saved or not, never showing its characters, and asks for
+each one not saved: the key, then the password, twice the first time,
+showing nothing of what is typed. Each key is saved only once its service
+takes it; Enter alone skips one. `npm run api-keys -- set dextools`
+replaces one.
 
-Both `getCryptoPriceFromCentralizedExchange.js` and crypto-price-filler send
-the key. In Apps Script, the key is a Script Property instead: see the
-`API KEY` section of the `.gs` file's header.
+To keep the password for a terminal, so the tools open their keys without
+asking:
+
+```bash
+source ./unlock-api-keys.sh
+```
+
+It asks for the password once, checks that it opens the keys, and keeps it in
+`API_KEYS_PASSWORD` until the terminal closes. Without it, each tool asks for
+the password as it starts. The password is kept nowhere on disk, and the keys
+only in memory, for one run. Without a saved CoinGecko key, the tools ask
+CoinGecko without one, at its lower rate limit.
+
+In Apps Script, the keys are not read from the file: the CoinGecko key is a
+Script Property (see the `API KEY` section of the exchange script's header),
+and the DexTools and x1.ninja keys are pasted into `crypto-price-fetchers.gs`.
 
 The store itself is `api-key-store/`, a module any Node project can use:
 see [its README](./api-key-store/README.md).
@@ -119,15 +132,15 @@ await prices.close();
 ```
 
 The functions take the Sheets arguments and return what the cell would show.
-`openCentralizedExchangePrices({ coinGeckoApiKey })` sends a CoinGecko key,
-such as the one `unlockCoinGeckoKey()` (`coingecko-api-key.js`) opens.
-Other repos install this one to use the runner, as
+`openCentralizedExchangePrices({ apiKeys: { coingecko } })` sends a
+CoinGecko key, such as the one `unlockProjectKeys` (`api-key-store/`)
+opens. Other repos install this one to use the runner, as
 `crypto-price-fetchers/apps-script-runner`, and the key store, as
 `crypto-price-fetchers/api-key-store`.
 
 ## Install
 
-For `./fetch-from-centralized-exchage/getCryptoPriceFromCentralizedExchange.gs`,
+For `./fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.gs`,
 and all other scripts in other sub-directories here, see the
 `README.md` in that directory.
 
@@ -135,7 +148,7 @@ For `./crypto-price-fetchers.gs`, see the file-header doc in that file.
 
 ## Usage
 
-For `./fetch-from-centralized-exchage/getCryptoPriceFromCentralizedExchange.gs`,
+For `./fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.gs`,
 and all other scripts in other sub-directories here, see the
 `README.md` in that directory.
 
@@ -143,16 +156,27 @@ For `./crypto-price-fetchers.gs`, see the file-header doc in that file.
 
 ## Test
 
-For `./fetch-from-centralized-exchage/getCryptoPriceFromCentralizedExchange.gs`,
+For `./fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.gs`,
 and all other scripts in other sub-directories here, see the
 `README.md` in that directory.
 
 For `./crypto-price-fetchers.gs`, see the file-header doc in that file.
 
-For the runner and the Node versions, from the repo's top folder:
+For everything else, from the repo's top folder, the one gate that must
+pass before a commit, LP Ranger's: the lint, the tests of the runner, the
+Node versions and the key store, crypto-price-filler's tests, and the
+security audits:
 
 ```bash
 npm ci
-npm run lint
-npm test
+npm ci --prefix fetch-from-centralized-exchange/crypto-price-filler
+npm run check
 ```
+
+## Documentation
+
+- [`docs/architecture.md`](docs/architecture.md): how the parts fit.
+- [`docs/engineering.md`](docs/engineering.md): the files, the gates, the
+  tests and CI.
+- [`docs/npm-project-commands.md`](docs/npm-project-commands.md): every npm
+  command.

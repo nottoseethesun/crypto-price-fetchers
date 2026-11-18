@@ -7,11 +7,15 @@
  *
  * How:
  *
- * - `loadAppsScript` runs the script's text in a fresh `vm` context whose
- *   globals are the Apps Script services (`apps-script-services.js`). Its
- *   top-level function declarations become properties of the context, and
- *   its top-level `const` and `let` values stay reachable by code run later
- *   in the same context.
+ * - `loadAppsScript` runs the text of the script's files, in order, in one
+ *   fresh `vm` context whose globals are the Apps Script services
+ *   (`apps-script-services.js`), as Apps Script loads every script file of
+ *   a project into one global scope. A script too long for one file, by LP
+ *   Ranger's 500 lines of code, is so split into several. Every file is
+ *   compiled before any runs. Their top-level function declarations become
+ *   properties of the context, and their top-level `const` and `let` values
+ *   stay reachable by code run later in the same context, a later file's
+ *   among it.
  * - `applyConfig` sets fields of the script's own config objects, such as
  *   `CONFIG.API_KEY`, from a config object shaped
  *   `{ CONFIG: { API_KEY: '...' } }`. It runs after the script has loaded,
@@ -31,29 +35,42 @@
  * directly.
  */
 
-import vm from 'node:vm';
+import vm from "node:vm";
 
 /** What a name a script declares looks like. */
 const DECLARED_NAME = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 
 /**
- * Runs a Sheets script in a fresh context whose globals are the services.
+ * Compiles one of a script's files.
  *
- * @param {string} source - The script's text
- * @param {string} filename - The script's path, for error messages
+ * @param {{source: string, filename: string}} file - Its text, and its path for error messages
+ * @returns {vm.Script} The compiled file
+ * @throws {Error} When it does not compile, naming it
+ */
+function compileFile({ source, filename }) {
+  try {
+    return new vm.Script(source, { filename });
+  } catch (error) {
+    throw new Error(
+      `The script ${filename} does not compile: ${error.message}`,
+      { cause: error },
+    );
+  }
+}
+
+/**
+ * Runs a Sheets script's files, in order, in one fresh context whose
+ * globals are the services.
+ *
+ * @param {Array<{source: string, filename: string}>} files - The script's files, in the order Apps Script loads them: each one's text, and its path for error messages
  * @param {Object} services - The Apps Script services, by name (`createAppsScriptServices`)
  * @returns {Object} The context, holding the script's top-level functions
- * @throws {Error} When the script does not compile, naming it, or what the script throws as it loads
+ * @throws {Error} When a file does not compile, naming it, before any file runs; or what the script throws as it loads
  */
-export function loadAppsScript(source, filename, services) {
-  let compiled;
-  try {
-    compiled = new vm.Script(source, { filename });
-  } catch (error) {
-    throw new Error(`The script ${filename} does not compile: ${error.message}`);
-  }
+export function loadAppsScript(files, services) {
+  const compiled = files.map(compileFile);
   const context = vm.createContext({ ...services });
-  compiled.runInContext(context);
+  for (const script of compiled) script.runInContext(context);
   return context;
 }
 
@@ -68,19 +85,26 @@ export function loadAppsScript(source, filename, services) {
  */
 function applyConfigObject(context, name, fields) {
   if (!DECLARED_NAME.test(name)) {
-    throw new Error(`The config names "${name}", which is not a name a script can declare`);
+    throw new Error(
+      `The config names "${name}", which is not a name a script can declare`,
+    );
   }
-  if (fields === null || typeof fields !== 'object' || Array.isArray(fields)) {
+  if (fields === null || typeof fields !== "object" || Array.isArray(fields)) {
     throw new Error(`The config's ${name} is not an object of fields`);
   }
-  const target = vm.runInContext(`typeof ${name} === 'undefined' ? undefined : ${name}`, context);
-  if (target === null || typeof target !== 'object') {
+  const target = vm.runInContext(
+    `typeof ${name} === 'undefined' ? undefined : ${name}`,
+    context,
+  );
+  if (target === null || typeof target !== "object") {
     throw new Error(`The script has no object named ${name} to configure`);
   }
-  const inScriptRealm = vm.runInContext('(json) => JSON.parse(json)', context);
+  const inScriptRealm = vm.runInContext("(json) => JSON.parse(json)", context);
   for (const [field, value] of Object.entries(fields)) {
     if (!Object.hasOwn(target, field)) {
-      throw new Error(`The script's ${name} has no field ${field}. Its fields: ${Object.keys(target).join(', ')}`);
+      throw new Error(
+        `The script's ${name} has no field ${field}. Its fields: ${Object.keys(target).join(", ")}`,
+      );
     }
     target[field] = inScriptRealm(JSON.stringify(value));
   }
@@ -111,7 +135,8 @@ export function applyConfig(context, config) {
  */
 function inRealm(value, realm) {
   if (value instanceof Date) return new realm.Date(value.getTime());
-  if (Array.isArray(value)) return realm.Array.from(value, (item) => inRealm(item, realm));
+  if (Array.isArray(value))
+    return realm.Array.from(value, (item) => inRealm(item, realm));
   return value;
 }
 
@@ -126,7 +151,11 @@ function inRealm(value, realm) {
  */
 export function callScriptFunction(context, name, args) {
   const fn = DECLARED_NAME.test(name) ? context[name] : undefined;
-  if (typeof fn !== 'function') throw new Error(`The script has no function named ${name}`);
-  const realm = { Date: vm.runInContext('Date', context), Array: vm.runInContext('Array', context) };
+  if (typeof fn !== "function")
+    throw new Error(`The script has no function named ${name}`);
+  const realm = {
+    Date: vm.runInContext("Date", context),
+    Array: vm.runInContext("Array", context),
+  };
   return fn(...args.map((arg) => inRealm(arg, realm)));
 }

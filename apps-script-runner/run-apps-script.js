@@ -2,8 +2,9 @@
  * Runs a Sheets script under Node, unchanged, and calls its functions.
  * @module apps-script-runner/run-apps-script
  *
- * What: `openAppsScript` loads one `.gs` file and returns its functions as
- * async calls. `await script.call('getCryptoPrice', 'xtm', ...)` returns
+ * What: `openAppsScript` loads a Sheets script, one `.gs` file or a
+ * script's files in the order Apps Script loads them, and returns its
+ * functions as async calls. `await script.call('getCryptoPrice', 'xtm', ...)` returns
  * what the Sheets cell would show, worked out by the script's own code.
  *
  * How: a Sheets script expects `UrlFetchApp.fetch` to return the response
@@ -32,11 +33,11 @@
  * in pulsechain-analytics, which installs it from this repo.
  */
 
-import { fileURLToPath } from 'node:url';
-import { MessageChannel, Worker } from 'node:worker_threads';
+import { fileURLToPath } from "node:url";
+import { MessageChannel, Worker } from "node:worker_threads";
 
 /** The worker thread's entry point. */
-const SCRIPT_WORKER = new URL('./script-worker.js', import.meta.url);
+const SCRIPT_WORKER = new URL("./script-worker.js", import.meta.url);
 
 /** How long a request may take before it counts as having no response, in milliseconds. */
 export const DEFAULT_REQUEST_TIMEOUT_MS = 60000;
@@ -48,7 +49,12 @@ export const DEFAULT_REQUEST_TIMEOUT_MS = 60000;
  * @returns {string} Its message
  */
 function messageOf(thrown) {
-  if (thrown !== null && typeof thrown === 'object' && typeof thrown.message === 'string') return thrown.message;
+  if (
+    thrown !== null &&
+    typeof thrown === "object" &&
+    typeof thrown.message === "string"
+  )
+    return thrown.message;
   return String(thrown);
 }
 
@@ -68,9 +74,13 @@ export async function answerRequest(request, fetchFunction, timeoutMs) {
       headers: request.headers,
       body: request.body,
       redirect: request.redirect,
-      signal: AbortSignal.timeout(timeoutMs)
+      signal: AbortSignal.timeout(timeoutMs),
     });
-    return { status: response.status, headers: Object.fromEntries(response.headers), text: await response.text() };
+    return {
+      status: response.status,
+      headers: Object.fromEntries(response.headers),
+      text: await response.text(),
+    };
   } catch (thrown) {
     return { failure: messageOf(thrown) };
   }
@@ -86,9 +96,9 @@ export async function answerRequest(request, fetchFunction, timeoutMs) {
 function isTextByName(value) {
   return (
     value !== null &&
-    typeof value === 'object' &&
+    typeof value === "object" &&
     !Array.isArray(value) &&
-    Object.values(value).every((text) => typeof text === 'string')
+    Object.values(value).every((text) => typeof text === "string")
   );
 }
 
@@ -103,15 +113,26 @@ function readOptions(options) {
   const config = options.config ?? {};
   const fetchFunction = options.fetch ?? globalThis.fetch;
   const onLog = options.onLog ?? null;
-  const requestTimeoutMs = options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+  const requestTimeoutMs =
+    options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
   const scriptProperties = options.scriptProperties ?? {};
-  if (typeof config !== 'object' || Array.isArray(config)) throw new TypeError('config must be an object');
-  if (typeof fetchFunction !== 'function') throw new TypeError('fetch must be a function');
-  if (onLog !== null && typeof onLog !== 'function') throw new TypeError('onLog must be a function');
-  if (typeof requestTimeoutMs !== 'number' || !Number.isFinite(requestTimeoutMs) || requestTimeoutMs <= 0) {
-    throw new TypeError('requestTimeoutMs must be a number of milliseconds above zero');
+  if (typeof config !== "object" || Array.isArray(config))
+    throw new TypeError("config must be an object");
+  if (typeof fetchFunction !== "function")
+    throw new TypeError("fetch must be a function");
+  if (onLog !== null && typeof onLog !== "function")
+    throw new TypeError("onLog must be a function");
+  if (
+    typeof requestTimeoutMs !== "number" ||
+    !Number.isFinite(requestTimeoutMs) ||
+    requestTimeoutMs <= 0
+  ) {
+    throw new TypeError(
+      "requestTimeoutMs must be a number of milliseconds above zero",
+    );
   }
-  if (!isTextByName(scriptProperties)) throw new TypeError('scriptProperties must be an object of strings');
+  if (!isTextByName(scriptProperties))
+    throw new TypeError("scriptProperties must be an object of strings");
   return { config, fetchFunction, onLog, requestTimeoutMs, scriptProperties };
 }
 
@@ -125,8 +146,17 @@ function readOptions(options) {
  * @param {Int32Array} answerCounter - The counter the worker waits on
  * @returns {Promise<void>} Settles once the answer is posted
  */
-async function answerPostedRequest({ number, request }, settings, requestPort, answerCounter) {
-  const answer = await answerRequest(request, settings.fetchFunction, settings.requestTimeoutMs);
+async function answerPostedRequest(
+  { number, request },
+  settings,
+  requestPort,
+  answerCounter,
+) {
+  const answer = await answerRequest(
+    request,
+    settings.fetchFunction,
+    settings.requestTimeoutMs,
+  );
   requestPort.postMessage({ number, answer });
   Atomics.add(answerCounter, 0, 1);
   Atomics.notify(answerCounter, 0);
@@ -157,20 +187,25 @@ function settleCall(session, id, finish) {
  */
 function onWorkerMessage(message, session) {
   switch (message.type) {
-    case 'ready':
+    case "ready":
       session.loaded.resolve();
       return;
-    case 'failed':
+    case "failed":
       session.loaded.reject(new Error(message.message));
       return;
-    case 'log':
-      if (session.onLog !== null) session.onLog({ level: message.level, text: message.text });
+    case "log":
+      if (session.onLog !== null)
+        session.onLog({ level: message.level, text: message.text });
       return;
-    case 'returned':
-      settleCall(session, message.id, (outcome) => outcome.resolve(message.value));
+    case "returned":
+      settleCall(session, message.id, (outcome) =>
+        outcome.resolve(message.value),
+      );
       return;
-    case 'threw':
-      settleCall(session, message.id, (outcome) => outcome.reject(new Error(message.message)));
+    case "threw":
+      settleCall(session, message.id, (outcome) =>
+        outcome.reject(new Error(message.message)),
+      );
       return;
     default:
       return;
@@ -186,7 +221,8 @@ function onWorkerMessage(message, session) {
  */
 function endSession(session, reason) {
   session.loaded.reject(new Error(reason));
-  for (const outcome of session.pending.values()) outcome.reject(new Error(reason));
+  for (const outcome of session.pending.values())
+    outcome.reject(new Error(reason));
   session.pending.clear();
 }
 
@@ -208,7 +244,11 @@ function startCall(session, name, args) {
     session.worker.postMessage({ id, name, args });
   } catch (thrown) {
     settleCall(session, id, () =>
-      outcome.reject(new Error(`The arguments to ${name} cannot be passed to the script: ${messageOf(thrown)}`))
+      outcome.reject(
+        new Error(
+          `The arguments to ${name} cannot be passed to the script: ${messageOf(thrown)}`,
+        ),
+      ),
     );
   }
   return outcome.promise;
@@ -218,7 +258,7 @@ function startCall(session, name, args) {
  * Loads a Sheets script under Node and returns its functions as async
  * calls.
  *
- * @param {string|URL} scriptPath - The `.gs` file
+ * @param {string|URL|Array<string|URL>} scriptPath - The `.gs` file, or a script's files in the order Apps Script loads them
  * @param {Object} [options] - How to run it
  * @param {Object<string, Object>} [options.config={}] - Fields of the script's config objects to set, such as `{ CONFIG: { API_KEY: '...' } }` (`applyConfig`)
  * @param {function(string, Object): Promise<Response>} [options.fetch=globalThis.fetch] - Does the script's web requests; shaped as Node's own fetch
@@ -232,22 +272,28 @@ export async function openAppsScript(scriptPath, options = {}) {
   const settings = readOptions(options);
   const answerCounter = new Int32Array(new SharedArrayBuffer(4));
   const { port1: requestPort, port2: workerRequestPort } = new MessageChannel();
-  requestPort.on('message', (posted) => answerPostedRequest(posted, settings, requestPort, answerCounter));
+  requestPort.on("message", (posted) =>
+    answerPostedRequest(posted, settings, requestPort, answerCounter),
+  );
   const worker = new Worker(SCRIPT_WORKER, {
     /*- The worker takes none of the caller's Node flags: a flag meant for
      *  the caller's own entry point, such as --input-type, stops a worker
      *  from starting, and the worker needs none to run a script. */
     execArgv: [],
     workerData: {
-      scriptPath: scriptPath instanceof URL ? fileURLToPath(scriptPath) : String(scriptPath),
+      scriptPaths: [scriptPath]
+        .flat()
+        .map((file) =>
+          file instanceof URL ? fileURLToPath(file) : String(file),
+        ),
       config: settings.config,
       scriptProperties: settings.scriptProperties,
       requestTimeoutMs: settings.requestTimeoutMs,
       logging: settings.onLog !== null,
       answerCounter: answerCounter.buffer,
-      requestPort: workerRequestPort
+      requestPort: workerRequestPort,
     },
-    transferList: [workerRequestPort]
+    transferList: [workerRequestPort],
   });
   const session = {
     worker,
@@ -263,16 +309,20 @@ export async function openAppsScript(scriptPath, options = {}) {
         worker.unref();
         requestPort.unref();
       }
-    }
+    },
   };
-  worker.on('message', (message) => onWorkerMessage(message, session));
-  worker.on('error', (error) => endSession(session, `The script's worker failed: ${messageOf(error)}`));
-  worker.on('exit', (code) => endSession(session, `The script's worker stopped, with exit code ${code}`));
+  worker.on("message", (message) => onWorkerMessage(message, session));
+  worker.on("error", (error) =>
+    endSession(session, `The script's worker failed: ${messageOf(error)}`),
+  );
+  worker.on("exit", (code) =>
+    endSession(session, `The script's worker stopped, with exit code ${code}`),
+  );
   let closed = false;
   const close = async () => {
     if (closed) return;
     closed = true;
-    endSession(session, 'The script was closed before the call returned');
+    endSession(session, "The script was closed before the call returned");
     requestPort.close();
     await worker.terminate();
   };
@@ -284,7 +334,10 @@ export async function openAppsScript(scriptPath, options = {}) {
   }
   session.holdOpen(false);
   return {
-    call: (name, ...args) => (closed ? Promise.reject(new Error('The script is closed')) : startCall(session, name, args)),
-    close
+    call: (name, ...args) =>
+      closed
+        ? Promise.reject(new Error("The script is closed"))
+        : startCall(session, name, args),
+    close,
   };
 }

@@ -1,10 +1,10 @@
 /**
  * DexTools Price & FDV Fetcher (with X1 blockchain support via x1.ninja) – Rate Limit Friendly & Fully Documented (January 2026)
- * 
+ *
  * PURPOSE:
  *   Provides reliable access to DexTools API v2 for token prices and Fully Diluted Values (FDV)
  *   from Google Sheets / Apps Script, with strong protection against rate limiting.
- * 
+ *
  * KEY FEATURES:
  *   - Supports exact pool address for price queries (DexTools specialty)
  *   - Caching via CacheService to minimize repeated API calls
@@ -21,31 +21,31 @@
  *     (DexTools doesn't list X1 yet — see "X1 BLOCKCHAIN ROUTING –
  *     DESIGN NOTE" below for the rationale)
  *   - Never caches zeros or failures → forces fresh retry on next call after transient issues
- * 
+ *
  * IMPORTANT – SUBSCRIPTION PLAN CONFIGURATION
- * 
+ *
  * The DexTools public API v2 requires the plan segment in the URL:
  * https://public-api.dextools.io/{plan}/v2/...
- * 
+ *
  * Valid values for SUBSCRIPTION_PLAN (must match your actual API key tier exactly):
  *   - "free"       → Free/limited tier (~40–60 req/min, monthly cap)
  *   - "standard"   → Standard plan (most common paid tier)
  *   - "advanced"   → Advanced plan
  *   - "pro"        → Pro / Premium plan
- * 
+ *
  * Using the WRONG value usually results in:
  *   - 401/403 Unauthorized
  *   - 404 Not Found
  *   - or HTTP 200 with empty data object {}
- * 
+ *
  * How to find your correct plan name:
  * 1. Log in to https://developer.dextools.io/
  * 2. Go to your API product / dashboard
  * 3. Check base URL examples, subscription details or billing section
  * 4. Look for the segment used (e.g. /standard/v2/, /pro/v2/)
- * 
+ *
  * USAGE
- * 
+ *
  * 1. Finding the correct chain identifier (blockchain slug):
  *    - DexTools uses short, lowercase slugs (e.g., "ether" for Ethereum mainnet, not "ethereum")
  *    - Official interactive API documentation shows examples:  
@@ -61,23 +61,23 @@
  *      - PulseChain: "pulse"
  *      - Solana: "solana"
  *      - X1 blockchain (routed to x1.ninja, not DexTools): "x1"
- * 
+ *
  * 2. Example calls (use these in your Google Sheets formulas):
- * 
+ *
  *    A. Basic token price (token address, no pool specified):  
  *       =dexToolsGetTokenPrice("ether", "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48")
  *       → Returns USDC price on Ethereum (~1.00 USD)
- * 
+ *
  *    B. FDV of a token:  
  *       =dexToolsGetTokenFDV("pulse", "0xF84b84dAAce6Ac00DbBAed26CA32Ff3570Aaf66C")
  *       → Returns FDV in USD for the Pulse token
- * 
+ *
  *    C. Price from a specific liquidity pool (most precise):  
  *       =dexToolsGetTokenPrice("ether", "0x2b591e99afe9f32eaa6214f7b7629768c40eeb39",
  *          {{"0x69d91b94f0aaf8e8a2586909fa77a5c2c89818d5", 0}})
  *       → Returns HEX price from the specified >$1M LP on Ethereum
  *       → Note: The extra "0" is required in Sheets to force array passing
- * 
+ *
  *    D. Using a different chain (e.g., Binance Smart Chain):
  *       =dexToolsGetTokenPrice("bsc", "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c")
  *       → Returns WBNB price on BSC
@@ -145,21 +145,21 @@
  *   for non-native tokens.
  *
  * PROJECT & LICENSE INFORMATION
- * 
+ *
  * This script is named crypto-price-fetcher.gs and is part of the open-source
  * crypto-price-fetchers GitHub repository:
  * https://github.com/nottoseethesun/crypto-price-fetchers
- * 
+ *
  * Use at your own risk. This script interacts with external APIs and handles
  * financial data. The author provides no warranty, expressed or implied.
- * 
+ *
  * Full license details (Apache 2.0 License) are available here:
  * https://github.com/nottoseethesun/crypto-price-fetchers/blob/main/LICENSE
- * 
+ *
  * TEST
- * 
+ *
  * To verify the script is working correctly, run the built-in test functions from the Apps Script editor:
- * 
+ *
  * 1. Standard test (clean summary output):
  *    - In the Apps Script editor, select the function: testDexToolsFunctions
  *    - Click Run (no parameters needed)
@@ -167,20 +167,20 @@
  *    - Expected: All 7 tests PASS with real values for supported tokens
  *      (tests 6 and 7 query x1.ninja for X1 wXNT price and X1 XENCAT
  *      FDV respectively, and depend on X1_CONFIG.API_KEY being set)
- * 
+ *
  * 2. Verbose test (maximum debug detail – recommended for troubleshooting):
  *    - Select the function: testDexToolsVerbose
  *    - Click Run
  *    - Or, select testDexToolsFunctions, then pass true as parameter (if dialog allows)
  *    - Expected: Detailed logs for every step (timestamps, lock attempts, raw API responses,
  *      data keys, cache info)
- * 
+ *
  * Run tests periodically, especially after changes to CONFIG, tokens, or during heavy sheet usage.
- * If any test fails with 0 (and verbose mode shows empty data keys), it indicates DexTools has 
+ * If any test fails with 0 (and verbose mode shows empty data keys), it indicates DexTools has
  * no indexed data for that token/pool.
- * 
+ *
  * TROUBLESHOOTING TIPS
- * 
+ *
  * 1. Cells stuck with "⌛ Rate limit / busy – retry soon" or "⚠️ API error – check logs"
  *    - This means the script couldn't get the lock within 60 seconds (another call is running or previously hung)
  *    - The script automatically retries on the next sheet recalculation (no need to immediately refresh the page)
@@ -190,10 +190,10 @@
  *      - Opening/reloading the sheet
  *    - If it persists >1–2 minutes: Hard refresh the page (Windows: Ctrl + Shift + R; Mac: Cmd + Shift + R)
  *    - Or, use menu → "DexTools Price/FDV → Refresh" (clears cache + forces recalc) if menu is working
- * 
+ *
  * 2. Persistent "Exceeded maximum execution time" in SUM or dependent cells
  *    - Caused by too many parallel custom function calls + temporary delays (locks/sleeps) during recalc
- *    - The error can "stick" in some cells even after the issue is resolved because Sheets' internal computation 
+ *    - The error can "stick" in some cells even after the issue is resolved because Sheets' internal computation
  *      queue gets corrupted
  *    - Automatic retry happens on next recalc (edit, open, background), but sometimes it doesn't clear the stuck state
  *    - Immediate fix that works reliably (your current method):
@@ -218,23 +218,23 @@
  *      - Use the "Refresh" menu or hard refresh proactively after adding new tokens
  *      - Avoid massive simultaneous edits that trigger full recalc
  *      - Mac users: Use Cmd + Shift + R for hard refresh (Windows: Ctrl + Shift + R)
- * 
+ *
  * 3. Cells show 0 for tokens that should have data
  *    - Run testDexToolsVerbose() → check logs for "empty data keys"
  *    - If empty: DexTools has no indexed data for that token/pool → normal, return 0
  *    - Hard refresh or edit sheet → retries automatically
- * 
+ *
  * 4. General tips
  *    - Mac users: Use Cmd (not Ctrl) for shortcuts (e.g. Cmd + Shift + R for hard refresh)
  *    - Monitor Executions log for warnings/errors
  *    - If issues persist: Run resetDexToolsLock() to force timestamp update
- * 
+ *
  * OPTIONAL: Add Custom Refresh Menu
- * 
- * The script includes code to create a custom menu "DexTools Price/FDV" with a "Refresh" item, but if the 
+ *
+ * The script includes code to create a custom menu "DexTools Price/FDV" with a "Refresh" item, but if the
  * menu is not appearing automatically, use an installable "On open" trigger for reliability (simple triggers can
  * be flaky with conflicts or permissions).
- * 
+ *
  * Step-by-step to add an installable trigger:
  * 1. In the Apps Script editor, go to the left sidebar and click the clock icon (Triggers).
  * 2. At the bottom right, click the blue "+ Add Trigger" button.
@@ -247,23 +247,23 @@
  * 8. Click "Save" at the bottom.
  * 9. If prompted, review and grant the requested permissions (this is normal for installable triggers).
  * 10. Close and reopen your spreadsheet tab (or refresh the page).
- * 
+ *
  * The menu should now appear consistently every time the sheet opens.
  * If it still does not appear, check the Triggers list for errors, ensure the function name is exactly
  * "onOpenDexTools", and verify no other scripts are conflicting.
- * 
+ *
  * Rate Limiting Strategy:
  *   - LockService.getScriptLock() → mutual exclusion (only one execution makes API call at a time)
  *   - PropertiesService → persists last call timestamp across all script executions
  *   - Utilities.sleep() → enforces minimum delay between real calls
  *   - On lock timeout (60s): returns user-friendly string visible in sheet cells
- * 
+ *
  * Google Apps Script Specifics:
  *   - Custom functions run in **parallel** for each cell → many concurrent calls possible
  *   - No built-in mutex → LockService is essential
  *   - Recursive sleep / naive timestamp checks → dangerous (quota violations, stack overflow)
  *   - Current pattern: lock → check time → sleep if needed → call → update time → release
- * 
+ *
  * Dependencies:
  *   - UrlFetchApp, LockService, PropertiesService, CacheService (all built-in)
  */
@@ -283,13 +283,13 @@
  * @property {number} LOCK_WAIT_MS             Max milliseconds to wait for lock acquisition
  */
 const CONFIG = {
-  API_KEY:               'paste_your_dextools_api_key_here',    // Remember, there's a free tier if needed
-  SUBSCRIPTION_PLAN:     'standard',          // ← MUST match your key's actual plan tier; free should work too
-  MIN_SECONDS_BETWEEN_CALLS: 0.7,               // Safe for Standard+; 1.5–3 for free tier; 1.0+ if also calling x1.ninja free (60 req/min)
-  API_HOST:              "https://public-api.dextools.io",
-  API_VERSION:           "v2",
-  CACHE_SECONDS:         300,                 // 5 minutes default – only successful results cached
-  LOCK_WAIT_MS:          120000,               // 60 seconds for lock wait (increased for stability)
+  API_KEY: "paste_your_dextools_api_key_here", // Remember, there's a free tier if needed
+  SUBSCRIPTION_PLAN: "standard", // ← MUST match your key's actual plan tier; free should work too
+  MIN_SECONDS_BETWEEN_CALLS: 0.7, // Safe for Standard+; 1.5–3 for free tier; 1.0+ if also calling x1.ninja free (60 req/min)
+  API_HOST: "https://public-api.dextools.io",
+  API_VERSION: "v2",
+  CACHE_SECONDS: 300, // 5 minutes default – only successful results cached
+  LOCK_WAIT_MS: 120000, // 60 seconds for lock wait (increased for stability)
 };
 
 /**
@@ -299,9 +299,9 @@ const CONFIG = {
  * @property {string} API_VERSION  Current API version
  */
 const X1_CONFIG = {
-  API_KEY:     'paste_your_x1_ninja_api_key_here',  // Free tier — get yours at https://x1.ninja/developers
-  API_HOST:    'https://api.x1.ninja',
-  API_VERSION: 'v1',
+  API_KEY: "paste_your_x1_ninja_api_key_here", // Free tier — get yours at https://x1.ninja/developers
+  API_HOST: "https://api.x1.ninja",
+  API_VERSION: "v1",
 };
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -350,13 +350,18 @@ const CACHE = CacheService.getScriptCache();
  * @param {number} [cacheSeconds=CONFIG.CACHE_SECONDS] - Override cache duration
  * @return {number|string} Price in USD, or 0 (for math) / friendly string on timeout
  */
-function dexToolsGetTokenPrice(blockchain, tokenAddress, poolAddresses = [], cacheSeconds = CONFIG.CACHE_SECONDS) {
-  const isX1 = String(blockchain || '').toLowerCase() === 'x1';
+function dexToolsGetTokenPrice(
+  blockchain,
+  tokenAddress,
+  poolAddresses = [],
+  cacheSeconds = CONFIG.CACHE_SECONDS,
+) {
+  const isX1 = String(blockchain || "").toLowerCase() === "x1";
   const pool = Array.isArray(poolAddresses) && poolAddresses[0]?.[0];
   const address = pool || tokenAddress;
   const isPool = !!pool;
-  const provider = isX1 ? 'x1' : 'dt';
-  const cacheKey = `${provider}_price_${blockchain}_${address}_${isPool ? 'pool' : 'token'}`;
+  const provider = isX1 ? "x1" : "dt";
+  const cacheKey = `${provider}_price_${blockchain}_${address}_${isPool ? "pool" : "token"}`;
 
   const cached = CACHE.get(cacheKey);
   if (cached) return Number(cached);
@@ -364,10 +369,10 @@ function dexToolsGetTokenPrice(blockchain, tokenAddress, poolAddresses = [], cac
   const price = withRateLimitProtection(() =>
     isX1
       ? fetchX1NinjaPrice(address)
-      : fetchDexToolsPrice(blockchain, address, isPool)
+      : fetchDexToolsPrice(blockchain, address, isPool),
   );
 
-  if (typeof price === 'number' && price > 0) {
+  if (typeof price === "number" && price > 0) {
     CACHE.put(cacheKey, price.toString(), cacheSeconds);
   }
 
@@ -400,13 +405,18 @@ function dexToolsGetTokenPrice(blockchain, tokenAddress, poolAddresses = [], cac
  * @param {number} [cacheSeconds=CONFIG.CACHE_SECONDS] - Override cache duration
  * @return {number|string} FDV in USD, or 0 (for math) / friendly string on timeout
  */
-function dexToolsGetTokenFDV(blockchain, tokenAddress, poolAddresses = [], cacheSeconds = CONFIG.CACHE_SECONDS) {
-  const isX1 = String(blockchain || '').toLowerCase() === 'x1';
+function dexToolsGetTokenFDV(
+  blockchain,
+  tokenAddress,
+  poolAddresses = [],
+  cacheSeconds = CONFIG.CACHE_SECONDS,
+) {
+  const isX1 = String(blockchain || "").toLowerCase() === "x1";
   const pool = Array.isArray(poolAddresses) && poolAddresses[0]?.[0];
   const address = pool || tokenAddress;
   const isPool = !!pool;
-  const provider = isX1 ? 'x1' : 'dt';
-  const cacheKey = `${provider}_fdv_${blockchain}_${address}_${isPool ? 'pool' : 'token'}`;
+  const provider = isX1 ? "x1" : "dt";
+  const cacheKey = `${provider}_fdv_${blockchain}_${address}_${isPool ? "pool" : "token"}`;
 
   const cached = CACHE.get(cacheKey);
   if (cached) return Number(cached);
@@ -416,10 +426,16 @@ function dexToolsGetTokenFDV(blockchain, tokenAddress, poolAddresses = [], cache
       return fetchX1NinjaFDV(address);
     }
     const info = fetchDexToolsTokenInfo(blockchain, tokenAddress);
-    return info?.fdv ?? info?.fullyDilutedValue ?? info?.fdvUsd ?? info?.metrics?.fdv ?? 0;
+    return (
+      info?.fdv ??
+      info?.fullyDilutedValue ??
+      info?.fdvUsd ??
+      info?.metrics?.fdv ??
+      0
+    );
   });
 
-  if (typeof fdv === 'number' && fdv > 0) {
+  if (typeof fdv === "number" && fdv > 0) {
     CACHE.put(cacheKey, fdv.toString(), cacheSeconds);
   }
 
@@ -441,18 +457,22 @@ function dexToolsGetTokenFDV(blockchain, tokenAddress, poolAddresses = [], cache
  */
 function withRateLimitProtection(callback) {
   const lock = LockService.getScriptLock();
-  
+
   const acquired = lock.tryLock(CONFIG.LOCK_WAIT_MS);
-  
+
   if (!acquired) {
-    console.warn("Rate limit lock timeout after " + (CONFIG.LOCK_WAIT_MS / 1000) + "s – another execution is holding it");
-    return "⌛ Rate limit / busy – retry soon";  // Visible in cell
+    console.warn(
+      "Rate limit lock timeout after " +
+        CONFIG.LOCK_WAIT_MS / 1000 +
+        "s – another execution is holding it",
+    );
+    return "⌛ Rate limit / busy – retry soon"; // Visible in cell
   }
 
   try {
-    const lastStr = props.getProperty('lastDexToolsCall');
-    const lastMs  = lastStr ? parseInt(lastStr, 10) : 0;
-    const nowMs   = Date.now();
+    const lastStr = props.getProperty("lastDexToolsCall");
+    const lastMs = lastStr ? parseInt(lastStr, 10) : 0;
+    const nowMs = Date.now();
 
     const waitedMs = nowMs - lastMs;
 
@@ -464,7 +484,7 @@ function withRateLimitProtection(callback) {
 
     const result = callback();
 
-    props.setProperty('lastDexToolsCall', Date.now().toString());
+    props.setProperty("lastDexToolsCall", Date.now().toString());
 
     return result;
   } catch (err) {
@@ -499,7 +519,9 @@ function fetchDexToolsPrice(blockchain, address, isPool) {
     console.log(`[PRICE] HTTP: ${code}`);
 
     if (code !== 200) {
-      console.error(`[PRICE] HTTP Error ${code}: ${response.getContentText().substring(0, 300)}`);
+      console.error(
+        `[PRICE] HTTP Error ${code}: ${response.getContentText().substring(0, 300)}`,
+      );
       return 0;
     }
 
@@ -533,7 +555,9 @@ function fetchDexToolsTokenInfo(blockchain, tokenAddress) {
     console.log(`[INFO] HTTP: ${code}`);
 
     if (code !== 200) {
-      console.error(`[INFO] HTTP Error ${code}: ${response.getContentText().substring(0, 300)}`);
+      console.error(
+        `[INFO] HTTP Error ${code}: ${response.getContentText().substring(0, 300)}`,
+      );
       return {};
     }
 
@@ -557,9 +581,9 @@ function getOptions() {
     method: "GET",
     headers: {
       "X-API-Key": CONFIG.API_KEY,
-      "Accept": "application/json"
+      Accept: "application/json",
     },
-    muteHttpExceptions: true
+    muteHttpExceptions: true,
   };
 }
 
@@ -587,7 +611,9 @@ function fetchX1NinjaPrice(poolAddress) {
     console.log(`[X1 PRICE] HTTP: ${code}`);
 
     if (code !== 200) {
-      console.error(`[X1 PRICE] HTTP Error ${code}: ${response.getContentText().substring(0, 300)}`);
+      console.error(
+        `[X1 PRICE] HTTP Error ${code}: ${response.getContentText().substring(0, 300)}`,
+      );
       return 0;
     }
 
@@ -628,7 +654,9 @@ function fetchX1NinjaFDV(poolAddress) {
     console.log(`[X1 FDV] HTTP: ${code}`);
 
     if (code !== 200) {
-      console.error(`[X1 FDV] HTTP Error ${code}: ${response.getContentText().substring(0, 300)}`);
+      console.error(
+        `[X1 FDV] HTTP Error ${code}: ${response.getContentText().substring(0, 300)}`,
+      );
       return 0;
     }
 
@@ -651,10 +679,10 @@ function getX1Options() {
   return {
     method: "GET",
     headers: {
-      "Authorization": `Bearer ${X1_CONFIG.API_KEY}`,
-      "Accept": "application/json"
+      Authorization: `Bearer ${X1_CONFIG.API_KEY}`,
+      Accept: "application/json",
     },
-    muteHttpExceptions: true
+    muteHttpExceptions: true,
   };
 }
 
@@ -683,7 +711,9 @@ function onOpenDexTools() {
  */
 function refreshDexTools() {
   SpreadsheetApp.flush();
-  console.log("Sheet formulas forcibly re-evaluated. Stuck cells should update.");
+  console.log(
+    "Sheet formulas forcibly re-evaluated. Stuck cells should update.",
+  );
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -693,30 +723,84 @@ function refreshDexTools() {
 /**
  * Comprehensive test function – run this from the script editor
  * to verify everything is working correctly.
- * 
- * @param {boolean} verbose - When true, logs maximum detail (lock attempts, 
+ *
+ * @param {boolean} verbose - When true, logs maximum detail (lock attempts,
  *                            raw JSON responses, full data keys, cache status, etc.)
  *                            Default: false (clean summary only)
  */
 function testDexToolsFunctions(verbose = false) {
   console.log("=== DexTools Full Test Started ===");
-  console.log(`Plan: ${CONFIG.SUBSCRIPTION_PLAN} | Delay: ${CONFIG.MIN_SECONDS_BETWEEN_CALLS}s | Cache: ${CONFIG.CACHE_SECONDS}s | Verbose mode: ${verbose}`);
+  console.log(
+    `Plan: ${CONFIG.SUBSCRIPTION_PLAN} | Delay: ${CONFIG.MIN_SECONDS_BETWEEN_CALLS}s | Cache: ${CONFIG.CACHE_SECONDS}s | Verbose mode: ${verbose}`,
+  );
 
   const testCases = [
-    { name: "Pulse token price", fn: () => dexToolsGetTokenPrice("pulse", "0xF84b84dAAce6Ac00DbBAed26CA32Ff3570Aaf66C") },
-    { name: "Pulse token FDV",   fn: () => dexToolsGetTokenFDV("pulse", "0xF84b84dAAce6Ac00DbBAed26CA32Ff3570Aaf66C") },
-    { name: "USDC (Ethereum) price – expected ~1.00 USD (stablecoin)", fn: () => dexToolsGetTokenPrice("ether", "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48") },
-    { name: "USDC (Ethereum) FDV – expected very large number (billions)", fn: () => dexToolsGetTokenFDV("ether", "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48") },
-    { name: "HEX (Ethereum) price with specific LP (> $1M pool)", fn: () => dexToolsGetTokenPrice("ether", "0x2b591e99afe9f32eaa6214f7b7629768c40eeb39", [["0x69d91b94f0aaf8e8a2586909fa77a5c2c89818d5", 0]]) },
-    { name: "X1 wXNT (wrapped XNT) price via x1.ninja – wXNT/USDC.X pool", fn: () => dexToolsGetTokenPrice("x1", "So11111111111111111111111111111111111111112", [["CAJeVEoSm1QQZccnCqYu9cnNF7TTD2fcUA3E5HQoxRvR", 0]]) },
-    { name: "X1 XENCAT (burn) FDV via x1.ninja – XENCAT/wXNT pool", fn: () => dexToolsGetTokenFDV("x1", "DQ6sApYPMJ8LwpvyUjthL7amykNBJ3fx5jZi2koN7vHb", [["6oTV8xMRP6w592xK79Untuq8vqCttFDHZnw3bN5Suxry", 0]]) },
+    {
+      name: "Pulse token price",
+      fn: () =>
+        dexToolsGetTokenPrice(
+          "pulse",
+          "0xF84b84dAAce6Ac00DbBAed26CA32Ff3570Aaf66C",
+        ),
+    },
+    {
+      name: "Pulse token FDV",
+      fn: () =>
+        dexToolsGetTokenFDV(
+          "pulse",
+          "0xF84b84dAAce6Ac00DbBAed26CA32Ff3570Aaf66C",
+        ),
+    },
+    {
+      name: "USDC (Ethereum) price – expected ~1.00 USD (stablecoin)",
+      fn: () =>
+        dexToolsGetTokenPrice(
+          "ether",
+          "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+        ),
+    },
+    {
+      name: "USDC (Ethereum) FDV – expected very large number (billions)",
+      fn: () =>
+        dexToolsGetTokenFDV(
+          "ether",
+          "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+        ),
+    },
+    {
+      name: "HEX (Ethereum) price with specific LP (> $1M pool)",
+      fn: () =>
+        dexToolsGetTokenPrice(
+          "ether",
+          "0x2b591e99afe9f32eaa6214f7b7629768c40eeb39",
+          [["0x69d91b94f0aaf8e8a2586909fa77a5c2c89818d5", 0]],
+        ),
+    },
+    {
+      name: "X1 wXNT (wrapped XNT) price via x1.ninja – wXNT/USDC.X pool",
+      fn: () =>
+        dexToolsGetTokenPrice(
+          "x1",
+          "So11111111111111111111111111111111111111112",
+          [["CAJeVEoSm1QQZccnCqYu9cnNF7TTD2fcUA3E5HQoxRvR", 0]],
+        ),
+    },
+    {
+      name: "X1 XENCAT (burn) FDV via x1.ninja – XENCAT/wXNT pool",
+      fn: () =>
+        dexToolsGetTokenFDV(
+          "x1",
+          "DQ6sApYPMJ8LwpvyUjthL7amykNBJ3fx5jZi2koN7vHb",
+          [["6oTV8xMRP6w592xK79Untuq8vqCttFDHZnw3bN5Suxry", 0]],
+        ),
+    },
   ];
 
   let passes = 0;
   let fails = 0;
 
   testCases.forEach((test, i) => {
-    console.log(`\nTest #${i+1}: ${test.name}`);
+    console.log(`\nTest #${i + 1}: ${test.name}`);
 
     if (verbose) {
       console.log("[VERBOSE] Starting execution of this test case...");
@@ -728,14 +812,18 @@ function testDexToolsFunctions(verbose = false) {
 
     console.log("→ Result:", result);
 
-    const isNumber = typeof result === 'number';
+    const isNumber = typeof result === "number";
     const isPass = isNumber && result > 0;
     console.log("→ Status:", isPass ? "PASS" : "FAIL");
 
     // Diagnostic when numeric zero is returned
     if (isNumber && result === 0) {
-      console.log("→ Possible causes: lock timeout, no data available from DexTools, API error, rate limit");
-      console.log("→ Note: 0 is returned intentionally so spreadsheet math still works.");
+      console.log(
+        "→ Possible causes: lock timeout, no data available from DexTools, API error, rate limit",
+      );
+      console.log(
+        "→ Note: 0 is returned intentionally so spreadsheet math still works.",
+      );
       console.log("→ You can manually replace 0 with a known value if needed.");
     }
 
@@ -745,10 +833,15 @@ function testDexToolsFunctions(verbose = false) {
       if (isNumber) {
         console.log("[VERBOSE] Numeric value:", result);
       }
-      const cachePrefix = test.name.toUpperCase().startsWith('X1') ? 'x1' : 'dt';
-      console.log("[VERBOSE] Cache key likely used:",
-        test.name.includes('FDV') ? `${cachePrefix}_fdv_${test.name.split(' ')[0].toLowerCase()}_...` :
-                                    `${cachePrefix}_price_${test.name.split(' ')[0].toLowerCase()}_...`);
+      const cachePrefix = test.name.toUpperCase().startsWith("X1")
+        ? "x1"
+        : "dt";
+      console.log(
+        "[VERBOSE] Cache key likely used:",
+        test.name.includes("FDV")
+          ? `${cachePrefix}_fdv_${test.name.split(" ")[0].toLowerCase()}_...`
+          : `${cachePrefix}_price_${test.name.split(" ")[0].toLowerCase()}_...`,
+      );
       console.log("[VERBOSE] Finished this test case");
     }
 

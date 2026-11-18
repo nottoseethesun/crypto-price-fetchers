@@ -24,8 +24,8 @@
  * Fit: `key-prompts.js` asks for keys and passwords through this.
  */
 
-import readline from 'node:readline';
-import { Writable } from 'node:stream';
+import readline from "node:readline";
+import { Writable } from "node:stream";
 
 /**
  * A stream that takes whatever is written to it and shows none of it.
@@ -36,7 +36,7 @@ function showsNothing() {
   return new Writable({
     write(_chunk, _encoding, done) {
       done();
-    }
+    },
   });
 }
 
@@ -55,18 +55,22 @@ export function openSecretPrompt(streams = {}) {
   const lines = [];
   const waiting = [];
   let stopped = null;
-  const rl = readline.createInterface({ input, output: showsNothing(), terminal: true });
-  rl.on('line', (line) => {
+  const rl = readline.createInterface({
+    input,
+    output: showsNothing(),
+    terminal: true,
+  });
+  rl.on("line", (line) => {
     const next = waiting.shift();
     if (next === undefined) lines.push(line);
     else next.resolve(line);
   });
-  rl.on('SIGINT', () => {
-    stopped = 'Stopped at the prompt';
+  rl.on("SIGINT", () => {
+    stopped = "Stopped at the prompt";
     rl.close();
   });
-  rl.on('close', () => {
-    stopped ??= 'The input ended before an answer was typed';
+  rl.on("close", () => {
+    stopped ??= "The input ended before an answer was typed";
     for (const next of waiting.splice(0)) next.reject(new Error(stopped));
   });
   const ask = async (prompt) => {
@@ -74,8 +78,11 @@ export function openSecretPrompt(streams = {}) {
     let answer;
     if (lines.length > 0) answer = lines.shift();
     else if (stopped !== null) throw new Error(stopped);
-    else answer = await new Promise((resolve, reject) => waiting.push({ resolve, reject }));
-    output.write('\n');
+    else
+      answer = await new Promise((resolve, reject) =>
+        waiting.push({ resolve, reject }),
+      );
+    output.write("\n");
     return answer;
   };
   return { ask, close: () => rl.close() };

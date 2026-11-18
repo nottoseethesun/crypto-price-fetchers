@@ -1,25 +1,27 @@
 /**
- * Tests for reading a Node version's config file.
+ * Tests for reading a Node version's config file, and laying opened keys
+ * over its values.
  * @module test/config-file.test
  */
 
-import { after, before, describe, it } from 'node:test';
-import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-import { readConfigFile } from '../apps-script-runner/config-file.js';
+import { after, before, describe, it } from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import {
+  layConfig,
+  readConfigFile,
+} from "../apps-script-runner/config-file.js";
+import { makeTempFolder, removeTempFolders } from "./helpers/temp-folders.js";
 
-describe('readConfigFile', () => {
+describe("readConfigFile", () => {
   let folder;
 
   before(() => {
-    folder = fs.mkdtempSync(path.join(os.tmpdir(), 'crypto-price-fetchers-test-config-'));
+    folder = makeTempFolder("config");
   });
 
-  after(() => {
-    fs.rmSync(folder, { recursive: true, force: true });
-  });
+  after(removeTempFolders);
 
   /**
    * Writes a file into the test's folder.
@@ -34,27 +36,66 @@ describe('readConfigFile', () => {
     return file;
   }
 
-  it('reads the values for the config objects', () => {
-    const file = write('config.json', '{ "CONFIG": { "API_KEY": "k" } }');
-    assert.deepEqual(readConfigFile(file), { CONFIG: { API_KEY: 'k' } });
+  it("reads the values for the config objects", () => {
+    const file = write("config.json", '{ "CONFIG": { "CACHE_SECONDS": 60 } }');
+    assert.deepEqual(readConfigFile(file), { CONFIG: { CACHE_SECONDS: 60 } });
   });
 
-  it('reads a missing optional file as no values', () => {
-    assert.deepEqual(readConfigFile(path.join(folder, 'missing.json')), {});
+  it("leaves out the project's list of api keys, which is no config object of the script", () => {
+    const file = write(
+      "with-keys.json",
+      '{ "apiKeys": ["dextools"], "CONFIG": { "CACHE_SECONDS": 60 } }',
+    );
+    assert.deepEqual(readConfigFile(file), { CONFIG: { CACHE_SECONDS: 60 } });
   });
 
-  it('refuses a missing file that is required, naming it', () => {
-    const file = path.join(folder, 'missing.json');
-    assert.throws(() => readConfigFile(file, { required: true }), new RegExp(`Cannot read the config file ${file}`));
+  it("reads a missing optional file as no values", () => {
+    assert.deepEqual(readConfigFile(path.join(folder, "missing.json")), {});
   });
 
-  it('refuses a file that is not JSON', () => {
-    const file = write('broken.json', '{ "CONFIG": ');
+  it("refuses a missing file that is required, naming it", () => {
+    const file = path.join(folder, "missing.json");
+    assert.throws(
+      () => readConfigFile(file, { required: true }),
+      (error) =>
+        error.message.startsWith(`Cannot read the config file ${file}`),
+    );
+  });
+
+  it("refuses a file that is not JSON", () => {
+    const file = write("broken.json", '{ "CONFIG": ');
     assert.throws(() => readConfigFile(file), /is not valid JSON/);
   });
 
-  it('refuses JSON that is not an object', () => {
-    assert.throws(() => readConfigFile(write('list.json', '["k"]')), /holds no JSON object/);
-    assert.throws(() => readConfigFile(write('null.json', 'null')), /holds no JSON object/);
+  it("refuses JSON that is not an object", () => {
+    assert.throws(
+      () => readConfigFile(write("list.json", '["k"]')),
+      /holds no JSON object/,
+    );
+    assert.throws(
+      () => readConfigFile(write("null.json", "null")),
+      /holds no JSON object/,
+    );
+  });
+});
+
+describe("layConfig", () => {
+  it("lays values over a config, object by object, keeping its other fields", () => {
+    const config = {
+      CONFIG: { CACHE_SECONDS: 60, API_KEY: "placeholder" },
+      OTHER: { A: 1 },
+    };
+    assert.deepEqual(
+      layConfig(config, {
+        CONFIG: { API_KEY: "opened-key" },
+        X1_CONFIG: { API_KEY: "x1-key" },
+      }),
+      {
+        CONFIG: { CACHE_SECONDS: 60, API_KEY: "opened-key" },
+        OTHER: { A: 1 },
+        X1_CONFIG: { API_KEY: "x1-key" },
+      },
+    );
+    assert.deepEqual(config.CONFIG.API_KEY, "placeholder");
   });
 });

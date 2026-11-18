@@ -7,7 +7,7 @@
  * @author Christopher M. Balz with Grok and Claude.ai
  */
 
-import cliProgress from 'cli-progress';
+import cliProgress from "cli-progress";
 
 /**
  * Determines if progress bar should be shown based on environment
@@ -15,7 +15,7 @@ import cliProgress from 'cli-progress';
  * @returns {boolean} True if progress bar should be displayed
  */
 export function shouldShowProgressBar(verbose) {
-  const isTestEnv = process.env.NODE_ENV === 'test' || !!process.env.VITEST;
+  const isTestEnv = process.env.NODE_ENV === "test" || !!process.env.VITEST;
   return !verbose && !isTestEnv;
 }
 
@@ -27,11 +27,13 @@ export function shouldShowProgressBar(verbose) {
  */
 export function createProgressBar(total, options = {}) {
   const bar = new cliProgress.SingleBar({
-    format: options.format || 'Fetching prices |{bar}| {percentage}% | {value}/{total} rows | ETA: {eta_formatted}',
-    barCompleteChar: '\u2588',
-    barIncompleteChar: '\u2591',
+    format:
+      options.format ||
+      "Fetching prices |{bar}| {percentage}% | {value}/{total} rows | ETA: {eta_formatted}",
+    barCompleteChar: "\u2588",
+    barIncompleteChar: "\u2591",
     hideCursor: true,
-    ...options
+    ...options,
   });
 
   let current = 0;
@@ -53,7 +55,7 @@ export function createProgressBar(total, options = {}) {
       bar.stop();
     },
     getProgress: () => ({ current, total }),
-    getPercentage: () => total > 0 ? Math.round((current / total) * 100) : 0
+    getPercentage: () => (total > 0 ? Math.round((current / total) * 100) : 0),
   };
 }
 
@@ -89,10 +91,10 @@ export function createNoOpProgressBar(total) {
       stopped = true;
     },
     getProgress: () => ({ current, total }),
-    getPercentage: () => total > 0 ? Math.round((current / total) * 100) : 0,
+    getPercentage: () => (total > 0 ? Math.round((current / total) * 100) : 0),
     // Additional methods for testing
     isStarted: () => started,
-    isStopped: () => stopped
+    isStopped: () => stopped,
   };
 }
 

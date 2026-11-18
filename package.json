@@ -1,20 +1,34 @@
 {
   "name": "crypto-price-fetchers",
   "version": "1.0.0",
-  "description": "Node versions of the crypto price Sheets scripts, the runner that runs a Sheets script under Node, unchanged, and a store of api keys encrypted with a password",
+  "description": "Node versions of the crypto price Sheets scripts, the runner that runs a Sheets script under Node, unchanged, a store of api keys encrypted with a password, and the security lint's rule against printing a secret",
   "type": "module",
   "exports": {
     "./api-key-store": "./api-key-store/index.js",
-    "./apps-script-runner": "./apps-script-runner/index.js"
+    "./apps-script-runner": "./apps-script-runner/index.js",
+    "./eslint-rules/no-secret-logging": "./eslint-rules/no-secret-logging.js"
   },
   "files": [
     "api-key-store/",
-    "apps-script-runner/"
+    "apps-script-runner/",
+    "eslint-rules/",
+    "unlock-api-keys.sh"
   ],
   "scripts": {
-    "lint": "eslint . --max-warnings 0",
-    "save-api-key": "node save-api-key.js",
-    "test": "node --test \"test/*.test.js\""
+    "api-keys": "node manage-api-keys.js",
+    "prelint": "husky",
+    "lint": "eslint . --max-warnings 0 && markdownlint-cli2 && npm run format:check && github-actionlint .github/workflows/*.yml && npm run knip:files",
+    "lint:fix": "eslint . --fix && markdownlint-cli2 --fix && npm run format",
+    "format": "prettier --write \"**/*.{js,gs,json,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{js,gs,json,yml,yaml}\"",
+    "knip:files": "knip --include files",
+    "test": "node --test \"test/*.test.js\"",
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-lines=80 \"test/*.test.js\"",
+    "test:filler": "npm run test:strict --prefix fetch-from-centralized-exchange/crypto-price-filler",
+    "audit:deps": "npm audit --audit-level=high --omit=dev && npm audit --audit-level=high --omit=dev --prefix fetch-from-centralized-exchange/crypto-price-filler",
+    "audit:security": "eslint -c eslint-security.config.js . --max-warnings 0",
+    "audit:secrets": "secretlint \"**/*\"",
+    "check": "npm run lint && npm run test:coverage && npm run test:filler && npm run audit:deps && npm run audit:security && npm run audit:secrets"
   },
   "author": "Christopher M. Balz with Grok and Claude",
   "license": "Apache-2.0",
@@ -22,8 +36,20 @@
     "commander": "^12.1.0"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.2",
-    "eslint": "^9.39.2"
+    "@eslint/js": "^10.0.1",
+    "@secretlint/secretlint-rule-preset-recommend": "^11.7.1",
+    "eslint": "^10.15.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-n": "^17.24.0",
+    "eslint-plugin-no-secrets": "^2.3.3",
+    "eslint-plugin-security": "^4.2.1",
+    "github-actionlint": "^1.7.12",
+    "globals": "^17.14.0",
+    "husky": "^9.1.7",
+    "knip": "^5.88.1",
+    "markdownlint-cli2": "^0.23.3",
+    "prettier": "^3.10.1",
+    "secretlint": "^11.7.1"
   },
   "engines": {
     "node": ">=22"

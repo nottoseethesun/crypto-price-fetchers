@@ -78,15 +78,15 @@
  * @requires commander
  */
 
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
+import fs from "fs";
+import path from "path";
+import os from "os";
 
-import { Command } from 'commander';
-import { parse as csvParse } from 'csv-parse/sync';
-import { createObjectCsvWriter } from 'csv-writer';
+import { Command } from "commander";
+import { parse as csvParse } from "csv-parse/sync";
+import { createObjectCsvWriter } from "csv-writer";
 
-import { backfillPrices, logv, DEFAULT_COLUMNS } from './utils/backfill.js';
+import { backfillPrices, logv, DEFAULT_COLUMNS } from "./utils/backfill.js";
 
 /**
  * Loads configuration from config.json.
@@ -94,7 +94,7 @@ import { backfillPrices, logv, DEFAULT_COLUMNS } from './utils/backfill.js';
  */
 function loadConfig() {
   try {
-    return JSON.parse(fs.readFileSync('./config.json', 'utf8'));
+    return JSON.parse(fs.readFileSync("./config.json", "utf8"));
   } catch (_e) {
     return {};
   }
@@ -106,7 +106,7 @@ function loadConfig() {
  * @returns {string} Expanded file path
  */
 function expandPath(filePath) {
-  if (filePath?.startsWith('~')) {
+  if (filePath?.startsWith("~")) {
     return path.join(os.homedir(), filePath.slice(1));
   }
   return filePath;
@@ -122,12 +122,16 @@ function expandPath(filePath) {
 function validateAndResolveOptions(options, config) {
   const inputFile = expandPath(options.input);
   const outputFile = options.output || inputFile;
-  const verbose = options.verbose || process.env.VERBOSE === '1';
-  const backfillHighest = options.backfillHighest || config.BACKFILL_HIGHEST || false;
-  const backfillLowest = options.backfillLowest || config.BACKFILL_LOWEST || false;
+  const verbose = options.verbose || process.env.VERBOSE === "1";
+  const backfillHighest =
+    options.backfillHighest || config.BACKFILL_HIGHEST || false;
+  const backfillLowest =
+    options.backfillLowest || config.BACKFILL_LOWEST || false;
 
   if (!backfillHighest && !backfillLowest) {
-    throw new Error('Must specify --backfill-highest or --backfill-lowest (or set in config.json)');
+    throw new Error(
+      "Must specify --backfill-highest or --backfill-lowest (or set in config.json)",
+    );
   }
 
   if (!fs.existsSync(inputFile)) {
@@ -138,7 +142,7 @@ function validateAndResolveOptions(options, config) {
     inputFile,
     outputFile,
     verbose,
-    useHighest: backfillHighest // backfillHighest takes precedence
+    useHighest: backfillHighest, // backfillHighest takes precedence
   };
 }
 
@@ -149,18 +153,18 @@ function validateAndResolveOptions(options, config) {
  * @throws {Error} If CSV is empty
  */
 function readCsvFile(filePath) {
-  const csvContent = fs.readFileSync(filePath, 'utf8');
+  const csvContent = fs.readFileSync(filePath, "utf8");
   const rows = csvParse(csvContent, {
     columns: true,
     skip_empty_lines: true,
     trim: true,
-    delimiter: ',',
+    delimiter: ",",
     quote: '"',
-    relax_column_count: true
+    relax_column_count: true,
   });
 
   if (rows.length === 0) {
-    throw new Error('Input CSV is empty');
+    throw new Error("Input CSV is empty");
   }
 
   const headers = Object.keys(rows[0]);
@@ -174,10 +178,16 @@ function readCsvFile(filePath) {
  * @throws {Error} If required price column is not found
  */
 function detectColumns(headers) {
-  const priceColName = headers.find(h => h.includes('$usd price')) || DEFAULT_COLUMNS.price;
-  const amountColName = headers.find(h => h.toLowerCase().includes('amount')) || DEFAULT_COLUMNS.amount;
-  const usdAmountColName = headers.find(h => h.includes('$usd amount')) || DEFAULT_COLUMNS.usdAmount;
-  const grandTotalColName = headers.find(h => h.includes('grand total')) || DEFAULT_COLUMNS.grandTotal;
+  const priceColName =
+    headers.find((h) => h.includes("$usd price")) || DEFAULT_COLUMNS.price;
+  const amountColName =
+    headers.find((h) => h.toLowerCase().includes("amount")) ||
+    DEFAULT_COLUMNS.amount;
+  const usdAmountColName =
+    headers.find((h) => h.includes("$usd amount")) || DEFAULT_COLUMNS.usdAmount;
+  const grandTotalColName =
+    headers.find((h) => h.includes("grand total")) ||
+    DEFAULT_COLUMNS.grandTotal;
 
   if (!headers.includes(priceColName)) {
     throw new Error(`Price column "${priceColName}" not found in CSV`);
@@ -196,10 +206,10 @@ function detectColumns(headers) {
 async function writeCsvFile(filePath, headers, rows) {
   const csvWriter = createObjectCsvWriter({
     path: filePath,
-    header: headers.map(h => ({ id: h, title: h })),
-    fieldDelimiter: ',',
+    header: headers.map((h) => ({ id: h, title: h })),
+    fieldDelimiter: ",",
     quote: '"',
-    escape: '"'
+    escape: '"',
   });
   await csvWriter.writeRecords(rows);
 }
@@ -211,35 +221,35 @@ async function writeCsvFile(filePath, headers, rows) {
 export function setupBackfillCommander() {
   const program = new Command();
   program
-    .name('backfill')
-    .description('Backfill empty/error prices in a CSV file using bracketing prices')
-    .version('1.0.0', '-v, --version', 'output the version number')
+    .name("backfill")
+    .description(
+      "Backfill empty/error prices in a CSV file using bracketing prices",
+    )
+    .version("1.0.0", "-v, --version", "output the version number")
 
     .requiredOption(
-      '--input <path>',
-      'Path to input CSV file (typically a previous output.csv)'
+      "--input <path>",
+      "Path to input CSV file (typically a previous output.csv)",
     )
     .option(
-      '--output <path>',
-      'Path to output CSV file (default: overwrites input)'
+      "--output <path>",
+      "Path to output CSV file (default: overwrites input)",
     )
     .option(
-      '--backfill-highest',
-      'Fill empty prices with highest bracketing price (conservative tax estimates)',
-      false
+      "--backfill-highest",
+      "Fill empty prices with highest bracketing price (conservative tax estimates)",
+      false,
     )
     .option(
-      '--backfill-lowest',
-      'Fill empty prices with lowest bracketing price (budgeting: avoid over-estimating)',
-      false
+      "--backfill-lowest",
+      "Fill empty prices with lowest bracketing price (budgeting: avoid over-estimating)",
+      false,
     )
-    .option(
-      '--verbose',
-      'Enable detailed logging during processing',
-      false
-    )
+    .option("--verbose", "Enable detailed logging during processing", false)
 
-    .addHelpText('after', `
+    .addHelpText(
+      "after",
+      `
 Examples:
   Backfill in place (conservative tax estimates):
     $ node backfill.js --input=output.csv --backfill-highest
@@ -249,9 +259,10 @@ Examples:
 
   Verbose mode:
     $ node backfill.js --input=output.csv --backfill-highest --verbose
-    `)
+    `,
+    )
 
-    .helpOption('-h, --help', 'display help for command');
+    .helpOption("-h, --help", "display help for command");
 
   return program;
 }
@@ -278,17 +289,19 @@ export function parseBackfillArgs() {
  */
 export async function runBackfill(options) {
   const config = loadConfig();
-  const { inputFile, outputFile, verbose, useHighest } = validateAndResolveOptions(options, config);
+  const { inputFile, outputFile, verbose, useHighest } =
+    validateAndResolveOptions(options, config);
 
   logv(verbose, 1, `Input file: ${inputFile}`);
   logv(verbose, 1, `Output file: ${outputFile}`);
-  logv(verbose, 1, `Backfill mode: ${useHighest ? 'highest' : 'lowest'}`);
+  logv(verbose, 1, `Backfill mode: ${useHighest ? "highest" : "lowest"}`);
 
   const { rows, headers } = readCsvFile(inputFile);
   logv(verbose, 1, `Read CSV content, ${rows.length} rows`);
-  logv(verbose, 1, `Detected headers: ${headers.join(', ')}`);
+  logv(verbose, 1, `Detected headers: ${headers.join(", ")}`);
 
-  const { priceColName, amountColName, usdAmountColName, grandTotalColName } = detectColumns(headers);
+  const { priceColName, amountColName, usdAmountColName, grandTotalColName } =
+    detectColumns(headers);
   logv(verbose, 1, `Price column: ${priceColName}`);
   logv(verbose, 1, `Amount column: ${amountColName}`);
 
@@ -300,14 +313,16 @@ export async function runBackfill(options) {
     usdAmountColName,
     grandTotalColName,
     useHighest,
-    verbose
+    verbose,
   });
 
   logv(verbose, 1, `Backfill stats: ${JSON.stringify(stats)}`);
 
   await writeCsvFile(outputFile, headers, rows);
 
-  console.log(`Backfill complete: ${stats.emptyRowsFilled} rows filled in ${stats.blocksFound} block(s)`);
+  console.log(
+    `Backfill complete: ${stats.emptyRowsFilled} rows filled in ${stats.blocksFound} block(s)`,
+  );
   console.log(`Output written to ${outputFile}`);
 
   return stats;

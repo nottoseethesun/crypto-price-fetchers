@@ -25,7 +25,9 @@ export function logv(shouldLog, level, message, ...args) {
  * @returns {boolean} True if the price is empty, 'Error', or missing
  */
 export function isPriceEmpty(price) {
-  return price === '' || price === 'Error' || price === null || price === undefined;
+  return (
+    price === "" || price === "Error" || price === null || price === undefined
+  );
 }
 
 /**
@@ -37,8 +39,10 @@ export function isPriceEmpty(price) {
  * @returns {Object} Object with leftPrice and rightPrice (or null if not found)
  */
 export function findBracketingPrices(rows, blockStart, blockEnd, priceColName) {
-  let leftPrice = blockStart > 0 ? parseFloat(rows[blockStart - 1][priceColName]) : null;
-  let rightPrice = blockEnd < rows.length ? parseFloat(rows[blockEnd][priceColName]) : null;
+  let leftPrice =
+    blockStart > 0 ? parseFloat(rows[blockStart - 1][priceColName]) : null;
+  let rightPrice =
+    blockEnd < rows.length ? parseFloat(rows[blockEnd][priceColName]) : null;
 
   if (isNaN(leftPrice)) leftPrice = null;
   if (isNaN(rightPrice)) rightPrice = null;
@@ -55,7 +59,9 @@ export function findBracketingPrices(rows, blockStart, blockEnd, priceColName) {
  */
 export function determineFillPrice(leftPrice, rightPrice, useHighest) {
   if (leftPrice !== null && rightPrice !== null) {
-    return useHighest ? Math.max(leftPrice, rightPrice) : Math.min(leftPrice, rightPrice);
+    return useHighest
+      ? Math.max(leftPrice, rightPrice)
+      : Math.min(leftPrice, rightPrice);
   }
   return leftPrice ?? rightPrice;
 }
@@ -86,11 +92,17 @@ export function fillBlock(rows, blockStart, blockEnd, priceColName, fillPrice) {
  * @param {string} usdAmountColName - Name of the USD amount column
  * @param {string} grandTotalColName - Name of the grand total column
  */
-export function recalculateTotals(rows, priceColName, amountColName, usdAmountColName, grandTotalColName) {
+export function recalculateTotals(
+  rows,
+  priceColName,
+  amountColName,
+  usdAmountColName,
+  grandTotalColName,
+) {
   let grandTotalUsd = 0;
   for (const row of rows) {
     const price = parseFloat(row[priceColName]);
-    const amount = parseFloat((row[amountColName] || '').trim());
+    const amount = parseFloat((row[amountColName] || "").trim());
     if (!isNaN(price) && !isNaN(amount)) {
       const usdAmount = amount * price;
       row[usdAmountColName] = usdAmount.toFixed(8);
@@ -122,13 +134,13 @@ export function backfillPrices(rows, options) {
     usdAmountColName,
     grandTotalColName,
     useHighest,
-    verbose = false
+    verbose = false,
   } = options;
 
   const stats = {
     totalRows: rows.length,
     emptyRowsFilled: 0,
-    blocksFound: 0
+    blocksFound: 0,
   };
 
   let i = 0;
@@ -140,19 +152,40 @@ export function backfillPrices(rows, options) {
 
       stats.blocksFound++;
 
-      const { leftPrice, rightPrice } = findBracketingPrices(rows, blockStart, blockEnd, priceColName);
+      const { leftPrice, rightPrice } = findBracketingPrices(
+        rows,
+        blockStart,
+        blockEnd,
+        priceColName,
+      );
       const fillPrice = determineFillPrice(leftPrice, rightPrice, useHighest);
 
       if (fillPrice !== null) {
-        logv(verbose, 1, `Backfilling rows ${blockStart + 1}-${blockEnd} with price ${fillPrice}`);
-        stats.emptyRowsFilled += fillBlock(rows, blockStart, blockEnd, priceColName, fillPrice);
+        logv(
+          verbose,
+          1,
+          `Backfilling rows ${blockStart + 1}-${blockEnd} with price ${fillPrice}`,
+        );
+        stats.emptyRowsFilled += fillBlock(
+          rows,
+          blockStart,
+          blockEnd,
+          priceColName,
+          fillPrice,
+        );
       }
     } else {
       i++;
     }
   }
 
-  recalculateTotals(rows, priceColName, amountColName, usdAmountColName, grandTotalColName);
+  recalculateTotals(
+    rows,
+    priceColName,
+    amountColName,
+    usdAmountColName,
+    grandTotalColName,
+  );
 
   return stats;
 }
@@ -162,8 +195,8 @@ export function backfillPrices(rows, options) {
  * @type {Object}
  */
 export const DEFAULT_COLUMNS = {
-  price: '$usd price',
-  amount: 'amount',
-  usdAmount: '$usd amount',
-  grandTotal: 'grand total ($usd)'
+  price: "$usd price",
+  amount: "amount",
+  usdAmount: "$usd amount",
+  grandTotal: "grand total ($usd)",
 };

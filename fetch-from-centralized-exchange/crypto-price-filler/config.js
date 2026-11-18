@@ -14,13 +14,13 @@
  * @author Christopher M. Balz with Grok and Claude.ai
  */
 
-import fs from 'fs';
+import fs from "fs";
 
 /** The settings as committed. */
-const COMMITTED_SETTINGS = new URL('./config-example.json', import.meta.url);
+const COMMITTED_SETTINGS = new URL("./config-example.json", import.meta.url);
 
 /** The owner's own settings, which git ignores. */
-const OWN_SETTINGS = new URL('./config.json', import.meta.url);
+const OWN_SETTINGS = new URL("./config.json", import.meta.url);
 
 /**
  * Reads a settings file.
@@ -29,7 +29,7 @@ const OWN_SETTINGS = new URL('./config.json', import.meta.url);
  * @returns {Object} Its settings
  */
 function readSettings(file) {
-  return JSON.parse(fs.readFileSync(file, 'utf8'));
+  return JSON.parse(fs.readFileSync(file, "utf8"));
 }
 
 /**

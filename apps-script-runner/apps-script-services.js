@@ -45,8 +45,8 @@
  * them with a stand-in `fetchSync`.
  */
 
-import util from 'node:util';
-import { formatDate } from './format-date.js';
+import util from "node:util";
+import { formatDate } from "./format-date.js";
 
 /** Apps Script's cache expiry when the script gives none, in seconds. */
 export const DEFAULT_CACHE_SECONDS = 600;
@@ -65,8 +65,14 @@ const QUOTED_RESPONSE_CHARACTERS = 200;
  * @throws {Error} When the time is not a number of milliseconds from zero up
  */
 export function sleepSync(milliseconds) {
-  if (typeof milliseconds !== 'number' || !Number.isFinite(milliseconds) || milliseconds < 0) {
-    throw new Error(`Utilities.sleep needs a number of milliseconds, not ${String(milliseconds)}`);
+  if (
+    typeof milliseconds !== "number" ||
+    !Number.isFinite(milliseconds) ||
+    milliseconds < 0
+  ) {
+    throw new Error(
+      `Utilities.sleep needs a number of milliseconds, not ${String(milliseconds)}`,
+    );
   }
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds);
 }
@@ -84,19 +90,21 @@ export function sleepSync(milliseconds) {
 export function toRequest(url, params) {
   const headers = { ...(params.headers ?? {}) };
   let body;
-  if (typeof params.payload === 'string') {
+  if (typeof params.payload === "string") {
     body = params.payload;
   } else if (params.payload !== undefined && params.payload !== null) {
     body = new URLSearchParams(Object.entries(params.payload)).toString();
-    headers['content-type'] = 'application/x-www-form-urlencoded';
+    headers["content-type"] = "application/x-www-form-urlencoded";
   }
-  if (typeof params.contentType === 'string') headers['content-type'] = params.contentType;
+  if (typeof params.contentType === "string")
+    headers["content-type"] = params.contentType;
   return {
     url: String(url),
-    method: typeof params.method === 'string' ? params.method.toUpperCase() : 'GET',
+    method:
+      typeof params.method === "string" ? params.method.toUpperCase() : "GET",
     headers,
     body,
-    redirect: params.followRedirects === false ? 'manual' : 'follow'
+    redirect: params.followRedirects === false ? "manual" : "follow",
   };
 }
 
@@ -111,21 +119,23 @@ export function toRequest(url, params) {
  * @throws {Error} When there was no response, or its status is 400 or more and `muteHttpExceptions` is not true
  */
 export function toHttpResponse(url, params, answer) {
-  if (typeof answer.failure === 'string') {
-    throw new Error(`The request for ${url} got no response: ${answer.failure}`);
+  if (typeof answer.failure === "string") {
+    throw new Error(
+      `The request for ${url} got no response: ${answer.failure}`,
+    );
   }
   if (answer.status >= 400 && params.muteHttpExceptions !== true) {
     throw new Error(
       `Request failed for ${url} returned code ${answer.status}. ` +
         `Truncated server response: ${answer.text.slice(0, QUOTED_RESPONSE_CHARACTERS)} ` +
-        '(use muteHttpExceptions option to examine full response)'
+        "(use muteHttpExceptions option to examine full response)",
     );
   }
   return {
     getResponseCode: () => answer.status,
     getContentText: () => answer.text,
     getHeaders: () => ({ ...answer.headers }),
-    getAllHeaders: () => ({ ...answer.headers })
+    getAllHeaders: () => ({ ...answer.headers }),
   };
 }
 
@@ -140,7 +150,7 @@ function createUrlFetchApp(fetchSync) {
     fetch(url, params) {
       const options = params ?? {};
       return toHttpResponse(url, options, fetchSync(toRequest(url, options)));
-    }
+    },
   };
 }
 
@@ -163,15 +173,24 @@ function createCache(now) {
       return entry.value;
     },
     put(key, value, expirationInSeconds = DEFAULT_CACHE_SECONDS) {
-      if (typeof expirationInSeconds !== 'number' || !Number.isFinite(expirationInSeconds) || expirationInSeconds < 1) {
-        throw new Error(`Cache.put needs an expiry of one second or more, not ${String(expirationInSeconds)}`);
+      if (
+        typeof expirationInSeconds !== "number" ||
+        !Number.isFinite(expirationInSeconds) ||
+        expirationInSeconds < 1
+      ) {
+        throw new Error(
+          `Cache.put needs an expiry of one second or more, not ${String(expirationInSeconds)}`,
+        );
       }
       const seconds = Math.min(expirationInSeconds, MAX_CACHE_SECONDS);
-      entries.set(key, { value: String(value), expiresAtMs: now() + seconds * 1000 });
+      entries.set(key, {
+        value: String(value),
+        expiresAtMs: now() + seconds * 1000,
+      });
     },
     remove(key) {
       entries.delete(key);
-    }
+    },
   };
 }
 
@@ -195,7 +214,7 @@ function createLock() {
     },
     hasLock() {
       return held;
-    }
+    },
   };
 }
 
@@ -206,7 +225,9 @@ function createLock() {
  * @returns {{getProperty: function(string): ?string, setProperty: function(string, *): Object, deleteProperty: function(string): Object}} The properties
  */
 function createProperties(initial = {}) {
-  const values = new Map(Object.entries(initial).map(([key, value]) => [key, String(value)]));
+  const values = new Map(
+    Object.entries(initial).map(([key, value]) => [key, String(value)]),
+  );
   const properties = {
     getProperty: (key) => values.get(key) ?? null,
     setProperty(key, value) {
@@ -216,7 +237,7 @@ function createProperties(initial = {}) {
     deleteProperty(key) {
       values.delete(key);
       return properties;
-    }
+    },
   };
   return properties;
 }
@@ -233,16 +254,16 @@ function createLogging(log) {
   };
   const Logger = {
     log(...values) {
-      write('log', values);
+      write("log", values);
       return Logger;
-    }
+    },
   };
   const console = {
-    log: (...values) => write('log', values),
-    info: (...values) => write('info', values),
-    warn: (...values) => write('warn', values),
-    error: (...values) => write('error', values),
-    debug: (...values) => write('debug', values)
+    log: (...values) => write("log", values),
+    info: (...values) => write("info", values),
+    warn: (...values) => write("warn", values),
+    error: (...values) => write("error", values),
+    debug: (...values) => write("debug", values),
   };
   return { Logger, console };
 }
@@ -258,21 +279,39 @@ function createLogging(log) {
  * @param {Object<string, string>} [options.scriptProperties={}] - The Script Properties the script starts with, such as an api key it reads
  * @returns {Object} The services, by their Apps Script names
  */
-export function createAppsScriptServices({ fetchSync, sleep = sleepSync, log = null, now = Date.now, scriptProperties = {} }) {
+export function createAppsScriptServices({
+  fetchSync,
+  sleep = sleepSync,
+  log = null,
+  now = Date.now,
+  scriptProperties = {},
+}) {
   const cache = createCache(now);
-  const properties = { script: createProperties(scriptProperties), user: createProperties(), document: createProperties() };
+  const properties = {
+    script: createProperties(scriptProperties),
+    user: createProperties(),
+    document: createProperties(),
+  };
   const { Logger, console } = createLogging(log);
   return {
     UrlFetchApp: createUrlFetchApp(fetchSync),
-    CacheService: { getScriptCache: () => cache, getUserCache: () => cache, getDocumentCache: () => cache },
-    LockService: { getScriptLock: createLock, getUserLock: createLock, getDocumentLock: createLock },
+    CacheService: {
+      getScriptCache: () => cache,
+      getUserCache: () => cache,
+      getDocumentCache: () => cache,
+    },
+    LockService: {
+      getScriptLock: createLock,
+      getUserLock: createLock,
+      getDocumentLock: createLock,
+    },
     PropertiesService: {
       getScriptProperties: () => properties.script,
       getUserProperties: () => properties.user,
-      getDocumentProperties: () => properties.document
+      getDocumentProperties: () => properties.document,
     },
     Utilities: { sleep, formatDate },
     Logger,
-    console
+    console,
   };
 }

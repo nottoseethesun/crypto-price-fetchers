@@ -12,10 +12,10 @@ This utility is useful for tokens not supported by smart-contract-oriented API, 
 it focuses on reading prices from Centralized Exchanges as distinguished from Decentralized Exchanges.
 
 For example, tokens such as Bitcoin and Monero, although sometimes they have wrapped versions such as $wBTC, don't trade
-directly in decentralized exchange liquidity pools.  
+directly in decentralized exchange liquidity pools.
 
 Instead, it's easiest to get their current price from a centralized exchange, which calls for a different codebase
-as for example, one cannot specifiy a liquidity pool.  
+as for example, one cannot specifiy a liquidity pool.
 
 Note: If the few decentralized trading exchanges for these coins had more volume and an API, then that could be used.
 
@@ -26,7 +26,7 @@ Note: If the few decentralized trading exchanges for these coins had more volume
 
 ## Prerequisites
 
-NodeJS 21.1.0+
+NodeJS 22+
 
 ## Installation
 
@@ -44,12 +44,13 @@ repo's top, encrypted with a password you choose. To save it, from the repo's
 top folder:
 
 ```bash
-npm run save-api-key -- coingecko
+npm run api-keys
 ```
 
-Each run then asks for the password before it prices anything, and asks
-CoinGecko once whether it takes the key. Without a saved key, the tool asks
-CoinGecko without one, at CoinGecko's lower rate limits. See
+Each run then opens it before it prices anything, with the password
+`source ./unlock-api-keys.sh` keeps for the terminal, or else one it asks
+for, and asks CoinGecko once whether it takes the key. Without a saved key,
+the tool asks CoinGecko without one, at CoinGecko's lower rate limits. See
 [Api keys](../../README.md#api-keys) in the repo's README.
 
 ### Usage
@@ -84,12 +85,19 @@ node backfill.js --input=output.csv --backfill-lowest
 
 ### Lint
 
-ESLint is configured to enforce code quality and cyclomatic complexity (max 17).
+The repo's lint, run from its top folder, covers this tool too, with LP
+Ranger's rules: no function above cyclomatic complexity 17, no file above
+500 lines of code, Prettier's formatting, and the rest that
+[`docs/engineering.md`](../../docs/engineering.md) lists.
 
 ```bash
+cd ../..
 npm run lint        # Check for lint errors
-npm run lint:fix    # Auto-fix lint errors where possible
+npm run lint:fix    # Fix what the tools can
 ```
+
+`npm run check`, also from the top folder, runs the lint, both test suites,
+this one's with at least 80% of lines covered, and the security audits.
 
 ### Test
 
@@ -133,7 +141,7 @@ alias swtlog="aha --black -y 'body { font-size: 14px; }' < test.log > test.html 
 
 ## Contributing
 
-Fork me on GitHub. :)  Contributions are welcome but note that any contributions are subject to the license as defined in the LICENSE file here.
+Fork me on GitHub. :) Contributions are welcome but note that any contributions are subject to the license as defined in the LICENSE file here.
 
 To be accepted for pull request:
 
@@ -142,4 +150,4 @@ To be accepted for pull request:
 - Any major new functionality must have a test runnable from the current approach
 - Statement coverage must remain at or above 80%
 
-[![CI - Lint & Tests](https://github.com/nottoseethesun/crypto-price-fetchers/actions/workflows/test-price-filler.yml/badge.svg)](https://github.com/nottoseethesun/crypto-price-fetchers/actions/workflows/test-price-filler.yml)
+[![CI](https://github.com/nottoseethesun/crypto-price-fetchers/actions/workflows/ci.yml/badge.svg)](https://github.com/nottoseethesun/crypto-price-fetchers/actions/workflows/ci.yml)

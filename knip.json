@@ -1,0 +1,15 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "crypto-price-fetchers.js",
+    "eslint-security.config.js",
+    "apps-script-runner/script-worker.js",
+    "fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.js",
+    "fetch-from-centralized-exchange/crypto-price-filler/index.js",
+    "fetch-from-centralized-exchange/crypto-price-filler/vitest.config.js",
+    "fetch-from-centralized-exchange/crypto-price-filler/tests/**/*.test.js",
+    "fetch-from-centralized-exchange/crypto-price-filler/tests/helpers/stand-in-fetch-preload.js",
+    "test/**/*.test.js"
+  ],
+  "project": ["**/*.js"]
+}
