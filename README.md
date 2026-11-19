@@ -1,6 +1,6 @@
 # Crypto Price Fetchers
 
-![A green fairy with translucent emerald wings, a leafy crown, and a flowing green dress hovers in a misty ancient forest, reaching toward a glowing parchment scroll that displays “HEX $0.042” along with a rising chart and interconnected crypto symbols. Soft golden light rays filter through the trees while a Rivendell-inspired castle and floating coins appear in the background.](./assets/images/fairy-sprite-price-fetcher_github-social-share-img.jpeg "Crypto Price Fetchers")
+![A green fairy with translucent emerald wings, a leafy crown, and a flowing green dress hovers in a misty ancient forest, reaching toward a glowing parchment scroll that displays “HEX $0.042” along with a rising chart and interconnected crypto symbols. Soft golden light rays filter through the trees while a Rivendell-inspired castle and floating coins appear in the background.](./assets/images/fairy-sprite-price-fetcher_github-social-share-img_1280-640.jpeg "Crypto Price Fetchers")
 
 [![Lint (JS+Apps Script+MD)](https://img.shields.io/github/actions/workflow/status/nottoseethesun/crypto-price-fetchers/ci.yml?branch=main&label=lint)](https://github.com/nottoseethesun/crypto-price-fetchers/actions/workflows/ci.yml)
 [![Tests (Node 22/24)](https://img.shields.io/github/actions/workflow/status/nottoseethesun/crypto-price-fetchers/ci.yml?branch=main&label=tests)](https://github.com/nottoseethesun/crypto-price-fetchers/actions/workflows/ci.yml)
