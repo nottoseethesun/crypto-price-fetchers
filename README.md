@@ -8,13 +8,12 @@
 
 ## Overview
 
-A collection of scripts useful for fetching the current price and also the price at
-a point in time in the past (can even be one minute in the past) of various
-crypto tokens.
+Scripts that fetch crypto token prices: the price now, and the price at a
+past time, down to the minute.
 
-The need for this arises out of the proliferation of crypto tokens, such that
-most tracking services simply cannot fetch the price of many of the great tokens out
-there.
+There are far more crypto tokens than most price-tracking services cover,
+so those services have no price for many of them. These scripts ask the
+exchanges where such tokens trade.
 
 Each Google Sheets script here (`.gs`) has a Node version beside it, with the
 same name ending in `.js`, for Node programs and the command line. The Node
@@ -23,27 +22,28 @@ answers, and a fix to the script is a fix to both. See
 [Node versions of the Sheets scripts](#node-versions-of-the-sheets-scripts)
 below.
 
-### Options
+### The Scripts
 
-`crypto-price-fetchers.gs` is a Google Apps Script that fetches only the current
-price, and is limited to tokens that are based on smart-contract technology,
-such as in PulseChain, Ethereum, and Solana. The X1 blockchain is supported
-here as well, in addition to the blockchains that DexTools already covers — X1
-calls are routed through the x1.ninja API since DexTools does not list X1 yet.
-See the file's header documentation for details.
+Each script fits one need: the price now or at a past time, in a sheet or
+on a computer.
+
+`crypto-price-fetchers.gs` is a Google Apps Script that gives a token's
+current price, and its fully diluted value. It asks DexTools, so it covers
+tokens on the chains DexTools lists, such as PulseChain, Ethereum and
+Solana. For X1, which DexTools does not list, it asks x1.ninja instead. The
+file's header says how to use it.
 
 `fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.gs`,
-with the price sources in `getCryptoPriceFromCentralizedExchange-sources.gs`
-beside it, is a Google Apps Script that currently fetches the price only at
-a point in time in
-the past, although "the past" can be just one minute in the past.  It is limited
-to tokens traded on the API of the Centralized Exchanges that it currently
-supports and also, as a Google Apps Script, cannot handle more than 100 or
-so calls at a time.
+with its price sources in `getCryptoPriceFromCentralizedExchange-sources.gs`
+beside it, is a Google Apps Script that gives a token's price at a past
+time, as recent as a minute ago. It asks the centralized exchanges it
+supports, so it covers the tokens they trade. Within Apps Script's limits,
+it handles about 100 calls at a time.
 
-`fetch-from-centralized-exchange/crypto-price-filler/index.js` is like
-`getCryptoPriceFromCentralizedExchange.gs` but, as a NodeJS script, can
-handle any load in terms of numbers of price points to fetch.
+`fetch-from-centralized-exchange/crypto-price-filler/index.js` does the
+same job on a computer, for a CSV file of any length: it fills in the
+price of each row. It runs outside Apps Script, so Apps Script's limits do
+not apply to it.
 
 `crypto-price-fetchers.js` and
 `fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.js`
@@ -51,11 +51,13 @@ are the Node versions of the two Sheets scripts.
 
 ## Node versions of the Sheets scripts
 
-A Node version answers as its Sheets function does, because it runs the
-Sheets script itself. The runner in `apps-script-runner/` loads the `.gs`
-file under Node in a worker thread and supplies the Apps Script services the
-script calls: web requests, cache, lock, script properties, sleep, date
-formatting and logs.
+A Node version lets a Node program or the command line call a Sheets
+function, and get what its cell would show. It runs the Sheets script
+itself. The runner in `apps-script-runner/` loads the `.gs` file under
+Node, and supplies the Apps Script services the script calls: web
+requests, cache, lock, script properties, sleep, date formatting and logs.
+It runs the script in a worker thread, so the script can wait for each web
+request as it does in Apps Script ([why](docs/architecture.md#the-runner)).
 
 What differs from the sheet:
 
@@ -72,7 +74,8 @@ What differs from the sheet:
 
 ### Install
 
-Node 22 or later. From the repo's top folder:
+The Node versions need Node 22 or later, and the repo's packages. From the
+repo's top folder:
 
 ```bash
 npm ci
@@ -117,6 +120,10 @@ see [its README](./api-key-store/README.md).
 
 ### Command line
 
+Each Node version is also a command line. These ask for USDC's price on
+Ethereum, a token's fully diluted value on X1 from one pool, and XTM's low
+at a past minute:
+
 ```bash
 node crypto-price-fetchers.js price ether 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48
 node crypto-price-fetchers.js fdv x1 So11111111111111111111111111111111111111112 --pool CAJeVEoSm1QQZccnCqYu9cnNF7TTD2fcUA3E5HQoxRvR
@@ -128,6 +135,9 @@ stderr, with exit code 1. `--help` lists the options, `--config <file>`
 reads another config file, and `--verbose` shows the script's log on stderr.
 
 ### From Node
+
+A Node program imports a Node version, opens it once, and calls its
+functions:
 
 ```js
 import { openCentralizedExchangePrices } from './fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.js';
@@ -144,34 +154,21 @@ opens. Other repos install this one to use the runner, as
 `crypto-price-fetchers/apps-script-runner`, and the key store, as
 `crypto-price-fetchers/api-key-store`.
 
-## Install
+## Install and Usage in Google Sheets
 
-For `./fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.gs`,
-and all other scripts in other sub-directories here, see the
-`README.md` in that directory.
+Each Sheets script is pasted into a sheet's Apps Script project. Its own
+documentation says how to install it, set its keys and call it from a cell:
 
-For `./crypto-price-fetchers.gs`, see the file-header doc in that file.
-
-## Usage
-
-For `./fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.gs`,
-and all other scripts in other sub-directories here, see the
-`README.md` in that directory.
-
-For `./crypto-price-fetchers.gs`, see the file-header doc in that file.
+- `crypto-price-fetchers.gs`: the header of that file.
+- The exchange script and crypto-price-filler:
+  [`fetch-from-centralized-exchange/README.md`](fetch-from-centralized-exchange/README.md).
 
 ## Test
 
-For `./fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.gs`,
-and all other scripts in other sub-directories here, see the
-`README.md` in that directory.
-
-For `./crypto-price-fetchers.gs`, see the file-header doc in that file.
-
-For everything else, from the repo's top folder, the one gate that must
-pass before a commit, LP Ranger's: the lint, the tests of the runner, the
-Node versions and the key store, crypto-price-filler's tests, and the
-security audits:
+The repo's tests run on a computer, before every commit, in one gate,
+LP Ranger's: the lint, the tests of the runner, the Node versions and the
+key store, crypto-price-filler's tests, and the security audits. From the
+repo's top folder:
 
 ```bash
 npm ci
@@ -179,7 +176,13 @@ npm ci --prefix fetch-from-centralized-exchange/crypto-price-filler
 npm run check
 ```
 
+The Sheets scripts also hold tests that run only in Apps Script, by hand.
+[How the Sheets scripts are tested](docs/engineering.md#how-the-sheets-scripts-gs-are-tested)
+sets the two kinds apart.
+
 ## Documentation
+
+The `docs/` folder holds three references:
 
 - [`docs/architecture.md`](docs/architecture.md): how the parts fit.
 - [`docs/engineering.md`](docs/engineering.md): the files, the gates, the

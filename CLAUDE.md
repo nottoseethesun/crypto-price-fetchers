@@ -26,12 +26,15 @@ A Node version runs its `.gs` unchanged, through the runner in
 Ranger's rules forbid a second copy. A fix belongs in the `.gs`, where it
 fixes both.
 
-The runner loads a script, one file or several in Apps Script's order, in a
-worker thread with Node versions of the Apps Script services, and does each web request on the caller's thread, with the
-caller's fetch, while the worker blocks; the file headers in
-`apps-script-runner/` explain how. pulsechain-analytics installs this repo
-from GitHub, pinned to a commit, for the runner
-(`crypto-price-fetchers/apps-script-runner`), so a change to the runner
+Apps Script's `UrlFetchApp.fetch` returns the response, where Node's
+`fetch` returns a promise that a script's code cannot wait for on its own
+thread. So the runner loads a script, one file or several in Apps Script's
+order, in a worker thread, with Node versions of the Apps Script services.
+It does each web request on the caller's thread, with the caller's fetch,
+while the worker blocks; the file headers in `apps-script-runner/` explain
+how. pulsechain-analytics installs this repo from GitHub, pinned to a
+commit, for the runner (`crypto-price-fetchers/apps-script-runner`), which
+runs pulsechain-analytics' own Sheets script. A change to the runner
 reaches it only when it moves the pin.
 
 ## Keys
@@ -71,6 +74,11 @@ them.
 covers the files, the gates, the tests and CI, and
 `docs/npm-project-commands.md` lists every npm command, as LP Ranger's
 `docs/` does. A change keeps them true.
+
+Every doc passes the owner's documentation audit: it tells no story of an
+old bug, leads every topic and sub-topic with the context it needs,
+explains with facts rather than adjectives, and leaves out no step in the
+logic of an explanation.
 
 ## Gates and CI
 
@@ -118,8 +126,10 @@ crypto-price-filler's tests are in
 and `npm run test:filler` runs them from the top folder. They ask no
 outside service either. The top folder's lint covers the filler.
 
-The Sheets scripts are tested there too, run unchanged under Node.
-`tests/helpers/` holds the stand-ins:
+The Sheets scripts are tested two ways, which `docs/engineering.md` sets
+apart: under Node, unchanged, in both suites; and in Apps Script, by test
+functions inside the scripts that the owner runs by hand. crypto-price-filler's
+`tests/helpers/` holds its stand-ins:
 
 - `sheets-script.js` runs a Sheets script, one file or several, in the
   test's thread with the runner's services. Its `UrlFetchApp` answers from

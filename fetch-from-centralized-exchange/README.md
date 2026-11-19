@@ -10,9 +10,11 @@ These tools are designed for tokens that don't trade on
 decentralized exchanges, such as Bitcoin (BTC), Monero (XMR),
 and Tari (XTM).
 
-Unlike DEX-traded tokens (which can be priced via DexScreener
-or DexTools APIs), CEX-traded tokens require querying exchange
-APIs like MEXC, with fallbacks to CoinGecko and CoinPaprika.
+A token that trades in a decentralized exchange's pool can be
+priced from the pool, through DexScreener's or DexTools' API. A
+token that trades only on centralized exchanges has no pool, so
+its price has to come from an exchange's API: MEXC's first, then
+CoinGecko's or CoinPaprika's.
 
 ## Tools
 
@@ -29,9 +31,10 @@ different use cases, and a Node version of the first:
 
 ### 1. Google Apps Script (`getCryptoPriceFromCentralizedExchange.gs`)
 
-A custom `=getCryptoPrice()` function for Google Sheets with
-multi-provider fallback (MEXC, CoinGecko, CoinPaprika),
-caching, and rate-limit protection.
+A custom `=getCryptoPrice()` function for Google Sheets. It asks
+MEXC for the price first, then CoinGecko, then CoinPaprika. It
+caches each answer, and its lock makes the calls of many cells
+take turns, so a sheet stays within each service's rate limit.
 
 The script is in three files, each pasted into a script file of its own in
 Apps Script, which loads a project's script files into one scope:
@@ -87,29 +90,28 @@ says what differs from the sheet.
 
 ## Sample Output
 
-### Google Sheets
+A sheet of XTM payouts. Its "$usd price" column holds
+`=getCryptoPrice("xtm", C2, "UTC")` and the like, which price each payout
+at its date and time:
 
-![Validator Rewards with Prices](./readme-images/google-sheets-example.png)
-
-### The Additional CSV of Analyitics Data That The NodeJS Implementation Produces
-
-![Validator Rewards Analytics](./readme-images/xnt-rewards-analytics.png)
+![A Google Sheet of XTM payouts, each priced in USD by =getCryptoPrice at the payout's date and time](./readme-images/google-sheets-example.png)
 
 ## Supported Tokens
 
-Both tools support the same set of tokens. Configuration is
-maintained in:
+Both tools support the same set of tokens. Each keeps its own
+list of them:
 
-- **GAS:** `TOKEN_TO_ID` constant in `getCryptoPriceFromCentralizedExchange.gs`
-- **Node.js:** `supported-tokens.json`
+- **The Apps Script:** the `TOKEN_TO_ID` constant in
+  `getCryptoPriceFromCentralizedExchange.gs`
+- **crypto-price-filler:** `supported-tokens.json`
 
 Current tokens: BTC, XMR, GRC, XTM (and any token listed on
 MEXC)
 
 ## Contributing
 
-Contributions welcome! Fork on GitHub and submit a pull
-request.
+Contributions are welcome: fork the repo on GitHub and open a
+pull request.
 
 **Requirements:**
 
