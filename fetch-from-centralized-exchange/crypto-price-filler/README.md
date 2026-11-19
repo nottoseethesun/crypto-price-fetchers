@@ -4,20 +4,19 @@
 
 USE AT YOUR OWN RISK: SEE LICENSE FILE, INCLUDED TWO DIRECTORIES UP.
 
-This is a NodeJS utility that reads a given input csv that contains a set of rows each with a timestamp, and gets the
-price at a specified point in time in the past (can be a prior minute, even) for the specified token, writing it out to
-an `output.csv` file that also contains the timestamps, but paired with the price of the token for each row.
+This Node tool fills in a token's prices in a CSV file. It reads a CSV
+whose rows each hold a timestamp, finds the token's price at each time,
+down to the minute, and writes `output.csv`, with each row's timestamp
+and price.
 
-This utility is useful for tokens not supported by smart-contract-oriented API, such as DexScreener's or DexTools, since
-it focuses on reading prices from Centralized Exchanges as distinguished from Decentralized Exchanges.
-
-For example, tokens such as Bitcoin and Monero, although sometimes they have wrapped versions such as $wBTC, don't trade
-directly in decentralized exchange liquidity pools.
-
-Instead, it's easiest to get their current price from a centralized exchange, which calls for a different codebase
-as for example, one cannot specifiy a liquidity pool.
-
-Note: If the few decentralized trading exchanges for these coins had more volume and an API, then that could be used.
+It is for coins that trade on centralized exchanges rather than in
+decentralized exchanges' pools, such as Bitcoin and Monero. A wrapped
+version, such as wBTC, may trade in a pool, but the coin itself does not.
+Services that price a token from its pool, such as DexScreener and
+DexTools, have no price for these coins, since there is no pool to name.
+This tool asks centralized exchanges instead. If the few decentralized
+exchanges that trade these coins had more volume and an API, they could be
+asked too.
 
 ### Current Roster of Utilities
 
@@ -53,11 +52,12 @@ for, and asks CoinGecko once whether it takes the key. Without a saved key,
 the tool asks CoinGecko without one, at CoinGecko's lower rate limits. See
 [Api keys](../../README.md#api-keys) in the repo's README.
 
-### Usage
+## Usage
 
-#### index.js - Price Fetching
+### index.js: Price Fetching
 
-Refer to the file-header documentation in `./index.js` for complete usage details.
+`index.js` prices every row of a CSV file. The file header in `./index.js`
+lists all its options.
 
 ```bash
 node index.js --token=grc --input=mining.csv --output=filled.csv
@@ -68,10 +68,14 @@ as `America/Chicago`; each row gets the offset the zone had at that time,
 daylight saving included. `node index.js --list-valid-timezones` prints every
 name `--tz` takes.
 
-#### backfill.js - Backfill Existing CSV
+### backfill.js: Filling Empty Prices
 
-Use `backfill.js` to apply backfill to an existing output CSV file without re-fetching prices.
-Refer to the file-header documentation in `./backfill.js` for complete usage details.
+A row whose price no service gave is left empty in the output. `backfill.js`
+fills such rows in an output CSV file already written, without asking any
+service again: each takes the price of the nearest priced row before or
+after it, the higher of the two with `--backfill-highest`, the lower with
+`--backfill-lowest`. The file header in `./backfill.js` lists all its
+options.
 
 ```bash
 # Backfill with highest bracketing price (conservative tax estimates)
@@ -101,10 +105,11 @@ this one's with at least 80% of lines covered, and the security audits.
 
 ### Test
 
-Because `vitest` (amazingly) neglects to verify that the files will actually load into
-NodeJS, a whole separate test target, `test:strict`, is required for that.
-This way, if an `import` statement is incorrect, the error will be caught in test
-and not break production.
+vitest loads each file through its own module loader, which finds imports
+that Node itself does not. So the tests can pass while `index.js` fails to
+start under Node, for example after a wrong `import`. `test:strict` first
+starts the real command line with `--help`, then runs the tests, so such
+an import fails the run.
 
 ```bash
 npm run test        # Run tests with coverage
@@ -113,14 +118,20 @@ npm run test:strict # Validate CLI parsing + run tests
 
 #### Debug Test
 
-`npm run test:debug`
-`npm run test:strict`
+`npm run test:debug` runs the tests with each one named, and the tool's
+log shown (`VERBOSE=1`).
 
 #### Save Test Log to File
+
+The log is long, so it can be written to a file:
 
 `npm run test:debug > test.log 2>&1`
 
 #### View Log for Quick Copy-Paste of Log
+
+The log holds the terminal's color codes, which a text editor shows as
+noise. `aha` turns them into an HTML page, which a browser shows in color,
+ready to copy.
 
 ##### Install `aha`
 
@@ -148,6 +159,6 @@ To be accepted for pull request:
 - **ESLint must pass** (`npm run lint`) - enforces cyclomatic complexity max 17
 - **All tests must pass** (`npm run test:strict`)
 - Any major new functionality must have a test runnable from the current approach
-- Statement coverage must remain at or above 80%
+- Line coverage must remain at or above 80%
 
 [![CI](https://github.com/nottoseethesun/crypto-price-fetchers/actions/workflows/ci.yml/badge.svg)](https://github.com/nottoseethesun/crypto-price-fetchers/actions/workflows/ci.yml)

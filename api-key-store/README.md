@@ -1,9 +1,14 @@
 # api-key-store
 
-Api keys kept encrypted with a password, in a JSON file git ignores: LP
-Ranger's way of keeping its api keys, as a module any Node project can use.
+An api key must not be committed, and should not sit on disk in plain
+text. This module keeps a project's api keys in a JSON file git ignores,
+each encrypted with one password the owner types. It is LP Ranger's way of
+keeping its api keys, as a module any Node project can use.
 
 ## How it keeps a key
+
+A project names the services whose keys it sends. The key manager asks for
+each key, and saves it encrypted once its service takes it:
 
 - A project lists the services whose keys its programs use in its top
   folder's `config.json`, under `apiKeys`:
@@ -27,7 +32,9 @@ Ranger's way of keeping its api keys, as a module any Node project can use.
 
 ## The password in a terminal
 
-`unlock-api-keys.sh`, a copy of which is in each project's top folder, asks
+Without help, each program asks for the password as it starts, which is
+slow when several programs run in turn. `unlock-api-keys.sh`, a copy of
+which is in each project's top folder, asks
 for the password once and keeps it for that terminal in the environment
 variable `API_KEYS_PASSWORD`:
 
@@ -37,8 +44,7 @@ source ./unlock-api-keys.sh
 
 It checks that the password opens the keys saved before it keeps it.
 The project's programs then open their keys with it, without asking, and
-the key manager saves new keys with it. Without it, a program asks for
-the password as it starts. Closing the terminal forgets the password, as
+the key manager saves new keys with it. Closing the terminal forgets the password, as
 does `unset API_KEYS_PASSWORD`. With one password for every project, one
 unlock serves them all.
 
@@ -60,6 +66,9 @@ file the other wrote:
 ```
 
 ## Using it in another project
+
+Another project installs this repo from GitHub, then calls the store from
+its own key manager and programs:
 
 1. Install this repo from GitHub, pinned to a commit, as a dependency, so
    `npm install` installs it:

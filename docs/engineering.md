@@ -18,6 +18,9 @@ The repo follows LP Ranger's coding standards: its `CLAUDE.md` and
 - [The Gate: `npm run check`](#the-gate-npm-run-check)
 - [Lint](#lint)
 - [Tests](#tests)
+  - [How the Sheets Scripts (`.gs`) Are Tested](#how-the-sheets-scripts-gs-are-tested)
+    - [The Node Tests](#the-node-tests)
+    - [The Apps Script Tests](#the-apps-script-tests)
 - [Security Audits](#security-audits)
 - [Dead Code Detection](#dead-code-detection)
 - [CI and Branch Protection](#ci-and-branch-protection)
@@ -27,7 +30,8 @@ The repo follows LP Ranger's coding standards: its `CLAUDE.md` and
 
 ## Quick Start
 
-Node 22 or later. From the repo's top folder:
+A working copy needs Node 22 or later, the packages of the repo and of
+crypto-price-filler, and the api keys. From the repo's top folder:
 
 ```bash
 npm ci
@@ -39,6 +43,9 @@ npm run check        # the gate
 ---
 
 ## Files on Disk
+
+The programs and their tests read and write these files. Git keeps only
+the ones that hold no key and none of the owner's own settings.
 
 | File | In git | What it holds |
 | ---- | ------ | ------------- |
@@ -62,15 +69,25 @@ and push, and CI runs it on Node 22 and Node 24.
 
 ## Lint
 
-`npm run lint` runs:
+The lint checks each file's form before any test runs: the rules the code
+follows, its formatting, the workflows, and files nothing uses.
+`npm run lint` runs five tools:
 
 | Tool | Configured in | What it holds the repo to |
 | ---- | ------------- | ------------------------- |
-| ESLint | `eslint.config.js` | LP Ranger's rules, with no warning allowed: cyclomatic complexity ≤ 17, ≤ 500 lines of code a file (blank lines and comments not counted), lines ≤ 80 characters but strings, urls and comments, `===`, no unused name, no `var`, `const` where nothing is reassigned, no `Math.random`, no comment that tells Prettier to skip code, and every import resolved. The Sheets scripts are linted as the plain scripts Apps Script loads, with its services as globals. |
+| ESLint | `eslint.config.js` | LP Ranger's rules, with no warning allowed: cyclomatic complexity ≤ 17, ≤ 500 lines of code a file (blank lines and comments not counted), lines ≤ 80 characters but strings, urls and comments, `===`, no unused name, no `var`, `const` where nothing is reassigned, no `Math.random`, no comment that tells Prettier to skip code, and every import resolved. It reads the Sheets scripts too, as the paragraph below the table says. |
 | markdownlint | `.markdownlint-cli2.jsonc` | LP Ranger's settings, over every Markdown file. |
 | Prettier | `.prettierrc`, `.prettierignore` | Its formatting, in check mode, over every JavaScript, Sheets script, JSON and YAML file. |
 | actionlint | — | The GitHub workflows. |
 | knip | `knip.json` | No file nothing reaches. See [Dead Code Detection](#dead-code-detection). |
+
+The Sheets scripts are plain scripts, not modules: Apps Script loads them
+without imports, with its services as globals. ESLint reads them the same
+way, and two settings follow from that. A name that one file of the
+exchange script uses from another is declared in a `/* global */` comment,
+since no import says where it comes from. And `no-unused-vars` passes a
+script's top-level functions, since a cell or another file calls them, out
+of ESLint's sight. The security lint reads the Sheets scripts too.
 
 The husky pre-commit hook (`.husky/pre-commit`) runs `npm run lint`, so an
 unformatted or failing file stops the commit; `npm run format` or
@@ -82,8 +99,9 @@ excused.
 
 ## Tests
 
-The tests ask nothing outside the computer, and never read the owner's key
-file or password.
+Two test suites run in `npm run check`: the top folder's, on Node's own
+test runner, and crypto-price-filler's, on vitest. Neither asks a service
+outside the computer, and neither reads the owner's key file or password.
 
 **The top folder's tests** (`test/`, Node's test runner) cover the runner,
 the Node versions, the key store and `no-secret-logging`. The scripts'
@@ -118,61 +136,121 @@ again rather than written again.
 
 ### How the Sheets Scripts (`.gs`) Are Tested
 
-A Sheets script runs in Google's Apps Script, which no test can reach, and
-it is unlike the repo's other code in three ways:
+The repo has two Sheets scripts. A Sheets script is Google Apps Script:
+JavaScript that runs on Google's servers, inside a spreadsheet, where a
+cell calls one of its functions. `crypto-price-fetchers.gs` is one file.
+The exchange script is three: `getCryptoPriceFromCentralizedExchange.gs`,
+its price sources in `-sources.gs`, and its tests in `-tests.gs`.
 
-- It is a plain script, not a module. It imports nothing, and reaches the
-  world through Apps Script's services, which are globals: `UrlFetchApp`
-  for web requests, `CacheService`, `LockService` and the rest.
-- Apps Script loads all of a project's files into one scope, so the files
-  of a split script call each other with no import:
-  `getCryptoPriceFromCentralizedExchange.gs` calls the price sources in
-  its `-sources.gs`.
-- `UrlFetchApp.fetch` returns the response at once, where Node's `fetch`
-  returns a promise.
+Two separate sets of tests check the scripts:
 
-So the tests run the real `.gs` files under Node, unchanged, with the
-runner's Node versions of the services
-(`apps-script-runner/apps-script-services.js`) and a stand-in for each
-service on the web. No test keeps a copy of a script's logic, so what
-passes is the code the owner pastes into Apps Script. A script runs in one
-of three ways:
+- **The Node tests** run on this computer, in `npm run check` and in CI.
+  They check the scripts' own logic: what each function returns, given the
+  answers the price services give.
+- **The Apps Script tests** are functions inside the scripts. The owner
+  runs them by hand, in the Apps Script editor. They check what only
+  Google's servers can show: Apps Script's own services, the lock, and the
+  price services' real answers.
+
+The two sets share no code, and neither runs the other.
+
+#### The Node Tests
+
+Node runs the real `.gs` files, unchanged, so a Node test passes or fails
+on the code the owner pastes into Apps Script. Apps Script and Node differ
+in three ways, and the runner, `apps-script-runner/`, bridges each one:
+
+1. **The services.** A `.gs` file imports nothing. It reaches the web, a
+   cache and a lock through Apps Script's services, which are globals:
+   `UrlFetchApp`, `CacheService`, `LockService`, `PropertiesService`,
+   `Utilities` and `Logger`. The runner gives the script Node versions of
+   the methods it calls (`apps-script-services.js`), and only those. A
+   script that calls another method fails under Node with "is not a
+   function", which names the method.
+2. **One scope.** Apps Script loads all of a project's files into one
+   global scope. So the exchange script's files call each other's
+   functions with no import. The runner runs a script's files, in Apps
+   Script's order, in one `vm` context (`load-apps-script.js`).
+3. **Waiting for a web request.** In Apps Script, `UrlFetchApp.fetch` holds
+   the script until the response arrives, then returns it. In Node, `fetch`
+   returns a promise at once, and the response comes only after the running
+   code has finished and Node's event loop has run. A script's code cannot
+   finish without its response. So if the script ran on Node's main
+   thread, the response could never arrive. The runner therefore runs the
+   script in a worker thread. For each request, the worker hands the
+   request to the main thread and blocks. The main thread, whose event loop
+   keeps running, does the request with Node's `fetch`, hands the response
+   back and wakes the worker. To the script, `UrlFetchApp.fetch` has
+   returned the response, as in Apps Script (`run-apps-script.js`,
+   `script-worker.js`).
+
+The tests run a script in one of two ways: in the runner's worker thread,
+as the Node versions do, or in the test's own thread, with requests
+answered at once.
 
 | Tests | How the script runs | What they check |
 | ----- | ------------------- | --------------- |
-| `test/crypto-price-fetchers.test.js`, `test/get-crypto-price-from-centralized-exchange.test.js` | Through its Node version, as a program runs it. The runner loads the files in a worker thread, which waits on each web request while the test's thread answers it from `standInFetch` (`test/helpers/stand-in-web.js`), as DexTools, x1.ninja, MEXC and CoinGecko answer. | What each function returns, as its cell would show it, and the command lines. |
-| crypto-price-filler's `tests/regressions.test.js`, `tests/xtm-coingecko-id.test.js` | In the test's own thread (`tests/helpers/sheets-script.js`). The files load, in Apps Script's order, into one `vm` context; `UrlFetchApp.fetch` answers at once from the test's function, and sleeps return at once. | That each fixed bug stays fixed in the script as in the Node tool, and that no file of the exchange script holds a CoinGecko api key. |
-| `test/load-apps-script.test.js`, `test/run-apps-script.test.js`, `test/apps-script-services.test.js` | Small scripts in `test/fixtures/`: `runner-check.gs`, whose functions each use one service, or pass one kind of value, and return what they saw; a script split into two files that share names; and one that throws as it loads. | That the runner loads, configures and calls a script as Apps Script does, and that its services act as Apps Script's do. |
+| `test/crypto-price-fetchers.test.js`, `test/get-crypto-price-from-centralized-exchange.test.js` | Through its Node version, in the worker thread. Each request goes to `standInFetch` (`test/helpers/stand-in-web.js`), which answers as DexTools, x1.ninja, MEXC or CoinGecko does. | What each Sheets function returns, as its cell would show it, and the Node versions' command lines. |
+| `test/run-apps-script.test.js` | A small script, `test/fixtures/runner-check.gs`, in the worker thread. Its requests go through Node's own `fetch` to a web server on this computer. | The hand-off between the threads: the worker waits, the main thread does the request, and each response reaches the request it answers. |
+| crypto-price-filler's `tests/regressions.test.js`, `tests/xtm-coingecko-id.test.js` | In the test's own thread (`tests/helpers/sheets-script.js`). `UrlFetchApp.fetch` answers at once from a function the test gives, so nothing waits. | The cases the regression tests cover, checked in the exchange script as in the Node tool, and that no file of the exchange script holds a CoinGecko api key. |
+| `test/load-apps-script.test.js`, `test/apps-script-services.test.js` | Small scripts in `test/fixtures/`, in the test's own thread, with requests answered at once. | That a script's files load into one scope, in order, and that each Node service acts as Apps Script's does. |
 
-Three things follow from running the scripts this way:
+The Node tests run Node's versions of the services, one call at a time,
+against stand-ins for the price services. So three things lie outside
+them:
 
-- Node's coverage report lists the `.gs` files, since the runner compiles
-  each under its own path, so they count toward the top folder's 80%
-  floor. crypto-price-filler's coverage does not count them.
-- The runner's services hold only the methods the Sheets scripts call,
-  here and in pulsechain-analytics. A script that calls another fails
-  under Node with "is not a function", naming the method; the fix is to
-  add it to `apps-script-services.js`, with a test.
-- The stand-ins answer as each service answered when its tests were
-  written. A change in a service's answers shows only when a script runs
-  against the real service: in the sheet, in a Node version run by hand,
-  or in the tests in `getCryptoPriceFromCentralizedExchange-tests.gs`.
+- **Apps Script's own services.** Google's `UrlFetchApp`, cache and lock
+  never run under Node.
+- **The lock.** The runner answers one call at a time, so under Node the
+  `LockService` lock is always free. A script that asks for a lock it
+  already holds is not caught.
+- **The price services' real answers.** Each stand-in answers as its
+  service answered when the test was written.
 
-Those tests run in Apps Script itself, against the real services. The
-owner pastes the file into the same Apps Script project as the other two
-and runs `test`, which runs them all, from the editor's "Run" button. No
-Node test runs them, and the sheet needs the file for nothing else.
+The Apps Script tests cover these three.
 
-The lint reads the `.gs` files as the plain scripts Apps Script loads, with
-its services as globals, under LP Ranger's rules (see [Lint](#lint)), and
-the security lint reads them too. A name one file uses from another is
-declared in a `/* global */` comment, so the lint knows it, and
-`no-unused-vars` leaves top-level names alone, since a cell or another file
-calls a script's top-level functions, where ESLint cannot see the call.
+Node's coverage report lists the `.gs` files, because the runner compiles
+each under its own path. So their lines count toward the top folder's 80%
+floor. The test functions inside `crypto-price-fetchers.gs` never run under
+Node, so their lines count as not covered. No Node test loads `-tests.gs`,
+so it is not in the report. crypto-price-filler's coverage, from vitest,
+does not count the `.gs` files.
+
+#### The Apps Script Tests
+
+The Apps Script tests run on Google's servers, through Apps Script's real
+services, and ask the real price services. So they need a network, and the
+api keys the scripts read. The owner runs each one by hand, from the Run
+button in the Apps Script editor, and reads its results in the editor's
+log. No automated run calls them.
+
+- **`crypto-price-fetchers.gs`** holds its own. `testDexToolsFunctions`
+  asks for the prices and fully diluted values of a few tokens on
+  PulseChain, Ethereum and X1, and logs each result. `testDexToolsVerbose`
+  runs it with the lock attempts, the raw responses and the cache's state
+  logged too.
+- **The exchange script's** are in its third file,
+  `getCryptoPriceFromCentralizedExchange-tests.gs`. The owner pastes it
+  into the same Apps Script project as the other two files; the sheet
+  needs it for nothing else. `test` runs the file's two tests:
+  - `testGetCryptoPrice` prices several coins at past dates through
+    `getCryptoPrice`, and checks that each price falls in its expected
+    range. A coin the script does not know must give a message, not a
+    price.
+  - `testCoinGeckoDeadlockRegression` checks the lock. Apps Script's
+    locks are not re-entrant: a script that asks for a lock it already
+    holds waits forever. `getCryptoPrice` holds its lock while it looks up
+    a price. The test prices GRC, which MEXC does not list, so the lookup
+    goes on to CoinGecko while the lock is held. If that step asked for
+    the lock again, the call would never return. The test passes when the
+    call returns.
 
 ---
 
 ## Security Audits
+
+Three audits look for security problems: in the packages the repo
+installs, in the code, and in the text of every file.
 
 | Command | What it runs | What it catches |
 | ------- | ------------ | --------------- |
@@ -196,18 +274,22 @@ things are this repo's own:
 
 ## Dead Code Detection
 
-`npm run knip:files` fails on any file nothing reaches, as in LP Ranger.
-`knip.json` names the entry points knip cannot find for itself: the command
-lines, the worker the runner starts by its path, the filler's preload that
-its tests start by its path, the security config and the tests. Unused
-exports are not gated.
+A file nothing in the repo uses is dead code. knip finds such a file: it
+follows the imports from each entry point, a file that a program or a test
+starts from, and reports any file it never reaches. `npm run knip:files`
+fails on one, as in LP Ranger. Some files are started by their path rather
+than imported, so `knip.json` names them as entry points: the command
+lines, the worker the runner starts, the preload that crypto-price-filler's
+tests start, the security config and the tests. Unused exports are not
+gated.
 
 ---
 
 ## CI and Branch Protection
 
-Two workflows run on every push to `main`, every pull request to `main`, and
-by hand:
+CI runs the gate again on GitHub, so a change reaches `main` only after it
+passes there too. Two workflows run on every push to `main`, every pull
+request to `main`, and by hand:
 
 | Workflow | Job | Runs |
 | -------- | --- | ---- |
@@ -224,7 +306,9 @@ deleted. The steps from a branch to `main` are LP Ranger's eight, in its
 
 ## Known Bugs
 
-A bug found gets a test in crypto-price-filler's `tests/known-bugs.test.js`,
-declared with `it.fails`, so it passes while the bug is present. Its fix
-makes the test fail; the same change declares the test with `it` and moves
-it to `tests/regressions.test.js`, which guards the fixed bugs.
+A bug found but not yet fixed is recorded as a test, which fails once the
+bug is gone, so the record cannot go stale. crypto-price-filler's
+`tests/known-bugs.test.js` declares each with `it.fails`: the test passes
+while the bug is present. The fix makes it fail. The same change declares
+it with `it` and moves it to `tests/regressions.test.js`, where it keeps
+the fixed behavior from coming back. None is known today.

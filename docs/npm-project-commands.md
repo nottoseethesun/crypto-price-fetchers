@@ -34,6 +34,9 @@ npm test -- --test-name-pattern="unlockApiKeys"
 
 ## Api Keys
 
+The api keys the programs send are kept encrypted in `api-keys.json`. One
+command manages them.
+
 | Command | Flags | Description | Example |
 | ------- | ----- | ----------- | ------- |
 | `api-keys` | `set <service>`, `check-password`, `--help` | The key manager. Lists each key the top `config.json` names, saved or not, never showing a key's characters, and asks for each one not saved: the key, then the password. Each key is saved, encrypted, once its service takes it. `set <service>` replaces one key. `check-password` says, by its exit code, whether the password in `API_KEYS_PASSWORD` opens every key saved; `unlock-api-keys.sh` runs it. | `npm run api-keys` · `npm run api-keys -- set coingecko` |
@@ -44,6 +47,9 @@ for a terminal: see [the key store's README](../api-key-store/README.md).
 ---
 
 ## Developer Tools
+
+These commands check or fix the form of the code: `lint` runs the checks,
+and `format` and `lint:fix` make the fixes the tools can make.
 
 | Command | Flags | Description | Example |
 | ------- | ----- | ----------- | ------- |
@@ -56,8 +62,8 @@ for a terminal: see [the key store's README](../api-key-store/README.md).
 
 ## Test
 
-The gates. `check` runs all of them and is what must pass before a commit
-and a push.
+These commands run the gates: the tests and the audits. `check` runs all of
+them, after the lint, and must pass before a commit and a push.
 
 | Command | Flags | Description | Example |
 | ------- | ----- | ----------- | ------- |
@@ -74,6 +80,8 @@ and a push.
 
 ## Commands That Are Usually Not Run Alone
 
+npm runs this command itself, before another one.
+
 | Command | Flags | Description | Example |
 | ------- | ----- | ----------- | ------- |
 | `prelint` | — | Runs before `lint`; installs the husky hooks, so the pre-commit hook is in place once `lint` or `check` has run. It is here rather than in `prepare` because npm runs a git dependency's `prepare`, after installing its development packages, in every project that installs this repo from GitHub. | automatic |
@@ -82,7 +90,8 @@ and a push.
 
 ## crypto-price-filler's Commands
 
-Run in `fetch-from-centralized-exchange/crypto-price-filler/`, after
+crypto-price-filler is a package of its own, with its own commands. They
+run in `fetch-from-centralized-exchange/crypto-price-filler/`, after
 `npm ci` there. Its lint is the top folder's.
 
 | Command | Flags | Description | Example |
