@@ -13,6 +13,7 @@ gates work. This file covers how to drive them.
 - [Passing Flags](#passing-flags)
 - [Api Keys](#api-keys)
 - [Build](#build)
+- [Summ CSV Files](#summ-csv-files)
 - [Developer Tools](#developer-tools)
 - [Test](#test)
 - [Commands That Are Usually Not Run Alone](#commands-that-are-usually-not-run-alone)
@@ -61,6 +62,18 @@ gives that copy.
 
 ---
 
+## Summ CSV Files
+
+Every CSV file the owner imports into Summ is written by one utility,
+which checks every row first and writes nothing while any row breaks a
+rule ([its README](../summ-csv/README.md) lists the rules).
+
+| Command | Flags | Description | Example |
+| ------- | ----- | ----------- | ------- |
+| `summ-csv` | `--rows <file>`, `--template <file>`, `--out <file>`, `--replace`, `--help` | Reads a JSON array of rows from `--rows`, checks each, and writes the file at `--out`: the header of the template at `--template`, as it is written there, then a line per row. Prints the rows written and where, with exit code 0, or every problem with its row, with exit code 1. A file already at `--out` is written over only with `--replace`. | `npm run summ-csv -- --rows rows.json --template advanced-template-reference.csv --out missing.csv` |
+
+---
+
 ## Developer Tools
 
 These commands check or fix the form of the code: `lint` runs the checks,
@@ -87,7 +100,7 @@ them, after the lint, and must pass before a commit and a push.
 | `audit:security` | — | The security lint, `eslint-security.config.js`: eslint-plugin-security, eslint-plugin-no-secrets and `no-secret-logging`. | `npm run audit:security` |
 | `check` | — | The full gate: `lint`, `test:coverage`, `test:filler` and the three audits, in that order, stopping at the first that fails. | `npm run check` |
 | `format:check` | — | Prettier in check mode; fails rather than rewriting. | `npm run format:check` |
-| `test` | any `node --test` flag | The tests of the runner, the Node versions, the build step, the price clients, the key store and the lint rule, on Node's test runner. | `npm test -- --test-name-pattern="openAppsScript"` |
+| `test` | any `node --test` flag | The tests of the runner, the Node versions, the build step, the price clients, the key store, the lint rule, the versions tool and the Summ CSV writer, on Node's test runner. | `npm test -- --test-name-pattern="openAppsScript"` |
 | `test:coverage` | — | The same tests with coverage, failing below 80% of lines covered. | `npm run test:coverage` |
 | `test:filler` | — | crypto-price-filler's `test:strict`, from the top folder. | `npm run test:filler` |
 
@@ -126,7 +139,8 @@ run in `fetch-from-centralized-exchange/crypto-price-filler/`, after
 
 This repo's bin, `github-project-deps`, is no command of this repo: the
 projects that install this repo run it, as
-`npm run github-project-deps -- main` or `-- release`.
+`npm run github-project-deps -- main` or `-- release`. Its other bin,
+`summ-csv`, is the command above, for a project that installs this repo.
 
 - [Which version they install](architecture.md#which-version-they-install)
   — what that bin does.

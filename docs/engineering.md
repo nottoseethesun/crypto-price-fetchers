@@ -53,6 +53,7 @@ the ones that hold no key and none of the owner's own settings.
 | `config.json` | yes | The services whose keys the programs send, under `apiKeys`. No key. |
 | `api-keys.json` | no | The keys, each encrypted with the owner's password (see [the key store](architecture.md#the-key-store)). `api-keys.json.tmp` is the file it is written through. `API_KEYS_FILE_PATH` names another, as the tests do. |
 | `config.json` beside a Node version | no | Values laid over the script's config objects. `crypto-price-fetchers.js` and the exchange script read one when it is there. |
+| `summ-csv/settings.json` | yes | The Summ CSV writer's facts of each chain, by Summ's name for it (its own coin, the forms of its hashes and addresses), and the fiat currencies a reference price may be in. |
 | `crypto-price-filler/config-example.json` | yes | The filler's settings. |
 | `crypto-price-filler/config.json` | no | The owner's settings, laid over `config-example.json`. |
 | `build/apps-script/` | no | The Sheets scripts as `npm run build apps-script` writes them when the owner declines a clipboard tool: they hold the api keys in the clear, readable by the owner alone. |
@@ -108,7 +109,8 @@ outside the computer, and neither reads the owner's key file or password.
 **The top folder's tests** (`test/`, Node's test runner) cover the runner,
 the Node versions, the build step, the price clients (`dex-prices/`), the
 key store, `no-secret-logging`, the versions tool
-(`github-project-deps/`) and the shared helpers (`lib/`). The scripts' and the clients' requests
+(`github-project-deps/`), the Summ CSV writer (`summ-csv/`) and the shared
+helpers (`lib/`). The scripts' and the clients' requests
 go to a stand-in fetch or a stand-in server on the computer
 (`test/helpers/stand-in-web.js`; `test/helpers/gecko-terminal-stand-in.js`
 answers as GeckoTerminal does). The build step's tests stand in for the
@@ -116,7 +118,12 @@ clipboard, the install and the questions. The versions tool's tests run
 it on projects in temp folders, with a stand-in npm that writes the
 lockfile an install would (`test/helpers/github-project-deps-stand-ins.js`);
 git itself lists their package.json files, and npm's dry-run pack shows
-what the package ships for the bin. The key store's tests save keys in temp
+what the package ships for the bin. The Summ CSV writer's tests change one
+value of a row that passes every rule, so each test reads one rule's
+problem (`test/helpers/summ-csv-rows.js`), read a copy of the owner's
+template (`test/fixtures/summ-template.csv`), and write their files in
+temp folders; their rows' wallets and hashes are made up, so no address of
+the owner's is in the repo. The key store's tests save keys in temp
 folders of their own (`test/helpers/temp-folders.js`), removed when a test
 file ends; `test/fixtures/lp-ranger-api-keys.json`, written by LP Ranger's
 own code, checks that the store opens LP Ranger's files. A test that starts

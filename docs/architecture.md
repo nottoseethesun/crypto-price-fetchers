@@ -28,6 +28,7 @@ Two companion references sit alongside this one:
 - [crypto-price-filler](#crypto-price-filler)
 - [Prices of Tokens That Trade in Pools](#prices-of-tokens-that-trade-in-pools)
 - [The Key Store](#the-key-store)
+- [The Summ CSV Writer](#the-summ-csv-writer)
 - [Projects That Use This One](#projects-that-use-this-one)
 - [Technology Choices](#technology-choices)
 
@@ -37,8 +38,8 @@ Two companion references sit alongside this one:
 
 The Sheets scripts do the pricing. The other parts run the scripts on a
 computer, price a whole CSV file, keep the api keys, stop a key from being
-printed, and choose which version of this repo the projects that use it
-install.
+printed, choose which version of this repo the projects that use it
+install, and write the CSV files the owner imports into Summ.
 
 | Part | Where | What it is |
 | ---- | ----- | ---------- |
@@ -51,6 +52,7 @@ install.
 | The key store | `api-key-store/`, `manage-api-keys.js`, `unlock-api-keys.sh` | Api keys kept encrypted with a password: LP Ranger's design, as a module. |
 | The security lint's rule | `eslint-rules/no-secret-logging.js` | Refuses printing a name that may hold a secret. |
 | The versions tool | `github-project-deps.js`, `github-project-deps/` | The bin `github-project-deps`, which sets a project's dependencies from GitHub to their projects' main branch or latest release. |
+| The Summ CSV writer | `summ-csv.js`, `summ-csv/` | Writes the CSV files the owner imports into Summ, once every row has passed its rules: `npm run summ-csv`, the bin `summ-csv`, and `writeSummCsv` for a program. |
 | The shared helpers | `lib/` | Code more than one part uses: `messageOf`, which gives the message of something thrown, for the runner, the key store, the build step and the versions tool. |
 
 ---
@@ -235,6 +237,48 @@ each opens a file the other wrote.
   one.
 
 The password is kept nowhere on disk, and the plain keys only in memory.
+
+---
+
+## The Summ CSV Writer
+
+Summ, the crypto tax service, imports a CSV file in its own layout and
+takes whatever the file says, so a token named wrongly, an amount rounded
+or gas put on two rows reaches the books as written. The owner's rule is
+that every such file is made by one utility, `summ-csv/`, which checks
+every row first and writes nothing while any row breaks a rule. Its README,
+[`summ-csv/README.md`](../summ-csv/README.md), lists the rules and the
+form of a row.
+
+The utility works in three steps, each in a module of its own:
+
+1. **The header.** The owner keeps Summ's header in a template file of one
+   line, sixteen columns: Summ's fifteen and the token's contract address.
+   `columns.js` reads it and gives the key a row holds each column's value
+   under, in the header's order, and refuses a header that lacks a column,
+   names one twice, or names one Summ's import does not have.
+2. **The rules.** `rules.js` checks each row: its shape, the columns every
+   row fills, one token per row, the forms of times and amounts, gas in the
+   chain's own coin, and, for a row on a blockchain, the forms of its hash
+   and addresses and a contract address on every token. A chain's facts,
+   its own coin and those forms, come from `settings.json`, by Summ's name
+   for the chain, so a chain is added there, with no change to the code. A
+   last rule reads the cells that would be written and refuses a
+   transaction's gas on a second row.
+3. **The cells.** `values.js` writes each value as text at the file's edge,
+   as LP Ranger's rule for numbers asks: an amount, kept by a program as a
+   whole number of the token's smallest units and its decimals, as plain
+   decimal text cut by the text alone, never through a JavaScript number;
+   a time as Summ's `YYYY-MM-DD HH:MM:SS`; and, on a chain whose hashes
+   and addresses are hex, each in lower case, as the files Summ has
+   already taken from the owner are written.
+
+`index.js` puts the steps together, as `summCsvText` and `writeSummCsv`,
+and writes over an existing file only when the call says so, through a
+file beside it that is then renamed. `command-line.js` reads rows from a
+JSON file for `npm run summ-csv` and the bin `summ-csv`. A project that
+installs this repo imports `crypto-price-fetchers/summ-csv` to write such
+a file from its own code.
 
 ---
 

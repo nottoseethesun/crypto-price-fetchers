@@ -67,6 +67,19 @@ as `crypto-price-fetchers/dex-prices/...`. The exchange script keeps a loop
 of its own in its `-sources.gs`, since Apps Script cannot load a Node
 module.
 
+## Summ csv files
+
+**Every csv file for Summ is written by `summ-csv/`**, through
+`npm run summ-csv`, the bin `summ-csv`, or `writeSummCsv` from
+`crypto-price-fetchers/summ-csv`: never by a script written for the
+occasion. The owner's rule; the utility checks every row against the
+rules in `summ-csv/README.md` and writes nothing while any row breaks one.
+A chain's facts (its own coin, the forms of its hashes and addresses) are
+in `summ-csv/settings.json`, so a chain is added there. The header comes
+from the owner's template, whose path a caller passes; this public repo
+holds only a copy of its header, `test/fixtures/summ-template.csv`, and no
+address of the owner's.
+
 ## Keys
 
 **Never show any character of an api key once it is entered**: not in a
