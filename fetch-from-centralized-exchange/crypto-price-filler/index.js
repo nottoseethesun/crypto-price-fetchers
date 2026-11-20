@@ -440,9 +440,11 @@ const outputRows = [];
 
 let grandTotalUsd = 0;
 
-// Open the CoinGecko, CoinPaprika and Moralis api keys, those saved, before
-// pricing anything: with the password in API_KEYS_PASSWORD, or else one asked
-// for, then each service is asked once whether it takes its key
+/*-
+ *  Open the CoinGecko, CoinPaprika and Moralis api keys, those saved,
+ *  before pricing anything: with the password in API_KEYS_PASSWORD, or else
+ *  one asked for, then each service is asked once whether it takes its key.
+ */
 try {
   await unlockProjectKeys({
     projectTop: fileURLToPath(new URL("../..", import.meta.url)),

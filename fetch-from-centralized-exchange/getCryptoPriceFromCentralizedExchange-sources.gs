@@ -194,8 +194,11 @@ function getPriceFromCoinGecko(id, utcMs, target) {
 
   const dateStr = Utilities.formatDate(new Date(utcMs), "UTC", "dd-MM-yyyy");
 
-  // 1) Try market_chart/range with its own cache, kept for the time asked:
-  //    its window is centred on that time, so two times of one day differ
+  /*-
+   *  1) Try market_chart/range with its own cache, kept for the time
+   *  asked: its window is centred on that time, so two times of one day
+   *  differ.
+   */
   const rangeCacheKey = `gecko_range_${id}_${Math.floor(utcMs / 1000)}_${target}`;
   const rangeCached = getCachedResult(rangeCacheKey);
   if (typeof rangeCached === "number") return rangeCached;
@@ -216,9 +219,11 @@ function getPriceFromCoinGecko(id, utcMs, target) {
     );
   }
 
-  // 2) Fall back to the day's price (history) with its own cache. One
-  //    price is not a range, so it answers close only. Never the current
-  //    price (tickers): that would put today's price on a past date.
+  /*-
+   *  2) Fall back to the day's price (history) with its own cache. One
+   *  price is not a range, so it answers close only. Never the current
+   *  price (tickers): that would put today's price on a past date.
+   */
   if (target !== "close") {
     Logger.log(
       `CoinGecko has no dated ${target} for ${id}: the day's single price answers close only`,

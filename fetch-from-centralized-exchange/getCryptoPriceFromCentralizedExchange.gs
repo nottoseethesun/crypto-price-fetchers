@@ -239,13 +239,17 @@ const CONFIG = {
   COINPAPRIKA_BASE: "https://api.coinpaprika.com/v1",
   COINPAPRIKA_PRO_BASE: "https://api-pro.coinpaprika.com/v1",
 
-  // The CoinGecko demo api key, sent in this header; empty for none. The
-  // build step sets it (see API KEYS), as the Node version does
+  /*-
+   *  The CoinGecko demo api key, sent in this header; empty for none. The
+   *  build step sets it (see API KEYS), as the Node version does.
+   */
   COINGECKO_API_KEY: "",
   COINGECKO_API_KEY_HEADER: "x-cg-demo-api-key",
 
-  // The CoinPaprika paid-plan api key, sent as this header's whole value;
-  // empty for none. The build step sets it (see API KEYS)
+  /*-
+   *  The CoinPaprika paid-plan api key, sent as this header's whole
+   *  value; empty for none. The build step sets it (see API KEYS).
+   */
   COINPAPRIKA_API_KEY: "",
   COINPAPRIKA_API_KEY_HEADER: "Authorization",
 

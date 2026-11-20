@@ -34,8 +34,7 @@ vi.mock(
   },
 );
 
-// The Sheets script's files its function needs, in the order Apps Script
-// loads them
+/** The Sheets script's files its function needs, in the order Apps Script loads them. */
 const SHEETS_SCRIPT_PATH = [
   "../../getCryptoPriceFromCentralizedExchange.gs",
   "../../getCryptoPriceFromCentralizedExchange-sources.gs",
