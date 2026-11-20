@@ -124,7 +124,7 @@ function testGetCryptoPrice() {
       token: "grc",
       dateStr: "2026-02-08 12:00:00",
       tz: "CST",
-      highOrLow: "high",
+      mode: "high",
       expectedRange: [0.001, 0.05],
     },
     {
@@ -132,7 +132,7 @@ function testGetCryptoPrice() {
       token: "grc",
       dateStr: "2026-02-08 12:00:00",
       tz: "CST",
-      highOrLow: "low",
+      mode: "low",
       expectedRange: [0.001, 0.05],
     },
     {
@@ -140,7 +140,7 @@ function testGetCryptoPrice() {
       token: "xtm",
       dateStr: "2026-02-08 12:00:00",
       tz: "CST",
-      highOrLow: "high",
+      mode: "high",
       expectedRange: [0.001, 0.1],
     },
     {
@@ -148,7 +148,7 @@ function testGetCryptoPrice() {
       token: "xtm",
       dateStr: "2026-02-08 12:00:00",
       tz: "CST",
-      highOrLow: "low",
+      mode: "low",
       expectedRange: [0.001, 0.1],
     },
     {
@@ -156,7 +156,7 @@ function testGetCryptoPrice() {
       token: "xmr",
       dateStr: "2025-12-01 14:30:00",
       tz: "UTC",
-      highOrLow: "high",
+      mode: "high",
       expectedRange: [380, 450],
     },
     {
@@ -164,7 +164,15 @@ function testGetCryptoPrice() {
       token: "btc",
       dateStr: "2026-01-01 00:00:00",
       tz: "UTC",
-      highOrLow: "high",
+      mode: "high",
+      expectedRange: [85000, 100000],
+    },
+    {
+      name: "BTC - New Year 2026 (close)",
+      token: "btc",
+      dateStr: "2026-01-01 00:00:00",
+      tz: "UTC",
+      mode: "close",
       expectedRange: [85000, 100000],
     },
     {
@@ -172,7 +180,7 @@ function testGetCryptoPrice() {
       token: "zzzzzzfake",
       dateStr: "2026-02-08 12:00:00",
       tz: "CST",
-      highOrLow: "high",
+      mode: "high",
       expectedRange: null,
     },
     {
@@ -180,7 +188,7 @@ function testGetCryptoPrice() {
       token: "xtm",
       dateStr: "2026-12-31 23:59:59",
       tz: "CST",
-      highOrLow: "high",
+      mode: "high",
       expectedRange: null,
     },
   ];
@@ -193,7 +201,7 @@ function testGetCryptoPrice() {
     console.log(`│ Test ${index + 1}/${testCases.length}: ${test.name}`);
     console.log(`│   Token: ${test.token.toUpperCase()}`);
     console.log(`│   Date:  ${test.dateStr} ${test.tz}`);
-    console.log(`│   Mode:  ${test.highOrLow.toUpperCase()}`);
+    console.log(`│   Mode:  ${test.mode.toUpperCase()}`);
 
     const startTime = new Date().getTime();
 
@@ -201,7 +209,7 @@ function testGetCryptoPrice() {
       test.token,
       test.dateStr,
       test.tz,
-      test.highOrLow,
+      test.mode,
       0, // Fast mode for tests
     );
 

@@ -6,9 +6,14 @@
  * and date/time, then fill a CSV file with USD prices and calculated USD amounts.
  *
  * Features:
- * - Primary source: MEXC (1m & 60m klines)
- * - Fallbacks: CoinGecko (hourly prices, then the day's price for close), CoinPaprika (OHLCV);
- *   every price is that of the row's time, never the current one
+ * - A token that trades in pools: Moralis first, with a saved Moralis key (the close at the
+ *   block of the row's time), then GeckoTerminal (1m & 1h candles of the pool it ranks highest,
+ *   within the last 180 days)
+ * - Every token: MEXC (1m & 60m klines), then CoinGecko (hourly prices, then the day's price
+ *   for close), then CoinPaprika (the day's candle, then the day's price for close). These
+ *   three are the price sources of the Sheets script getCryptoPriceFromCentralizedExchange,
+ *   which this tool runs unchanged through the repo's runner (`sources/exchange.js`)
+ * - Every price is that of the row's time, never the current one
  * - Reads dates in a named time zone, daylight saving included
  * - Caching, rate-limit retry, BTC-pair adjustment at the row's time
  * - Verbose logging for debugging
@@ -22,29 +27,31 @@
  * Installation
  * ------------
  *
- * 1. Ensure Node.js v21.1.0 or later is installed
- * 2. Install dependencies:
+ * 1. Ensure Node.js v22 or later is installed
+ * 2. Install dependencies, here and in the repo's top folder, which holds the runner
+ *    that runs the Sheets script's price sources:
  *    npm install
  *
  * Configuration
  * -------------
  *
  * All configuration is done via JSON files: `supported-tokens.json` for tokens,
- * and `config-example.json` for API settings, as committed. No code changes required.
+ * and `config-example.json` for the settings, as committed. No code changes required.
  *
  * Your own settings go in `config.json`, which git ignores: each setting in it
  * takes the place of the same setting in `config-example.json`, so it needs only
  * the ones that differ. Without it, the tool runs on the committed settings.
  *
- * The CoinGecko api key is no setting: it is kept encrypted, with a password you
- * choose, in `api-keys.json` at the repo's top, which git ignores. To save one, in
- * the repo's top folder:
+ * The CoinGecko, CoinPaprika and Moralis api keys are no settings: they are kept
+ * encrypted, with a password you choose, in `api-keys.json` at the repo's top, which git
+ * ignores. To save them, in the repo's top folder:
  *   npm run api-keys
- * Each run opens it before it prices anything, with the password in the
+ * Each run opens them before it prices anything, with the password in the
  * environment variable API_KEYS_PASSWORD, which `source ./unlock-api-keys.sh`
  * (in the repo's top folder) keeps for a terminal, or else with one it asks for,
- * and asks CoinGecko once whether it takes the key. Without a saved key, the
- * tool asks CoinGecko without one.
+ * and asks each service once whether it takes its key. Without a saved CoinGecko key,
+ * the tool asks CoinGecko without one; without a CoinPaprika key, CoinPaprika's free
+ * server; without a Moralis key, it does not ask Moralis.
  *
  * ADDING A NEW COIN (supported-tokens.json):
  *
@@ -74,30 +81,38 @@
  *     "note": "Privacy coin"
  *   }
  *
+ *   A token that trades in pools names three fields more, which turn on Moralis and
+ *   GeckoTerminal for it; the services pick the pool:
+ *     "contract": "0x…",                       // its contract address, EIP-55 checksummed
+ *     "geckoterminal_network": "pulsechain",   // GeckoTerminal's id for its chain, or null
+ *     "moralis_chain": "0x171"                 // Moralis's id for its chain, or null
+ *   GeckoTerminal lists its network ids at https://api.geckoterminal.com/api/v2/networks,
+ *   and Moralis its chain ids in its documentation. The "phex" entry, HEX on PulseChain,
+ *   is an example.
+ *
  * ADDING A NEW DATA SOURCE:
  *
- *   To add a new price API source (e.g., CryptoCompare, Binance):
+ *   A source that prices a coin by its ticker or a service's coin id (e.g., CryptoCompare,
+ *   Binance) belongs in the Sheets script, `../getCryptoPriceFromCentralizedExchange-sources.gs`,
+ *   so the sheet gets it too:
+ *   1. Add its function there, and to the script's provider chain
+ *   2. Add the function to those `openCentralizedExchangeSources` opens
+ *      (`../getCryptoPriceFromCentralizedExchange.js`)
+ *   3. Ask it in `sources/price.js` as MEXC, CoinGecko and CoinPaprika are asked
+ *      (`tryExchangeSource`)
  *
- *   1. Create a new module in `sources/` (e.g., `sources/cryptoCompare.js`)
- *      Export a function like: getPriceFromCryptoCompare(id, utcMs, target, verbose)
- *      - Should return a price (number) or null if unavailable
- *      - Use `fetchWithRetry` from `utils/fetch.js` for rate-limit handling
- *      - Include verbose logging with logv() pattern
+ *   A source that prices a token by its contract, as Moralis and GeckoTerminal do, is a
+ *   module in `sources/` over a client in the repo's `dex-prices/`:
+ *   1. Export a function like getPriceFromX(poolToken, utcMs, target, verbose), which
+ *      returns a price (number) or null; the client's requests retry with
+ *      `fetchWithRetries` (`dex-prices/web-request.js`)
+ *   2. Ask it in `sources/price.js` among the pool sources, with the existing pattern
+ *      for null checks and logging
  *
- *   2. Add API configuration to `config-example.json`:
- *      - Base URL (e.g., "CRYPTOOMPARE_BASE": "https://...")
- *      - Rate limit delay (e.g., "CRYPTOOMPARE_RATE_LIMIT_MS": 1000)
- *      An api key, if the service needs one, is no setting: list the service in
- *      the repo's top `config.json` under `apiKeys`, with its check in
- *      `api-key-store/services.js`, and open it as `index.js` opens CoinGecko's.
- *
- *   3. Add the source ID field to `supported-tokens.json` schema:
- *      - Add "cryptoCompare_id" field to relevant tokens
- *
- *   4. Integrate into `sources/price.js`:
- *      - Import your new function
- *      - Add it to the fallback chain (after MEXC, CoinGecko, CoinPaprika)
- *      - Follow the existing pattern for null checks and logging
+ *   Either way, the source's id field goes in `supported-tokens.json`, and its settings in
+ *   `config-example.json`. An api key, if the service needs one, is no setting: list the
+ *   service in the repo's top `config.json` under `apiKeys`, with its check in
+ *   `api-key-store/services.js`, and open it as `index.js` opens the others.
  *
  * API KEYS (kept encrypted in api-keys.json at the repo's top, never in a settings file):
  *
@@ -107,27 +122,31 @@
  *                        top folder. Without one, CoinGecko is asked without a key
  *                        (stricter rate limits).
  *
- * RATE LIMITING (config-example.json, or config.json to override):
+ *   CoinPaprika          A key for one of CoinPaprika's paid plans, if you buy one
+ *                        (https://coinpaprika.com/api). Save it with `npm run api-keys`,
+ *                        in the repo's top folder. With it, CoinPaprika's paid server is
+ *                        asked, which reaches as far back as the plan does. Without one,
+ *                        its free server: the day's candle for the last 24 hours, and the
+ *                        day's price at 00:00 UTC for the last 365 days.
  *
- *   REQUEST_DELAY_MS     Default delay (in milliseconds) between successive API requests.
- *                        Used as a baseline for all sources. Default: 1200ms.
+ *   Moralis              Your Moralis api key. Obtain from https://admin.moralis.com
+ *                        Save it with `npm run api-keys`, in the repo's top folder.
+ *                        Without one, Moralis is not asked, and GeckoTerminal prices
+ *                        tokens that trade in pools.
  *
- *   COINGECKO_RATE_LIMIT_MS
- *                        CoinGecko-specific delay between requests. Set based on your plan:
- *                        - Demo (free with key): 30 req/min → 2000ms recommended
- *                        - Analyst: 500 req/min → 120ms
- *                        - Pro: higher limits → adjust accordingly
- *                        Default: 2000ms. Skipped in test environments.
+ * RATE LIMITING:
  *
- *   To customize for your API plan:
- *   1. Check your provider's documentation for rate limits
- *   2. Calculate delay: (60000 ms / requests_per_minute)
- *   3. Set the relevant *_RATE_LIMIT_MS value in config.json
+ *   MEXC, CoinGecko and CoinPaprika: the Sheets script sends a request again after each
+ *   wait in its CONFIG.RETRY_DELAYS_MS while the service refuses it as one too many
+ *   (status 429). GeckoTerminal is asked at most 20 times a minute, and a request it
+ *   refuses is sent again after 10, 30 and 60 seconds (the repo's `dex-prices/`).
  *
  * OTHER SETTINGS (config-example.json, or config.json to override):
  *
- *   MAX_RETRIES          Number of retry attempts on rate-limit (429) errors. Default: 3.
- *   RETRY_BACKOFF_MS     Array of backoff delays for successive retries. Default: [5000, 10000, 20000].
+ *   GECKOTERMINAL_TOP_POOLS_CONSIDERED
+ *                        How many of the pools GeckoTerminal lists for a token are weighed
+ *                        when the tool picks one: the deepest of them that traded in the
+ *                        last 24 hours, as LP Ranger picks. Default: 10.
  *
  *   BACKFILL_HIGHEST     Set to true to enable --backfill-highest by default. Default: false.
  *                        Fills empty/error prices with the highest of the two bracketing prices.
@@ -248,7 +267,8 @@
  *   node index.js --token=grc --input=tests/mock-input.csv --output=tests/mock-filled.csv --verbose
  *
  *   Expected behavior:
- *   - Fetches real prices from configured sources (MEXC → CoinGecko → CoinPaprika)
+ *   - Fetches real prices from configured sources (Moralis → GeckoTerminal for a token
+ *     that trades in pools, then MEXC → CoinGecko → CoinPaprika)
  *   - Fills $usd price, $usd amount, and grand total columns
  *   - Future/invalid dates left blank
  *   - If no price available → writes 'Error'
@@ -267,11 +287,11 @@
  * TroubleShooting
  * ---------------
  *
- * - Ensure Node.js v21.1.0 or later is installed
+ * - Ensure Node.js v22 or later is installed
  * - Ensure internet connectivity for API access
  * - Check that input CSV matches expected format exactly
- * - Use --verbose flag for detailed logs
- * - Check API status of MEXC, CoinGecko, CoinPaprika if fetches fail
+ * - Use --verbose flag for detailed logs, the Sheets script's lines among them
+ * - Check API status of Moralis, GeckoTerminal, MEXC, CoinGecko, CoinPaprika if fetches fail
  * - Review rate-limit handling in logs if many requests are made
  * - For unexpected errors, check stack traces in verbose output
  * - If CoinGecko answers 401, save its key again (npm run api-keys -- set coingecko,
@@ -288,10 +308,12 @@ import { createObjectCsvWriter } from "csv-writer";
 
 import { parseInputToUtcMs } from "./utils/date.js";
 import { getCryptoPrice } from "./sources/price.js";
+import { closeExchangeSources } from "./sources/exchange.js";
 import config from "./config.js";
 import { getCache, setCache } from "./utils/cache.js";
 import { getProgressBar } from "./utils/progress.js";
-import { backfillPrices, logv } from "./utils/backfill.js";
+import { backfillPrices } from "./utils/backfill.js";
+import { logv } from "./utils/log.js";
 import { fileURLToPath } from "url";
 import { unlockProjectKeys } from "../../api-key-store/index.js";
 
@@ -418,13 +440,15 @@ const outputRows = [];
 
 let grandTotalUsd = 0;
 
-// Open the CoinGecko api key, when one is saved, before pricing anything: with
-// the password in API_KEYS_PASSWORD, or else one asked for, then CoinGecko is
-// asked once whether it takes the key
+/*-
+ *  Open the CoinGecko, CoinPaprika and Moralis api keys, those saved,
+ *  before pricing anything: with the password in API_KEYS_PASSWORD, or else
+ *  one asked for, then each service is asked once whether it takes its key.
+ */
 try {
   await unlockProjectKeys({
     projectTop: fileURLToPath(new URL("../..", import.meta.url)),
-    services: ["coingecko"],
+    services: ["coingecko", "coinpaprika", "moralis"],
   });
 } catch (error) {
   console.error(error.message);
@@ -496,6 +520,9 @@ for (let i = 0; i < rows.length; i++) {
 
 // Stop progress bar
 progressBar.stop();
+
+// Close the worker that runs the Sheets script's price sources
+await closeExchangeSources();
 
 // Apply backfill if requested (backfillHighest takes precedence if both are set)
 if (backfillHighest || backfillLowest) {

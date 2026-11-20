@@ -3,9 +3,10 @@
  * @module manage-api-keys
  *
  * What: lists the api keys of the services this project's `config.json`
- * names under `apiKeys` (CoinGecko, DexTools and x1.ninja), each saved or
- * not, never showing their characters, and asks for each one not saved,
- * keeping it encrypted in `api-keys.json` here, which git ignores.
+ * names under `apiKeys` (CoinGecko, CoinPaprika, DexTools, Moralis and
+ * x1.ninja), each saved or not, never showing their characters, and asks
+ * for each one not saved, keeping it encrypted in `api-keys.json` here,
+ * which git ignores.
  * `npm run api-keys -- set <service>` replaces one, and `check-password`
  * is what `unlock-api-keys.sh` runs; `--help` gives the rest.
  *

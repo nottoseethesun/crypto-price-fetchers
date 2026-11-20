@@ -7,17 +7,7 @@
  * @author Christopher M. Balz with Claude.ai
  */
 
-/**
- * Verbosity-aware logger function.
- * @param {boolean} shouldLog - Whether logging is enabled
- * @param {number} level - Log level (1 = basic, 2+ = more detail)
- * @param {string} message - Message to log
- * @param {...*} args - Additional arguments to log
- */
-export function logv(shouldLog, level, message, ...args) {
-  if (!shouldLog || level < 1) return;
-  console.log(`[VERBOSE:${level}] ${message}`, ...args);
-}
+import { logv } from "./log.js";
 
 /**
  * Checks if a price value should be considered empty/missing.

@@ -86,7 +86,8 @@ import { Command } from "commander";
 import { parse as csvParse } from "csv-parse/sync";
 import { createObjectCsvWriter } from "csv-writer";
 
-import { backfillPrices, logv, DEFAULT_COLUMNS } from "./utils/backfill.js";
+import { backfillPrices, DEFAULT_COLUMNS } from "./utils/backfill.js";
+import { logv } from "./utils/log.js";
 
 /**
  * Loads configuration from config.json.

@@ -20,14 +20,19 @@ import { STAND_IN_GECKO_KEY } from "./stand-in-coingecko-key.js";
 const asked = [];
 
 /**
- * A response as Node's fetch gives it.
+ * A response as Node's fetch gives it: a real `Response`, since the runner
+ * reads its text and headers to hand the Sheets script what `UrlFetchApp`
+ * gives.
  *
  * @param {number} status - The status
  * @param {*} body - The json body
- * @returns {{ok: boolean, status: number, json: function(): Promise<*>}} The response
+ * @returns {Response} The response
  */
 function respond(status, body) {
-  return { ok: status === 200, status, json: async () => body };
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
 }
 
 /*-

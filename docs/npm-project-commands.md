@@ -12,6 +12,7 @@ gates work. This file covers how to drive them.
 
 - [Passing Flags](#passing-flags)
 - [Api Keys](#api-keys)
+- [Build](#build)
 - [Developer Tools](#developer-tools)
 - [Test](#test)
 - [Commands That Are Usually Not Run Alone](#commands-that-are-usually-not-run-alone)
@@ -23,11 +24,13 @@ gates work. This file covers how to drive them.
 ## Passing Flags
 
 Run with `npm run <name>`; `test` also works without `run`. Flags go after
-a `--` separator, which tells npm the rest belongs to the script:
+a `--` separator, which tells npm the rest belongs to the script; a word
+with no dashes, such as `apps-script`, needs none:
 
 ```sh
 npm run api-keys -- set dextools
 npm test -- --test-name-pattern="unlockApiKeys"
+npm run build apps-script
 ```
 
 ---
@@ -43,6 +46,18 @@ command manages them.
 
 `source ./unlock-api-keys.sh`, which is no npm command, keeps the password
 for a terminal: see [the key store's README](../api-key-store/README.md).
+
+---
+
+## Build
+
+The Sheets scripts run in Apps Script, which cannot read the key file, so
+the keys go into the copy of a script that is pasted there. One command
+gives that copy.
+
+| Command | Flags | Description | Example |
+| ------- | ----- | ----------- | ------- |
+| `build` | `apps-script [script]`, `--help` | `apps-script` opens the saved keys, as the programs do, and gives each Sheets script that sends keys with them, and the values of the config.json its Node version reads, set at the end of its first file. It puts each file on the clipboard in turn, saying where to paste it, waits for Enter between files, and clears the clipboard after the last. With no clipboard tool installed, it offers to install one (`sudo apt install xclip`, or `wl-clipboard` on Wayland); declined, it warns that the keys go to disk in the clear, then writes the files to `build/apps-script/`, readable by the owner alone. `[script]` names one script: `crypto-price-fetchers` or `getCryptoPriceFromCentralizedExchange`. | `npm run build apps-script` · `npm run build apps-script crypto-price-fetchers` |
 
 ---
 
@@ -72,7 +87,7 @@ them, after the lint, and must pass before a commit and a push.
 | `audit:security` | — | The security lint, `eslint-security.config.js`: eslint-plugin-security, eslint-plugin-no-secrets and `no-secret-logging`. | `npm run audit:security` |
 | `check` | — | The full gate: `lint`, `test:coverage`, `test:filler` and the three audits, in that order, stopping at the first that fails. | `npm run check` |
 | `format:check` | — | Prettier in check mode; fails rather than rewriting. | `npm run format:check` |
-| `test` | any `node --test` flag | The tests of the runner, the Node versions, the key store and the lint rule, on Node's test runner. | `npm test -- --test-name-pattern="openAppsScript"` |
+| `test` | any `node --test` flag | The tests of the runner, the Node versions, the build step, the price clients, the key store and the lint rule, on Node's test runner. | `npm test -- --test-name-pattern="openAppsScript"` |
 | `test:coverage` | — | The same tests with coverage, failing below 80% of lines covered. | `npm run test:coverage` |
 | `test:filler` | — | crypto-price-filler's `test:strict`, from the top folder. | `npm run test:filler` |
 

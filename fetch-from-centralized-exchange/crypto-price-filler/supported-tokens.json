@@ -10,6 +10,7 @@
     "xtm": {
       "name": "Tari",
       "coingecko_id": "minotari",
+      "coinpaprika_id": "xtm-tari",
       "mexc_symbol": "XTM",
       "note": "Listed on MEXC as XTMUSDT"
     },
@@ -23,8 +24,19 @@
     "btc": {
       "name": "Bitcoin",
       "coingecko_id": "bitcoin",
+      "coinpaprika_id": "btc-bitcoin",
       "mexc_symbol": "BTC",
       "note": "BTC pair adjustment needed"
+    },
+    "phex": {
+      "name": "HEX on PulseChain",
+      "coingecko_id": "hex-pulsechain",
+      "coinpaprika_id": "hex-hex-pulsechain",
+      "mexc_symbol": null,
+      "contract": "0x2b591e99afE9f32eAA6214f7B7629768c40Eeb39",
+      "geckoterminal_network": "pulsechain",
+      "moralis_chain": "0x171",
+      "note": "Trades in PulseChain's pools: Moralis with a saved key, then GeckoTerminal for the last 180 days, then CoinGecko and CoinPaprika"
     }
   }
 }

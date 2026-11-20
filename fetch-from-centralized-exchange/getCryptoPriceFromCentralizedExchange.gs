@@ -2,17 +2,20 @@
  * Google Apps Script: Get Crypto Price from Centralized Exchange
  * ==============================================================
  *
- * @fileoverview Fetches historical high or low cryptocurrency prices (USD)
- *   from centralized exchanges for use directly in Google Sheets.
+ * @fileoverview Fetches historical high, low or closing cryptocurrency
+ *   prices (USD) from centralized exchanges for use directly in Google
+ *   Sheets.
  * @author Christopher M. Balz, with Grok and Claude
- * @version 2.15.0
- * @lastModified November 18, 2026
+ * @version 2.16.0
+ * @lastModified November 19, 2026
  *
  * OVERVIEW
  * --------
- * Custom Google Sheets function that returns the historical high or low USD
- * price for a cryptocurrency on a given date. Queries multiple exchange APIs
- * in sequence until a price is found.
+ * Custom Google Sheets function that returns the historical high, low or
+ * closing USD price for a cryptocurrency at a given time. Queries multiple
+ * exchange APIs in sequence until a price is found. crypto-price-filler,
+ * the Node tool for whole CSV files, asks these same price sources through
+ * the repo's runner, so a fix here fixes both.
  *
  * INSTALLATION
  * ------------
@@ -29,69 +32,86 @@
  * 4. Optional: add getCryptoPriceFromCentralizedExchange-tests.gs the same
  *    way, to run the tests from the editor
  * 5. Save and refresh the sheet
- * 6. Optional: set the CoinGecko api key (see API KEY below)
+ * To send the CoinGecko and CoinPaprika api keys, paste this file as the
+ * repo's build step gives it instead (see API KEYS below).
  *
- * API KEY
- * -------
- * The CoinGecko demo api key is kept in the project's Script Properties,
- * never in this file, so the file is shared and committed without it. In
- * the Apps Script editor: Project Settings (the gear on the left) ->
- * Script Properties -> Add script property. Property: COINGECKO_API_KEY.
- * Value: the key. Then Save script properties.
+ * API KEYS
+ * --------
+ * This file, as committed, holds no api key: CONFIG.COINGECKO_API_KEY and
+ * CONFIG.COINPAPRIKA_API_KEY are empty, and the script asks each service
+ * without a key. The repo's build step, `npm run build apps-script`, run
+ * in the repo's top folder, gives this file with the keys saved there
+ * (`npm run api-keys`) set at its end, and says where to paste it. Each
+ * key is optional:
  *
- * The script sends the key to CoinGecko in the x-cg-demo-api-key header,
- * never in a url, so no url the log quotes holds it. Without the property,
- * the script asks CoinGecko without a key, which CoinGecko answers at a
- * lower rate.
+ *   COINGECKO_API_KEY   - A CoinGecko demo api key, sent to CoinGecko in
+ *                         the x-cg-demo-api-key header. Without it,
+ *                         CoinGecko answers at a lower rate.
+ *   COINPAPRIKA_API_KEY - A key for one of CoinPaprika's paid plans, sent
+ *                         to CoinPaprika's paid server as the whole
+ *                         Authorization header. Without it, the script
+ *                         asks CoinPaprika's free server.
+ *
+ * A key goes only in a header, never in a url, so no url the log quotes
+ * holds it.
  *
  * USAGE
  * -----
- *   =getCryptoPrice(token, dateStr, tz, highOrLow)
+ *   =getCryptoPrice(token, dateStr, tz, mode)
  *
  * Parameters:
- *   token     - Ticker symbol, case-insensitive ("btc", "grc", "xmr", "xtm")
- *   dateStr   - "YYYY-MM-DD HH:MM:SS" (24-hour) or a cell reference
- *   tz        - Timezone abbreviation (see SUPPORTED TIMEZONES below)
- *   highOrLow - "high" or "low"; defaults to "high" if omitted (any value
- *               other than "low" is also treated as "high")
+ *   token   - Ticker symbol, case-insensitive ("btc", "grc", "xmr", "xtm")
+ *   dateStr - "YYYY-MM-DD HH:MM:SS" (24-hour) or a cell reference
+ *   tz      - Timezone abbreviation (see SUPPORTED TIMEZONES below)
+ *   mode    - "high", "low" or "close"; defaults to "high" if omitted (any
+ *             other value is also treated as "high")
  *
  * Examples:
  *   =getCryptoPrice("btc", "2026-01-15 14:30:00", "CST", "high")
  *   =getCryptoPrice("grc", A1, "CST")
  *   =getCryptoPrice("xmr", A1, "UTC", "low")
+ *   =getCryptoPrice("xtm", A1, "UTC", "close")
  *
- * HIGH / LOW MODE
- * ---------------
- * Specifying "high" returns the highest price recorded during the relevant
- * time period, while "low" returns the lowest. This lets you bound a
- * transaction's value: use "high" for the best-case sale price and "low"
- * for the worst-case, or vice versa depending on perspective.
+ * HIGH, LOW AND CLOSE
+ * -------------------
+ * Each provider prices a period around the requested time. "high" returns
+ * the highest price recorded in that period and "low" the lowest, which
+ * bound a transaction's value: "high" for the best-case sale price and
+ * "low" for the worst-case, or the other way round, depending on
+ * perspective. "close" returns the price at the end of the period, the
+ * nearest to the time that the provider records.
  *
- * The time period covered depends on which provider returns the data:
+ * The period depends on which provider returns the data:
  *
  *   MEXC: Tries a 1-minute candle first (the single minute containing
  *     the requested timestamp). If no trades occurred in that minute, it
- *     falls back to a 60-minute candle. Returns the real OHLCV high or
- *     low from whichever candle matched. A coin MEXC trades only against
- *     BTC is priced in USD with BTC/USDT's candle at the same time.
+ *     falls back to a 60-minute candle. Returns the real OHLCV high, low
+ *     or close of whichever candle matched. A coin MEXC trades only
+ *     against BTC is priced in USD with BTC/USDT's candle at the same
+ *     time.
  *
  *   CoinGecko market_chart/range: Fetches hourly data points over a
  *     24-hour window centered on the requested time (12 hours before to
- *     12 hours after), then returns Math.max (high) or Math.min (low)
- *     across all of those points.
+ *     12 hours after): the highest of them for high, the lowest for low,
+ *     and the one nearest the time for close.
  *
- *   CoinGecko history: This endpoint returns only the day's single
- *     price, with no time-range high/low data. A +/-1.5% spread is
- *     applied as an approximation (high = price * 1.015,
- *     low = price * 0.985).
+ *   CoinGecko history: The day's single price, recorded at 00:00 UTC.
+ *     One price is not a range, so it answers close only; high and low go
+ *     on to CoinPaprika.
  *
- *   CoinPaprika: Requests a 1-minute OHLCV candle ending at the
- *     requested timestamp. Returns the real high or low from that
- *     candle.
+ *   CoinPaprika: The day's OHLCV candle (00:00 to 23:59:59 UTC) holding
+ *     the requested time: its high, low or close. A plan reaches only so
+ *     many days back for candles (the free plan, the last 24 hours). For
+ *     an older day, close takes the day's price at 00:00 UTC instead, which
+ *     the free plan has for the last 365 days; that one price answers close
+ *     only.
  *
  * DATA SOURCES (PROVIDER CHAIN)
  * -----------------------------
- * Providers are tried in order; the first successful result is returned:
+ * Providers are tried in order; the first successful result is returned.
+ * None asks for the current price, which would put today's price on a
+ * past date. A request a provider refuses as one too many (status 429) is
+ * sent again after each wait in RETRY_DELAYS_MS.
  *
  *   1. MEXC       - Primary. Real OHLCV candles (1-minute, then 1-hour
  *                   fallback). Queries exchangeInfo to verify the trading
@@ -99,15 +119,16 @@
  *
  *   2. CoinGecko  - Tries two sub-endpoints in order, both dated:
  *                   a) market_chart/range (24h window, hourly data points)
- *                   b) history (the price of the requested UTC day)
- *                   It never asks for the current price, which would put
- *                   today's price on a past date.
+ *                   b) history (the price of the requested UTC day), for
+ *                      close only
  *                   Both send the demo api key when the Script Property
- *                   COINGECKO_API_KEY holds one (see API KEY above).
- *                   Retries on 429 (rate limit) up to 3 times with 5s sleep.
+ *                   COINGECKO_API_KEY holds one (see API KEYS above).
  *
- *   3. CoinPaprika - OHLCV fallback. Skip list: grc-gridcoin (is_active is
- *                   false; free-tier OHLCV is limited to 24h).
+ *   3. CoinPaprika - The day's candle, then, for close, the day's price
+ *                   (see above). With the Script Property
+ *                   COINPAPRIKA_API_KEY, both are asked of the paid server
+ *                   with the key, and reach as far back as the plan does.
+ *                   Skip list: grc-gridcoin (is_active is false).
  *
  * TOKEN MAPPINGS (TOKEN_TO_ID):
  *   Tokens not listed in TOKEN_TO_ID use the raw ticker as the CoinGecko /
@@ -134,20 +155,29 @@
  *     NEGATIVE_CACHE     - TTL for "no data" results (300 = 5min)
  *
  *   COINGECKO_BASE       - CoinGecko API v3 base URL
- *   COINGECKO_API_KEY_PROPERTY
- *                        - The Script Property holding the CoinGecko demo
- *                          api key ("COINGECKO_API_KEY"; see API KEY)
+ *   COINGECKO_API_KEY    - The CoinGecko demo api key; empty for none, as
+ *                          committed (see API KEYS)
  *   COINGECKO_API_KEY_HEADER
  *                        - The header the key is sent in
  *                          ("x-cg-demo-api-key")
- *   COINPAPRIKA_BASE     - CoinPaprika API v1 base URL
+ *   COINPAPRIKA_BASE     - CoinPaprika API v1 base URL, the free server
+ *   COINPAPRIKA_PRO_BASE - CoinPaprika's paid server, asked with a key
+ *   COINPAPRIKA_API_KEY  - The CoinPaprika api key; empty for none, as
+ *                          committed (see API KEYS)
+ *   COINPAPRIKA_API_KEY_HEADER
+ *                        - The header the key is sent in, as its whole
+ *                          value ("Authorization")
  *
  *   Endpoint templates (use {base}, {id}, {date}, {from}, {to}, {start},
  *   {end} placeholders):
  *     COINGECKO_HISTORY_TEMPLATE
  *     COINGECKO_MARKET_CHART_RANGE_TEMPLATE
- *     COINPAPRIKA_TICKERS_TEMPLATE
- *     COINPAPRIKA_OHLCV_TEMPLATE
+ *     COINPAPRIKA_OHLCV_TEMPLATE      - the day's candle
+ *     COINPAPRIKA_DAY_PRICE_TEMPLATE  - the day's price at 00:00 UTC
+ *
+ *   RETRY_DELAYS_MS      - The waits, in milliseconds, before each new try
+ *                          of a request refused with status 429
+ *                          ([5000, 5000]: three tries in all)
  *
  *   Rate-limit tuning:
  *     LOCK_WAIT_MS         - Lock acquisition timeout (2000ms)
@@ -207,19 +237,34 @@ const CONFIG = {
   // API URL bases
   COINGECKO_BASE: "https://api.coingecko.com/api/v3",
   COINPAPRIKA_BASE: "https://api.coinpaprika.com/v1",
+  COINPAPRIKA_PRO_BASE: "https://api-pro.coinpaprika.com/v1",
 
-  // The CoinGecko demo api key: read from this Script Property, sent in this header
-  COINGECKO_API_KEY_PROPERTY: "COINGECKO_API_KEY",
+  /*-
+   *  The CoinGecko demo api key, sent in this header; empty for none. The
+   *  build step sets it (see API KEYS), as the Node version does.
+   */
+  COINGECKO_API_KEY: "",
   COINGECKO_API_KEY_HEADER: "x-cg-demo-api-key",
+
+  /*-
+   *  The CoinPaprika paid-plan api key, sent as this header's whole
+   *  value; empty for none. The build step sets it (see API KEYS).
+   */
+  COINPAPRIKA_API_KEY: "",
+  COINPAPRIKA_API_KEY_HEADER: "Authorization",
 
   // Endpoint templates
   COINGECKO_HISTORY_TEMPLATE: "{base}/coins/{id}/history?date={date}",
   COINGECKO_MARKET_CHART_RANGE_TEMPLATE:
     "{base}/coins/{id}/market_chart/range?vs_currency=usd&from={from}&to={to}",
 
-  COINPAPRIKA_TICKERS_TEMPLATE: "{base}/tickers/{id}",
   COINPAPRIKA_OHLCV_TEMPLATE:
     "{base}/coins/{id}/ohlcv/historical?start={start}&end={end}&quote=usd",
+  COINPAPRIKA_DAY_PRICE_TEMPLATE:
+    "{base}/tickers/{id}/historical?start={date}&interval=1d&limit=1&quote=usd",
+
+  // The waits before each new try of a request refused with status 429
+  RETRY_DELAYS_MS: [5000, 5000],
 
   // Rate limit tuning
   LOCK_WAIT_MS: 2000, // Wait time for lock acquisition
@@ -283,15 +328,15 @@ function getCryptoPrice(
   token,
   dateStr,
   tz,
-  highOrLow = "high",
+  mode = "high",
   apiDelayMs = CONFIG.GENERAL_DELAY_MS,
 ) {
   Logger.log(
-    `getCryptoPrice called: token=${token}, date=${dateStr}, tz=${tz}, mode=${highOrLow}, delay=${apiDelayMs}ms`,
+    `getCryptoPrice called: token=${token}, date=${dateStr}, tz=${tz}, mode=${mode}, delay=${apiDelayMs}ms`,
   );
 
   token = token.toLowerCase();
-  const target = highOrLow.toLowerCase() === "low" ? "low" : "high";
+  const target = priceTarget(mode);
 
   // Parse and validate date
   const safeDateStr = normalizeDateStr(dateStr);
@@ -335,6 +380,12 @@ function normalizeDateStr(dateStr) {
   }
   Logger.log(`Invalid dateStr type: ${typeof dateStr}`);
   return { error: "Invalid date format" };
+}
+
+/** The price a mode asks for: "low" or "close" as named, in any letter case, and "high" for any other value */
+function priceTarget(mode) {
+  const named = String(mode).toLowerCase();
+  return named === "low" || named === "close" ? named : "high";
 }
 
 /** Attempts to acquire lock with exponential backoff retry */
@@ -545,13 +596,6 @@ function createUtcTimestampFromComponents(components) {
 
   Logger.log(`UTC timestamp created: ${date.getTime()}`);
   return date.getTime();
-}
-
-function applySpread(price, target) {
-  const spread = 0.015; // 1.5%
-  const result = target === "low" ? price * (1 - spread) : price * (1 + spread);
-  Logger.log(`Applied spread (${target}): ${price} → ${result}`);
-  return result;
 }
 
 /** ============================================================================

@@ -24,7 +24,9 @@ Each `.gs` has a Node version beside it, of the same name ending in `.js`:
 A Node version runs its `.gs` unchanged, through the runner in
 `apps-script-runner/`, and never copies the script's logic, since LP
 Ranger's rules forbid a second copy. A fix belongs in the `.gs`, where it
-fixes both.
+fixes both. crypto-price-filler keeps no price source of its own for
+MEXC, CoinGecko or CoinPaprika: it asks the exchange script's, through its
+Node version's `openCentralizedExchangeSources` (`sources/exchange.js`).
 
 Apps Script's `UrlFetchApp.fetch` returns the response, where Node's
 `fetch` returns a promise that a script's code cannot wait for on its own
@@ -37,6 +39,19 @@ commit, for the runner (`crypto-price-fetchers/apps-script-runner`), which
 runs pulsechain-analytics' own Sheets script. A change to the runner
 reaches it only when it moves the pin.
 
+## Prices of tokens that trade in pools
+
+`dex-prices/` holds the clients of the services that price a token from
+a blockchain's pools, in LP Ranger's order: Moralis (`moralis.js`) first,
+at the block the chain had at a time, when a key is saved, then
+GeckoTerminal (`geckoterminal.js`), from the candles of the pool LP Ranger
+would pick, within its budget of requests. Every request goes through
+`web-request.js`, the one loop that sends a request again after a 429.
+crypto-price-filler's pool sources use them, and other repos install them
+as `crypto-price-fetchers/dex-prices/...`. The exchange script keeps a loop
+of its own in its `-sources.gs`, since Apps Script cannot load a Node
+module.
+
 ## Keys
 
 **Never show any character of an api key once it is entered**: not in a
@@ -44,8 +59,9 @@ reply, a log line, an error message, a test's output, or a listing. The key
 manager says only whether each key is saved.
 
 No api key is committed. The keys the programs send (CoinGecko's,
-DexTools' and x1.ninja's, as the top `config.json` lists them under
-`apiKeys`) are kept in `api-keys.json` at the repo's top, which git ignores,
+CoinPaprika's, DexTools', Moralis' and x1.ninja's, as the top
+`config.json` lists them under `apiKeys`) are kept in `api-keys.json` at
+the repo's top, which git ignores,
 encrypted with one password the owner types: LP Ranger's design, built as a
 module any project can use, `api-key-store/` (its README shows how).
 `npm run api-keys` runs the key manager, `manage-api-keys.js`. A program
@@ -60,11 +76,18 @@ A test names a key file of its own, never the owner's, and passes no
 `vitest.config.js` names a key file that does not exist and empties the
 password.
 
-In Apps Script, the CoinGecko key is the Script Property `COINGECKO_API_KEY`,
-which the owner sets, and the DexTools and x1.ninja keys are pasted into
-`crypto-price-fetchers.gs`. The Node versions hand the keys they open to
-their scripts: as that Script Property, and as `CONFIG.API_KEY` and
-`X1_CONFIG.API_KEY`. crypto-price-filler reads `config-example.json`, its
+The Node versions hand the keys they open to their scripts as config
+values: `CONFIG.COINGECKO_API_KEY` and `CONFIG.COINPAPRIKA_API_KEY` in the
+exchange script, `CONFIG.API_KEY` and `X1_CONFIG.API_KEY` in
+`crypto-price-fetchers.gs`, which the committed scripts leave empty or
+holding a placeholder. For Apps Script, `npm run build apps-script`
+(`build.js`, `apps-script-build/`) sets the same values, with those of the
+config.json each Node version reads, as the last statements of each
+script's first file, from each Node version's `APPS_SCRIPT_BUILD` spec. It
+puts each file on the clipboard, or, when no clipboard tool is installed
+and the owner declines the install it offers, writes it to
+`build/apps-script/`, which git ignores, readable by the owner alone. It
+prints no key. crypto-price-filler reads `config-example.json`, its
 committed settings, with its own `config.json`, which git ignores, laid over
 them.
 
@@ -106,8 +129,9 @@ the rule from this repo (`crypto-price-fetchers/eslint-rules/no-secret-logging`)
 
 ## Tests
 
-The runner, the Node versions, the key store and the lint rule are tested
-from the repo's top folder, on Node's own test runner. The tests ask no
+The runner, the Node versions, the build step, the price clients, the key
+store and the lint rule are tested from the repo's top folder, on Node's
+own test runner. The tests ask no
 outside service: the scripts' requests go to a stand-in fetch or a stand-in
 server on the computer (`test/helpers/stand-in-web.js`). The key store's
 tests save keys in temp folders of their own
@@ -133,10 +157,11 @@ functions inside the scripts that the owner runs by hand. crypto-price-filler's
 
 - `sheets-script.js` runs a Sheets script, one file or several, in the
   test's thread with the runner's services. Its `UrlFetchApp` answers from
-  a function the test gives.
-- `fetch-with-retry.js` stands in for `fetchWithRetry`, the http layer of the
-  Node tool's price sources, and holds the hooks the getCryptoPrice tests
-  share.
+  a function the test gives, with any status, and the script's config is
+  set as its Node version sets it.
+- `stand-in-fetch.js` is a stand-in fetch for the Node tool's own sources:
+  the exchange sources, whose Sheets script then runs for real in its
+  worker, and the pool sources, whose shared clients then ask it.
 - `stand-in-fetch-preload.js` runs the real command line, `index.js`, in a
   child process against a stand-in MEXC, and a stand-in CoinGecko ping that
   takes the one key in `stand-in-coingecko-key.js`.

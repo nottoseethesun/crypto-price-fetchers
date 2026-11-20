@@ -186,11 +186,62 @@ describe("the services", () => {
     );
   });
 
+  it("check Moralis's key by asking its api version, which names no chain, with the key in the X-API-Key header and in no url", async () => {
+    const fetch = answering(200);
+    assert.equal(
+      await SERVICES.moralis.check("moralis-key", { fetch }),
+      "valid",
+    );
+    assert.equal(
+      fetch.requests[0].url,
+      "https://deep-index.moralis.io/api/v2.2/web3/version",
+    );
+    assert.equal(fetch.requests[0].url.includes("chain"), false);
+    assert.equal(fetch.requests[0].headers["x-api-key"], "moralis-key");
+    assert.equal(fetch.requests[0].url.includes("moralis-key"), false);
+    assert.equal(
+      await SERVICES.moralis.check("moralis-key", { fetch: answering(401) }),
+      "invalid",
+    );
+    await assert.rejects(
+      SERVICES.moralis.check("moralis-key", { fetch: answering(500) }),
+      /Moralis answered with status 500/,
+    );
+  });
+
+  it("check CoinPaprika's key at its paid server's key facts, as the whole Authorization header and in no url", async () => {
+    const fetch = answering(200);
+    assert.equal(
+      await SERVICES.coinpaprika.check("paprika-key", { fetch }),
+      "valid",
+    );
+    assert.equal(
+      fetch.requests[0].url,
+      "https://api-pro.coinpaprika.com/v1/key/info",
+    );
+    assert.equal(fetch.requests[0].headers.authorization, "paprika-key");
+    assert.equal(fetch.requests[0].url.includes("paprika-key"), false);
+    for (const status of [401, 403]) {
+      assert.equal(
+        await SERVICES.coinpaprika.check("paprika-key", {
+          fetch: answering(status),
+        }),
+        "invalid",
+      );
+    }
+    await assert.rejects(
+      SERVICES.coinpaprika.check("paprika-key", { fetch: answering(402) }),
+      /CoinPaprika answered with status 402/,
+    );
+  });
+
   it("are found by name, and an unknown name is refused, naming those known", () => {
     assert.equal(serviceNamed("dextools").name, "DexTools");
+    assert.equal(serviceNamed("moralis").name, "Moralis");
+    assert.equal(serviceNamed("coinpaprika").name, "CoinPaprika");
     assert.throws(
-      () => serviceNamed("moralis"),
-      /No service is named "moralis"; the services are coingecko, dextools, x1ninja/,
+      () => serviceNamed("dexscreener"),
+      /No service is named "dexscreener"; the services are coingecko, coinpaprika, dextools, moralis, x1ninja/,
     );
   });
 });
@@ -233,8 +284,8 @@ describe("a project's key list and key file", () => {
       /lists a service twice under apiKeys/,
     );
     assert.throws(
-      () => readNeededKeys(makeProject(["moralis"])),
-      /No service is named "moralis"/,
+      () => readNeededKeys(makeProject(["dexscreener"])),
+      /No service is named "dexscreener"/,
     );
   });
 
@@ -254,7 +305,7 @@ describe("a project's key list and key file", () => {
   it("list in this project's config.json the services its programs use", () => {
     assert.deepEqual(
       readNeededKeys(REPO_TOP).map((service) => service.service),
-      ["coingecko", "dextools", "x1ninja"],
+      ["coingecko", "coinpaprika", "dextools", "moralis", "x1ninja"],
     );
   });
 
@@ -476,11 +527,11 @@ describe("manage-api-keys.js, as a program", () => {
   });
 
   it("lists this project's keys and takes answers typed on its stdin: Enter alone skips each", () => {
-    const run = runProgram([], "\n\n\n");
+    const run = runProgram([], "\n\n\n\n\n");
     assert.equal(run.status, 0, run.stderr);
     assert.match(
       run.stdout,
-      /CoinGecko {2}not saved\n {2}DexTools {3}not saved\n {2}x1\.ninja {3}not saved\n$/,
+      /CoinGecko {4}not saved\n {2}CoinPaprika {2}not saved\n {2}DexTools {5}not saved\n {2}Moralis {6}not saved\n {2}x1\.ninja {5}not saved\n$/,
     );
     assert.match(
       run.stderr,
