@@ -232,6 +232,22 @@ A project runs it as `npm run github-project-deps -- main` or
 [Which version they install](docs/architecture.md#which-version-they-install)
 explains how it works.
 
+## Summ CSV files
+
+Summ, the crypto tax service, imports a CSV file in its own layout and
+takes what the file says as written. `summ-csv/` writes those files: it
+checks every row, such as one token per row and a contract address on
+every token, and writes nothing while any row breaks a rule. From the
+repo's top folder:
+
+```bash
+npm run summ-csv -- --rows rows.json --template advanced-template-reference.csv --out missing.csv
+```
+
+A program imports `writeSummCsv` from `crypto-price-fetchers/summ-csv`
+instead. [Its README](./summ-csv/README.md) gives the rules and the form of
+a row.
+
 ## Usage in Google Sheets
 
 Each Sheets script is pasted into a sheet's Apps Script project, best as
@@ -247,8 +263,8 @@ Its own documentation says how to call it from a cell:
 
 The repo's tests run on a computer, before every commit, in one gate,
 LP Ranger's: the lint, the tests of the runner, the Node versions, the
-build step, the price clients, the key store and the versions tool,
-crypto-price-filler's tests, and the security audits. From the repo's top folder:
+build step, the price clients, the key store, the versions tool and the
+Summ CSV writer, crypto-price-filler's tests, and the security audits. From the repo's top folder:
 
 ```bash
 npm ci

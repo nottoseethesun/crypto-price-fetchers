@@ -1,0 +1,10 @@
+{
+  "chains": {
+    "pulsechain": {
+      "ownCoin": "PLS",
+      "transactionHash": { "prefix": "0x", "alphabet": "hex", "length": 64 },
+      "address": { "prefix": "0x", "alphabet": "hex", "length": 40 }
+    }
+  },
+  "referencePriceCurrencies": ["USD"]
+}
