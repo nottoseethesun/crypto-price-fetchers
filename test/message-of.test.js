@@ -45,4 +45,10 @@ describe("messageOf", () => {
     )[0];
     assert.ok(packed.files.some((file) => file.path === "lib/message-of.js"));
   });
+
+  it("is exported, so a project that installs this repo imports this one copy", async () => {
+    const shared = await import("crypto-price-fetchers/lib/message-of");
+
+    assert.equal(shared.messageOf, messageOf);
+  });
 });

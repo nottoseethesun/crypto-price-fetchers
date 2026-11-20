@@ -118,7 +118,11 @@ clipboard, the install and the questions. The versions tool's tests run
 it on projects in temp folders, with a stand-in npm that writes the
 lockfile an install would (`test/helpers/github-project-deps-stand-ins.js`);
 git itself lists their package.json files, and npm's dry-run pack shows
-what the package ships for the bin. The Summ CSV writer's tests change one
+what the package ships for the bin. The shared helpers' tests ask npm's
+dry-run pack whether `lib/` ships, and import `messageOf` by the
+package's own name, `crypto-price-fetchers/lib/message-of`, which Node
+resolves through the package's `exports`, as it does in a project that
+installs this repo. The Summ CSV writer's tests change one
 value of a row that passes every rule, so each test reads one rule's
 problem (`test/helpers/summ-csv-rows.js`), read a copy of the owner's
 template (`test/fixtures/summ-template.csv`), and write their files in

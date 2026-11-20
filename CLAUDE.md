@@ -161,7 +161,8 @@ The runner, the Node versions, the build step, the price clients, the key
 store, the lint rule, the versions tool and the shared helpers in `lib/`
 are tested from the repo's top folder, on Node's own test runner. Code
 that more than one part uses lives once, in `lib/`, which ships with the
-package. The tests ask no
+package; `messageOf` is exported as `crypto-price-fetchers/lib/message-of`,
+for the projects that install this repo. The tests ask no
 outside service: the scripts' requests go to a stand-in fetch or a stand-in
 server on the computer (`test/helpers/stand-in-web.js`). The key store's
 tests save keys in temp folders of their own

@@ -43,6 +43,8 @@ An amount is decimal text, such as "12.5", or {"raw": "12500000",
 "decimals": 6}. Every problem in the rows is listed, and nothing is written
 while any stands. A file already at --out is written over only with
 --replace. summ-csv/README.md gives every rule.
+
+Exit codes: 0 when the file was written; 1 when it was not.
 `;
 
 /**
