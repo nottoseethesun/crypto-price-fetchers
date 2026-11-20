@@ -416,6 +416,24 @@ describe("a run", () => {
     assert.deepEqual(npm.calls, []);
   });
 
+  it("prints what a step throws, as lib/message-of.js gives it, and ends with exit code 1", async () => {
+    const npm = standInNpm();
+    const { exitCode, stderr } = await runOn(
+      makeTempFolder("thrown"),
+      ["main"],
+      {
+        runNpm: npm.runNpm,
+        listPackageFiles: () => {
+          throw "the list of package.json files could not be read";
+        },
+      },
+    );
+
+    assert.equal(exitCode, 1);
+    assert.equal(stderr, "the list of package.json files could not be read\n");
+    assert.deepEqual(npm.calls, []);
+  });
+
   it("explains each mode in its help", async () => {
     const { exitCode, stdout } = await runOn(
       makeTempFolder("help"),
