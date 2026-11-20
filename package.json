@@ -1,7 +1,7 @@
 {
   "name": "crypto-price-fetchers",
   "version": "1.0.0",
-  "description": "Node versions of the crypto price Sheets scripts, the runner that runs a Sheets script under Node, unchanged, the GeckoTerminal and Moralis clients for the prices of tokens that trade in pools, a store of api keys encrypted with a password, and the security lint's rule against printing a secret",
+  "description": "Node versions of the crypto price Sheets scripts, the runner that runs a Sheets script under Node, unchanged, the GeckoTerminal and Moralis clients for the prices of tokens that trade in pools, a store of api keys encrypted with a password, the security lint's rule against printing a secret, and a tool that sets a project's dependencies from GitHub to their main branch or latest release",
   "type": "module",
   "exports": {
     "./api-key-store": "./api-key-store/index.js",
@@ -11,11 +11,16 @@
     "./dex-prices/web-request": "./dex-prices/web-request.js",
     "./eslint-rules/no-secret-logging": "./eslint-rules/no-secret-logging.js"
   },
+  "bin": {
+    "github-project-deps": "github-project-deps.js"
+  },
   "files": [
     "api-key-store/",
     "apps-script-runner/",
     "dex-prices/",
     "eslint-rules/",
+    "github-project-deps.js",
+    "github-project-deps/",
     "unlock-api-keys.sh"
   ],
   "scripts": {

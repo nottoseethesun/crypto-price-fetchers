@@ -124,6 +124,12 @@ run in `fetch-from-centralized-exchange/crypto-price-filler/`, after
 
 ## See Also
 
+This repo's bin, `github-project-deps`, is no command of this repo: the
+projects that install this repo run it, as
+`npm run github-project-deps -- main` or `-- release`.
+
+- [Which version they install](architecture.md#which-version-they-install)
+  — what that bin does.
 - [`docs/engineering.md`](engineering.md) — the gates, the tests and CI.
 - [`docs/architecture.md`](architecture.md) — how the parts fit.
 - [LP Ranger's `docs/claude/CLAUDE-CI.md`](https://github.com/nottoseethesun/lp-ranger/blob/main/docs/claude/CLAUDE-CI.md)
