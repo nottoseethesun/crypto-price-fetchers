@@ -23,9 +23,11 @@
  *   plan in turn, 1.1 seconds apart, since the free plan takes one request
  *   a second: a 200 from any plan takes the key, and 403 from every plan
  *   refuses it.
- * - moralis: Moralis's price of Wrapped PLS on PulseChain, the request LP
- *   Ranger checks a Moralis key with, with the key in the `X-API-Key`
- *   header (`dex-prices/moralis.js`). 200 takes the key; 401 refuses it.
+ * - moralis: Moralis's api version (`/web3/version`), with the key in the
+ *   `X-API-Key` header (`dex-prices/moralis.js`). The request names no
+ *   chain, so the check holds for any chain a project prices on, and
+ *   Moralis refuses it without a key it knows. 200 takes the key; 401
+ *   refuses it.
  * - x1ninja: x1.ninja's XNT / USDC.X pool, the pool x1-validator-analytics
  *   prices XNT in, with the key as a bearer token. 200 takes the key; 401
  *   refuses it.
@@ -67,8 +69,8 @@ const DEXTOOLS_PLANS = Object.freeze([
 /** The time between two of the check's requests to DexTools, in milliseconds. */
 const DEXTOOLS_SPACING_MS = 1100;
 
-/** Moralis's price of Wrapped PLS on PulseChain, which a key must be able to read. */
-const MORALIS_PROBE = `${MORALIS_API_URL}/erc20/0xA1077a294dDE1B09bB078844df40758a5D0f9a27/price?chain=0x171`;
+/** Moralis's api version, which names no chain and which Moralis gives only for a key it knows. */
+const MORALIS_PROBE = `${MORALIS_API_URL}/web3/version`;
 
 /** x1.ninja's XNT / USDC.X pool, which a key must be able to read. */
 const X1_NINJA_POOL =
@@ -169,7 +171,7 @@ async function checkDexTools(key, options = {}) {
 }
 
 /**
- * Asks Moralis whether it takes a key, by reading a price with it.
+ * Asks Moralis whether it takes a key, by asking its api version with it.
  *
  * @param {string} key - The key
  * @param {CheckOptions} [options] - What a test replaces

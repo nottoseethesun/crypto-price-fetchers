@@ -186,7 +186,7 @@ describe("the services", () => {
     );
   });
 
-  it("check Moralis's key by reading Wrapped PLS's price with it, in the X-API-Key header and in no url", async () => {
+  it("check Moralis's key by asking its api version, which names no chain, with the key in the X-API-Key header and in no url", async () => {
     const fetch = answering(200);
     assert.equal(
       await SERVICES.moralis.check("moralis-key", { fetch }),
@@ -194,8 +194,9 @@ describe("the services", () => {
     );
     assert.equal(
       fetch.requests[0].url,
-      "https://deep-index.moralis.io/api/v2.2/erc20/0xA1077a294dDE1B09bB078844df40758a5D0f9a27/price?chain=0x171",
+      "https://deep-index.moralis.io/api/v2.2/web3/version",
     );
+    assert.equal(fetch.requests[0].url.includes("chain"), false);
     assert.equal(fetch.requests[0].headers["x-api-key"], "moralis-key");
     assert.equal(fetch.requests[0].url.includes("moralis-key"), false);
     assert.equal(

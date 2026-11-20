@@ -272,9 +272,9 @@ export function bestPool(pools, considered) {
  * @property {string} network - GeckoTerminal's id for the network, such as 'pulsechain'
  * @property {string} pool - The pool's address
  * @property {string} timeframe - 'minute', 'hour' or 'day'
- * @property {string} [token] - The pool's token to price: 'base', 'quote' or its address; GeckoTerminal's base when absent
+ * @property {(string|null)} [token] - The pool's token to price: 'base', 'quote' or its address; GeckoTerminal's base when absent or null
  * @property {string} [currency='usd'] - 'usd', or 'token' for the pool's other token
- * @property {number} [beforeSeconds] - Only candles that opened before this time, in unix seconds; the latest candles when absent
+ * @property {(number|null)} [beforeSeconds] - Only candles that opened before this time, in unix seconds; the latest candles when absent or null
  * @property {number} [limit=CANDLES_PER_REQUEST] - The most candles to give
  */
 
@@ -291,10 +291,12 @@ function candlesUrl(query, apiUrl) {
     limit: String(query.limit ?? CANDLES_PER_REQUEST),
     currency: query.currency ?? "usd",
   });
-  if (query.beforeSeconds !== undefined) {
+  if (query.beforeSeconds !== undefined && query.beforeSeconds !== null) {
     params.set("before_timestamp", String(query.beforeSeconds));
   }
-  if (query.token !== undefined) params.set("token", query.token);
+  if (query.token !== undefined && query.token !== null) {
+    params.set("token", query.token);
+  }
   return (
     `${apiUrl}/networks/${query.network}/pools/${query.pool}` +
     `/ohlcv/${query.timeframe}?${params}`

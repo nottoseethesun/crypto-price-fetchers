@@ -101,6 +101,25 @@ describe("candlePage", () => {
     assert.equal(params.has("token"), false);
   });
 
+  it("reads a null token or time as absent, and asks for the latest candles in GeckoTerminal's base", async () => {
+    const { settings, fetch } = standIn(() => ({
+      data: { attributes: { ohlcv_list: [] } },
+    }));
+    await candlePage(
+      {
+        network: "pulsechain",
+        pool: "0xpool",
+        timeframe: "hour",
+        token: null,
+        beforeSeconds: null,
+      },
+      settings,
+    );
+    const params = paramsOf(fetch.requests[0]);
+    assert.equal(params.has("before_timestamp"), false);
+    assert.equal(params.has("token"), false);
+  });
+
   it("drops candles it cannot read, and counts every candle sent", async () => {
     const { settings } = standIn(() => ({
       data: {
