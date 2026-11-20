@@ -33,6 +33,7 @@
  */
 
 import { Command, CommanderError } from "commander";
+import { messageOf } from "../lib/message-of.js";
 import { openSecretPrompt } from "./ask-password.js";
 import { checkPasswordOpensKeys, hasEncryptedKey } from "./key-file.js";
 import {
@@ -59,22 +60,6 @@ sets it for a terminal), else one typed.
 Exit codes:
   0  every key asked for is saved or skipped; check-password: the password opens the keys
   1  a key was not saved, the password does not open the keys, or the arguments were wrong`;
-
-/**
- * The message of something thrown.
- *
- * @param {*} thrown - What was thrown
- * @returns {string} Its message
- */
-function messageOf(thrown) {
-  if (
-    thrown !== null &&
-    typeof thrown === "object" &&
-    typeof thrown.message === "string"
-  )
-    return thrown.message;
-  return String(thrown);
-}
 
 /**
  * Runs `use` with the test's prompt, or with one prompt on the terminal

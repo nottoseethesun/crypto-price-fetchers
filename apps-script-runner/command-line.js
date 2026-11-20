@@ -35,6 +35,7 @@
 import fs from "node:fs";
 import { pathToFileURL } from "node:url";
 import { Command, CommanderError } from "commander";
+import { messageOf } from "../lib/message-of.js";
 import { layConfig, readConfigFile } from "./config-file.js";
 import { openAppsScript } from "./run-apps-script.js";
 
@@ -44,22 +45,6 @@ Exit codes:
   0  the script returned a number, printed on stdout
   1  the script returned something else, such as a message, printed on
      stderr; or the call failed; or the arguments were wrong`;
-
-/**
- * The message of something thrown.
- *
- * @param {*} thrown - What was thrown
- * @returns {string} Its message
- */
-function messageOf(thrown) {
-  if (
-    thrown !== null &&
-    typeof thrown === "object" &&
-    typeof thrown.message === "string"
-  )
-    return thrown.message;
-  return String(thrown);
-}
 
 /**
  * Opens the script, calls one of its functions, prints what it returned,

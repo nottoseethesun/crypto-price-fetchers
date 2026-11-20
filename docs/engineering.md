@@ -107,8 +107,8 @@ outside the computer, and neither reads the owner's key file or password.
 
 **The top folder's tests** (`test/`, Node's test runner) cover the runner,
 the Node versions, the build step, the price clients (`dex-prices/`), the
-key store, `no-secret-logging` and the versions tool
-(`github-project-deps/`). The scripts' and the clients' requests
+key store, `no-secret-logging`, the versions tool
+(`github-project-deps/`) and the shared helpers (`lib/`). The scripts' and the clients' requests
 go to a stand-in fetch or a stand-in server on the computer
 (`test/helpers/stand-in-web.js`; `test/helpers/gecko-terminal-stand-in.js`
 answers as GeckoTerminal does). The build step's tests stand in for the
