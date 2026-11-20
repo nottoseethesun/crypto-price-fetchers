@@ -217,6 +217,21 @@ clients, as `crypto-price-fetchers/dex-prices/geckoterminal`,
 `crypto-price-fetchers/apps-script-runner`, and the key store, as
 `crypto-price-fetchers/api-key-store`.
 
+## Projects that install this one
+
+A project that installs this repo from GitHub names it with a ref: `main`
+for its main branch, or `semver:*` for its latest release, the highest
+version tag. The project's lockfile keeps the commit the ref named when the
+lockfile was made, and `npm ci` installs that commit.
+
+This repo's bin, `github-project-deps`, sets every dependency a project
+installs from GitHub to one of the two, and makes the project's lockfiles
+again, so the newest commit of main, or the newest release, is installed.
+A project runs it as `npm run github-project-deps -- main` or
+`npm run github-project-deps -- release`; `--help` says more.
+[Which version they install](docs/architecture.md#which-version-they-install)
+explains how it works.
+
 ## Usage in Google Sheets
 
 Each Sheets script is pasted into a sheet's Apps Script project, best as
@@ -232,8 +247,8 @@ Its own documentation says how to call it from a cell:
 
 The repo's tests run on a computer, before every commit, in one gate,
 LP Ranger's: the lint, the tests of the runner, the Node versions, the
-build step, the price clients and the key store, crypto-price-filler's
-tests, and the security audits. From the repo's top folder:
+build step, the price clients, the key store and the versions tool,
+crypto-price-filler's tests, and the security audits. From the repo's top folder:
 
 ```bash
 npm ci

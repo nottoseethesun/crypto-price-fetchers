@@ -36,8 +36,9 @@ Two companion references sit alongside this one:
 ## The Parts
 
 The Sheets scripts do the pricing. The other parts run the scripts on a
-computer, price a whole CSV file, keep the api keys, and stop a key from
-being printed.
+computer, price a whole CSV file, keep the api keys, stop a key from being
+printed, and choose which version of this repo the projects that use it
+install.
 
 | Part | Where | What it is |
 | ---- | ----- | ---------- |
@@ -49,6 +50,7 @@ being printed.
 | The price clients | `dex-prices/` | Moralis and GeckoTerminal, which price a token from a blockchain's pools, and the one loop that sends a refused request again. |
 | The key store | `api-key-store/`, `manage-api-keys.js`, `unlock-api-keys.sh` | Api keys kept encrypted with a password: LP Ranger's design, as a module. |
 | The security lint's rule | `eslint-rules/no-secret-logging.js` | Refuses printing a name that may hold a secret. |
+| The versions tool | `github-project-deps.js`, `github-project-deps/` | The bin `github-project-deps`, which sets a project's dependencies from GitHub to their projects' main branch or latest release. |
 
 ---
 
@@ -238,15 +240,40 @@ The password is kept nowhere on disk, and the plain keys only in memory.
 ## Projects That Use This One
 
 pulsechain-analytics, pulsechain-validator-analytics and
-x1-validator-analytics install this repo from GitHub, pinned to a commit,
-as a dependency their `npm install` installs. pulsechain-analytics and
+x1-validator-analytics install this repo from GitHub, as a dependency
+their `npm install` installs. pulsechain-analytics and
 x1-validator-analytics use the key store, run `no-secret-logging` in their
 security lint, and keep a copy of `unlock-api-keys.sh`, which their tests
 hold to this one.
 pulsechain-analytics also runs a Sheets script of its own,
 `fetch-amount-of-token-transferred.gs`, through the runner; it calls
-nothing in this repo's Sheets scripts. A change here reaches them when they
-move the pin.
+nothing in this repo's Sheets scripts.
+
+### Which Version They Install
+
+A dependency installed from GitHub names its repo and a ref:
+`github:nottoseethesun/crypto-price-fetchers#main` names this repo's main
+branch, and `#semver:*` its latest release, the highest version tag. When
+npm makes a project's lockfile, it installs the commit the ref names at
+that moment, and the lockfile keeps that commit, which `npm ci` installs
+until the lockfile is made again. So a change here reaches a project once
+its lockfile is made again at a commit that has the change.
+
+The bin `github-project-deps` (`github-project-deps.js`,
+`github-project-deps/`) makes it again: a project runs it as
+`npm run github-project-deps -- main` or `-- release`. It sets every
+dependency the project installs from GitHub to the mode's ref, in each
+package.json the project's git keeps. Then, in each of those folders, it
+makes the lockfile again as LP Ranger makes one for a change of
+dependency: it deletes package-lock.json, then node_modules, and runs
+`npm install`. When an install fails, as it does for a release whose top
+folder has no package.json, such as this repo's 1.3.0, every package.json
+and package-lock.json goes back to what it held, and node_modules is
+installed again from them. The projects follow main, and the tool is
+optional: a project's committed lockfile already names a commit of this
+repo, which `npm ci` installs.
+
+### What Installing It Runs
 
 npm runs the `prepare` script of a package installed from git in each
 project that installs it, after installing that package's development

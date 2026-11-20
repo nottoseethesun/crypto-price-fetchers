@@ -34,10 +34,25 @@ thread. So the runner loads a script, one file or several in Apps Script's
 order, in a worker thread, with Node versions of the Apps Script services.
 It does each web request on the caller's thread, with the caller's fetch,
 while the worker blocks; the file headers in `apps-script-runner/` explain
-how. pulsechain-analytics installs this repo from GitHub, pinned to a
-commit, for the runner (`crypto-price-fetchers/apps-script-runner`), which
-runs pulsechain-analytics' own Sheets script. A change to the runner
-reaches it only when it moves the pin.
+how. pulsechain-analytics installs this repo from GitHub for the runner
+(`crypto-price-fetchers/apps-script-runner`), which runs
+pulsechain-analytics' own Sheets script. A change to the runner reaches it
+once its lockfile is made again, below.
+
+## The projects that install this repo
+
+pulsechain-analytics, pulsechain-validator-analytics and
+x1-validator-analytics install this repo from GitHub as
+`github:nottoseethesun/crypto-price-fetchers#main`, which follows main, or
+`#semver:*`, which follows the latest release, the highest version tag;
+their lockfiles keep the commit installed. The bin `github-project-deps`
+(`github-project-deps.js`, `github-project-deps/`) switches between the
+two, as each project's `npm run github-project-deps -- main|release`, and
+makes the lockfiles again, as LP Ranger's rule for a change of dependency
+says: package-lock.json deleted first, then node_modules, then
+`npm install`. The projects follow main; tags carry no `v`. The tool
+belongs here, once, since each project installs this repo: no project keeps
+a copy.
 
 ## Prices of tokens that trade in pools
 
@@ -130,8 +145,8 @@ the rule from this repo (`crypto-price-fetchers/eslint-rules/no-secret-logging`)
 ## Tests
 
 The runner, the Node versions, the build step, the price clients, the key
-store and the lint rule are tested from the repo's top folder, on Node's
-own test runner. The tests ask no
+store, the lint rule and the versions tool are tested from the repo's top
+folder, on Node's own test runner. The tests ask no
 outside service: the scripts' requests go to a stand-in fetch or a stand-in
 server on the computer (`test/helpers/stand-in-web.js`). The key store's
 tests save keys in temp folders of their own
