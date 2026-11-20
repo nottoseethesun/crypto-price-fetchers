@@ -51,7 +51,7 @@ install.
 | The key store | `api-key-store/`, `manage-api-keys.js`, `unlock-api-keys.sh` | Api keys kept encrypted with a password: LP Ranger's design, as a module. |
 | The security lint's rule | `eslint-rules/no-secret-logging.js` | Refuses printing a name that may hold a secret. |
 | The versions tool | `github-project-deps.js`, `github-project-deps/` | The bin `github-project-deps`, which sets a project's dependencies from GitHub to their projects' main branch or latest release. |
-| The shared helpers | `lib/` | Code more than one part uses: `messageOf`, which gives the message of something thrown, for the runner, the key store and the build step. |
+| The shared helpers | `lib/` | Code more than one part uses: `messageOf`, which gives the message of something thrown, for the runner, the key store, the build step and the versions tool. |
 
 ---
 

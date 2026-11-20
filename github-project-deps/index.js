@@ -44,6 +44,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync, spawn as nodeSpawn } from "node:child_process";
 import { Argument, Command, CommanderError } from "commander";
+import { messageOf } from "../lib/message-of.js";
 
 /** The ref each mode installs a GitHub project at. */
 export const MODE_REFS = Object.freeze({ main: "main", release: "semver:*" });
@@ -398,8 +399,7 @@ export async function runGithubProjectDeps(argv, project, deps = {}) {
     await program.parseAsync(argv);
   } catch (thrown) {
     if (thrown instanceof CommanderError) return thrown.exitCode;
-    if (!(thrown instanceof Error)) throw thrown;
-    run.tell(thrown.message);
+    run.tell(messageOf(thrown));
     return 1;
   }
   return exitCode;
