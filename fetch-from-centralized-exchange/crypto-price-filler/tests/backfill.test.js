@@ -6,10 +6,10 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   backfillPrices,
-  logv,
   isPriceEmpty,
   DEFAULT_COLUMNS,
 } from "../utils/backfill.js";
+import { logv } from "../utils/log.js";
 
 // Helper to create test rows
 function createRow(price, amount = "10") {

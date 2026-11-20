@@ -42,21 +42,10 @@ import {
 } from "../../../dex-prices/geckoterminal.js";
 import config from "../config.js";
 import { getCache, setCache } from "../utils/cache.js";
+import { logv } from "../utils/log.js";
 
 /** The timeframes whose candles price a time, in the order asked. */
 const TIMEFRAMES = Object.freeze(["minute", "hour"]);
-
-/**
- * Logs a message when verbose, at a level of one or more.
- *
- * @param {boolean} shouldLog - Whether to log
- * @param {number} level - The message's level
- * @param {string} message - The message
- */
-function logv(shouldLog, level, message) {
-  if (!shouldLog || level < 1) return;
-  console.log(`[VERBOSE:${level}] ${message}`);
-}
 
 /**
  * The pool to read a token's price from, and the token's side of it, from

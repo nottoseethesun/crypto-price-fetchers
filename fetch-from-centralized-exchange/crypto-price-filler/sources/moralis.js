@@ -30,18 +30,7 @@ import {
   priceAtBlock,
 } from "../../../dex-prices/moralis.js";
 import { getApiKey } from "../../../api-key-store/index.js";
-
-/**
- * Logs a message when verbose, at a level of one or more.
- *
- * @param {boolean} shouldLog - Whether to log
- * @param {number} level - The message's level
- * @param {string} message - The message
- */
-function logv(shouldLog, level, message) {
-  if (!shouldLog || level < 1) return;
-  console.log(`[VERBOSE:${level}] ${message}`);
-}
+import { logv } from "../utils/log.js";
 
 /**
  * A token that trades in pools, as `supported-tokens.json` names it.

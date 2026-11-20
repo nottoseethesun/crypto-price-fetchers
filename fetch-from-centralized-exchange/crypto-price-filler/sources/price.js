@@ -19,19 +19,8 @@ import { getPriceFromGeckoTerminal } from "./geckoterminal.js";
 import { exchangeSources } from "./exchange.js";
 import { getCache, setCache } from "../utils/cache.js";
 import { parseInputToUtcMs } from "../utils/date.js";
+import { logv } from "../utils/log.js";
 import fs from "fs";
-
-/**
- * Helper logging function.
- * @param {boolean} shouldLog - Whether to log
- * @param {number} level - Log level
- * @param {string} message - Message to log
- * @param {...*} args - Additional arguments
- */
-function logv(shouldLog, level, message, ...args) {
-  if (!shouldLog || level < 1) return;
-  console.log(`[VERBOSE:${level}] ${message}`, ...args);
-}
 
 /**
  * Reads the pool facts of a token's entry: its contract, and the ids

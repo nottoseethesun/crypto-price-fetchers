@@ -312,7 +312,8 @@ import { closeExchangeSources } from "./sources/exchange.js";
 import config from "./config.js";
 import { getCache, setCache } from "./utils/cache.js";
 import { getProgressBar } from "./utils/progress.js";
-import { backfillPrices, logv } from "./utils/backfill.js";
+import { backfillPrices } from "./utils/backfill.js";
+import { logv } from "./utils/log.js";
 import { fileURLToPath } from "url";
 import { unlockProjectKeys } from "../../api-key-store/index.js";
 

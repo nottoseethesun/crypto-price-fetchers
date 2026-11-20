@@ -25,16 +25,18 @@
 
 import { openCentralizedExchangeSources } from "../../getCryptoPriceFromCentralizedExchange.js";
 import { getApiKey } from "../../../api-key-store/index.js";
+import { logv } from "../utils/log.js";
 
 /** The script as it opens, from the first price asked; null until then, and once closed. */
 let opening = null;
 
 /**
- * Prints a line the script logged, marked as the script's.
+ * Prints a line the script logged, marked as the script's, in the verbose
+ * log's second level.
  * @param {{text: string}} line - The line
  */
 function printScriptLine({ text }) {
-  console.log(`[VERBOSE:2] [Sheets script] ${text}`);
+  logv(true, 2, `[Sheets script] ${text}`);
 }
 
 /**
