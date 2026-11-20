@@ -30,23 +30,26 @@ Each script fits one need: the price now or at a past time, in a sheet or
 on a computer.
 
 `crypto-price-fetchers.gs` is a Google Apps Script that gives a token's
-current price, and its fully diluted value. It asks DexTools, so it covers
+current price, and its fully diluted value. It asks DexTools, a service
+that prices tokens from the pools of decentralized exchanges, so it covers
 tokens on the chains DexTools lists, such as PulseChain, Ethereum and
-Solana. For X1, which DexTools does not list, it asks x1.ninja instead. The
-file's header says how to use it.
+Solana. For X1, which DexTools does not list, it asks x1.ninja, a service
+that does the same for X1, instead. The file's header says how to use it.
 
 `fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.gs`,
 with its price sources in `getCryptoPriceFromCentralizedExchange-sources.gs`
 beside it, is a Google Apps Script that gives a token's high, low or
-closing price at a past time, as recent as a minute ago. It asks MEXC,
-then CoinGecko, then CoinPaprika, so it covers the tokens they price.
-Within Apps Script's limits, it handles about 100 calls at a time.
+closing price at a past time, as recent as a minute ago. It asks MEXC, a
+centralized exchange, then CoinGecko, then CoinPaprika, two services that
+gather the exchanges' prices, so it covers the tokens they price. Within
+Apps Script's limits, it handles about 100 calls at a time.
 
-`fetch-from-centralized-exchange/crypto-price-filler/index.js` does that
-job on a computer, for a CSV file of any length: it fills in the price of
-each row. It asks the exchange script's own three price sources, run under
-Node, and, for a token that trades in pools, Moralis and GeckoTerminal
-first (see [Tokens that trade in pools](#tokens-that-trade-in-pools)). It
+crypto-price-filler, `fetch-from-centralized-exchange/crypto-price-filler/index.js`,
+does that job on a computer, for a CSV file of any length: it fills in the
+price of each row. It asks the exchange script's own three price sources,
+run under Node, and, for a token that trades in pools, Moralis and
+GeckoTerminal first, two services that price a token from its chain's
+pools (see [Tokens that trade in pools](#tokens-that-trade-in-pools)). It
 runs outside Apps Script, so Apps Script's limits do not apply to it.
 
 `crypto-price-fetchers.js` and
@@ -72,8 +75,10 @@ npm ci --prefix fetch-from-centralized-exchange/crypto-price-filler
 ### 2. The api keys
 
 The keys the tools send are kept in `api-keys.json` at the repo's top,
-which git ignores, encrypted with one password you choose, as LP Ranger
-keeps its keys. The top `config.json` lists the services they are for:
+which git ignores, encrypted with one password you choose, by this repo's
+key store, `api-key-store/`, which keeps keys as LP Ranger, the owner's bot
+that manages his 9mm V3 liquidity positions, keeps its own. The top
+`config.json` lists the services they are for:
 
 | Service     | What it prices                                                          | Without a key                      |
 | ----------- | ----------------------------------------------------------------------- | ---------------------------------- |
@@ -83,7 +88,8 @@ keeps its keys. The top `config.json` lists the services they are for:
 | DexTools    | Current prices and fully diluted values, for `crypto-price-fetchers.gs` | No price: DexTools needs a key     |
 | x1.ninja    | The same, on X1                                                         | No price: x1.ninja needs a key     |
 
-To save them, from the repo's top folder:
+`npm run api-keys` runs the key store's manager, `manage-api-keys.js`. To
+save the keys, from the repo's top folder:
 
 ```bash
 npm run api-keys
@@ -96,7 +102,7 @@ takes it; Enter alone skips one. `npm run api-keys -- set coinpaprika`
 replaces one.
 
 To keep the password for a terminal, so the tools open their keys without
-asking:
+asking, run `unlock-api-keys.sh`, a script in the repo's top folder:
 
 ```bash
 source ./unlock-api-keys.sh
@@ -113,8 +119,9 @@ see [its README](./api-key-store/README.md).
 ### 3. The Sheets scripts, with their keys
 
 A Sheets script runs in Google's Apps Script, which cannot read the key
-file, so the keys go into the script you paste. The build step writes them
-in, so no key is typed into a script by hand:
+file, so the keys go into the script you paste. This repo's build step,
+`build.js` with `apps-script-build/`, writes them in, so no key is typed
+into a script by hand:
 
 ```bash
 npm run build apps-script
@@ -219,10 +226,14 @@ clients, as `crypto-price-fetchers/dex-prices/geckoterminal`,
 
 ## Projects that install this one
 
-A project that installs this repo from GitHub names it with a ref: `main`
-for its main branch, or `semver:*` for its latest release, the highest
-version tag. The project's lockfile keeps the commit the ref named when the
-lockfile was made, and `npm ci` installs that commit.
+Three of the owner's projects install this repo from GitHub:
+pulsechain-analytics, his tools for questions about PulseChain;
+pulsechain-validator-analytics, for his PulseChain validators' withdrawal
+addresses and payments; and x1-validator-analytics, for his X1
+validator's rewards. A project that installs this repo names it with a
+ref: `main` for its main branch, or `semver:*` for its latest release, the
+highest version tag. The project's lockfile keeps the commit the ref
+named when the lockfile was made, and `npm ci` installs that commit.
 
 This repo's bin, `github-project-deps`, sets every dependency a project
 installs from GitHub to one of the two, and makes the project's lockfiles

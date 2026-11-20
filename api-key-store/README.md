@@ -1,9 +1,11 @@
 # api-key-store
 
 An api key must not be committed, and should not sit on disk in plain
-text. This module keeps a project's api keys in a JSON file git ignores,
-each encrypted with one password the owner types. It is LP Ranger's way of
-keeping its api keys, as a module any Node project can use.
+text. This module, part of crypto-price-fetchers, the owner's repo of code
+his projects share, keeps a project's api keys in a JSON file git ignores,
+each encrypted with one password the owner types. It is the way LP Ranger,
+the owner's bot that manages his 9mm V3 liquidity positions, keeps its api
+keys, as a module any Node project can use.
 
 ## How it keeps a key
 

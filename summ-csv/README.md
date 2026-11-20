@@ -2,8 +2,9 @@
 
 Summ, the crypto tax service, imports a csv file in its own layout, and
 takes whatever the file says: a token named wrongly, an amount rounded, or
-gas on two rows reaches the books as written. This utility writes those
-files. It checks every row against the rules below and writes nothing while
+gas on two rows reaches the books as written. This utility, part of
+crypto-price-fetchers, the owner's repo of code his projects share, writes
+those files. It checks every row against the rules below and writes nothing while
 any row breaks one, naming each problem and its row. Every csv for Summ is
 made with it, by `npm run summ-csv` or from a Node program, rather than by
 a script written for the occasion, so every file passes the same checks.

@@ -13,15 +13,17 @@ It prices two kinds of token, each where it trades:
 
 - A coin that trades on centralized exchanges rather than in pools, such
   as Bitcoin and Monero, has no pool for a pool's price service to read.
-  The tool asks MEXC, then CoinGecko, then CoinPaprika, through the price
-  sources of the Sheets script beside this folder,
+  The tool asks MEXC, a centralized exchange, then CoinGecko, then
+  CoinPaprika, two services that gather the exchanges' prices, through the
+  price sources of the Sheets script beside this folder,
   `getCryptoPriceFromCentralizedExchange-sources.gs`, which it runs
   unchanged under Node (`sources/exchange.js`), so the sheet and the tool
   price alike.
 - A token that trades in a blockchain's pools, such as HEX on PulseChain,
   is asked of Moralis first, when a Moralis key is saved, then of
-  GeckoTerminal, as LP Ranger asks them, and then of CoinGecko and
-  CoinPaprika. Its entry in `supported-tokens.json` names its contract and
+  GeckoTerminal, two services that price a token from its chain's pools,
+  in the order LP Ranger, the owner's bot that manages his 9mm V3
+  liquidity positions, asks them, and then of CoinGecko and CoinPaprika. Its entry in `supported-tokens.json` names its contract and
   its chain's ids.
 
 The order of the sources, and what each gives, is in the file header of
@@ -38,9 +40,9 @@ NodeJS 22+
 
 ## Installation
 
-The tool uses the repo's runner and key store, from the repo's top
-folder, so it needs the packages of both folders. From the repo's top
-folder:
+The tool uses the runner and the key store of crypto-price-fetchers, the
+repo this folder is in, from the repo's top folder, so it needs the
+packages of both folders. From the repo's top folder:
 
 ```bash
 npm ci
@@ -59,7 +61,8 @@ The exchange sources run on the Sheets script's own settings, its `CONFIG`.
 
 The api keys are no settings: the CoinGecko, CoinPaprika and Moralis keys
 are kept in `api-keys.json` at the repo's top, encrypted with a password you
-choose. To save them, from the repo's top folder:
+choose, by the repo's key store, whose key manager `npm run api-keys` runs.
+To save them, from the repo's top folder:
 
 ```bash
 npm run api-keys
@@ -125,7 +128,8 @@ this one's with at least 80% of lines covered, and the security audits.
 
 ### Test
 
-vitest loads each file through its own module loader, which finds imports
+The tests run on vitest, a test runner. vitest loads each file through its
+own module loader, which finds imports
 that Node itself does not. So the tests can pass while `index.js` fails to
 start under Node, for example after a wrong `import`. `test:strict` first
 starts the real command line with `--help`, then runs the tests, so such

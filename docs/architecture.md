@@ -5,9 +5,11 @@ by itself, in USD: the price now, from a pool on a decentralized exchange,
 and the price at a past minute, from centralized exchanges and, for a token
 that trades in pools, from the services that price those pools. It does so
 in Google Sheets, as Apps Script, and on a computer, as Node programs that
-run the same scripts. Three other projects build on it:
-pulsechain-analytics, pulsechain-validator-analytics and
-x1-validator-analytics.
+run the same scripts. Three other projects of the owner's build on it:
+pulsechain-analytics, his tools for questions about PulseChain;
+pulsechain-validator-analytics, for his PulseChain validators' withdrawal
+addresses and payments; and x1-validator-analytics, for his X1
+validator's rewards.
 
 Two companion references sit alongside this one:
 
@@ -39,7 +41,10 @@ Two companion references sit alongside this one:
 The Sheets scripts do the pricing. The other parts run the scripts on a
 computer, price a whole CSV file, keep the api keys, stop a key from being
 printed, choose which version of this repo the projects that use it
-install, and write the CSV files the owner imports into Summ.
+install, and write the CSV files the owner imports into Summ, the crypto
+tax calculator he keeps his books in. The key store and the price
+clients' order follow LP Ranger, the owner's bot that manages his 9mm V3
+liquidity positions.
 
 | Part | Where | What it is |
 | ---- | ----- | ---------- |
@@ -63,16 +68,19 @@ A Sheets script is Google Apps Script: JavaScript that runs on Google's
 servers, inside a spreadsheet, where a cell calls one of its functions.
 
 `crypto-price-fetchers.gs` gives a token's current price and its fully
-diluted value, from DexTools for the chains DexTools covers, and from
-x1.ninja for X1, which DexTools does not list. A cell names the chain and the
-token, or a pool.
+diluted value, from DexTools, a service that prices tokens from the pools
+of decentralized exchanges, for the chains DexTools covers, and from
+x1.ninja, which does the same for X1, which DexTools does not list. A cell
+names the chain and the token, or a pool.
 
 `getCryptoPriceFromCentralizedExchange.gs` gives a token's price at a past
-minute: the candle's high, low or close, from MEXC first, then CoinGecko,
-then CoinPaprika. Apps Script runs the calls of many cells at the same
-time. The script's lock makes those calls take turns at the services, and
-its cache answers a question already asked without asking again. So a
-sheet full of cells keeps within the services' rate limits. The script is
+minute: the candle's high, low or close, from MEXC, a centralized
+exchange, first, then CoinGecko, then CoinPaprika, two services that
+gather the exchanges' prices. Apps Script runs the calls of many cells at
+the same time. The script's lock makes those calls take turns at the
+services, and its cache answers a question already asked without asking
+again. So a sheet full of cells keeps within the services' rate limits.
+The script is
 in three files, which Apps Script loads into one scope: the function and
 its settings, the price sources (`-sources.gs`), and the tests run from the
 editor (`-tests.gs`). Each file names what it uses from the others in a
@@ -227,9 +235,9 @@ each opens a file the other wrote.
 - `npm run api-keys`, the key manager (`key-manager.js`), lists the keys,
   saved or not, never showing a key's characters, and saves each key typed
   once its service takes it (`services.js` holds each service's check).
-- `source ./unlock-api-keys.sh` asks for the password once, checks that it
-  opens the keys saved, and keeps it for that terminal in
-  `API_KEYS_PASSWORD`.
+- `source ./unlock-api-keys.sh`, a script in the repo's top folder, asks
+  for the password once, checks that it opens the keys saved, and keeps it
+  for that terminal in `API_KEYS_PASSWORD`.
 - A program calls `unlockProjectKeys` as it starts. It opens the keys it
   uses with that password, or asks for one, has each service check its key,
   and keeps the keys in memory for the run (`key-holder.js`). A key a
@@ -284,15 +292,23 @@ a file from its own code.
 
 ## Projects That Use This One
 
-pulsechain-analytics, pulsechain-validator-analytics and
-x1-validator-analytics install this repo from GitHub, as a dependency
-their `npm install` installs. pulsechain-analytics and
-x1-validator-analytics use the key store, run `no-secret-logging` in their
-security lint, and keep a copy of `unlock-api-keys.sh`, which their tests
-hold to this one.
-pulsechain-analytics also runs a Sheets script of its own,
-`fetch-amount-of-token-transferred.gs`, through the runner; it calls
-nothing in this repo's Sheets scripts.
+Three of the owner's projects install this repo from GitHub, as a
+dependency their `npm install` installs:
+
+- pulsechain-analytics, his tools for questions about PulseChain, runs a
+  Sheets script of its own, `fetch-amount-of-token-transferred.gs`,
+  through the runner, and calls nothing in this repo's Sheets scripts. Its
+  ratio chart asks GeckoTerminal through the GeckoTerminal client, and its
+  Summ sweep writes its CSV through the Summ CSV writer.
+- pulsechain-validator-analytics, for his PulseChain validators'
+  withdrawal addresses and payments, sends no key today, and keeps the key
+  store ready.
+- x1-validator-analytics, for his X1 validator's rewards, prices each
+  reward through the GeckoTerminal client.
+
+All three use the key store, run `no-secret-logging` in their security
+lint, keep a copy of `unlock-api-keys.sh`, which their tests hold to this
+one, and run the versions tool.
 
 ### Which Version They Install
 

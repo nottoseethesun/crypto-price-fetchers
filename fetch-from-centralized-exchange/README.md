@@ -7,15 +7,17 @@
 This directory contains utilities for fetching historical
 cryptocurrency prices in USD. They are built for tokens that trade
 on centralized exchanges (CEXs), such as Bitcoin (BTC), Monero (XMR)
-and Tari (XTM), and crypto-price-filler prices tokens that trade in
-a blockchain's pools as well.
+and Tari (XTM), and crypto-price-filler, the Node tool here that fills a
+CSV's price columns, prices tokens that trade in a blockchain's pools as
+well.
 
 A token that trades only on centralized exchanges has no pool, so its
 price has to come from an exchange's API, or from a service that
-gathers the exchanges' prices: MEXC's first, then CoinGecko's, then
-CoinPaprika's. A token that trades in pools, such as HEX on
-PulseChain, is priced from the pools: crypto-price-filler asks
-Moralis and GeckoTerminal for it before those three.
+gathers the exchanges' prices: the API of MEXC, an exchange, first, then
+those of CoinGecko and CoinPaprika, two such services. A token that
+trades in pools, such as HEX on PulseChain, is priced from the pools:
+crypto-price-filler asks Moralis and GeckoTerminal, two services that
+price a token from its chain's pools, for it before those three.
 
 ## Tools
 
