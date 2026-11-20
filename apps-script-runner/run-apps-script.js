@@ -35,28 +35,13 @@
 
 import { fileURLToPath } from "node:url";
 import { MessageChannel, Worker } from "node:worker_threads";
+import { messageOf } from "../lib/message-of.js";
 
 /** The worker thread's entry point. */
 const SCRIPT_WORKER = new URL("./script-worker.js", import.meta.url);
 
 /** How long a request may take before it counts as having no response, in milliseconds. */
 export const DEFAULT_REQUEST_TIMEOUT_MS = 60000;
-
-/**
- * The message of something thrown.
- *
- * @param {*} thrown - What was thrown
- * @returns {string} Its message
- */
-function messageOf(thrown) {
-  if (
-    thrown !== null &&
-    typeof thrown === "object" &&
-    typeof thrown.message === "string"
-  )
-    return thrown.message;
-  return String(thrown);
-}
 
 /**
  * Does one request with the caller's fetch, and returns the answer the

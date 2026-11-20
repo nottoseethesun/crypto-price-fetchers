@@ -42,6 +42,7 @@ import {
   receiveMessageOnPort,
   workerData,
 } from "node:worker_threads";
+import { messageOf } from "../lib/message-of.js";
 import { createAppsScriptServices } from "./apps-script-services.js";
 import {
   applyConfig,
@@ -60,22 +61,6 @@ const requestPort = workerData.requestPort;
 
 /** The number of the latest request. */
 let requestNumber = 0;
-
-/**
- * The message of something thrown, from any realm.
- *
- * @param {*} thrown - What was thrown
- * @returns {string} Its message
- */
-function messageOf(thrown) {
-  if (
-    thrown !== null &&
-    typeof thrown === "object" &&
-    typeof thrown.message === "string"
-  )
-    return thrown.message;
-  return String(thrown);
-}
 
 /**
  * Takes the answers waiting on the request port, and returns the one to

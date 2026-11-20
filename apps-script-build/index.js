@@ -47,6 +47,7 @@ import {
 } from "../apps-script-runner/config-file.js";
 import { APPS_SCRIPT_BUILD as DEXTOOLS_SCRIPT } from "../crypto-price-fetchers.js";
 import { APPS_SCRIPT_BUILD as EXCHANGE_SCRIPT } from "../fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.js";
+import { messageOf } from "../lib/message-of.js";
 import { builtFiles } from "./built-script.js";
 import {
   copyToClipboard,
@@ -79,16 +80,6 @@ keeps it for a terminal), or else one asked for. No line printed shows a
 key: each file goes to the clipboard, which is cleared after the last, or,
 with no clipboard tool installed and none installed when offered, to a
 file in ${BUILD_FOLDER}/ that only you can read.`;
-
-/**
- * The message of a thrown value.
- *
- * @param {*} thrown - What was thrown
- * @returns {string} Its message
- */
-function messageOf(thrown) {
-  return thrown instanceof Error ? thrown.message : String(thrown);
-}
 
 /**
  * Asks a question at the terminal and gives the line typed.

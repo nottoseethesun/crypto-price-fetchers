@@ -21,6 +21,7 @@
     "eslint-rules/",
     "github-project-deps.js",
     "github-project-deps/",
+    "lib/",
     "unlock-api-keys.sh"
   ],
   "scripts": {
