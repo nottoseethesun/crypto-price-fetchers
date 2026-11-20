@@ -14,12 +14,18 @@
  *
  * - coingecko: CoinGecko's ping, with the key in the `x-cg-demo-api-key`
  *   header. 200 takes the key; 400 and 401 refuse it.
+ * - coinpaprika: the facts CoinPaprika's paid server gives about a key
+ *   (`/key/info`), with the key as the whole `Authorization` header, as
+ *   its paid plans take it. 200 takes the key; 401 and 403 refuse it.
  * - dextools: DexTools' list of blockchains, with the key in the
  *   `X-API-Key` header. DexTools serves each plan at its own path and
  *   answers 403 for a key that plan does not know, so the check asks each
  *   plan in turn, 1.1 seconds apart, since the free plan takes one request
  *   a second: a 200 from any plan takes the key, and 403 from every plan
  *   refuses it.
+ * - moralis: Moralis's price of Wrapped PLS on PulseChain, the request LP
+ *   Ranger checks a Moralis key with, with the key in the `X-API-Key`
+ *   header (`dex-prices/moralis.js`). 200 takes the key; 401 refuses it.
  * - x1ninja: x1.ninja's XNT / USDC.X pool, the pool x1-validator-analytics
  *   prices XNT in, with the key as a bearer token. 200 takes the key; 401
  *   refuses it.
@@ -32,6 +38,8 @@
  * `config.json` (`project-keys.js`).
  */
 
+import { MORALIS_API_URL, MORALIS_KEY_HEADER } from "../dex-prices/moralis.js";
+
 /** How long a service has to answer a check, in milliseconds. */
 const CHECK_TIMEOUT_MS = 15000;
 
@@ -40,6 +48,9 @@ export const COINGECKO_KEY_HEADER = "x-cg-demo-api-key";
 
 /** CoinGecko's ping. */
 const COINGECKO_PING = "https://api.coingecko.com/api/v3/ping";
+
+/** What CoinPaprika's paid server says of the key it is sent. */
+const COINPAPRIKA_KEY_INFO = "https://api-pro.coinpaprika.com/v1/key/info";
 
 /** DexTools' api, which serves each plan at its own path. */
 const DEXTOOLS_API = "https://public-api.dextools.io";
@@ -55,6 +66,9 @@ const DEXTOOLS_PLANS = Object.freeze([
 
 /** The time between two of the check's requests to DexTools, in milliseconds. */
 const DEXTOOLS_SPACING_MS = 1100;
+
+/** Moralis's price of Wrapped PLS on PulseChain, which a key must be able to read. */
+const MORALIS_PROBE = `${MORALIS_API_URL}/erc20/0xA1077a294dDE1B09bB078844df40758a5D0f9a27/price?chain=0x171`;
 
 /** x1.ninja's XNT / USDC.X pool, which a key must be able to read. */
 const X1_NINJA_POOL =
@@ -113,6 +127,24 @@ async function checkCoinGecko(key, options = {}) {
 }
 
 /**
+ * Asks CoinPaprika's paid server whether it takes a key.
+ *
+ * @param {string} key - The key
+ * @param {CheckOptions} [options] - What a test replaces
+ * @returns {Promise<string>} 'valid' or 'invalid'
+ * @throws {Error} When CoinPaprika does not answer, or answers with another status
+ */
+async function checkCoinPaprika(key, options = {}) {
+  const status = await statusOf(options, COINPAPRIKA_KEY_INFO, {
+    Authorization: key,
+    Accept: "application/json",
+  });
+  if (status === 200) return "valid";
+  if (status === 401 || status === 403) return "invalid";
+  throw new Error(`CoinPaprika answered with status ${status}`);
+}
+
+/**
  * Asks DexTools, plan by plan, whether one of its plans takes a key.
  *
  * @param {string} key - The key
@@ -134,6 +166,24 @@ async function checkDexTools(key, options = {}) {
       throw new Error(`DexTools answered with status ${status}`);
   }
   return "invalid";
+}
+
+/**
+ * Asks Moralis whether it takes a key, by reading a price with it.
+ *
+ * @param {string} key - The key
+ * @param {CheckOptions} [options] - What a test replaces
+ * @returns {Promise<string>} 'valid' or 'invalid'
+ * @throws {Error} When Moralis does not answer, or answers with another status
+ */
+async function checkMoralis(key, options = {}) {
+  const status = await statusOf(options, MORALIS_PROBE, {
+    [MORALIS_KEY_HEADER]: key,
+    Accept: "application/json",
+  });
+  if (status === 200) return "valid";
+  if (status === 401) return "invalid";
+  throw new Error(`Moralis answered with status ${status}`);
 }
 
 /**
@@ -170,10 +220,20 @@ export const SERVICES = Object.freeze({
     name: "CoinGecko",
     check: checkCoinGecko,
   }),
+  coinpaprika: Object.freeze({
+    service: "coinpaprika",
+    name: "CoinPaprika",
+    check: checkCoinPaprika,
+  }),
   dextools: Object.freeze({
     service: "dextools",
     name: "DexTools",
     check: checkDexTools,
+  }),
+  moralis: Object.freeze({
+    service: "moralis",
+    name: "Moralis",
+    check: checkMoralis,
   }),
   x1ninja: Object.freeze({
     service: "x1ninja",

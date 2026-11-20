@@ -5,24 +5,25 @@
 **USE AT YOUR OWN RISK: SEE LICENSE FILE IN PARENT DIRECTORY.**
 
 This directory contains utilities for fetching historical
-cryptocurrency prices from centralized exchanges (CEXs).
-These tools are designed for tokens that don't trade on
-decentralized exchanges, such as Bitcoin (BTC), Monero (XMR),
-and Tari (XTM).
+cryptocurrency prices in USD. They are built for tokens that trade
+on centralized exchanges (CEXs), such as Bitcoin (BTC), Monero (XMR)
+and Tari (XTM), and crypto-price-filler prices tokens that trade in
+a blockchain's pools as well.
 
-A token that trades in a decentralized exchange's pool can be
-priced from the pool, through DexScreener's or DexTools' API. A
-token that trades only on centralized exchanges has no pool, so
-its price has to come from an exchange's API: MEXC's first, then
-CoinGecko's or CoinPaprika's.
+A token that trades only on centralized exchanges has no pool, so its
+price has to come from an exchange's API, or from a service that
+gathers the exchanges' prices: MEXC's first, then CoinGecko's, then
+CoinPaprika's. A token that trades in pools, such as HEX on
+PulseChain, is priced from the pools: crypto-price-filler asks
+Moralis and GeckoTerminal for it before those three.
 
 ## Tools
 
-This directory contains two separate implementations for
-different use cases, and a Node version of the first:
+This directory contains two tools for different uses, and a Node
+version of the first:
 
 | Tool                                | Use Case                          | Capacity              |
-|-------------------------------------|-----------------------------------|-----------------------|
+| ----------------------------------- | --------------------------------- | --------------------- |
 | **Google Apps Script**              | Google Sheets                     | ~100 calls per run    |
 | **Node.js CLI**                     | Batch processing CSVs             | Thousands of rows     |
 | **Node version of the Apps Script** | Node programs and one-off lookups | No Apps Script limits |
@@ -31,10 +32,11 @@ different use cases, and a Node version of the first:
 
 ### 1. Google Apps Script (`getCryptoPriceFromCentralizedExchange.gs`)
 
-A custom `=getCryptoPrice()` function for Google Sheets. It asks
-MEXC for the price first, then CoinGecko, then CoinPaprika. It
-caches each answer, and its lock makes the calls of many cells
-take turns, so a sheet stays within each service's rate limit.
+A custom `=getCryptoPrice()` function for Google Sheets, which gives
+the high, the low or the close of the period around a time. It asks
+MEXC for the price first, then CoinGecko, then CoinPaprika. It caches
+each answer, and its lock makes the calls of many cells take turns,
+so a sheet stays within each service's rate limit.
 
 The script is in three files, each pasted into a script file of its own in
 Apps Script, which loads a project's script files into one scope:
@@ -47,24 +49,34 @@ Apps Script, which loads a project's script files into one scope:
   the tests to run from the Apps Script editor, which the sheet does not
   need.
 
-For detailed usage, installation, configuration, and data-source
-documentation, see the file header in
+The repo's build step, `npm run build apps-script`, gives the three files
+one at a time on the clipboard, with the CoinGecko and CoinPaprika keys
+saved in the repo set at the end of the first, and says where to paste
+each: see [Install](../README.md#3-the-sheets-scripts-with-their-keys) in
+the repo's README. Pasted as committed, the script asks both services
+without a key.
+
+For detailed usage, configuration, and data-source documentation, see the
+file header in
 [`getCryptoPriceFromCentralizedExchange.gs`](./getCryptoPriceFromCentralizedExchange.gs).
 
 ---
 
 ### 2. Node.js CLI (`crypto-price-filler/`)
 
-A command-line tool for batch processing CSV files with
-thousands of timestamps, using the same multi-provider
-fallback chain.
+A command-line tool for batch processing CSV files with thousands of
+timestamps. For a token that trades in pools, it asks Moralis and
+GeckoTerminal first; for every token, it then asks MEXC, CoinGecko and
+CoinPaprika through the Apps Script's own price sources, run unchanged
+under Node, so the sheet and the tool price alike.
 
 For detailed documentation, see the file header in
 [`crypto-price-filler/index.js`](./crypto-price-filler/index.js)
 and
 [`crypto-price-filler/README.md`](./crypto-price-filler/README.md).
-It sends the CoinGecko demo key saved, encrypted, in the repo's key file:
-see [Api keys](../README.md#api-keys) in the repo's README.
+It sends the CoinGecko, CoinPaprika and Moralis keys saved, encrypted, in
+the repo's key file: see [The api keys](../README.md#2-the-api-keys) in
+the repo's README.
 
 ---
 
@@ -78,9 +90,9 @@ command line:
 node getCryptoPriceFromCentralizedExchange.js xtm "2026-01-15 14:30:00" --tz CST --mode low
 ```
 
-It sends the CoinGecko demo key saved, encrypted, in the repo's key file
-([Api keys](../README.md#api-keys)), asking for its password first. Install
-and the rest are in the
+It sends the CoinGecko and CoinPaprika keys saved, encrypted, in the
+repo's key file ([The api keys](../README.md#2-the-api-keys)), asking for
+its password first. The rest is in the
 [repo's README](../README.md#node-versions-of-the-sheets-scripts), and the
 file header in
 [`getCryptoPriceFromCentralizedExchange.js`](./getCryptoPriceFromCentralizedExchange.js)
@@ -98,15 +110,16 @@ at its date and time:
 
 ## Supported Tokens
 
-Both tools support the same set of tokens. Each keeps its own
-list of them:
+Each tool keeps its own list of the ids each service knows a token by:
 
 - **The Apps Script:** the `TOKEN_TO_ID` constant in
   `getCryptoPriceFromCentralizedExchange.gs`
-- **crypto-price-filler:** `supported-tokens.json`
+- **crypto-price-filler:** `supported-tokens.json`, which also names a
+  pool token's contract and chains
 
-Current tokens: BTC, XMR, GRC, XTM (and any token listed on
-MEXC)
+Current tokens: BTC, XMR, GRC, XTM (and any token listed on MEXC) in the
+Apps Script; BTC, GRC, XTM, XTZ and HEX on PulseChain (`phex`) in
+crypto-price-filler.
 
 ## Contributing
 

@@ -22,7 +22,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { saveEncryptedKey } from "../api-key-store/index.js";
 import {
+  keyConfig,
   openCentralizedExchangePrices,
+  openCentralizedExchangeSources,
   runCommandLine,
 } from "../fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.js";
 import { capturedOutput } from "./helpers/captured-output.js";
@@ -31,6 +33,7 @@ import { makeTempFolder, removeTempFolders } from "./helpers/temp-folders.js";
 
 const MEXC = "https://api.mexc.com/api/v3";
 const COINGECKO = "https://api.coingecko.com/api/v3";
+const COINPAPRIKA_PRO = "https://api-pro.coinpaprika.com/v1";
 
 /** 12:30 UTC on 2025-06-15, the time the tests ask about. */
 const ROW_UTC_MS = Date.UTC(2025, 5, 15, 12, 30, 0);
@@ -76,6 +79,37 @@ function answerCoinGeckoRange({ url, headers }) {
         [ROW_UTC_MS + 3600000, 2.5],
       ],
     };
+  }
+  return null;
+}
+
+/**
+ * Answers for when MEXC lists no XTM pair, CoinGecko has no hourly prices,
+ * and only CoinPaprika's paid server, asked with the key `paprika-key`,
+ * gives XTM's candle of 2025-06-15, with high 2.50. The paid server's key
+ * facts take that key alone.
+ *
+ * @param {{url: string, headers: Object<string, string>}} request - The request
+ * @returns {*} The response (`standInFetch`)
+ */
+function answerPaprikaPaid({ url, headers }) {
+  if (url === `${MEXC}/exchangeInfo`) return { symbols: [] };
+  if (url.startsWith(`${COINGECKO}/coins/minotari/market_chart/range?`))
+    return { prices: [] };
+  if (!url.startsWith(COINPAPRIKA_PRO)) return null;
+  if (headers.authorization !== "paprika-key")
+    return { status: 403, text: "{}" };
+  if (url === `${COINPAPRIKA_PRO}/key/info`) return { plan: "starter" };
+  if (url.startsWith(`${COINPAPRIKA_PRO}/coins/xtm-tari/ohlcv/historical?`)) {
+    return [
+      {
+        time_open: "2025-06-15T00:00:00Z",
+        time_close: "2025-06-15T23:59:59Z",
+        high: 2.5,
+        low: 2.0,
+        close: 2.2,
+      },
+    ];
   }
   return null;
 }
@@ -137,6 +171,15 @@ describe("openCentralizedExchangePrices", () => {
     });
   });
 
+  it("gives the close of MEXC's candle for the time", async () => {
+    await withPrices(answerMexcCandle, async (prices) => {
+      assert.equal(
+        await prices.getCryptoPrice("xtm", ROW_TIME, "UTC", "close"),
+        1.1,
+      );
+    });
+  });
+
   it("takes the time as a Date, as a date cell gives it", async () => {
     await withPrices(answerMexcCandle, async (prices) => {
       assert.equal(
@@ -190,14 +233,73 @@ describe("openCentralizedExchangePrices", () => {
     );
   });
 
-  it("refuses a config that sets a CoinGecko key, which the script reads from its Script Properties", async () => {
-    await assert.rejects(
-      openCentralizedExchangePrices({
-        config: { CONFIG: { COINGECKO_API_KEY: "gecko-key" } },
-        fetch: standInFetch(() => null),
-      }),
-      /The script's CONFIG has no field COINGECKO_API_KEY/,
+  it("lays the keys it is given over the config's values", async () => {
+    await withPrices(
+      answerCoinGeckoRange,
+      async (prices, fetch) => {
+        await prices.getCryptoPrice("xtm", ROW_TIME, "UTC", "high");
+        assert.deepEqual(coinGeckoKeysSent(fetch), [
+          ["/api/v3/coins/minotari/market_chart/range", "gecko-key"],
+        ]);
+      },
+      {
+        config: { CONFIG: { COINGECKO_API_KEY: "" } },
+        apiKeys: { coingecko: "gecko-key" },
+      },
     );
+  });
+
+  it("asks CoinPaprika's paid server with the CoinPaprika key it is given, the whole Authorization header", async () => {
+    await withPrices(
+      answerPaprikaPaid,
+      async (prices, fetch) => {
+        assert.equal(
+          await prices.getCryptoPrice("xtm", ROW_TIME, "UTC", "high"),
+          2.5,
+        );
+        const paprika = fetch.requests.filter((request) =>
+          request.url.startsWith(COINPAPRIKA_PRO),
+        );
+        assert.equal(paprika.length, 1);
+        assert.equal(paprika[0].headers.authorization, "paprika-key");
+        assert.ok(
+          !paprika[0].url.includes("paprika-key"),
+          "a url holds the key",
+        );
+      },
+      { apiKeys: { coinpaprika: "paprika-key" } },
+    );
+  });
+});
+
+describe("openCentralizedExchangeSources", () => {
+  it("gives the script's three price sources, each taking an id, a time in milliseconds and a target", async () => {
+    const fetch = standInFetch(answerMexcCandle);
+    const sources = await openCentralizedExchangeSources({ config: {}, fetch });
+    try {
+      assert.equal(
+        await sources.getPriceFromMEXC("XTM", ROW_UTC_MS, "close"),
+        1.1,
+      );
+      assert.equal(
+        await sources.getPriceFromCoinGecko("minotari", ROW_UTC_MS, "high"),
+        null,
+      );
+      assert.equal(
+        await sources.getPriceFromCoinPaprika("xtm-tari", ROW_UTC_MS, "high"),
+        null,
+      );
+    } finally {
+      await sources.close();
+    }
+  });
+
+  it("sets each key it is given in the script's CONFIG, and none it is not", () => {
+    assert.deepEqual(keyConfig({ coingecko: "g", coinpaprika: "p" }), {
+      CONFIG: { COINGECKO_API_KEY: "g", COINPAPRIKA_API_KEY: "p" },
+    });
+    assert.deepEqual(keyConfig({ coingecko: null }), {});
+    assert.deepEqual(keyConfig({}), {});
   });
 });
 
@@ -206,6 +308,7 @@ describe("getCryptoPriceFromCentralizedExchange.js, the command line", () => {
   let configFile;
   let noKeysFile;
   let savedKeyFile;
+  let paprikaKeyFile;
 
   before(async () => {
     folder = makeTempFolder("cex");
@@ -214,6 +317,8 @@ describe("getCryptoPriceFromCentralizedExchange.js, the command line", () => {
     noKeysFile = path.join(folder, "no-api-keys.json");
     savedKeyFile = path.join(folder, "api-keys.json");
     await saveEncryptedKey(savedKeyFile, "coingecko", "gecko-key", "pw");
+    paprikaKeyFile = path.join(folder, "paprika-api-keys.json");
+    await saveEncryptedKey(paprikaKeyFile, "coinpaprika", "paprika-key", "pw");
   });
 
   after(removeTempFolders);
@@ -286,6 +391,38 @@ describe("getCryptoPriceFromCentralizedExchange.js, the command line", () => {
         stdout: "0.8\n",
         stderr: "",
       },
+    );
+  });
+
+  it("prints the close with --mode close", async () => {
+    assert.deepEqual(printed(await run(["xtm", ROW_TIME, "--mode", "close"])), {
+      exitCode: 0,
+      stdout: "1.1\n",
+      stderr: "",
+    });
+  });
+
+  it("opens a saved CoinPaprika key, has CoinPaprika check it, and sends it to the paid server", async () => {
+    const result = await run(["xtm", ROW_TIME], answerPaprikaPaid, {
+      env: { API_KEYS_FILE_PATH: paprikaKeyFile, API_KEYS_PASSWORD: "pw" },
+      ask: askNothing,
+    });
+    assert.deepEqual(printed(result), {
+      exitCode: 0,
+      stdout: "2.5\n",
+      stderr: "",
+    });
+    assert.deepEqual(
+      result.fetch.requests
+        .filter((request) => request.url.startsWith(COINPAPRIKA_PRO))
+        .map((request) => [
+          new URL(request.url).pathname,
+          request.headers.authorization,
+        ]),
+      [
+        ["/v1/key/info", "paprika-key"],
+        ["/v1/coins/xtm-tari/ohlcv/historical", "paprika-key"],
+      ],
     );
   });
 
@@ -377,10 +514,10 @@ describe("getCryptoPriceFromCentralizedExchange.js, the command line", () => {
     );
   });
 
-  it("refuses a mode other than high or low", async () => {
+  it("refuses a mode other than high, low or close", async () => {
     const result = await run(["xtm", ROW_TIME, "--mode", "middle"]);
     assert.equal(result.exitCode, 1);
-    assert.match(result.stderr, /Allowed choices are high, low/);
+    assert.match(result.stderr, /Allowed choices are high, low, close/);
   });
 
   it("answers --help on stdout, with exit code 0, asking no password", async () => {
@@ -393,7 +530,7 @@ describe("getCryptoPriceFromCentralizedExchange.js, the command line", () => {
       result.stdout,
       /Usage: getCryptoPriceFromCentralizedExchange \[options\] <token> <date>/,
     );
-    assert.match(result.stdout, /CoinGecko api key:/);
+    assert.match(result.stdout, /Api keys:/);
     assert.match(result.stdout, /Exit codes:/);
   });
 

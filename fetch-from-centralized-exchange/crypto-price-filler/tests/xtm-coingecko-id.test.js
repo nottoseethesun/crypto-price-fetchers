@@ -8,32 +8,31 @@
  * `/en/coins/minotari-tari`, is not the id. Under any other id CoinGecko
  * gives no Minotari price, and the row stays unpriced.
  *
- * The Node tool takes the id from the shipped `supported-tokens.json`, so the
- * first test drives the real provider chain (`getCryptoPrice`, then MEXC, then
- * CoinGecko) over that file, with only the http layer, `fetchWithRetry`,
- * standing in for the services. The Sheets script keeps its own table,
- * `TOKEN_TO_ID`, so the second test runs
- * `getCryptoPriceFromCentralizedExchange.gs` unchanged under Node, with
- * stand-ins for the Apps Script services it calls, and drives its provider
- * chain the same way. Both stand-ins are in `tests/helpers/`.
+ * The Node tool takes the id from the shipped `supported-tokens.json` and
+ * asks the Sheets script's CoinGecko source with it, so the first test
+ * drives the real provider chain (`getCryptoPrice`, then MEXC, then
+ * CoinGecko) over that file, with the script running in its worker and only
+ * the web standing in (`helpers/stand-in-fetch.js`). The Sheets script
+ * keeps its own table, `TOKEN_TO_ID`, so the second test runs it unchanged
+ * in the test's thread (`helpers/sheets-script.js`) and drives its provider
+ * chain the same way.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import path from "path";
 import { getCryptoPrice } from "../sources/price.js";
-import * as fetchUtils from "../utils/fetch.js";
-import { answeringFetchWithRetry } from "./helpers/fetch-with-retry.js";
+import { closeExchangeSources } from "../sources/exchange.js";
+import { answerWith, asked as askedByTool } from "./helpers/stand-in-fetch.js";
 import { loadSheetsScript } from "./helpers/sheets-script.js";
 
-vi.mock("../utils/fetch.js", () => {
-  const mockFn = vi.fn();
-  return {
-    fetchWithRetry: mockFn,
-    default: mockFn,
-  };
-});
-
-const mockFetchWithRetry = vi.mocked(fetchUtils.fetchWithRetry);
+// The Sheets script, opened by its Node version with the stand-in fetch
+vi.mock(
+  "../../getCryptoPriceFromCentralizedExchange.js",
+  async (importOriginal) => {
+    const { withStandInFetch } = await import("./helpers/stand-in-fetch.js");
+    return withStandInFetch(await importOriginal());
+  },
+);
 
 // The Sheets script's files its function needs, in the order Apps Script
 // loads them
@@ -75,14 +74,12 @@ function answerWithoutMexcCandle(url) {
 }
 
 describe("XTM priced from CoinGecko under Minotari's id", () => {
-  beforeEach(() => {
-    mockFetchWithRetry.mockReset();
-    mockFetchWithRetry.mockImplementation(
-      answeringFetchWithRetry(answerWithoutMexcCandle),
-    );
+  afterEach(async () => {
+    await closeExchangeSources();
   });
 
   it("the Node tool prices an XTM row from CoinGecko when MEXC has no candle", async () => {
+    answerWith(answerWithoutMexcCandle);
     const price = await getCryptoPrice(
       "xtm",
       "2025-06-15 12:30:00",
@@ -91,9 +88,9 @@ describe("XTM priced from CoinGecko under Minotari's id", () => {
       false,
       new Map(),
     );
-    const coinGeckoUrls = mockFetchWithRetry.mock.calls
-      .map(([url]) => url)
-      .filter((url) => url.includes("api.coingecko.com"));
+    const coinGeckoUrls = askedByTool.filter((url) =>
+      url.includes("api.coingecko.com"),
+    );
 
     expect(coinGeckoUrls.some((url) => url.includes("/coins/minotari/"))).toBe(
       true,

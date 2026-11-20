@@ -36,8 +36,9 @@ crypto-price-filler, and the api keys. From the repo's top folder:
 ```bash
 npm ci
 npm ci --prefix fetch-from-centralized-exchange/crypto-price-filler
-npm run api-keys     # save the api keys, once
-npm run check        # the gate
+npm run api-keys            # save the api keys, once
+npm run check               # the gate
+npm run build apps-script   # the Sheets scripts with their keys, for Apps Script
 ```
 
 ---
@@ -54,6 +55,7 @@ the ones that hold no key and none of the owner's own settings.
 | `config.json` beside a Node version | no | Values laid over the script's config objects. `crypto-price-fetchers.js` and the exchange script read one when it is there. |
 | `crypto-price-filler/config-example.json` | yes | The filler's settings. |
 | `crypto-price-filler/config.json` | no | The owner's settings, laid over `config-example.json`. |
+| `build/apps-script/` | no | The Sheets scripts as `npm run build apps-script` writes them when the owner declines a clipboard tool: they hold the api keys in the clear, readable by the owner alone. |
 | `coverage/` | no | A test run's coverage report. |
 
 ---
@@ -104,9 +106,12 @@ test runner, and crypto-price-filler's, on vitest. Neither asks a service
 outside the computer, and neither reads the owner's key file or password.
 
 **The top folder's tests** (`test/`, Node's test runner) cover the runner,
-the Node versions, the key store and `no-secret-logging`. The scripts'
-requests go to a stand-in fetch or a stand-in server on the computer
-(`test/helpers/stand-in-web.js`). The key store's tests save keys in temp
+the Node versions, the build step, the price clients (`dex-prices/`), the
+key store and `no-secret-logging`. The scripts' and the clients' requests
+go to a stand-in fetch or a stand-in server on the computer
+(`test/helpers/stand-in-web.js`; `test/helpers/gecko-terminal-stand-in.js`
+answers as GeckoTerminal does). The build step's tests stand in for the
+clipboard, the install and the questions. The key store's tests save keys in temp
 folders of their own (`test/helpers/temp-folders.js`), removed when a test
 file ends; `test/fixtures/lp-ranger-api-keys.json`, written by LP Ranger's
 own code, checks that the store opens LP Ranger's files. A test that starts
@@ -116,17 +121,20 @@ bash, and in zsh where zsh is installed. `npm run test:coverage` fails below
 80% of lines covered.
 
 **crypto-price-filler's tests** (`tests/`, vitest) cover the tool, its
-sources and its command line, and run the Sheets script unchanged under
-Node. Its `vitest.config.js` names a key file that does not exist and
-empties `API_KEYS_PASSWORD`, so no test finds the owner's key, and fails a
-coverage run below 80% of lines. `tests/helpers/` holds the stand-ins:
+sources and its command line, and run the exchange script unchanged under
+Node: its price sources in `sheets-sources.test.js`, which carries what
+each source must do for both tools. Its `vitest.config.js` names a key file
+that does not exist and empties `API_KEYS_PASSWORD`, so no test finds the
+owner's key, and fails a coverage run below 80% of lines. `tests/helpers/`
+holds the stand-ins:
 
 - `sheets-script.js` runs a Sheets script, one file or several, in the
   test's thread with the runner's services; its `UrlFetchApp` answers from
-  a function the test gives.
-- `fetch-with-retry.js` stands in for `fetchWithRetry`, the http layer of
-  the price sources, and holds the hooks the getCryptoPrice tests share
-  (`useFetchStandIn`).
+  a function the test gives, with any status, and the script's config is
+  set as its Node version sets it.
+- `stand-in-fetch.js` is a stand-in fetch for the tool's own sources: the
+  exchange sources, whose Sheets script then runs for real in the runner's
+  worker, and the pool sources, whose shared clients then ask it.
 - `stand-in-fetch-preload.js` runs the real command line, `index.js`, in a
   child process against a stand-in MEXC, and a stand-in CoinGecko ping that
   takes the one key in `stand-in-coingecko-key.js`.
@@ -192,7 +200,8 @@ answered at once.
 | ----- | ------------------- | --------------- |
 | `test/crypto-price-fetchers.test.js`, `test/get-crypto-price-from-centralized-exchange.test.js` | Through its Node version, in the worker thread. Each request goes to `standInFetch` (`test/helpers/stand-in-web.js`), which answers as DexTools, x1.ninja, MEXC or CoinGecko does. | What each Sheets function returns, as its cell would show it, and the Node versions' command lines. |
 | `test/run-apps-script.test.js` | A small script, `test/fixtures/runner-check.gs`, in the worker thread. Its requests go through Node's own `fetch` to a web server on this computer. | The hand-off between the threads: the worker waits, the main thread does the request, and each response reaches the request it answers. |
-| crypto-price-filler's `tests/regressions.test.js`, `tests/xtm-coingecko-id.test.js` | In the test's own thread (`tests/helpers/sheets-script.js`). `UrlFetchApp.fetch` answers at once from a function the test gives, so nothing waits. | The cases the regression tests cover, checked in the exchange script as in the Node tool, and that no file of the exchange script holds a CoinGecko api key. |
+| crypto-price-filler's `tests/sheets-sources.test.js`, `tests/regressions.test.js`, `tests/xtm-coingecko-id.test.js` | In the test's own thread (`tests/helpers/sheets-script.js`). `UrlFetchApp.fetch` answers at once from a function the test gives, so nothing waits. | What each price source gives, the cases the regression tests cover, and that no file of the exchange script holds a CoinGecko api key. |
+| crypto-price-filler's `tests/regressions.test.js`, `tests/xtm-coingecko-id.test.js`, through the tool | Through the exchange script's Node version, in the worker thread, as the tool runs it (`tests/helpers/stand-in-fetch.js`). | The same cases, reached through the tool's provider chain. |
 | `test/load-apps-script.test.js`, `test/apps-script-services.test.js` | Small scripts in `test/fixtures/`, in the test's own thread, with requests answered at once. | That a script's files load into one scope, in order, and that each Node service acts as Apps Script's does. |
 
 The Node tests run Node's versions of the services, one call at a time,

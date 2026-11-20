@@ -1,7 +1,9 @@
 /**
  * Simple in-memory cache for Crypto Price Filler
  * @module utils/cache
- * @description Provides a shared Map instance for price caching.
+ * @description Provides a shared Map instance for the run's lookups: the
+ * prices, and the pool a token's GeckoTerminal price is read from, with the
+ * token's side of it (`sources/geckoterminal.js`).
  * Uses singleton pattern so all parts of the app share the same cache.
  * Global shared cache for Crypto Price Filler
  * Uses globalThis to ensure the same Map instance across all modules/workers.
@@ -17,11 +19,11 @@ const cacheInstance = globalThis.__crypto_price_cache__;
 
 /**
  * Get the cached value for a specific key, or the entire cache Map if no key is provided.
- * Returns the raw cached price (number or null) or undefined if not found/expired.
+ * Returns the raw cached value (a price, a pool, or null) or undefined if not found/expired.
  * For backward compatibility with tests that expect the whole Map.
  *
  * @param {string} [key] - Optional cache key to lookup
- * @returns {number|null|undefined|Map} Cached price, undefined, or the full Map
+ * @returns {number|Object|null|undefined|Map} Cached value, undefined, or the full Map
  */
 export function getCache(key = null) {
   if (key === null) {
@@ -44,7 +46,7 @@ export function getCache(key = null) {
  * Set a value in the cache for a specific key with optional TTL.
  *
  * @param {string} key - The cache key
- * @param {number|null} value - The price to cache
+ * @param {number|Object|null} value - The value to cache: a price, or a pool as `{address, side}`
  * @param {number} [ttlMs] - Time to live in ms (optional)
  */
 export function setCache(key, value, ttlMs = null) {

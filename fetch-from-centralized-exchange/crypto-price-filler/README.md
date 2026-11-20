@@ -5,18 +5,27 @@
 USE AT YOUR OWN RISK: SEE LICENSE FILE, INCLUDED TWO DIRECTORIES UP.
 
 This Node tool fills in a token's prices in a CSV file. It reads a CSV
-whose rows each hold a timestamp, finds the token's price at each time,
-down to the minute, and writes `output.csv`, with each row's timestamp
-and price.
+whose rows each hold a timestamp, finds the token's USD price at each
+time, down to the minute, and writes `output.csv`, with each row's
+timestamp and price.
 
-It is for coins that trade on centralized exchanges rather than in
-decentralized exchanges' pools, such as Bitcoin and Monero. A wrapped
-version, such as wBTC, may trade in a pool, but the coin itself does not.
-Services that price a token from its pool, such as DexScreener and
-DexTools, have no price for these coins, since there is no pool to name.
-This tool asks centralized exchanges instead. If the few decentralized
-exchanges that trade these coins had more volume and an API, they could be
-asked too.
+It prices two kinds of token, each where it trades:
+
+- A coin that trades on centralized exchanges rather than in pools, such
+  as Bitcoin and Monero, has no pool for a pool's price service to read.
+  The tool asks MEXC, then CoinGecko, then CoinPaprika, through the price
+  sources of the Sheets script beside this folder,
+  `getCryptoPriceFromCentralizedExchange-sources.gs`, which it runs
+  unchanged under Node (`sources/exchange.js`), so the sheet and the tool
+  price alike.
+- A token that trades in a blockchain's pools, such as HEX on PulseChain,
+  is asked of Moralis first, when a Moralis key is saved, then of
+  GeckoTerminal, as LP Ranger asks them, and then of CoinGecko and
+  CoinPaprika. Its entry in `supported-tokens.json` names its contract and
+  its chain's ids.
+
+The order of the sources, and what each gives, is in the file header of
+`./index.js`.
 
 ### Current Roster of Utilities
 
@@ -29,7 +38,16 @@ NodeJS 22+
 
 ## Installation
 
-`npm install`
+The tool uses the repo's runner and key store, from the repo's top
+folder, so it needs the packages of both folders. From the repo's top
+folder:
+
+```bash
+npm ci
+npm ci --prefix fetch-from-centralized-exchange/crypto-price-filler
+```
+
+See [Install](../../README.md#install) in the repo's README.
 
 ## Configuration
 
@@ -37,20 +55,22 @@ NodeJS 22+
 settings go in `config.json` beside it, which git ignores: each setting there
 takes the place of the same one in `config-example.json`, so it needs only
 those that differ. The file header in `./index.js` describes every setting.
+The exchange sources run on the Sheets script's own settings, its `CONFIG`.
 
-The CoinGecko demo key is no setting: it is kept in `api-keys.json` at the
-repo's top, encrypted with a password you choose. To save it, from the repo's
-top folder:
+The api keys are no settings: the CoinGecko, CoinPaprika and Moralis keys
+are kept in `api-keys.json` at the repo's top, encrypted with a password you
+choose. To save them, from the repo's top folder:
 
 ```bash
 npm run api-keys
 ```
 
-Each run then opens it before it prices anything, with the password
+Each run then opens them before it prices anything, with the password
 `source ./unlock-api-keys.sh` keeps for the terminal, or else one it asks
-for, and asks CoinGecko once whether it takes the key. Without a saved key,
-the tool asks CoinGecko without one, at CoinGecko's lower rate limits. See
-[Api keys](../../README.md#api-keys) in the repo's README.
+for, and asks each service once whether it takes its key. Without a saved
+key, the tool asks CoinGecko without one, at its lower rate limits, asks
+CoinPaprika's free server, and does not ask Moralis. See
+[The api keys](../../README.md#2-the-api-keys) in the repo's README.
 
 ## Usage
 

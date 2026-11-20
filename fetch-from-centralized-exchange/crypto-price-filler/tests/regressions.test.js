@@ -10,35 +10,35 @@
  * CLAUDE.md).
  *
  * The tests drive the real code, with the price services standing in at the
- * http layer (see `tests/helpers/`): `fetchWithRetry` for the Node tool's
- * functions, a preloaded fetch for its command line, run in a child process,
- * and `UrlFetchApp` for the Sheets script, which runs unchanged under Node.
- * The Node tool's functions run on the committed settings, whatever a
- * `config.json` on this computer holds.
+ * http layer (see `tests/helpers/`). The Node tool prices with the Sheets
+ * script's sources, run in a worker thread through the repo's runner, so
+ * its functions run against a stand-in fetch (`stand-in-fetch.js`); its
+ * command line, run in a child process, against a preloaded fetch; and the
+ * Sheets script, run unchanged in the test's thread, against a stand-in
+ * `UrlFetchApp`. The Node tool's functions run on the committed settings,
+ * whatever a `config.json` on this computer holds.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { execFileSync, spawnSync } from "child_process";
 import fs from "fs";
 import os from "os";
 import path from "path";
 import { pathToFileURL } from "url";
-import { getPriceFromMEXC } from "../sources/mexc.js";
-import { getPriceFromCoinGecko } from "../sources/coingecko.js";
-import { getPriceFromCoinPaprika } from "../sources/coinpaprika.js";
 import { getCryptoPrice } from "../sources/price.js";
+import { closeExchangeSources, exchangeSources } from "../sources/exchange.js";
 import { canonicalTimeZone, parseInputToUtcMs } from "../utils/date.js";
-import * as fetchUtils from "../utils/fetch.js";
-import { answeringFetchWithRetry } from "./helpers/fetch-with-retry.js";
-import { loadSheetsScript } from "./helpers/sheets-script.js";
+import { answerWith, asked as askedByTool } from "./helpers/stand-in-fetch.js";
+import { loadSheetsScript, reply } from "./helpers/sheets-script.js";
 
-vi.mock("../utils/fetch.js", () => {
-  const mockFn = vi.fn();
-  return {
-    fetchWithRetry: mockFn,
-    default: mockFn,
-  };
-});
+// The Sheets script, opened by its Node version with the stand-in fetch
+vi.mock(
+  "../../getCryptoPriceFromCentralizedExchange.js",
+  async (importOriginal) => {
+    const { withStandInFetch } = await import("./helpers/stand-in-fetch.js");
+    return withStandInFetch(await importOriginal());
+  },
+);
 
 // The committed settings, read afresh for this file, whatever a config.json holds
 vi.mock("../config.js", async () => {
@@ -49,8 +49,6 @@ vi.mock("../config.js", async () => {
     ),
   };
 });
-
-const mockFetchWithRetry = vi.mocked(fetchUtils.fetchWithRetry);
 
 const FILLER_DIR = path.resolve(__dirname, "..");
 // The Sheets script's files its function needs, in the order Apps Script
@@ -93,9 +91,7 @@ function answerMexcCandle(url) {
  * Answers for a coin MEXC does not list and CoinGecko lists against USD,
  * as it does Tezos: CoinGecko's hourly range has no prices, and its price
  * for the day asked says 1.23. Its live ticker says 9.99, so a tool that
- * put the live price on a past date would give 9.99. The tickers carry
- * both the Node tool's field (`last`) and the Sheets script's
- * (`converted_last`).
+ * put the live price on a past date would give 9.99.
  *
  * @param {string} url - The requested url
  * @returns {Object|null} The json body, or null for a 404
@@ -118,6 +114,26 @@ function answerCoinGeckoForPastDay(url) {
   }
   if (url.includes("/history"))
     return { market_data: { current_price: { usd: DATED_PRICE } } };
+  return null;
+}
+
+/**
+ * Answers as CoinPaprika's free plan does for a day older than a day:
+ * it refuses the candle, as beyond the plan, and gives the day's price
+ * at 00:00 UTC, 2.05 on 2025-06-15.
+ *
+ * @param {string} url - The requested url
+ * @returns {*} The answer
+ */
+function answerPaprikaBeyondCandles(url) {
+  if (url.includes("/ohlcv/historical")) {
+    return reply(402, {
+      error:
+        "Getting historical OHLCV data before 2026-11-19 is not allowed in this plan",
+    });
+  }
+  if (url.includes("/tickers/xtm-tari/historical"))
+    return [{ timestamp: "2025-06-15T00:00:00Z", price: 2.05 }];
   return null;
 }
 
@@ -209,23 +225,51 @@ function gitIgnores(relativePath) {
   );
 }
 
+/**
+ * Runs a function with the computer's time zone set to another, then
+ * restores it.
+ *
+ * @param {string} zone - The time zone, such as 'America/Chicago'
+ * @param {function(): *} run - What to run in it
+ * @returns {*} What it returned
+ */
+function inTimeZone(zone, run) {
+  const saved = process.env.TZ;
+  /*-
+   *  TEST-ONLY global swap: the day under test would come from the time
+   *  zone the computer is set to, and the script offers no seam for it.
+   *  Restored pristine in the `finally` below, immediately after the call
+   *  that needed it.
+   */
+  process.env.TZ = zone;
+  try {
+    return run();
+  } finally {
+    if (saved === undefined) {
+      delete process.env.TZ;
+    } else {
+      process.env.TZ = saved;
+    }
+  }
+}
+
 describe("fixed bugs", () => {
   beforeEach(() => {
-    mockFetchWithRetry.mockReset();
+    answerWith(() => null);
+  });
+
+  afterEach(async () => {
+    await closeExchangeSources();
   });
 
   describe("close mode gives the candle close, not its high", () => {
-    it("MEXC, in close mode, gives the candle close", async () => {
-      mockFetchWithRetry.mockImplementation(
-        answeringFetchWithRetry(answerMexcCandle),
-      );
-      expect(await getPriceFromMEXC("xtm", ROW_UTC_MS, "close")).toBe(1.1);
+    it("MEXC, in close mode, gives the candle close", () => {
+      const script = loadSheetsScript(SHEETS_SCRIPT_PATH, answerMexcCandle);
+      expect(script.getPriceFromMEXC("xtm", ROW_UTC_MS, "close")).toBe(1.1);
     });
 
     it("the provider chain, in close mode, gives the candle close", async () => {
-      mockFetchWithRetry.mockImplementation(
-        answeringFetchWithRetry(answerMexcCandle),
-      );
+      answerWith(answerMexcCandle);
       expect(
         await getCryptoPrice(
           "xtm",
@@ -243,28 +287,28 @@ describe("fixed bugs", () => {
         "1.1",
       );
     });
+
+    it("the Sheets script, in close mode, gives the candle close", () => {
+      const script = loadSheetsScript(SHEETS_SCRIPT_PATH, answerMexcCandle);
+      expect(
+        script.getCryptoPrice("xtm", "2025-06-15 12:30:00", "UTC", "close", 0),
+      ).toBe(1.1);
+    });
   });
 
   describe("a past date gets the price of that day, never the live one", () => {
-    it("CoinGecko gives its price for 2025-03-15", async () => {
-      mockFetchWithRetry.mockImplementation(
-        answeringFetchWithRetry(answerCoinGeckoForPastDay),
+    it("CoinGecko gives its price for 2025-03-15", () => {
+      const script = loadSheetsScript(
+        SHEETS_SCRIPT_PATH,
+        answerCoinGeckoForPastDay,
       );
-      expect(
-        await getPriceFromCoinGecko(
-          "xtz",
-          PAST_UTC_MS,
-          "close",
-          false,
-          "tezos",
-        ),
-      ).toBe(DATED_PRICE);
+      expect(script.getPriceFromCoinGecko("tezos", PAST_UTC_MS, "close")).toBe(
+        DATED_PRICE,
+      );
     });
 
     it("the provider chain gives the price for 2025-03-15 when MEXC lacks the pair", async () => {
-      mockFetchWithRetry.mockImplementation(
-        answeringFetchWithRetry(answerCoinGeckoForPastDay),
-      );
+      answerWith(answerCoinGeckoForPastDay);
       expect(
         await getCryptoPrice(
           "xtz",
@@ -283,46 +327,31 @@ describe("fixed bugs", () => {
         answerCoinGeckoForPastDay,
       );
       expect(
-        script.getPriceFromCoinGecko("tezos", PAST_UTC_MS, "high"),
-      ).toBeCloseTo(DATED_PRICE * 1.015, 10);
+        script.getCryptoPrice("xtz", "2025-03-15 03:00:00", "UTC", "close", 0),
+      ).toBe(DATED_PRICE);
     });
   });
 
-  describe("CoinGecko's day is the UTC day, whatever the computer's clock", () => {
-    it("on a computer set to Chicago time, 03:00 UTC on 2025-03-15 asks for 15-03-2025", async () => {
-      // CoinGecko answers nothing, so the tool goes on to ask for the day's price
-      mockFetchWithRetry.mockImplementation(
-        answeringFetchWithRetry(() => null),
-      );
-      const zone = process.env.TZ;
-      /*-
-       *  TEST-ONLY global swap: the day under test would come from the time
-       *  zone the computer is set to, and the tool offers no seam for it.
-       *  Restored pristine in the `finally` below, immediately after the call
-       *  that needed it.
-       */
-      process.env.TZ = "America/Chicago";
-      try {
-        await getPriceFromCoinGecko(
-          "xtz",
-          PAST_UTC_MS,
-          "close",
-          false,
-          "tezos",
-        );
-      } finally {
-        if (zone === undefined) {
-          delete process.env.TZ;
-        } else {
-          process.env.TZ = zone;
-        }
-      }
-      const days = mockFetchWithRetry.mock.calls
-        .map(([url]) => url)
+  describe("the day asked of CoinGecko and CoinPaprika is the UTC day, whatever the computer's clock", () => {
+    it("on a computer set to Chicago time, 03:00 UTC on 2025-03-15 asks for 2025-03-15", () => {
+      const asked = [];
+      const script = loadSheetsScript(SHEETS_SCRIPT_PATH, (url) => {
+        asked.push(url);
+        return null;
+      });
+      inTimeZone("America/Chicago", () => {
+        script.getPriceFromCoinGecko("tezos", PAST_UTC_MS, "close");
+        script.getPriceFromCoinPaprika("xtz-tezos", PAST_UTC_MS, "close");
+      });
+      const geckoDays = asked
         .filter((url) => url.includes("/history"))
         .map((url) => new URL(url).searchParams.get("date"));
-      expect(days).not.toHaveLength(0);
-      for (const day of days) expect(day).toBe("15-03-2025");
+      expect(geckoDays).not.toHaveLength(0);
+      for (const day of geckoDays) expect(day).toBe("15-03-2025");
+      const paprikaDays = asked
+        .filter((url) => url.includes("/ohlcv/"))
+        .map((url) => new URL(url).searchParams.get("start"));
+      expect(paprikaDays).toEqual(["2025-03-15"]);
     });
   });
 
@@ -423,14 +452,12 @@ describe("fixed bugs", () => {
   });
 
   describe("CoinPaprika's candles are asked at its OHLCV address", () => {
-    it("the Node tool asks /coins/{id}/ohlcv/historical", async () => {
-      mockFetchWithRetry.mockImplementation(
-        answeringFetchWithRetry((url) => (url.includes("/ohlcv/") ? [] : null)),
-      );
-      await getPriceFromCoinPaprika("xtm-tari", ROW_UTC_MS, "high", false);
-      const asked = mockFetchWithRetry.mock.calls.map(([url]) => url);
-      expect(asked[0]).toMatch(
-        /^https:\/\/api\.coinpaprika\.com\/v1\/coins\/xtm-tari\/ohlcv\/historical\?start=\d+&end=\d+$/,
+    it("the Node tool asks /coins/{id}/ohlcv/historical, through the Sheets script", async () => {
+      answerWith((url) => (url.includes("/ohlcv/") ? [] : null));
+      const sources = await exchangeSources();
+      await sources.getPriceFromCoinPaprika("xtm-tari", ROW_UTC_MS, "high");
+      expect(askedByTool[0]).toBe(
+        "https://api.coinpaprika.com/v1/coins/xtm-tari/ohlcv/historical?start=2025-06-15&end=2025-06-15&quote=usd",
       );
     });
 
@@ -440,16 +467,66 @@ describe("fixed bugs", () => {
         asked.push(url);
         if (url.includes("/exchangeInfo")) return { symbols: [] };
         if (url.includes("/market_chart/range")) return { prices: [] };
-        if (url.includes("/tickers/")) return { quotes: { USD: { price: 1 } } };
-        if (url.includes("/ohlcv/")) return [{ high: "2.5", low: "2.0" }];
+        if (url.includes("/ohlcv/")) {
+          return [
+            {
+              time_open: "2025-06-15T00:00:00Z",
+              time_close: "2025-06-15T23:59:59Z",
+              high: 2.5,
+              low: 2.0,
+              close: 2.2,
+            },
+          ];
+        }
         return null;
       });
       expect(
         script.getCryptoPrice("xtm", "2025-06-15 12:30:00", "UTC", "high", 0),
       ).toBe(2.5);
-      expect(asked.find((url) => url.includes("/ohlcv/"))).toMatch(
-        /^https:\/\/api\.coinpaprika\.com\/v1\/coins\/xtm-tari\/ohlcv\/historical\?start=\d+&end=\d+&quote=usd$/,
+      expect(asked.find((url) => url.includes("/ohlcv/"))).toBe(
+        "https://api.coinpaprika.com/v1/coins/xtm-tari/ohlcv/historical?start=2025-06-15&end=2025-06-15&quote=usd",
       );
+    });
+  });
+
+  describe("CoinPaprika prices a day its free plan's candles do not reach", () => {
+    it("the Sheets script gives the day's 00:00 UTC price for close when the candle is beyond the plan", () => {
+      const script = loadSheetsScript(
+        SHEETS_SCRIPT_PATH,
+        answerPaprikaBeyondCandles,
+      );
+      expect(
+        script.getPriceFromCoinPaprika("xtm-tari", ROW_UTC_MS, "close"),
+      ).toBe(2.05);
+    });
+
+    it("the Node tool gives the same, through the Sheets script", async () => {
+      answerWith(answerPaprikaBeyondCandles);
+      const sources = await exchangeSources();
+      expect(
+        await sources.getPriceFromCoinPaprika("xtm-tari", ROW_UTC_MS, "close"),
+      ).toBe(2.05);
+    });
+  });
+
+  describe("CoinGecko's hourly prices are kept for the time asked, not for its day", () => {
+    it("the Sheets script asks again for another time of the same day, and gives that time's price", () => {
+      const asked = [];
+      const script = loadSheetsScript(SHEETS_SCRIPT_PATH, (url) => {
+        asked.push(url);
+        const from = Number(new URL(url).searchParams.get("from")) * 1000;
+        const centre = from + 43200000;
+        return {
+          prices: [[centre, centre === ROW_UTC_MS ? 2.4 : 3.1]],
+        };
+      });
+      expect(script.getPriceFromCoinGecko("tezos", ROW_UTC_MS, "high")).toBe(
+        2.4,
+      );
+      expect(
+        script.getPriceFromCoinGecko("tezos", ROW_UTC_MS + 7200000, "high"),
+      ).toBe(3.1);
+      expect(asked).toHaveLength(2);
     });
   });
 });

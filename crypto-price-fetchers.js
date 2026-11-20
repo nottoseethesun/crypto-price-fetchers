@@ -84,6 +84,24 @@ function keyConfig(keys) {
 }
 
 /**
+ * What `npm run build apps-script` gives of this script for the sheet
+ * (`apps-script-build/`): its one file, with the DexTools and x1.ninja
+ * keys set at its end as `keyConfig` sets them here.
+ */
+export const APPS_SCRIPT_BUILD = Object.freeze({
+  name: "crypto-price-fetchers",
+  files: Object.freeze([
+    Object.freeze({
+      path: fileURLToPath(SHEETS_SCRIPT),
+      appsScriptName: "crypto-price-fetchers",
+    }),
+  ]),
+  services: Object.freeze(["dextools", "x1ninja"]),
+  keyConfig,
+  defaultConfigFile: DEFAULT_CONFIG_FILE,
+});
+
+/**
  * Opens the script and returns its Sheets functions as async calls.
  *
  * @param {Object} [options] - How to open it (`openScriptFunctions`)

@@ -1,27 +1,32 @@
 /**
  * Unit tests for Price fetching orchestration
  * @module tests/price.test
+ *
+ * `getCryptoPrice` asks the pool sources (Moralis, then GeckoTerminal) for
+ * a token that names a contract, then the Sheets script's sources (MEXC,
+ * CoinGecko, CoinPaprika, through `exchange.js`), each skipped when the
+ * token's entry names no id for it. Every source is a stand-in here, as
+ * are the cache and the token list.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { getCryptoPrice } from "../sources/price.js";
-import * as mexc from "../sources/mexc.js";
-import * as coingecko from "../sources/coingecko.js";
-import * as coinpaprika from "../sources/coinpaprika.js";
+import * as exchange from "../sources/exchange.js";
+import * as moralis from "../sources/moralis.js";
+import * as geckoterminal from "../sources/geckoterminal.js";
 import * as cacheModule from "../utils/cache.js";
 import fs from "fs";
 
-// Mock all price source modules
-vi.mock("../sources/mexc.js", () => ({
-  getPriceFromMEXC: vi.fn(),
+vi.mock("../sources/exchange.js", () => ({
+  exchangeSources: vi.fn(),
 }));
 
-vi.mock("../sources/coingecko.js", () => ({
-  getPriceFromCoinGecko: vi.fn(),
+vi.mock("../sources/moralis.js", () => ({
+  getPriceFromMoralis: vi.fn(),
 }));
 
-vi.mock("../sources/coinpaprika.js", () => ({
-  getPriceFromCoinPaprika: vi.fn(),
+vi.mock("../sources/geckoterminal.js", () => ({
+  getPriceFromGeckoTerminal: vi.fn(),
 }));
 
 vi.mock("../utils/cache.js", () => ({
@@ -41,12 +46,21 @@ vi.mock("fs", async (importOriginal) => {
   };
 });
 
-const mockMexc = vi.mocked(mexc.getPriceFromMEXC);
-const mockCoingecko = vi.mocked(coingecko.getPriceFromCoinGecko);
-const mockCoinpaprika = vi.mocked(coinpaprika.getPriceFromCoinPaprika);
+const mockExchangeSources = vi.mocked(exchange.exchangeSources);
+const mockMoralis = vi.mocked(moralis.getPriceFromMoralis);
+const mockGeckoTerminal = vi.mocked(geckoterminal.getPriceFromGeckoTerminal);
 const mockGetCache = vi.mocked(cacheModule.getCache);
 const mockSetCache = vi.mocked(cacheModule.setCache);
 const mockReadFileSync = vi.mocked(fs.readFileSync);
+
+/** The Sheets script's sources, as `exchangeSources` gives them. */
+const sources = {
+  getPriceFromMEXC: vi.fn(),
+  getPriceFromCoinGecko: vi.fn(),
+  getPriceFromCoinPaprika: vi.fn(),
+};
+
+const PHEX_CONTRACT = "0x2b591e99afE9f32eAA6214f7B7629768c40Eeb39";
 
 // Test token configurations
 const TEST_TOKENS_CONFIG = {
@@ -57,28 +71,69 @@ const TEST_TOKENS_CONFIG = {
       mexc_symbol: null,
     },
     xtm: {
-      coingecko_id: "torum",
+      coingecko_id: "minotari",
       coinpaprika_id: null,
-      mexc_symbol: "XTMUSDT",
+      mexc_symbol: "XTM",
     },
     btc: {
       coingecko_id: "bitcoin",
       coinpaprika_id: "btc-bitcoin",
-      mexc_symbol: "BTCUSDT",
+      mexc_symbol: "BTC",
+    },
+    nogecko: {
+      coingecko_id: null,
+      coinpaprika_id: "ngk-nogecko",
+      mexc_symbol: null,
+    },
+    phex: {
+      coingecko_id: "hex-pulsechain",
+      coinpaprika_id: "hex-hex-pulsechain",
+      mexc_symbol: null,
+      contract: PHEX_CONTRACT,
+      geckoterminal_network: "pulsechain",
+      moralis_chain: "0x171",
+    },
+    nomoralis: {
+      coingecko_id: null,
+      coinpaprika_id: null,
+      mexc_symbol: null,
+      contract: PHEX_CONTRACT,
+      geckoterminal_network: "pulsechain",
+    },
+    nogeckoterminal: {
+      coingecko_id: null,
+      coinpaprika_id: null,
+      mexc_symbol: null,
+      contract: PHEX_CONTRACT,
+      moralis_chain: "0x171",
     },
   },
 };
 
+const AT = "2024-01-01 12:00:00";
+const AT_MS = Date.UTC(2024, 0, 1, 12, 0, 0);
+
+/**
+ * Prices a token at AT in UTC.
+ *
+ * @param {string} token - The token
+ * @param {string} [target='high'] - The price target
+ * @param {Object} [more] - verbose and testCache
+ * @returns {Promise<number|null>} The price
+ */
+function priceOf(token, target = "high", { verbose = false, testCache } = {}) {
+  return getCryptoPrice(token, AT, "UTC", target, verbose, testCache);
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
-
-  // Default mock for fs.readFileSync
   mockReadFileSync.mockReturnValue(JSON.stringify(TEST_TOKENS_CONFIG));
-
-  // Default: all sources return null
-  mockMexc.mockResolvedValue(null);
-  mockCoingecko.mockResolvedValue(null);
-  mockCoinpaprika.mockResolvedValue(null);
+  mockExchangeSources.mockResolvedValue(sources);
+  sources.getPriceFromMEXC.mockResolvedValue(null);
+  sources.getPriceFromCoinGecko.mockResolvedValue(null);
+  sources.getPriceFromCoinPaprika.mockResolvedValue(null);
+  mockMoralis.mockResolvedValue(null);
+  mockGeckoTerminal.mockResolvedValue(null);
   mockGetCache.mockReturnValue(undefined);
 });
 
@@ -88,280 +143,192 @@ afterEach(() => {
 
 describe("Price Fetching Orchestration", () => {
   describe("getCryptoPrice", () => {
-    describe("source priority and fallback", () => {
-      it("returns MEXC price when available", async () => {
-        mockMexc.mockResolvedValueOnce(50000);
-
-        const price = await getCryptoPrice(
-          "btc",
-          "2024-01-01 12:00:00",
-          "UTC",
+    describe("the Sheets script's sources, in order", () => {
+      it("returns MEXC's price when it has one, under the token's MEXC symbol", async () => {
+        sources.getPriceFromMEXC.mockResolvedValueOnce(50000);
+        expect(await priceOf("btc")).toBe(50000);
+        expect(sources.getPriceFromMEXC).toHaveBeenCalledWith(
+          "BTC",
+          AT_MS,
           "high",
-          false,
         );
-
-        expect(price).toBe(50000);
-        expect(mockMexc).toHaveBeenCalled();
-        expect(mockCoingecko).not.toHaveBeenCalled();
-        expect(mockCoinpaprika).not.toHaveBeenCalled();
+        expect(sources.getPriceFromCoinGecko).not.toHaveBeenCalled();
+        expect(sources.getPriceFromCoinPaprika).not.toHaveBeenCalled();
       });
 
-      it("falls back to CoinGecko when MEXC returns null", async () => {
-        mockMexc.mockResolvedValueOnce(null);
-        mockCoingecko.mockResolvedValueOnce(49500);
-
-        const price = await getCryptoPrice(
-          "btc",
-          "2024-01-01 12:00:00",
-          "UTC",
+      it("falls back to CoinGecko, under the token's CoinGecko id, when MEXC has none", async () => {
+        sources.getPriceFromCoinGecko.mockResolvedValueOnce(49500);
+        expect(await priceOf("btc")).toBe(49500);
+        expect(sources.getPriceFromCoinGecko).toHaveBeenCalledWith(
+          "bitcoin",
+          AT_MS,
           "high",
-          false,
         );
-
-        expect(price).toBe(49500);
-        expect(mockMexc).toHaveBeenCalled();
-        expect(mockCoingecko).toHaveBeenCalled();
       });
 
-      it("falls back to CoinPaprika when MEXC and CoinGecko fail", async () => {
-        mockMexc.mockResolvedValueOnce(null);
-        mockCoingecko.mockResolvedValueOnce(null);
-        mockCoinpaprika.mockResolvedValueOnce(0.006);
+      it("falls back to CoinPaprika, under its id, when MEXC and CoinGecko have none", async () => {
+        sources.getPriceFromCoinPaprika.mockResolvedValueOnce(0.006);
+        expect(await priceOf("grc")).toBe(0.006);
+        expect(sources.getPriceFromCoinPaprika).toHaveBeenCalledWith(
+          "grc-gridcoin",
+          AT_MS,
+          "high",
+        );
+      });
 
-        const price = await getCryptoPrice(
-          "grc",
-          "2024-01-01 12:00:00",
-          "UTC",
+      it("skips each source the token's entry names no id for", async () => {
+        await priceOf("grc");
+        expect(sources.getPriceFromMEXC).not.toHaveBeenCalled();
+        sources.getPriceFromCoinPaprika.mockClear();
+        await priceOf("xtm");
+        expect(sources.getPriceFromCoinPaprika).not.toHaveBeenCalled();
+        sources.getPriceFromCoinGecko.mockClear();
+        await priceOf("nogecko");
+        expect(sources.getPriceFromCoinGecko).not.toHaveBeenCalled();
+      });
+
+      it("opens the script's sources with the run's verbose setting", async () => {
+        await priceOf("btc", "high", { verbose: true });
+        expect(mockExchangeSources).toHaveBeenCalledWith(true);
+      });
+
+      it("passes over an answer that is not a finite number", async () => {
+        sources.getPriceFromMEXC.mockResolvedValueOnce(Number.NaN);
+        sources.getPriceFromCoinGecko.mockResolvedValueOnce("49500");
+        sources.getPriceFromCoinPaprika.mockResolvedValueOnce(48000);
+        expect(await priceOf("btc")).toBe(48000);
+      });
+    });
+
+    describe("a token that trades in pools", () => {
+      it("is asked of Moralis first, with its contract and chains", async () => {
+        mockMoralis.mockResolvedValueOnce(0.0042);
+        expect(await priceOf("phex", "close")).toBe(0.0042);
+        expect(mockMoralis).toHaveBeenCalledWith(
+          {
+            contract: PHEX_CONTRACT,
+            network: "pulsechain",
+            moralisChain: "0x171",
+          },
+          AT_MS,
           "close",
           false,
         );
-
-        expect(price).toBe(0.006);
-        expect(mockCoinpaprika).toHaveBeenCalled();
+        expect(mockGeckoTerminal).not.toHaveBeenCalled();
+        expect(mockExchangeSources).not.toHaveBeenCalled();
       });
 
-      it("skips MEXC when mexc_symbol is null", async () => {
-        mockCoingecko.mockResolvedValueOnce(0.0065);
-
-        const price = await getCryptoPrice(
-          "grc",
-          "2024-01-01 12:00:00",
-          "UTC",
+      it("is asked of GeckoTerminal when Moralis has no price", async () => {
+        mockGeckoTerminal.mockResolvedValueOnce(0.0041);
+        expect(await priceOf("phex", "high")).toBe(0.0041);
+        expect(mockGeckoTerminal).toHaveBeenCalledWith(
+          expect.objectContaining({ contract: PHEX_CONTRACT }),
+          AT_MS,
           "high",
           false,
         );
-
-        expect(price).toBe(0.0065);
-        expect(mockMexc).not.toHaveBeenCalled();
-        expect(mockCoingecko).toHaveBeenCalled();
       });
 
-      it("skips CoinPaprika when coinpaprika_id is null", async () => {
-        mockMexc.mockResolvedValueOnce(null);
-        mockCoingecko.mockResolvedValueOnce(null);
-
-        const price = await getCryptoPrice(
-          "xtm",
-          "2024-01-01 12:00:00",
-          "UTC",
-          "high",
-          false,
+      it("falls back to CoinGecko and CoinPaprika when neither pool source has a price", async () => {
+        sources.getPriceFromCoinPaprika.mockResolvedValueOnce(0.004);
+        expect(await priceOf("phex", "close")).toBe(0.004);
+        expect(sources.getPriceFromCoinGecko).toHaveBeenCalledWith(
+          "hex-pulsechain",
+          AT_MS,
+          "close",
         );
+        expect(sources.getPriceFromCoinPaprika).toHaveBeenCalledWith(
+          "hex-hex-pulsechain",
+          AT_MS,
+          "close",
+        );
+      });
 
-        expect(price).toBeNull();
-        expect(mockCoinpaprika).not.toHaveBeenCalled();
+      it("skips Moralis without a Moralis chain, and GeckoTerminal without a network", async () => {
+        await priceOf("nomoralis");
+        expect(mockMoralis).not.toHaveBeenCalled();
+        expect(mockGeckoTerminal).toHaveBeenCalledTimes(1);
+        mockGeckoTerminal.mockClear();
+        await priceOf("nogeckoterminal");
+        expect(mockMoralis).toHaveBeenCalledTimes(1);
+        expect(mockGeckoTerminal).not.toHaveBeenCalled();
+      });
+
+      it("asks neither pool source for a token that names no contract", async () => {
+        await priceOf("btc");
+        expect(mockMoralis).not.toHaveBeenCalled();
+        expect(mockGeckoTerminal).not.toHaveBeenCalled();
       });
     });
 
     describe("caching behavior", () => {
-      it("returns cached price on cache hit", async () => {
-        // getCache is called twice: once for truthiness check, once to get value
-        mockGetCache.mockReturnValue(45000);
-
-        const price = await getCryptoPrice(
-          "btc",
-          "2024-01-01 12:00:00",
-          "UTC",
-          "high",
-          false,
-        );
-
-        expect(price).toBe(45000);
-        expect(mockMexc).not.toHaveBeenCalled();
-        expect(mockCoingecko).not.toHaveBeenCalled();
-        expect(mockCoinpaprika).not.toHaveBeenCalled();
-
-        // Reset for other tests
-        mockGetCache.mockReturnValue(undefined);
+      it("returns cached price on cache hit, asking no source", async () => {
+        mockGetCache.mockReturnValue(48000);
+        expect(await priceOf("btc")).toBe(48000);
+        expect(mockExchangeSources).not.toHaveBeenCalled();
       });
 
       it("caches fetched price", async () => {
-        // Reset all mocks to ensure clean state
-        mockMexc.mockReset();
-        mockCoingecko.mockReset();
-        mockCoinpaprika.mockReset();
-        mockGetCache.mockReset();
-        mockSetCache.mockReset();
-
-        mockGetCache.mockReturnValue(undefined);
-        mockMexc.mockResolvedValueOnce(50000);
-
-        await getCryptoPrice(
-          "btc",
-          "2024-01-01 12:00:00",
-          "UTC",
-          "high",
-          false,
+        sources.getPriceFromMEXC.mockResolvedValueOnce(50000);
+        await priceOf("btc");
+        expect(mockSetCache).toHaveBeenCalledWith(
+          "price_btc_20240101120000_UTC_high",
+          50000,
         );
-
-        expect(mockSetCache).toHaveBeenCalled();
-        const cacheCall = mockSetCache.mock.calls[0];
-        expect(cacheCall[1]).toBe(50000);
       });
 
-      it("uses test cache when provided", async () => {
-        const testCache = new Map();
-        testCache.set("price_btc_20240101120000_UTC_high", 48000);
-
-        const price = await getCryptoPrice(
-          "btc",
-          "2024-01-01 12:00:00",
-          "UTC",
-          "high",
-          false,
-          testCache,
-        );
-
-        expect(price).toBe(48000);
+      it("uses the test cache when one is given, and sets its value", async () => {
+        const testCache = new Map([["price_btc_20240101120000_UTC_low", 1]]);
+        expect(await priceOf("btc", "low", { testCache })).toBe(1);
         expect(mockGetCache).not.toHaveBeenCalled();
-      });
-
-      it("sets value in test cache when provided", async () => {
-        const testCache = new Map();
-        mockMexc.mockResolvedValueOnce(51000);
-
-        await getCryptoPrice(
-          "btc",
-          "2024-01-01 12:00:00",
-          "UTC",
-          "high",
-          false,
-          testCache,
-        );
-
-        expect(testCache.size).toBe(1);
+        sources.getPriceFromMEXC.mockResolvedValueOnce(50000);
+        await priceOf("btc", "high", { testCache });
+        expect(testCache.get("price_btc_20240101120000_UTC_high")).toBe(50000);
         expect(mockSetCache).not.toHaveBeenCalled();
       });
     });
 
     describe("error handling", () => {
       it("returns null for invalid date", async () => {
-        const price = await getCryptoPrice(
-          "btc",
-          "not-a-date",
-          "UTC",
-          "high",
-          false,
-        );
-
-        expect(price).toBeNull();
-        expect(mockMexc).not.toHaveBeenCalled();
+        expect(
+          await getCryptoPrice("btc", "not a date", "UTC", "high"),
+        ).toBeNull();
       });
 
-      it("returns null for future date", async () => {
-        const futureDate = new Date(Date.now() + 86400000)
+      it("returns null for future date, asking no source", async () => {
+        const future = new Date(Date.now() + 86400000 * 30)
           .toISOString()
           .slice(0, 19)
           .replace("T", " ");
-
-        const price = await getCryptoPrice(
-          "btc",
-          futureDate,
-          "UTC",
-          "high",
-          false,
-        );
-
-        expect(price).toBeNull();
-        expect(mockMexc).not.toHaveBeenCalled();
+        expect(await getCryptoPrice("btc", future, "UTC", "high")).toBeNull();
+        expect(mockExchangeSources).not.toHaveBeenCalled();
       });
 
-      it("handles MEXC throwing error", async () => {
-        // Reset all mocks to ensure clean state
-        mockMexc.mockReset();
-        mockCoingecko.mockReset();
-        mockCoinpaprika.mockReset();
-
-        mockMexc.mockRejectedValueOnce(new Error("Network error"));
-        mockCoingecko.mockResolvedValueOnce(49000);
-
-        const price = await getCryptoPrice(
-          "btc",
-          "2024-01-01 12:00:00",
-          "UTC",
-          "high",
-          false,
-        );
-
-        expect(price).toBe(49000);
+      it("goes on to the next source when one throws", async () => {
+        sources.getPriceFromMEXC.mockRejectedValueOnce(new Error("down"));
+        sources.getPriceFromCoinGecko.mockRejectedValueOnce(new Error("down"));
+        sources.getPriceFromCoinPaprika.mockResolvedValueOnce(47000);
+        expect(await priceOf("btc")).toBe(47000);
       });
 
-      it("handles CoinGecko throwing error", async () => {
-        // Reset all mocks to ensure clean state
-        mockMexc.mockReset();
-        mockCoingecko.mockReset();
-        mockCoinpaprika.mockReset();
-
-        // grc has no mexc_symbol, so MEXC is skipped
-        mockCoingecko.mockRejectedValueOnce(new Error("API error"));
-        mockCoinpaprika.mockResolvedValueOnce(0.0055);
-
-        const price = await getCryptoPrice(
-          "grc",
-          "2024-01-01 12:00:00",
-          "UTC",
-          "high",
-          false,
-        );
-
-        expect(price).toBe(0.0055);
-      });
-
-      it("handles CoinPaprika throwing error", async () => {
-        // Reset all mocks to ensure clean state
-        mockMexc.mockReset();
-        mockCoingecko.mockReset();
-        mockCoinpaprika.mockReset();
-
-        // grc has no mexc_symbol, so MEXC is skipped
-        mockCoingecko.mockResolvedValueOnce(null);
-        mockCoinpaprika.mockRejectedValueOnce(new Error("Rate limited"));
-
-        const price = await getCryptoPrice(
-          "grc",
-          "2024-01-01 12:00:00",
-          "UTC",
-          "high",
-          false,
-        );
-
-        expect(price).toBeNull();
+      it("gives null when the script's sources cannot be opened", async () => {
+        mockExchangeSources.mockRejectedValue(new Error("no worker"));
+        expect(await priceOf("btc")).toBeNull();
       });
     });
 
     describe("verbose logging", () => {
-      it("logs when verbose is enabled", async () => {
+      it("logs which source answered when verbose is enabled", async () => {
         const consoleSpy = vi
           .spyOn(console, "log")
           .mockImplementation(() => {});
-        mockMexc.mockResolvedValueOnce(50000);
-
-        await getCryptoPrice("btc", "2024-01-01 12:00:00", "UTC", "high", true);
-
-        expect(consoleSpy).toHaveBeenCalled();
-        const logCalls = consoleSpy.mock.calls.map((c) => c[0]);
-        expect(logCalls.some((msg) => msg.includes("[VERBOSE"))).toBe(true);
-
+        sources.getPriceFromCoinPaprika.mockResolvedValueOnce(0.006);
+        await priceOf("grc", "high", { verbose: true });
+        const lines = consoleSpy.mock.calls.map(([line]) => line);
+        expect(lines).toContain("[VERBOSE:1] MEXC skipped since set to null");
+        expect(lines).toContain(
+          "[VERBOSE:1] CoinPaprika success - price: 0.006",
+        );
         consoleSpy.mockRestore();
       });
 
@@ -369,77 +336,21 @@ describe("Price Fetching Orchestration", () => {
         const consoleSpy = vi
           .spyOn(console, "log")
           .mockImplementation(() => {});
-        mockMexc.mockResolvedValueOnce(50000);
-
-        await getCryptoPrice(
-          "btc",
-          "2024-01-01 12:00:00",
-          "UTC",
-          "high",
-          false,
-        );
-
-        const verboseLogs = consoleSpy.mock.calls.filter(
-          (c) => c[0] && c[0].includes && c[0].includes("[VERBOSE"),
-        );
-        expect(verboseLogs.length).toBe(0);
-
-        consoleSpy.mockRestore();
-      });
-
-      it("logs CoinPaprika success", async () => {
-        const consoleSpy = vi
-          .spyOn(console, "log")
-          .mockImplementation(() => {});
-        mockCoingecko.mockResolvedValueOnce(null);
-        mockCoinpaprika.mockResolvedValueOnce(0.006);
-
-        await getCryptoPrice("grc", "2024-01-01 12:00:00", "UTC", "high", true);
-
-        const logMessages = consoleSpy.mock.calls.map((c) => c[0]);
-        expect(
-          logMessages.some((msg) => msg.includes("CoinPaprika success")),
-        ).toBe(true);
-
+        await priceOf("btc");
+        expect(consoleSpy).not.toHaveBeenCalled();
         consoleSpy.mockRestore();
       });
     });
 
     describe("token configuration", () => {
-      it("handles unknown token gracefully", async () => {
-        // Reset all mocks to ensure clean state
-        mockMexc.mockReset();
-        mockCoingecko.mockReset();
-        mockCoinpaprika.mockReset();
-
-        // Ensure all sources return null for unknown token
-        mockMexc.mockResolvedValue(null);
-        mockCoingecko.mockResolvedValue(null);
-        mockCoinpaprika.mockResolvedValue(null);
-
-        const price = await getCryptoPrice(
-          "unknowntoken",
-          "2024-01-01 12:00:00",
-          "UTC",
-          "high",
-          false,
-        );
-
-        // Unknown token has no config, so all sources are skipped, returns null
-        expect(price).toBeNull();
+      it("asks no source for a token supported-tokens.json does not list", async () => {
+        expect(await priceOf("unknown")).toBeNull();
+        expect(sources.getPriceFromMEXC).not.toHaveBeenCalled();
+        expect(mockMoralis).not.toHaveBeenCalled();
       });
 
       it("reads token config from supported-tokens.json", async () => {
-        mockMexc.mockResolvedValueOnce(50000);
-
-        await getCryptoPrice(
-          "btc",
-          "2024-01-01 12:00:00",
-          "UTC",
-          "high",
-          false,
-        );
-
+        await priceOf("btc");
         expect(mockReadFileSync).toHaveBeenCalledWith(
           "./supported-tokens.json",
           "utf8",
@@ -448,68 +359,16 @@ describe("Price Fetching Orchestration", () => {
     });
 
     describe("price target options", () => {
-      it("passes high target to sources", async () => {
-        mockMexc.mockResolvedValueOnce(50500);
-
-        await getCryptoPrice(
-          "btc",
-          "2024-01-01 12:00:00",
-          "UTC",
-          "high",
-          false,
-        );
-
-        expect(mockMexc).toHaveBeenCalledWith(
-          "BTCUSDT",
-          expect.any(Number),
-          "high",
-          false,
-        );
-      });
-
-      it("passes low target to sources", async () => {
-        mockMexc.mockResolvedValueOnce(49500);
-
-        await getCryptoPrice("btc", "2024-01-01 12:00:00", "UTC", "low", false);
-
-        expect(mockMexc).toHaveBeenCalledWith(
-          "BTCUSDT",
-          expect.any(Number),
-          "low",
-          false,
-        );
-      });
-
-      it("passes close target to sources", async () => {
-        mockMexc.mockResolvedValueOnce(50000);
-
-        await getCryptoPrice(
-          "btc",
-          "2024-01-01 12:00:00",
-          "UTC",
-          "close",
-          false,
-        );
-
-        expect(mockMexc).toHaveBeenCalledWith(
-          "BTCUSDT",
-          expect.any(Number),
-          "close",
-          false,
-        );
-      });
-
-      it("defaults to high target", async () => {
-        mockMexc.mockResolvedValueOnce(50500);
-
-        await getCryptoPrice("btc", "2024-01-01 12:00:00", "UTC");
-
-        expect(mockMexc).toHaveBeenCalledWith(
-          "BTCUSDT",
-          expect.any(Number),
-          "high",
-          false,
-        );
+      it("passes the target to the sources", async () => {
+        for (const target of ["high", "low", "close"]) {
+          sources.getPriceFromMEXC.mockClear();
+          await priceOf("btc", target);
+          expect(sources.getPriceFromMEXC).toHaveBeenCalledWith(
+            "BTC",
+            AT_MS,
+            target,
+          );
+        }
       });
     });
   });

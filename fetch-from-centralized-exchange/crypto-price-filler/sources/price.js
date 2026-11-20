@@ -1,17 +1,22 @@
 /**
  * @file price.js
  * @description Main price fetching logic for crypto-price-filler.
- * Tries MEXC first (preferred), falls back to CoinGecko, then CoinPaprika if needed.
- * Handles caching, rate-limit retry, BTC pair adjustment, verbose logging.
+ * A token that trades in pools, which names its contract in
+ * supported-tokens.json, is asked of Moralis first (with a saved key) and
+ * GeckoTerminal next; then every token is asked of MEXC, CoinGecko and
+ * CoinPaprika, in that order, until one gives a price. Those three are
+ * the Sheets script getCryptoPriceFromCentralizedExchange's own price
+ * sources, run through the repo's runner (`exchange.js`).
+ * Handles caching and verbose logging.
  *
  * @module price
  * @version 1.0.0
  * @author Christopher M. Balz with Grok and Claude.ai
  */
 
-import { getPriceFromMEXC } from "./mexc.js";
-import { getPriceFromCoinGecko } from "./coingecko.js";
-import { getPriceFromCoinPaprika } from "./coinpaprika.js";
+import { getPriceFromMoralis } from "./moralis.js";
+import { getPriceFromGeckoTerminal } from "./geckoterminal.js";
+import { exchangeSources } from "./exchange.js";
 import { getCache, setCache } from "../utils/cache.js";
 import { parseInputToUtcMs } from "../utils/date.js";
 import fs from "fs";
@@ -29,9 +34,24 @@ function logv(shouldLog, level, message, ...args) {
 }
 
 /**
+ * Reads the pool facts of a token's entry: its contract, and the ids
+ * GeckoTerminal and Moralis give its chain.
+ * @param {Object} tokenConfig - The token's entry in supported-tokens.json
+ * @returns {import('./moralis.js').PoolToken|null} The facts, or null for a token that names no contract
+ */
+function poolTokenOf(tokenConfig) {
+  if (typeof tokenConfig.contract !== "string") return null;
+  return {
+    contract: tokenConfig.contract,
+    network: tokenConfig.geckoterminal_network ?? null,
+    moralisChain: tokenConfig.moralis_chain ?? null,
+  };
+}
+
+/**
  * Loads token configuration from supported-tokens.json.
  * @param {string} token - Token symbol
- * @returns {Object} Token configuration with coingeckoId, coinpaprikaId, mexcSymbol
+ * @returns {Object} Token configuration with coingeckoId, coinpaprikaId, mexcSymbol, and poolToken for a token that trades in pools
  */
 function loadTokenConfig(token) {
   const supportedTokens = JSON.parse(
@@ -43,6 +63,7 @@ function loadTokenConfig(token) {
     coingeckoId: tokenConfig.coingecko_id || null,
     coinpaprikaId: tokenConfig.coinpaprika_id || null,
     mexcSymbol: tokenConfig.mexc_symbol || null,
+    poolToken: poolTokenOf(tokenConfig),
   };
 }
 
@@ -98,93 +119,84 @@ function storeInCache(cacheKey, price, testCache) {
 }
 
 /**
- * Attempts to fetch price from MEXC.
- * @param {string} mexcSymbol - MEXC symbol
+ * Attempts to fetch price from Moralis, for a token that trades in pools
+ * and names Moralis's id for its chain.
+ * @param {import('./moralis.js').PoolToken|null} poolToken - The token's pool facts, or null
  * @param {number} utcMs - UTC timestamp
  * @param {string} target - Price target
  * @param {boolean} verbose - Enable verbose logging
  * @returns {Promise<number|null>} Price or null
  */
-async function tryMEXC(mexcSymbol, utcMs, target, verbose) {
-  if (mexcSymbol === null) {
-    logv(verbose, 1, "MEXC skipped since set to null");
+async function tryMoralis(poolToken, utcMs, target, verbose) {
+  if (poolToken === null || poolToken.moralisChain === null) {
+    logv(verbose, 1, "Moralis skipped: no contract or Moralis chain set");
     return null;
   }
-
-  try {
-    const price = await getPriceFromMEXC(mexcSymbol, utcMs, target, verbose);
-    if (price !== null) {
-      logv(verbose, 1, `MEXC success - price: ${price}`);
-    }
-    return price;
-  } catch (err) {
-    logv(verbose, 1, `MEXC failed: ${err.message}`);
-    return null;
-  }
+  const price = await getPriceFromMoralis(poolToken, utcMs, target, verbose);
+  if (price !== null) logv(verbose, 1, `Moralis success - price: ${price}`);
+  return price;
 }
 
 /**
- * Attempts to fetch price from CoinGecko.
- * @param {string} token - Token symbol
- * @param {string} coingeckoId - CoinGecko ID
+ * Attempts to fetch price from GeckoTerminal, for a token that trades in
+ * pools and names GeckoTerminal's id for its chain.
+ * @param {import('./moralis.js').PoolToken|null} poolToken - The token's pool facts, or null
  * @param {number} utcMs - UTC timestamp
  * @param {string} target - Price target
  * @param {boolean} verbose - Enable verbose logging
  * @returns {Promise<number|null>} Price or null
  */
-async function tryCoinGecko(token, coingeckoId, utcMs, target, verbose) {
-  if (!coingeckoId) {
-    logv(verbose, 1, "CoinGecko skipped since set to null");
+async function tryGeckoTerminal(poolToken, utcMs, target, verbose) {
+  if (poolToken === null || poolToken.network === null) {
+    logv(verbose, 1, "GeckoTerminal skipped: no contract or network set");
     return null;
   }
-
-  logv(verbose, 1, "Falling back to CoinGecko");
-  try {
-    const price = await getPriceFromCoinGecko(
-      token,
-      utcMs,
-      target,
-      verbose,
-      coingeckoId,
-    );
-    if (price !== null) {
-      logv(verbose, 1, `CoinGecko success - price: ${price}`);
-    }
-    return price;
-  } catch (err) {
-    logv(verbose, 1, `CoinGecko failed: ${err.message}`);
-    return null;
+  const price = await getPriceFromGeckoTerminal(
+    poolToken,
+    utcMs,
+    target,
+    verbose,
+  );
+  if (price !== null) {
+    logv(verbose, 1, `GeckoTerminal success - price: ${price}`);
   }
+  return price;
 }
 
 /**
- * Attempts to fetch price from CoinPaprika.
- * @param {string} coinpaprikaId - CoinPaprika ID
+ * Asks one of the Sheets script's price sources (`exchange.js`) for a
+ * price, skipping it when the token's entry names no id for it.
+ * @param {string} name - The source's name in log lines, such as 'MEXC'
+ * @param {string} sourceFunction - The script's function, such as 'getPriceFromMEXC'
+ * @param {string|null} id - The token's id at the source (its MEXC symbol, CoinGecko id or CoinPaprika id), or null to skip it
  * @param {number} utcMs - UTC timestamp
  * @param {string} target - Price target
  * @param {boolean} verbose - Enable verbose logging
  * @returns {Promise<number|null>} Price or null
  */
-async function tryCoinPaprika(coinpaprikaId, utcMs, target, verbose) {
-  if (!coinpaprikaId) {
-    logv(verbose, 1, "CoinPaprika skipped since set to null");
+async function tryExchangeSource(
+  name,
+  sourceFunction,
+  id,
+  utcMs,
+  target,
+  verbose,
+) {
+  if (id === null) {
+    logv(verbose, 1, `${name} skipped since set to null`);
     return null;
   }
-
-  logv(verbose, 1, "Falling back to CoinPaprika");
   try {
-    const price = await getPriceFromCoinPaprika(
-      coinpaprikaId,
-      utcMs,
-      target,
-      verbose,
-    );
-    if (price !== null) {
-      logv(verbose, 1, `CoinPaprika success - price: ${price}`);
+    const sources = await exchangeSources(verbose);
+    const price = await sources[sourceFunction](id, utcMs, target);
+    if (typeof price !== "number" || !Number.isFinite(price)) {
+      logv(verbose, 1, `${name} has no ${target} price`);
+      return null;
     }
+    logv(verbose, 1, `${name} success - price: ${price}`);
     return price;
   } catch (err) {
-    logv(verbose, 1, `CoinPaprika failed: ${err.message}`);
+    logv(verbose, 1, `${name} failed: ${err.message}`);
     return null;
   }
 }
@@ -194,9 +206,16 @@ async function tryCoinPaprika(coinpaprikaId, utcMs, target, verbose) {
  *
  * Priority:
  * 1. Cache hit
- * 2. MEXC
- * 3. CoinGecko
- * 4. CoinPaprika (additional fallback for coins like GRC)
+ * 2. Moralis, for a token with a contract and a Moralis chain, when a
+ *    Moralis key is saved; it answers the close only
+ * 3. GeckoTerminal, for a token with a contract and a GeckoTerminal
+ *    network, within the last 180 days
+ * 4. MEXC, under the token's mexc_symbol
+ * 5. CoinGecko, under its coingecko_id
+ * 6. CoinPaprika, under its coinpaprika_id
+ *
+ * 4 to 6 are the Sheets script's price sources (`exchange.js`); each is
+ * skipped when the token's entry names no id for it.
  *
  * @param {string} token - Token symbol (e.g. 'xtm', 'grc')
  * @param {string} dateStr - Date/time string in 'yyyy-MM-dd HH:mm:ss' format
@@ -215,7 +234,8 @@ export async function getCryptoPrice(
   verbose = false,
   testCache = null,
 ) {
-  const { coingeckoId, coinpaprikaId, mexcSymbol } = loadTokenConfig(token);
+  const { coingeckoId, coinpaprikaId, mexcSymbol, poolToken } =
+    loadTokenConfig(token);
 
   // Log resolved IDs
   const coingeckoStatus = coingeckoId || "skipped since set to null";
@@ -254,14 +274,43 @@ export async function getCryptoPrice(
   logv(verbose, 1, `Cache MISS for "${cacheKey}" - fetching price`);
 
   // Try sources in order
-  let price = await tryMEXC(mexcSymbol, utcMs, target, verbose);
+  let price = await tryMoralis(poolToken, utcMs, target, verbose);
 
   if (price === null) {
-    price = await tryCoinGecko(token, coingeckoId, utcMs, target, verbose);
+    price = await tryGeckoTerminal(poolToken, utcMs, target, verbose);
   }
 
   if (price === null) {
-    price = await tryCoinPaprika(coinpaprikaId, utcMs, target, verbose);
+    price = await tryExchangeSource(
+      "MEXC",
+      "getPriceFromMEXC",
+      mexcSymbol,
+      utcMs,
+      target,
+      verbose,
+    );
+  }
+
+  if (price === null) {
+    price = await tryExchangeSource(
+      "CoinGecko",
+      "getPriceFromCoinGecko",
+      coingeckoId,
+      utcMs,
+      target,
+      verbose,
+    );
+  }
+
+  if (price === null) {
+    price = await tryExchangeSource(
+      "CoinPaprika",
+      "getPriceFromCoinPaprika",
+      coinpaprikaId,
+      utcMs,
+      target,
+      verbose,
+    );
   }
 
   // Cache and return

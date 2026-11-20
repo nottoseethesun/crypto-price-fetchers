@@ -1,10 +1,12 @@
 # crypto-price-fetchers — System Architecture
 
 crypto-price-fetchers prices crypto tokens that Google Sheets cannot price
-by itself: the price now, from a pool on a decentralized exchange, and the
-price at a past minute, from centralized exchanges. It does so in Google
-Sheets, as Apps Script, and on a computer, as Node programs that run the
-same scripts. Two other projects build on it: pulsechain-analytics and
+by itself, in USD: the price now, from a pool on a decentralized exchange,
+and the price at a past minute, from centralized exchanges and, for a token
+that trades in pools, from the services that price those pools. It does so
+in Google Sheets, as Apps Script, and on a computer, as Node programs that
+run the same scripts. Three other projects build on it:
+pulsechain-analytics, pulsechain-validator-analytics and
 x1-validator-analytics.
 
 Two companion references sit alongside this one:
@@ -22,7 +24,9 @@ Two companion references sit alongside this one:
 - [The Sheets Scripts](#the-sheets-scripts)
 - [The Runner](#the-runner)
 - [The Node Versions](#the-node-versions)
+- [The Build Step](#the-build-step)
 - [crypto-price-filler](#crypto-price-filler)
+- [Prices of Tokens That Trade in Pools](#prices-of-tokens-that-trade-in-pools)
 - [The Key Store](#the-key-store)
 - [Projects That Use This One](#projects-that-use-this-one)
 - [Technology Choices](#technology-choices)
@@ -40,7 +44,9 @@ being printed.
 | The Sheets scripts | `crypto-price-fetchers.gs`, `fetch-from-centralized-exchange/*.gs` | Apps Script functions a sheet's cells call. |
 | The runner | `apps-script-runner/` | Runs a Sheets script under Node, unchanged. |
 | The Node versions | `crypto-price-fetchers.js`, `fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.js` | Each Sheets script as a Node module and a command line, through the runner. |
-| crypto-price-filler | `fetch-from-centralized-exchange/crypto-price-filler/` | A Node tool that fills a CSV's price columns, row by row, from the centralized exchanges. A package of its own. |
+| The build step | `build.js`, `apps-script-build/` | Gives each Sheets script with the saved api keys set in it, on the clipboard, for pasting into Apps Script. |
+| crypto-price-filler | `fetch-from-centralized-exchange/crypto-price-filler/` | A Node tool that fills a CSV's price columns, row by row, from the pools' price services and the exchange script's sources. A package of its own. |
+| The price clients | `dex-prices/` | Moralis and GeckoTerminal, which price a token from a blockchain's pools, and the one loop that sends a refused request again. |
 | The key store | `api-key-store/`, `manage-api-keys.js`, `unlock-api-keys.sh` | Api keys kept encrypted with a password: LP Ranger's design, as a module. |
 | The security lint's rule | `eslint-rules/no-secret-logging.js` | Refuses printing a name that may hold a secret. |
 
@@ -68,7 +74,8 @@ editor (`-tests.gs`). Each file names what it uses from the others in a
 `/* global */` comment, for the lint. How both scripts are tested is in
 [`docs/engineering.md`](engineering.md#how-the-sheets-scripts-gs-are-tested).
 
-The owner pastes the scripts into Apps Script; the repo is where they change.
+The owner pastes the scripts into Apps Script, as the build step gives
+them; the repo is where they change.
 
 ---
 
@@ -112,26 +119,91 @@ show. It never copies the script's logic: a fix in the `.gs` fixes both.
 
 What differs from the sheet: there is no 30-second limit per call and no
 daily cap on requests; the cache lasts while the script is open; and the
-api keys come from the key store, not the script. `crypto-price-fetchers.js`
-opens only the key its call needs, DexTools' or x1.ninja's, and lays it over
+api keys come from the key store, not the script. Each Node version lays
+the keys it opens over the script's config: `crypto-price-fetchers.js`
+opens only the key its call needs, DexTools' or x1.ninja's, for
 `CONFIG.API_KEY` or `X1_CONFIG.API_KEY`;
-`getCryptoPriceFromCentralizedExchange.js` hands CoinGecko's to the script
-as the Script Property `COINGECKO_API_KEY`, as Apps Script would.
+`getCryptoPriceFromCentralizedExchange.js` opens CoinGecko's and
+CoinPaprika's, for `CONFIG.COINGECKO_API_KEY` and
+`CONFIG.COINPAPRIKA_API_KEY`. Its `openCentralizedExchangeSources` opens
+the script's three price sources rather than its Sheets function, for
+crypto-price-filler.
+
+---
+
+## The Build Step
+
+Apps Script cannot read the key file, so a key reaches a sheet only inside
+the script pasted there. `npm run build apps-script` writes it in, so no
+key is typed into a script by hand (`apps-script-build/`).
+
+- Each Node version exports a build spec, `APPS_SCRIPT_BUILD`: the
+  script's files, in Apps Script's order, the services whose keys it
+  sends, and the function that lays the keys over its config.
+- The build opens the keys as the programs do (`unlockProjectKeys`), and
+  sets, as the last statements of each script's first file, the values
+  the Node version would set: those of the config.json it reads, with the
+  keys laid over them. It first loads the script with the runner and
+  applies the values, so a field the script lacks stops the build, as it
+  stops the Node version (`built-script.js`).
+- It puts each file on the clipboard in turn, through the desktop's tool
+  (`clipboard.js`), says where to paste it, waits for Enter, and clears
+  the clipboard after the last. With no tool installed, it offers to
+  install one with `sudo apt install`; declined, it warns that the keys go
+  to disk in the clear, then writes the files to `build/apps-script/`,
+  which git ignores, readable by the owner alone.
+
+No line it prints holds a key.
 
 ---
 
 ## crypto-price-filler
 
 The filler reads a CSV of timestamps and writes it out with each row's
-price, for as many rows as the file holds. Its sources (`sources/`) ask
-MEXC, CoinGecko and CoinPaprika in turn, through one http layer that
-retries after a rate limit (`utils/fetch.js`), with a cache of answers
-(`utils/cache.js`). As it starts, it opens the CoinGecko key from the key
-store; without one, it asks CoinGecko without a key, at its lower rate
-limit. `backfill.js` fills the empty prices of a file already written.
+price, for as many rows as the file holds, asking its sources in turn
+(`sources/price.js`), with a cache of answers (`utils/cache.js`):
+
+1. For a token whose entry in `supported-tokens.json` names its contract
+   and chains, the pool sources: Moralis (`sources/moralis.js`), when a
+   Moralis key is saved, then GeckoTerminal (`sources/geckoterminal.js`),
+   through the price clients (see
+   [Prices of Tokens That Trade in Pools](#prices-of-tokens-that-trade-in-pools)).
+2. For every token, MEXC, CoinGecko and CoinPaprika: the exchange
+   script's own sources, which the filler runs in a worker through the
+   script's Node version (`sources/exchange.js`), opened at the first
+   price asked and closed at the end of the run.
+
+As it starts, it opens the CoinGecko, CoinPaprika and Moralis keys from the
+key store, each one saved. `backfill.js` fills the empty prices of a file
+already written.
 
 Its settings are `config-example.json`, committed, with its own
-`config.json`, which git ignores, laid over them.
+`config.json`, which git ignores, laid over them. The exchange sources run
+on the script's own `CONFIG`.
+
+---
+
+## Prices of Tokens That Trade in Pools
+
+A token that trades in a blockchain's pools has a price wherever it
+trades, and the services that read the pools give it. `dex-prices/` holds
+their clients, asked in LP Ranger's order:
+
+- Moralis (`moralis.js`) gives the token's price at a block: the block the
+  chain had at a time, then the price there. It needs a key, and gives one
+  price, with no high or low.
+- GeckoTerminal (`geckoterminal.js`) gives a pool's candles. The pool is
+  the one LP Ranger picks: of the first pools GeckoTerminal ranks for the
+  token, the deepest that traded in the last day and holds the token on
+  one of its sides. Its public api serves the last 180 days, and takes
+  about thirty requests a minute, so the client keeps every caller in the
+  process within one budget of twenty a minute.
+- Every request goes through `web-request.js`, the one loop that sends a
+  request again after each wait while a service refuses it as one too
+  many (status 429).
+
+crypto-price-filler's pool sources use these clients, and other repos
+install them from this one.
 
 ---
 
@@ -165,10 +237,12 @@ The password is kept nowhere on disk, and the plain keys only in memory.
 
 ## Projects That Use This One
 
-pulsechain-analytics and x1-validator-analytics install this repo from
-GitHub, pinned to a commit, as a dependency their `npm install` installs.
-Both use the key store, run `no-secret-logging` in their security lint, and
-keep a copy of `unlock-api-keys.sh`, which their tests hold to this one.
+pulsechain-analytics, pulsechain-validator-analytics and
+x1-validator-analytics install this repo from GitHub, pinned to a commit,
+as a dependency their `npm install` installs. pulsechain-analytics and
+x1-validator-analytics use the key store, run `no-secret-logging` in their
+security lint, and keep a copy of `unlock-api-keys.sh`, which their tests
+hold to this one.
 pulsechain-analytics also runs a Sheets script of its own,
 `fetch-amount-of-token-transferred.gs`, through the runner; it calls
 nothing in this repo's Sheets scripts. A change here reaches them when they
