@@ -55,8 +55,8 @@ export function rawReply(status, text) {
 
 /**
  * The status and body text an answer stands for: a reply's own, else 200
- * with the json body, or 404 for null. `stand-in-exchange.js` reads
- * answers the same way.
+ * with the json body, or 404 for null. `stand-in-fetch.js` reads its
+ * answers through this function too.
  *
  * @param {*} answered - What `answer` returned
  * @returns {{status: number, text: string}} The status and the body
