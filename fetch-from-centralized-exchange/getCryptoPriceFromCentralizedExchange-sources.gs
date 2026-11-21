@@ -146,15 +146,51 @@ function findMEXCTradingPair(token, symbols) {
   return { symbol, useBTC };
 }
 
-/** Fetches kline data, trying 1m then 60m interval */
-function fetchMEXCKlineData(symbol, utcMs) {
-  // Try 1-minute interval first
-  let data = fetchKline(symbol, CONFIG.DEFAULT_INTERVAL, utcMs - 60000, utcMs);
-  if (isValidKlineData(data, utcMs)) return data;
+/** The length of each interval the script asks MEXC for, in ms: CONFIG.DEFAULT_INTERVAL's and CONFIG.FALLBACK_INTERVAL's. */
+const MEXC_INTERVAL_MS = Object.freeze({ "1m": 60000, "60m": 3600000 });
 
-  // Fallback to 60-minute interval
-  data = fetchKline(symbol, CONFIG.FALLBACK_INTERVAL, utcMs - 3600000, utcMs);
-  return data && data.length > 0 ? data : null;
+/**
+ * The candle of the minute that holds the time, or, when MEXC keeps no
+ * candle of that minute, the candle of the hour that holds it. MEXC keeps
+ * minute candles for about the last 30 days, and hour candles for years.
+ *
+ * @param {string} symbol - The MEXC pair, such as XTMUSDT
+ * @param {number} utcMs - The time, in ms since 1970 UTC
+ * @return {?Array} MEXC's candles, the one asked first, or null when neither period has one
+ */
+function fetchMEXCKlineData(symbol, utcMs) {
+  for (const interval of [CONFIG.DEFAULT_INTERVAL, CONFIG.FALLBACK_INTERVAL]) {
+    const data = fetchPeriodKline(symbol, interval, utcMs);
+    if (data !== null) return data;
+  }
+  return null;
+}
+
+/**
+ * The candle of the period of an interval that holds the time. MEXC's
+ * candles open on their period's boundaries, one for each period it keeps,
+ * whether or not anything traded in it, and MEXC gives the first candle
+ * that opens in the window asked, or none. So asked for the period itself,
+ * from its first millisecond to its last, MEXC gives the period's own
+ * candle, or none when it keeps no candle of the period.
+ *
+ * @param {string} symbol - The MEXC pair
+ * @param {string} interval - The interval, one MEXC_INTERVAL_MS lists
+ * @param {number} utcMs - The time, in ms since 1970 UTC
+ * @return {?Array} MEXC's candles, the period's first, or null when MEXC keeps none of the period
+ */
+function fetchPeriodKline(symbol, interval, utcMs) {
+  const periodMs = MEXC_INTERVAL_MS[interval];
+  if (periodMs === undefined) {
+    throw new Error(`MEXC interval ${interval} is not one the script knows`);
+  }
+  const start = Math.floor(utcMs / periodMs) * periodMs;
+  const data = fetchKline(symbol, interval, start, start + periodMs - 1);
+  if (data !== null && data.length > 0) return data;
+  Logger.log(
+    `MEXC keeps no ${interval} candle of the period that holds the time`,
+  );
+  return null;
 }
 
 /** Fetches single kline candle */
@@ -163,17 +199,6 @@ function fetchKline(symbol, interval, startTime, endTime) {
   const label = `MEXC ${interval} klines`;
   const data = jsonOf(fetchWithRetries(url, {}, label), label);
   return Array.isArray(data) ? data : null;
-}
-
-/** Validates kline data timestamp is close enough to requested time */
-function isValidKlineData(data, utcMs) {
-  if (!data || data.length === 0) return false;
-  const candleTime = data[0][0];
-  if (Math.abs(candleTime - utcMs) > 120000) {
-    Logger.log(`Warning: Candle time too far from requested - skipping`);
-    return false;
-  }
-  return true;
 }
 
 /** Reads the high, the low or the close of a kline candle */

@@ -259,7 +259,10 @@ that this section, or `CLAUDE.md`, names every one.
 
 Its helpers (`test/helpers/`), besides those the paragraphs above name:
 `captured-output.js`, a stream stand-in that keeps what is written to it,
-for the tests of the command lines.
+for the tests of the command lines; and `stand-in-mexc.js`, which gives
+the candle MEXC answers a request for candles with, the first that opens
+in the window asked, or none, so the stand-ins of both suites answer as
+MEXC does.
 
 **crypto-price-filler's** (`tests/`):
 
