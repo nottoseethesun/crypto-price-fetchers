@@ -40,27 +40,30 @@ MEXC for the price first, then CoinGecko, then CoinPaprika. It caches
 each answer, and its lock makes the calls of many cells take turns,
 so a sheet stays within each service's rate limit.
 
-The script is in three files, each pasted into a script file of its own in
-Apps Script, which loads a project's script files into one scope:
+The script is in three files, which work as one, since Apps Script runs
+every script file of a project in one global scope:
 
 - [`getCryptoPriceFromCentralizedExchange.gs`](./getCryptoPriceFromCentralizedExchange.gs):
-  `=getCryptoPrice()`, its settings, the cache and the menu.
+  `=getCryptoPrice()`, its settings and the cache.
 - [`getCryptoPriceFromCentralizedExchange-sources.gs`](./getCryptoPriceFromCentralizedExchange-sources.gs):
   the price sources.
 - [`getCryptoPriceFromCentralizedExchange-tests.gs`](./getCryptoPriceFromCentralizedExchange-tests.gs):
-  the tests to run from the Apps Script editor, which the sheet does not
-  need.
+  the tests to run from the Apps Script editor.
 
-The repo's build step, `npm run build apps-script`, gives the three files
-one at a time on the clipboard, with the CoinGecko and CoinPaprika keys
-saved in the repo set at the end of the first, and says where to paste
-each: see [Install](../README.md#3-the-sheets-scripts-with-their-keys) in
-the repo's README. Pasted as committed, the script asks both services
-without a key.
+The repo's build step, `npm run build apps-script`, puts the three files,
+with the repo's other Sheets scripts and the Crypto Price Fetchers menu,
+in one file to paste into a spreadsheet, with the CoinGecko and
+CoinPaprika keys saved in the repo set at its end: see
+[Install in Google Sheets](../README.md#3-install-in-google-sheets) in the
+repo's README. Without saved keys, the script asks both services without
+a key. The menu's Refresh & freeze historical prices item runs a tab's
+`getCryptoPrice` cells again and keeps each price as a number.
 
-For detailed usage, configuration, and data-source documentation, see the
-file header in
-[`getCryptoPriceFromCentralizedExchange.gs`](./getCryptoPriceFromCentralizedExchange.gs).
+The help section of the header of
+[`getCryptoPriceFromCentralizedExchange.gs`](./getCryptoPriceFromCentralizedExchange.gs),
+which the spreadsheet shows under Crypto Price Fetchers > Help, says how
+to call the function; the rest of the header covers its settings and
+data sources.
 
 ---
 

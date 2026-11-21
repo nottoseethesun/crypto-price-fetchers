@@ -6,8 +6,8 @@
  *   prices (USD) from centralized exchanges for use directly in Google
  *   Sheets.
  * @author Christopher M. Balz, with Grok and Claude
- * @version 2.16.0
- * @lastModified November 19, 2026
+ * @version 2.17.0
+ * @lastModified November 20, 2026
  *
  * OVERVIEW
  * --------
@@ -20,29 +20,22 @@
  * INSTALLATION
  * ------------
  * The script is in three files, to keep each under LP Ranger's 500 lines of
- * code. Apps Script loads every script file of a project into one global
- * scope, so they work as one.
- *
- * 1. Open Google Sheet -> Extensions -> Apps Script
- * 2. Paste this file's contents into the script file there
- * 3. Add a script file (Files, +, Script) named
- *    getCryptoPriceFromCentralizedExchange-sources, and paste
- *    getCryptoPriceFromCentralizedExchange-sources.gs into it: the price
- *    sources, MEXC, CoinGecko and CoinPaprika
- * 4. Optional: add getCryptoPriceFromCentralizedExchange-tests.gs the same
- *    way, to run the tests from the editor
- * 5. Save and refresh the sheet
- * To send the CoinGecko and CoinPaprika api keys, paste this file as the
- * repo's build step gives it instead (see API KEYS below).
+ * code: this one, getCryptoPriceFromCentralizedExchange-sources.gs, the
+ * price sources, MEXC, CoinGecko and CoinPaprika, and
+ * getCryptoPriceFromCentralizedExchange-tests.gs, the tests run from the
+ * Apps Script editor. Apps Script runs every script file of a project in
+ * one global scope, so the three work as one. The build step of the
+ * crypto-price-fetchers repo, `npm run build apps-script`, joins them with
+ * the repo's other Sheets scripts into the one file to paste into a
+ * spreadsheet; the repo's README, under Install, says how.
  *
  * API KEYS
  * --------
  * This file, as committed, holds no api key: CONFIG.COINGECKO_API_KEY and
  * CONFIG.COINPAPRIKA_API_KEY are empty, and the script asks each service
- * without a key. The repo's build step, `npm run build apps-script`, run
- * in the repo's top folder, gives this file with the keys saved there
- * (`npm run api-keys`) set at its end, and says where to paste it. Each
- * key is optional:
+ * without a key. The build step sets them at the end of the file it gives,
+ * from the keys saved in the repo (`npm run api-keys`). Each key is
+ * optional:
  *
  *   COINGECKO_API_KEY   - A CoinGecko demo api key, sent to CoinGecko in
  *                         the x-cg-demo-api-key header. Without it,
@@ -55,33 +48,77 @@
  * A key goes only in a header, never in a url, so no url the log quotes
  * holds it.
  *
- * USAGE
- * -----
- *   =getCryptoPrice(token, dateStr, tz, mode)
+ * <!-- HELP START -->
+ * ## Past prices: getCryptoPrice
  *
- * Parameters:
- *   token   - Ticker symbol, case-insensitive ("btc", "grc", "xmr", "xtm")
- *   dateStr - "YYYY-MM-DD HH:MM:SS" (24-hour) or a cell reference
- *   tz      - Timezone abbreviation (see SUPPORTED TIMEZONES below)
- *   mode    - "high", "low" or "close"; defaults to "high" if omitted (any
- *             other value is also treated as "high")
+ * `getCryptoPrice(token, dateStr, tz, mode)` gives a coin's price in USD at
+ * a past time: the highest, the lowest or the closing price of a short
+ * period around that time, from centralized exchanges.
  *
- * Examples:
- *   =getCryptoPrice("btc", "2026-01-15 14:30:00", "CST", "high")
- *   =getCryptoPrice("grc", A1, "CST")
- *   =getCryptoPrice("xmr", A1, "UTC", "low")
- *   =getCryptoPrice("xtm", A1, "UTC", "close")
+ * - `token`: the coin's ticker symbol, in any case, such as `"btc"`,
+ *   `"grc"`, `"xmr"` or `"xtm"`.
+ * - `dateStr`: the time, written `"YYYY-MM-DD HH:MM:SS"` (24-hour), or a
+ *   cell that holds a date and time.
+ * - `tz`: the time zone of that time, by its abbreviation (see Time
+ *   zones); left empty, UTC.
+ * - `mode`: `"high"`, `"low"` or `"close"`; any other value, or none,
+ *   means `"high"`.
  *
- * HIGH, LOW AND CLOSE
- * -------------------
- * Each provider prices a period around the requested time. "high" returns
- * the highest price recorded in that period and "low" the lowest, which
- * bound a transaction's value: "high" for the best-case sale price and
- * "low" for the worst-case, or the other way round, depending on
- * perspective. "close" returns the price at the end of the period, the
- * nearest to the time that the provider records.
+ * ```
+ * =getCryptoPrice("btc", "2026-01-15 14:30:00", "CST", "high")
+ * =getCryptoPrice("grc", A1, "CST")
+ * =getCryptoPrice("xmr", A1, "UTC", "low")
+ * =getCryptoPrice("xtm", A1, "UTC", "close")
+ * ```
  *
- * The period depends on which provider returns the data:
+ * A price for a time is kept for 24 hours, and "no data" for 5 minutes,
+ * so a cell that runs again within that time gives the answer it gave
+ * before. A past price does not change, so Refresh & freeze historical
+ * prices, in the Crypto Price Fetchers menu, can replace these formulas
+ * with their numbers.
+ *
+ * ### High, low and close
+ *
+ * Each source prices a period around the time. `"high"` gives the
+ * highest price recorded in that period and `"low"` the lowest, which
+ * bound what a trade at that time was worth. `"close"` gives the price at
+ * the end of the period, the nearest to the time the source records. The
+ * period depends on the source that answers:
+ *
+ * - MEXC, an exchange, asked first: the minute that holds the time, or, if
+ *   no trade happened in that minute, the hour.
+ * - CoinGecko, a service that gathers the exchanges' prices, asked next:
+ *   24 hours of hourly prices, from 12 hours before the time to 12 hours
+ *   after; for `"close"` only, the day's price at 00:00 UTC.
+ * - CoinPaprika, a service like CoinGecko, asked last: the day, from 00:00
+ *   to 23:59:59 UTC, that holds the time; for `"close"` only, when the day
+ *   is older than the plan's candles reach, the day's price at 00:00 UTC.
+ *
+ * ### Time zones
+ *
+ * UTC, GMT, EST, EDT, CST, CDT, MST, MDT, PST and PDT. Use the one in force
+ * at that time: CDT in summer and CST in winter for US Central time. Any
+ * other value gives a message in the cell instead of a price, so a
+ * misspelt zone is never read as UTC.
+ *
+ * ### Messages in the cell
+ *
+ * - `No data available from any source`: no source had a price for that
+ *   coin at that time; `No data available (cached)` repeats that answer
+ *   for 5 minutes.
+ * - `No data available for future dates`: the time is after now.
+ * - `Rate limit busy - retry later`: other cells kept the script busy;
+ *   choose Clean up errors in the Crypto Price Fetchers menu, which runs
+ *   the cell again.
+ * - `Unknown time zone`, or `Invalid` with a part of the date: check
+ *   `tz` or `dateStr`.
+ * - `#ERROR!`: choose Clean up errors in the Crypto Price Fetchers menu.
+ * <!-- HELP END -->
+ *
+ * HIGH, LOW AND CLOSE, BY SOURCE
+ * ------------------------------
+ * The help section above says what each mode gives. Each provider works it
+ * out from its own data:
  *
  *   MEXC: Tries a 1-minute candle first (the single minute containing
  *     the requested timestamp). If no trades occurred in that minute, it
@@ -121,13 +158,14 @@
  *                   a) market_chart/range (24h window, hourly data points)
  *                   b) history (the price of the requested UTC day), for
  *                      close only
- *                   Both send the demo api key when the Script Property
- *                   COINGECKO_API_KEY holds one (see API KEYS above).
+ *                   Both send the demo api key when
+ *                   CONFIG.COINGECKO_API_KEY holds one (see API KEYS
+ *                   above).
  *
  *   3. CoinPaprika - The day's candle, then, for close, the day's price
- *                   (see above). With the Script Property
- *                   COINPAPRIKA_API_KEY, both are asked of the paid server
- *                   with the key, and reach as far back as the plan does.
+ *                   (see above). With a key in CONFIG.COINPAPRIKA_API_KEY,
+ *                   both are asked of the paid server with the key, and
+ *                   reach as far back as the plan does.
  *                   Skip list: grc-gridcoin (is_active is false).
  *
  * TOKEN MAPPINGS (TOKEN_TO_ID):
@@ -148,7 +186,7 @@
  *   FALLBACK_INTERVAL    - Second kline resolution ("60m")
  *
  *   TIMEZONE_OFFSETS     - Map of abbreviation to UTC offset in hours
- *                          (see SUPPORTED TIMEZONES)
+ *                          (see Time zones, in the help section above)
  *
  *   CACHE_EXPIRY_SECONDS
  *     DAILY_PRICE        - TTL for successful price lookups (86400 = 24h)
@@ -184,20 +222,15 @@
  *     GENERAL_DELAY_MS     - Delay between API calls (200ms prod, 0ms test)
  *     MAX_LOCK_RETRIES     - Retry attempts on lock failure (3)
  *     LOCK_RETRY_BACKOFF   - Exponential backoff array [5000, 10000, 20000]
- *
- * SUPPORTED TIMEZONES
- * -------------------
- * UTC, GMT, EST, EDT, CST, CDT, MST, MDT, PST, PDT
- *
- * Use the correct abbreviation accounting for Daylight Saving Time
- * (e.g., CDT in summer, CST in winter for US Central). Any other value
- * shows a message in the cell instead of a price, so a misspelt zone is
- * never read as UTC. An empty one means UTC.
+ *   The tries and waits add up to 41 seconds, longer than the 30 seconds
+ *   Google gives a custom function, so a cell that waits them all shows
+ *   #ERROR! before the busy message: a known bug, in the repo's CLAUDE.md.
  *
  * TESTING
  * -------
- * In the Apps Script editor, select the "test" function from the function
- * dropdown and click Run. Results appear in the execution log.
+ * The repo's tests run this file unchanged under Node. In the Apps Script
+ * editor, select the "test" function from the function dropdown and click
+ * Run. Results appear in the execution log.
  *
  * LIMITATIONS
  * -----------
@@ -274,6 +307,14 @@ const CONFIG = {
 };
 
 const API_LOCK = LockService.getScriptLock();
+
+/**
+ * What a cell shows when the call got no script lock in its tries. The
+ * menu's Clean up errors runs again each cell that shows it.
+ *
+ * @type {string}
+ */
+const EXCHANGE_BUSY_MESSAGE = "Rate limit busy - retry later";
 
 /** ============================================================================
  *                       TOKEN MAPPINGS FOR FALLBACKS
@@ -358,7 +399,7 @@ function getCryptoPrice(
 
   // Acquire lock with retry
   const lockAcquired = acquireLockWithRetry(apiDelayMs);
-  if (!lockAcquired) return "Rate limit busy - retry later";
+  if (!lockAcquired) return EXCHANGE_BUSY_MESSAGE;
 
   try {
     const price = fetchPriceFromProviders(token, utcMs, target);
@@ -596,89 +637,4 @@ function createUtcTimestampFromComponents(components) {
 
   Logger.log(`UTC timestamp created: ${date.getTime()}`);
   return date.getTime();
-}
-
-/** ============================================================================
- *                          SEPARATE CUSTOM MENU
- * ========================================================================== */
-/**
- * Creates a separate top-level menu "Fetch Historical Crypto Prices" (does not merge with Tari Tools)
- */
-function onOpen() {
-  const ui = SpreadsheetApp.getUi();
-  ui.createMenu("Fetch Historical Crypto Prices")
-    .addItem("Refresh & Freeze All Prices", "refreshPrices")
-    .addToUi();
-}
-
-/**
- * Refreshes all prices in the currently active sheet, recalculates, then freezes them as static values.
- * Works on whichever tab is active when the menu item is clicked (no hard-coded tab name dependency).
- */
-function refreshPrices() {
-  const ui = SpreadsheetApp.getUi();
-  const response = ui.alert(
-    "Refresh All Prices?",
-    "This may take several minutes for large sheets. All formulas in the current sheet will be temporarily re-run, then frozen as static values.\n\nContinue?",
-    ui.ButtonSet.YES_NO,
-  );
-
-  if (response !== ui.Button.YES) return;
-
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = SpreadsheetApp.getActiveSheet(); // Always use the currently active tab
-  if (!sheet) {
-    ui.alert("Error: No active sheet found!");
-    return;
-  }
-
-  const sheetName = sheet.getName();
-  Logger.log(`Refreshing prices on active sheet: ${sheetName}`);
-
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) {
-    ui.alert("No data rows to refresh on this sheet.");
-    return;
-  }
-
-  // Change to your actual price column (1 = A, 2 = B, ..., 4 = D, etc.)
-  const priceColumn = 4; // ← EDIT THIS IF NEEDED
-
-  const formulaRange = sheet.getRange(2, priceColumn, lastRow - 1, 1);
-
-  // Robust toast handling (null check)
-  const toast = ss.toast(
-    `Starting refresh on "${sheetName}"...`,
-    "Progress",
-    -1,
-  );
-  if (toast === null) {
-    Logger.log("Toast creation failed - skipping progress updates");
-  }
-
-  const formulas = formulaRange.getFormulas();
-  formulaRange.clearContent();
-  SpreadsheetApp.flush();
-  formulaRange.setFormulas(formulas);
-
-  SpreadsheetApp.flush();
-
-  const values = formulaRange.getValues();
-  formulaRange.setValues(values);
-
-  if (toast !== null) {
-    try {
-      toast.setText(
-        "Refresh complete! Prices are now frozen as static values.",
-      );
-    } catch (e) {
-      Logger.log(`Toast update failed: ${e.message}`);
-    }
-  }
-
-  ui.alert(
-    "Done!",
-    `Prices on sheet "${sheetName}" refreshed and frozen.`,
-    ui.ButtonSet.OK,
-  );
 }

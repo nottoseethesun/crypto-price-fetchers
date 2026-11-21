@@ -9,3 +9,7 @@ coverage/
 # The encrypted api keys: written by the key manager, gitignored, and holding
 # secrets, so nothing normalizes them.
 api-keys.json
+
+# The file the build step writes when there is no clipboard: generated, with
+# code that is not this repo's, and ignored by git.
+build/

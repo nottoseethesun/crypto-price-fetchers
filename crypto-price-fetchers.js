@@ -16,8 +16,8 @@
  * - `openCryptoPriceFetchers` opens the script once and returns its two
  *   functions as async calls, with the Sheets arguments, plus `close`. The
  *   DexTools and x1.ninja keys passed to it go to the script as
- *   `CONFIG.API_KEY` and `X1_CONFIG.API_KEY`, which it reads each time it
- *   sends a request.
+ *   `DEXTOOLS_CONFIG.API_KEY` and `X1_CONFIG.API_KEY`, which it reads each
+ *   time it sends a request.
  * - The command line, `node crypto-price-fetchers.js price <chain> <token>`
  *   or `fdv <chain> <token>`, with `--pool <address>` for a pool, prints the
  *   number (`--help` gives the rest). Before it asks for a price, it opens
@@ -36,7 +36,8 @@
  * What differs from the sheet: it runs on this computer, so there is no
  * 30-second limit per call and no daily cap on requests. The cache and the
  * time of the last call, which spaces calls out, last while the script is
- * open: one run of the command line. The sheet's menu is not here.
+ * open: one run of the command line. The sheet's menu, which the build
+ * step adds from `crypto-price-fetchers-menu.gs`, is not here.
  *
  * Fit: beside `crypto-price-fetchers.gs`, which stays the one copy of the
  * logic, so a fix to it is a fix to both.
@@ -72,29 +73,27 @@ const FUNCTION_NAMES = ["dexToolsGetTokenPrice", "dexToolsGetTokenFDV"];
  * The config values that hand the script the keys given.
  *
  * @param {{dextools: (?string|undefined), x1ninja: (?string|undefined)}} keys - The keys, null or absent for none
- * @returns {Object<string, Object>} The values: `CONFIG.API_KEY` for DexTools and `X1_CONFIG.API_KEY` for x1.ninja
+ * @returns {Object<string, Object>} The values: `DEXTOOLS_CONFIG.API_KEY` for DexTools and `X1_CONFIG.API_KEY` for x1.ninja
  */
 function keyConfig(keys) {
   const config = {};
   if (typeof keys.dextools === "string")
-    config.CONFIG = { API_KEY: keys.dextools };
+    config.DEXTOOLS_CONFIG = { API_KEY: keys.dextools };
   if (typeof keys.x1ninja === "string")
     config.X1_CONFIG = { API_KEY: keys.x1ninja };
   return config;
 }
 
 /**
- * What `npm run build apps-script` gives of this script for the sheet
- * (`apps-script-build/`): its one file, with the DexTools and x1.ninja
- * keys set at its end as `keyConfig` sets them here.
+ * What `npm run build apps-script` puts of this script in the one file it
+ * gives for the sheet (`apps-script-build/`): its one file, whose header
+ * holds a help section, with the DexTools and x1.ninja keys set at the end
+ * of the built file as `keyConfig` sets them here.
  */
 export const APPS_SCRIPT_BUILD = Object.freeze({
   name: "crypto-price-fetchers",
   files: Object.freeze([
-    Object.freeze({
-      path: fileURLToPath(SHEETS_SCRIPT),
-      appsScriptName: "crypto-price-fetchers",
-    }),
+    Object.freeze({ path: fileURLToPath(SHEETS_SCRIPT), help: true }),
   ]),
   services: Object.freeze(["dextools", "x1ninja"]),
   keyConfig,

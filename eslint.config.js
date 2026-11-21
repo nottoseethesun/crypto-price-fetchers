@@ -17,6 +17,10 @@
  *   `'use strict'` is asked of it: the directive would change how the code
  *   the owner pastes into Apps Script runs.
  *
+ * `build/`, where the build step writes the file it gives when there is no
+ * clipboard, is not linted: git ignores it, and the file holds code that is
+ * not this repo's.
+ *
  * `npm run lint` runs it with `--max-warnings 0`, so a warning fails too.
  * The security rules are in `eslint-security.config.js`, which
  * `npm run audit:security` runs.
@@ -79,6 +83,7 @@ const SHARED_RULES = {
 /** The services Apps Script gives a Sheets script, as globals. */
 const APPS_SCRIPT_GLOBALS = {
   CacheService: "readonly",
+  HtmlService: "readonly",
   LockService: "readonly",
   Logger: "readonly",
   PropertiesService: "readonly",
@@ -89,7 +94,7 @@ const APPS_SCRIPT_GLOBALS = {
 };
 
 export default [
-  { ignores: ["**/node_modules/**", "**/coverage/**"] },
+  { ignores: ["**/node_modules/**", "**/coverage/**", "build/**"] },
   {
     files: ["**/*.js"],
     plugins: { n: nPlugin },
