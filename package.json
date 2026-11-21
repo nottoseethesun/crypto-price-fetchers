@@ -72,7 +72,7 @@
     "globals": "^17.14.0",
     "husky": "^9.1.7",
     "knip": "^5.88.1",
-    "markdownlint-cli2": "^0.23.3",
+    "markdownlint-cli2": "^0.24.2",
     "prettier": "^3.10.1",
     "secretlint": "^11.7.1"
   },
