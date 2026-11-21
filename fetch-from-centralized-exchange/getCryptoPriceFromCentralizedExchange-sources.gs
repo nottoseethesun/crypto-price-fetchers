@@ -80,18 +80,46 @@ function configuredKey(key) {
  *                          MEXC
  * ========================================================================== */
 
-/** The field of a kline candle, [open time, open, high, low, close, volume, ...], that each target reads */
-const MEXC_CANDLE_FIELD = { high: 2, low: 3, close: 4 };
+/** The field of a kline candle, [open time, open, high, low, close, volume, ...], that each value reads */
+const MEXC_CANDLE_FIELD = Object.freeze({
+  high: 2,
+  low: 3,
+  close: 4,
+  volume: 5,
+});
+
+/** A day, in ms */
+const MEXC_DAY_MS = 86400000;
+
+/** Monday 1970-01-05, 00:00 UTC, in ms: MEXC's weeks start on a Monday */
+const MEXC_FIRST_MONDAY_MS = 4 * MEXC_DAY_MS;
 
 /**
- * A token's price at a time from MEXC: from the candle of the trading pair
- * MEXC lists for it against USDT, or else against BTC, whose candle at the
- * same time then turns it into USD.
+ * The windows the script asks MEXC for, from the minute up to the year,
+ * each a period of UTC time: the interval of MEXC's candles that make it,
+ * how many of them it takes, since MEXC serves no 2-hour or yearly candle,
+ * and where the window that holds a time starts and ends.
+ */
+const MEXC_WINDOWS = Object.freeze([
+  fixedWindow("minute", "1m", 1, 60000),
+  fixedWindow("hour", "60m", 1, 3600000),
+  fixedWindow("2 hours", "60m", 2, 7200000),
+  fixedWindow("4 hours", "4h", 1, 14400000),
+  fixedWindow("day", "1d", 1, MEXC_DAY_MS),
+  { name: "week", interval: "1W", candles: 1, bounds: weekHolding },
+  { name: "month", interval: "1M", candles: 1, bounds: monthHolding },
+  { name: "year", interval: "1M", candles: 12, bounds: yearHolding },
+]);
+
+/**
+ * A token's price at a time from MEXC: from the candles of the trading
+ * pair MEXC lists for it against USDT, or else against BTC, whose price
+ * over the same window then turns it into USD.
  *
  * @param {string} token - The token's symbol, such as "btc"
  * @param {number} utcMs - The time, in ms since 1970 UTC
- * @param {string} target - The candle's price to give: "high", "low" or "close"
- * @returns {?number} The price in USD, or null when MEXC lists no pair for the token or gives no candle
+ * @param {string} target - The price to give: "average", "high", "low" or "close"
+ * @returns {?number} The price in USD, or null when MEXC lists no pair for the token or nothing traded in the year that holds the time
  */
 function getPriceFromMEXC(token, utcMs, target) {
   Logger.log(`Trying MEXC for ${token}`);
@@ -107,10 +135,21 @@ function getPriceFromMEXC(token, utcMs, target) {
   const pairInfo = findMEXCTradingPair(token, symbols);
   if (!pairInfo) return null;
 
-  const data = fetchMEXCKlineData(pairInfo.symbol, utcMs);
-  if (!data) return null;
+  const found = mexcPairPrice(pairInfo.symbol, utcMs, target);
+  if (found === null) return null;
 
-  return extractMEXCPrice(data, target, pairInfo.useBTC, utcMs);
+  let price = found.price;
+  if (pairInfo.useBTC) {
+    const btc = fetchWindowCandle("BTCUSDT", found.window, utcMs);
+    if (btc === null) return null;
+    price *= priceOf(btc, found.averaged ? "average" : target);
+  }
+  if (!Number.isFinite(price)) {
+    Logger.log(`MEXC candle gave no ${target} price`);
+    return null;
+  }
+  Logger.log(`MEXC final price: ${price} (${target}, ${found.window.name})`);
+  return price;
 }
 
 /** Fetches MEXC exchange symbols list */
@@ -146,83 +185,135 @@ function findMEXCTradingPair(token, symbols) {
   return { symbol, useBTC };
 }
 
-/** The length of each interval the script asks MEXC for, in ms: CONFIG.DEFAULT_INTERVAL's and CONFIG.FALLBACK_INTERVAL's. */
-const MEXC_INTERVAL_MS = Object.freeze({ "1m": 60000, "60m": 3600000 });
-
 /**
- * The candle of the minute that holds the time, or, when MEXC keeps no
- * candle of that minute, the candle of the hour that holds it. MEXC keeps
- * minute candles for about the last 30 days, and hour candles for years.
+ * A pair's price at a time from MEXC's candles. The window that holds the
+ * time comes first: its minute, or, for a time older than the minute
+ * candles MEXC keeps, about the last 30 days, its hour. When something
+ * traded in it, it gives the target's price: the average of its high and
+ * low, its high, its low or its close. When nothing traded in it, the
+ * script goes up one window at a time, to the year, and the first in which
+ * something traded gives the average of its high and low, whatever the
+ * target. MEXC gives a candle for every period it keeps, one in which
+ * nothing traded with volume 0.
  *
  * @param {string} symbol - The MEXC pair, such as XTMUSDT
  * @param {number} utcMs - The time, in ms since 1970 UTC
- * @return {?Array} MEXC's candles, the one asked first, or null when neither period has one
+ * @param {string} target - The price to give: "average", "high", "low" or "close"
+ * @return {?{window: Object, averaged: boolean, price: number}} The price, its window, and whether it is the average of the window's high and low; or null when nothing traded in the year that holds the time
  */
-function fetchMEXCKlineData(symbol, utcMs) {
-  for (const interval of [CONFIG.DEFAULT_INTERVAL, CONFIG.FALLBACK_INTERVAL]) {
-    const data = fetchPeriodKline(symbol, interval, utcMs);
-    if (data !== null) return data;
+function mexcPairPrice(symbol, utcMs, target) {
+  let level = 0;
+  let candle = fetchWindowCandle(symbol, MEXC_WINDOWS[0], utcMs);
+  if (candle === null) {
+    level = 1;
+    candle = fetchWindowCandle(symbol, MEXC_WINDOWS[1], utcMs);
   }
-  return null;
-}
-
-/**
- * The candle of the period of an interval that holds the time. MEXC's
- * candles open on their period's boundaries, one for each period it keeps,
- * whether or not anything traded in it, and MEXC gives the first candle
- * that opens in the window asked, or none. So asked for the period itself,
- * from its first millisecond to its last, MEXC gives the period's own
- * candle, or none when it keeps no candle of the period.
- *
- * @param {string} symbol - The MEXC pair
- * @param {string} interval - The interval, one MEXC_INTERVAL_MS lists
- * @param {number} utcMs - The time, in ms since 1970 UTC
- * @return {?Array} MEXC's candles, the period's first, or null when MEXC keeps none of the period
- */
-function fetchPeriodKline(symbol, interval, utcMs) {
-  const periodMs = MEXC_INTERVAL_MS[interval];
-  if (periodMs === undefined) {
-    throw new Error(`MEXC interval ${interval} is not one the script knows`);
+  if (candle !== null && candle.volume > 0) {
+    const window = MEXC_WINDOWS[level];
+    return {
+      window,
+      averaged: target === "average",
+      price: priceOf(candle, target),
+    };
   }
-  const start = Math.floor(utcMs / periodMs) * periodMs;
-  const data = fetchKline(symbol, interval, start, start + periodMs - 1);
-  if (data !== null && data.length > 0) return data;
+  for (level += 1; level < MEXC_WINDOWS.length; level++) {
+    const window = MEXC_WINDOWS[level];
+    candle = fetchWindowCandle(symbol, window, utcMs);
+    if (candle !== null && candle.volume > 0) {
+      return { window, averaged: true, price: priceOf(candle, "average") };
+    }
+  }
   Logger.log(
-    `MEXC keeps no ${interval} candle of the period that holds the time`,
+    `MEXC: nothing traded in ${symbol} in the year that holds the time`,
   );
   return null;
 }
 
-/** Fetches single kline candle */
-function fetchKline(symbol, interval, startTime, endTime) {
-  const url = `${CONFIG.EXCHANGE_BASE_URL}/klines?symbol=${symbol}&interval=${interval}&startTime=${startTime}&endTime=${endTime}&limit=1`;
+/** A candle's price for a target: the average of its high and low, or its high, its low or its close */
+function priceOf(candle, target) {
+  return target === "average" ? (candle.high + candle.low) / 2 : candle[target];
+}
+
+/**
+ * The candle of a window that holds a time. MEXC's candles open on their
+ * period's boundaries, and MEXC gives the candles that open in the window
+ * asked, oldest first, as many as the request's limit, so asked for the
+ * window from its first millisecond to its last, it gives the window's
+ * own candles. The 2 hours join their two hour candles, and the year its
+ * twelve month candles: the highest high, the lowest low, the last close
+ * and the volumes summed.
+ *
+ * @param {string} symbol - The MEXC pair
+ * @param {Object} window - One of MEXC_WINDOWS
+ * @param {number} utcMs - The time, in ms since 1970 UTC
+ * @return {?{high: number, low: number, close: number, volume: number}} The candle, or null when MEXC keeps none of the window
+ */
+function fetchWindowCandle(symbol, window, utcMs) {
+  const { start, end } = window.bounds(utcMs);
+  const candles = fetchKlines(
+    symbol,
+    window.interval,
+    start,
+    end,
+    window.candles,
+  );
+  if (candles === null || candles.length === 0) {
+    Logger.log(
+      `MEXC keeps no candle of the ${window.name} that holds the time`,
+    );
+    return null;
+  }
+  const values = (name) =>
+    candles.map((candle) => Number(candle[MEXC_CANDLE_FIELD[name]]));
+  return {
+    high: Math.max(...values("high")),
+    low: Math.min(...values("low")),
+    close: values("close")[candles.length - 1],
+    volume: values("volume").reduce((sum, volume) => sum + volume, 0),
+  };
+}
+
+/** Fetches a pair's candles of an interval that open from startTime to endTime, at most limit of them */
+function fetchKlines(symbol, interval, startTime, endTime, limit) {
+  const url = `${CONFIG.EXCHANGE_BASE_URL}/klines?symbol=${symbol}&interval=${interval}&startTime=${startTime}&endTime=${endTime}&limit=${limit}`;
   const label = `MEXC ${interval} klines`;
   const data = jsonOf(fetchWithRetries(url, {}, label), label);
   return Array.isArray(data) ? data : null;
 }
 
-/** Reads the high, the low or the close of a kline candle */
-function candlePrice(candle, target) {
-  return parseFloat(candle[MEXC_CANDLE_FIELD[target]]);
+/** A window of a fixed length, which starts at a whole number of its lengths since 1970 UTC */
+function fixedWindow(name, interval, candles, lengthMs) {
+  const bounds = (utcMs) => {
+    const start = Math.floor(utcMs / lengthMs) * lengthMs;
+    return { start, end: start + lengthMs - 1 };
+  };
+  return { name, interval, candles, bounds };
 }
 
-/**
- * Extracts price from kline data. A BTC pair's price is converted to USD
- * with BTC/USDT's candle at the same time, never the current BTC price.
- */
-function extractMEXCPrice(data, target, useBTC, utcMs) {
-  let price = candlePrice(data[0], target);
-  if (useBTC) {
-    const btcData = fetchMEXCKlineData("BTCUSDT", utcMs);
-    if (!btcData) return null;
-    price *= candlePrice(btcData[0], target);
-  }
-  if (!Number.isFinite(price)) {
-    Logger.log(`MEXC candle gave no ${target} price`);
-    return null;
-  }
-  Logger.log(`MEXC final price: ${price} (${target})`);
-  return price;
+/** The week, from Monday 00:00 UTC, that holds a time */
+function weekHolding(utcMs) {
+  const weekMs = 7 * MEXC_DAY_MS;
+  const start =
+    MEXC_FIRST_MONDAY_MS +
+    Math.floor((utcMs - MEXC_FIRST_MONDAY_MS) / weekMs) * weekMs;
+  return { start, end: start + weekMs - 1 };
+}
+
+/** The month, UTC, that holds a time */
+function monthHolding(utcMs) {
+  const date = new Date(utcMs);
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth();
+  return {
+    start: Date.UTC(year, month, 1),
+    end: Date.UTC(year, month + 1, 1) - 1,
+  };
+}
+
+/** The year, UTC, that holds a time */
+function yearHolding(utcMs) {
+  const year = new Date(utcMs).getUTCFullYear();
+  return { start: Date.UTC(year, 0, 1), end: Date.UTC(year + 1, 0, 1) - 1 };
 }
 
 /** ============================================================================
@@ -236,7 +327,7 @@ function extractMEXCPrice(data, target, useBTC, utcMs) {
  *
  * @param {string} id - The token's CoinGecko id, such as "bitcoin"
  * @param {number} utcMs - The time, in ms since 1970 UTC
- * @param {string} target - The price to give: "high", "low" or "close"
+ * @param {string} target - The price to give: "average", "high", "low" or "close"
  * @returns {?number} The price in USD, or null when CoinGecko has none for the time and target
  */
 function getPriceFromCoinGecko(id, utcMs, target) {
@@ -305,8 +396,9 @@ function getPriceFromCoinGecko(id, utcMs, target) {
 
 /**
  * Fetches time-series prices from CoinGecko market_chart/range for a 24h
- * window centred on the time, then returns the highest of the data points
- * for high, the lowest for low, or the one nearest the time for close.
+ * window centred on the time, then returns the average of the highest and
+ * the lowest of the data points for average, the highest for high, the
+ * lowest for low, or the one nearest the time for close.
  * Returns null on failure.
  */
 function tryCoinGeckoMarketChartRange(id, utcMs, target) {
@@ -341,9 +433,11 @@ function tryCoinGeckoMarketChartRange(id, utcMs, target) {
   return pickFromPoints(points, utcMs, target);
 }
 
-/** The price a target reads from [time in ms, price] points: the highest, the lowest, or the one nearest the time for close */
+/** The price a target reads from [time in ms, price] points: the average of the highest and the lowest, the highest, the lowest, or the one nearest the time for close */
 function pickFromPoints(points, utcMs, target) {
   const values = points.map((point) => point[1]);
+  if (target === "average")
+    return (Math.max(...values) + Math.min(...values)) / 2;
   if (target === "high") return Math.max(...values);
   if (target === "low") return Math.min(...values);
   if (target !== "close") return null;
@@ -389,7 +483,7 @@ function coinGeckoHeaders() {
  *
  * @param {string} id - The token's CoinPaprika id, such as "btc-bitcoin"
  * @param {number} utcMs - The time, in ms since 1970 UTC, whose UTC day is asked
- * @param {string} target - The price to give: "high", "low" or "close"
+ * @param {string} target - The price to give: "average", "high", "low" or "close"
  * @returns {?number} The price in USD, or null when CoinPaprika has none for the day and target
  */
 function getPriceFromCoinPaprika(id, utcMs, target) {
@@ -463,16 +557,21 @@ function coinPaprikaCandlePrice(access, id, day, target) {
       typeof entry.time_open === "string" &&
       entry.time_open.slice(0, 10) === day,
   );
-  const price = candle === undefined ? NaN : Number(candle[target]);
-  if (
-    candle === undefined ||
-    candle[target] === null ||
-    !Number.isFinite(price)
-  ) {
+  const price = candle === undefined ? NaN : paprikaCandlePrice(candle, target);
+  if (!Number.isFinite(price)) {
     Logger.log(`CoinPaprika has no ${target} in a candle of ${day}`);
     return { price: null, askDayPrice: true };
   }
   return { price, askDayPrice: false };
+}
+
+/** A CoinPaprika candle's price for a target: the average of its high and low, or its high, its low or its close; NaN for a price it leaves out */
+function paprikaCandlePrice(candle, target) {
+  const number = (value) =>
+    value === null || value === undefined ? NaN : Number(value);
+  if (target === "average")
+    return (number(candle.high) + number(candle.low)) / 2;
+  return number(candle[target]);
 }
 
 /** The day's price, which CoinPaprika records at 00:00 UTC, or null when it has none */
