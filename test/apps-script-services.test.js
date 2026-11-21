@@ -173,6 +173,38 @@ describe("CacheService", () => {
     assert.throws(() => cache.put("k", "v", "60"), /one second or more/);
   });
 
+  it("puts several values at once, gives the ones found, and removes several at once, as Apps Script's cache does", () => {
+    let nowMs = 0;
+    const { services } = servicesAnswering(OK, { now: () => nowMs });
+    const cache = services.CacheService.getScriptCache();
+    cache.putAll({ a: 1, b: "two" });
+    cache.putAll({ c: "three" }, 30);
+    assert.deepEqual(cache.getAll(["a", "b", "c", "missing"]), {
+      a: "1",
+      b: "two",
+      c: "three",
+    });
+    nowMs = 30 * 1000;
+    assert.deepEqual(cache.getAll(["a", "c"]), { a: "1" });
+    nowMs = DEFAULT_CACHE_SECONDS * 1000;
+    assert.deepEqual(cache.getAll(["a", "b"]), {});
+    cache.putAll({ a: "1", b: "2", c: "3" }, 86400);
+    cache.removeAll(["a", "c", "missing"]);
+    assert.deepEqual(cache.getAll(["a", "b", "c"]), { b: "2" });
+    nowMs += MAX_CACHE_SECONDS * 1000;
+    assert.equal(cache.get("b"), null);
+  });
+
+  it("refuses an expiry for several values that is not one second or more, keeping none of them", () => {
+    const { services } = servicesAnswering(OK);
+    const cache = services.CacheService.getScriptCache();
+    assert.throws(
+      () => cache.putAll({ a: "1" }, 0),
+      /Cache\.putAll needs an expiry of one second or more/,
+    );
+    assert.deepEqual(cache.getAll(["a"]), {});
+  });
+
   it("gives the same cache however the script asks for it", () => {
     const { services } = servicesAnswering(OK);
     services.CacheService.getUserCache().put("k", "v");

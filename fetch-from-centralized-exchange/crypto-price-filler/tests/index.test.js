@@ -1,4 +1,11 @@
-import { describe, it, expect, vi } from "vitest";
+/**
+ * Tests of the helpers the command line uses, the time zones and the
+ * parsing of a date, and of the command line itself, run as a program of
+ * its own.
+ * @module tests/index.test
+ */
+
+import { describe, it, expect } from "vitest";
 import { DateTime } from "luxon";
 import {
   canonicalTimeZone,
@@ -142,52 +149,5 @@ describe("Crypto Price Filler Helpers", () => {
       expect(exitedWithError).toBe(true);
       expect(exitCode).toBe(1); // Expect graceful exit 1 on invalid/empty CSV
     });
-  });
-
-  // Coverage collection for index.js (CLI entry point)
-  describe("index.js coverage collection (CLI entry point)", () => {
-    it("loads index.js without crashing (basic coverage)", async () => {
-      // Mock process.exit to prevent Commander from killing the test runner
-      const originalExit = process.exit;
-      process.exit = vi.fn();
-
-      // Mock valid argv to avoid commander error on missing token/input
-      const originalArgv = process.argv;
-      process.argv = [
-        "node",
-        "index.js",
-        "--token=test",
-        "--input=/dev/null",
-        "--output=/dev/null",
-      ];
-
-      try {
-        await import("../index.js");
-      } finally {
-        process.argv = originalArgv;
-        process.exit = originalExit;
-      }
-    }, 5000);
-
-    it("parses mocked CLI args without crashing (coverage boost)", async () => {
-      const originalArgv = process.argv;
-      const originalExit = process.exit;
-
-      process.argv = [
-        "node",
-        "index.js",
-        "--token=xtm",
-        "--input=/dev/null",
-        "--output=/dev/null",
-      ];
-      process.exit = vi.fn();
-
-      try {
-        await import("../index.js");
-      } finally {
-        process.argv = originalArgv;
-        process.exit = originalExit;
-      }
-    }, 5000);
   });
 });

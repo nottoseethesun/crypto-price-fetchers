@@ -83,6 +83,16 @@ function configuredKey(key) {
 /** The field of a kline candle, [open time, open, high, low, close, volume, ...], that each target reads */
 const MEXC_CANDLE_FIELD = { high: 2, low: 3, close: 4 };
 
+/**
+ * A token's price at a time from MEXC: from the candle of the trading pair
+ * MEXC lists for it against USDT, or else against BTC, whose candle at the
+ * same time then turns it into USD.
+ *
+ * @param {string} token - The token's symbol, such as "btc"
+ * @param {number} utcMs - The time, in ms since 1970 UTC
+ * @param {string} target - The candle's price to give: "high", "low" or "close"
+ * @returns {?number} The price in USD, or null when MEXC lists no pair for the token or gives no candle
+ */
 function getPriceFromMEXC(token, utcMs, target) {
   Logger.log(`Trying MEXC for ${token}`);
 
@@ -108,7 +118,7 @@ function fetchMEXCSymbols() {
   const url = CONFIG.EXCHANGE_BASE_URL + "/exchangeInfo";
   const label = "MEXC exchangeInfo";
   const body = jsonOf(fetchWithRetries(url, {}, label), label);
-  return body === null ? null : body.symbols || [];
+  return body === null ? null : (body.symbols ?? []);
 }
 
 /** Finds USDT or BTC trading pair for token */
@@ -194,6 +204,16 @@ function extractMEXCPrice(data, target, useBTC, utcMs) {
  *                          COINGECKO
  * ========================================================================== */
 
+/**
+ * A token's price at a time from CoinGecko: from its market chart over a
+ * window centred on the time, or else, for close alone, from the day's
+ * single price; each answer, or the lack of one, is cached.
+ *
+ * @param {string} id - The token's CoinGecko id, such as "bitcoin"
+ * @param {number} utcMs - The time, in ms since 1970 UTC
+ * @param {string} target - The price to give: "high", "low" or "close"
+ * @returns {?number} The price in USD, or null when CoinGecko has none for the time and target
+ */
 function getPriceFromCoinGecko(id, utcMs, target) {
   Logger.log(`Trying CoinGecko for ${id} at ${new Date(utcMs).toISOString()}`);
 
@@ -338,6 +358,15 @@ function coinGeckoHeaders() {
  *                          COINPAPRIKA
  * ========================================================================== */
 
+/**
+ * A token's price on a day from CoinPaprika: from the day's candle, or
+ * else, for close alone, from the day's single price.
+ *
+ * @param {string} id - The token's CoinPaprika id, such as "btc-bitcoin"
+ * @param {number} utcMs - The time, in ms since 1970 UTC, whose UTC day is asked
+ * @param {string} target - The price to give: "high", "low" or "close"
+ * @returns {?number} The price in USD, or null when CoinPaprika has none for the day and target
+ */
 function getPriceFromCoinPaprika(id, utcMs, target) {
   Logger.log("Trying CoinPaprika for " + id);
 

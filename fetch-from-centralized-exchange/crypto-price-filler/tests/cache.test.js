@@ -4,13 +4,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  getCache,
-  setCache,
-  clearCache,
-  replaceCache,
-  cacheSize,
-} from "../utils/cache.js";
+import { getCache, setCache, clearCache, cacheSize } from "../utils/cache.js";
 
 describe("Cache Utils", () => {
   beforeEach(() => {
@@ -22,11 +16,6 @@ describe("Cache Utils", () => {
   });
 
   describe("getCache", () => {
-    it("returns the entire Map when no key is provided", () => {
-      const cache = getCache();
-      expect(cache instanceof Map).toBe(true);
-    });
-
     it("returns undefined for non-existent key", () => {
       const value = getCache("non-existent-key");
       expect(value).toBeUndefined();
@@ -85,9 +74,8 @@ describe("Cache Utils", () => {
 
       expect(value).toBeUndefined();
 
-      // Verify it was deleted from cache
-      const cache = getCache();
-      expect(cache.has("expired-key")).toBe(false);
+      // The expired entry left the cache when it was asked for
+      expect(cacheSize()).toBe(0);
 
       vi.useRealTimers();
     });
@@ -121,25 +109,6 @@ describe("Cache Utils", () => {
       setCache("some-key", 123);
       clearCache();
       expect(cacheSize()).toBe(0);
-    });
-  });
-
-  describe("replaceCache", () => {
-    it("replaces the cache with a new Map", () => {
-      setCache("old-key", "old-value");
-
-      const newMap = new Map();
-      newMap.set("new-key", { value: "new-value", expires: null });
-
-      const result = replaceCache(newMap);
-
-      expect(result).toBe(newMap);
-    });
-
-    it("returns the new cache", () => {
-      const newMap = new Map();
-      const result = replaceCache(newMap);
-      expect(result).toBe(newMap);
     });
   });
 

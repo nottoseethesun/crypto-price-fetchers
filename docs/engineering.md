@@ -95,14 +95,16 @@ and on Node 24, the oldest the repo supports.
 
 The lint checks each file's form before any test runs: the rules the code
 follows, its formatting, the workflows, and files nothing uses.
-`npm run lint` runs five tools, each an npm package:
+`npm run lint` runs five tools: four npm packages, and actionlint, a
+program its author publishes for each system, which the table's fourth
+row explains:
 
 | Tool | Configured in | What it does, and what it holds the repo to |
 | ---- | ------------- | ------------------------------------------- |
 | ESLint | `eslint.config.js` | Checks JavaScript against rules: LP Ranger's, with no warning allowed: cyclomatic complexity ≤ 17, ≤ 500 lines of code a file (blank lines and comments not counted), lines ≤ 80 characters but strings, urls and comments, `===`, no unused name, no `var`, `const` where nothing is reassigned, no `Math.random`, no comment that tells Prettier, the formatter in the row below, to skip code, and every import resolved. It reads the Sheets scripts too, as the paragraph below the table says. |
 | markdownlint | `.markdownlint-cli2.jsonc` | Checks the form of Markdown files: LP Ranger's settings, over every Markdown file, such as one top heading first and no HTML. |
 | Prettier | `.prettierrc`, `.prettierignore` | Formats code; in check mode, it fails on any JavaScript, Sheets script, JSON or YAML file the repo keeps whose layout its formatting would change. |
-| actionlint | — | Checks the GitHub Actions workflow files, in `.github/workflows/`, for mistakes in their syntax and expressions. |
+| actionlint | `actionlint/release.js` | Checks the GitHub Actions workflow files, in `.github/workflows/`, for mistakes in their syntax, their expressions and the shell scripts their steps run. The lint runs the official release of actionlint, rhysd's program, through this repo's bin `run-actionlint` (`run-actionlint.js`, `actionlint/`): the first run downloads the archive for its system, refuses it unless its SHA-256 is the one `actionlint/release.js` pins, and keeps the program in `node_modules/.cache/actionlint/`, which later runs use. |
 | knip | `knip.json` | Finds files nothing imports or runs, and fails on any. See [Dead Code Detection](#dead-code-detection). |
 
 The Sheets scripts are plain scripts, not modules: Apps Script loads them
@@ -324,17 +326,18 @@ log. No automated run calls them.
 
 ## Security Audits
 
-Four audits look for security problems: in the packages the repo
+Five audits look for security problems: in the packages the repo
 installs, through npm audit, npm's check of installed packages against
 known vulnerabilities; in the code DEX Screener publishes that the build
-step can put in its file; in the repo's code, through ESLint with security
-rules; and in the text of every file, through secretlint, which looks for
-keys and credentials.
+step can put in its file; in the release of actionlint the lint runs; in
+the repo's code, through ESLint with security rules; and in the text of
+every file, through secretlint, which looks for keys and credentials.
 
 | Command | What it runs | What it catches |
 | ------- | ------------ | --------------- |
-| `npm run audit:deps` | `npm audit --audit-level=high --omit=dev`, for the repo and crypto-price-filler, then `npm run audit:dex-screener` | Known vulnerabilities, of high severity or worse, in the packages that ship; then what the next row says. |
+| `npm run audit:deps` | `npm audit --audit-level=high --omit=dev`, for the repo and crypto-price-filler, then `npm run audit:dex-screener` and `npm run audit:actionlint` | Known vulnerabilities, of high severity or worse, in the packages that ship; then what the next two rows say. |
 | `npm run audit:dex-screener` | `audit-dex-screener.js`: downloads each file of DEX Screener's Google Sheets functions at the commit `apps-script-build/dex-screener-files.js` names | A file that cannot be downloaded, or whose SHA-256 differs from the one written there. npm audit covers only packages installed from npm, and this code is not one. The build step runs the same audit before it compiles those files. |
+| `npm run audit:actionlint` | `run-actionlint --check`: downloads every archive of the actionlint release `actionlint/release.js` names | An archive that cannot be downloaded, or whose SHA-256 differs from the one written there. npm audit does not cover actionlint, which is no npm package; the lint makes the same check on the one archive it runs. |
 | `npm run audit:security` | ESLint with `eslint-security.config.js` | Code open to attack (eslint-plugin-security), strings that look like keys (eslint-plugin-no-secrets), and printing a name that may hold a secret (`no-secret-logging`). |
 | `npm run audit:secrets` | secretlint, with `.secretlintrc.json` and `.secretlintignore` | Keys and credentials in any file. |
 
@@ -395,7 +398,7 @@ request to `main`, and by hand:
 | Workflow | Job | Runs |
 | -------- | --- | ---- |
 | `ci.yml` | check-latest-nodejs-lts (Node 26), check-oldest-nodejs-supported (Node 24) | `npm run check`, after installing the repo's packages and crypto-price-filler's. |
-| `security-audit.yml` | Dependency Audit, Security Lint, Secret Scan | Each audit as a job of its own; Dependency Audit runs `npm run audit:deps`, so the check of DEX Screener's files with it. |
+| `security-audit.yml` | Dependency Audit, Security Lint, Secret Scan | Each audit as a job of its own; Dependency Audit runs `npm run audit:deps`, so the checks of DEX Screener's files and of actionlint's archives with it. |
 
 The two checks of `ci.yml` are named for their roles, not their Node
 versions, so moving to newer versions renames no check.

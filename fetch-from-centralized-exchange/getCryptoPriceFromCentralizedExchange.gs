@@ -335,6 +335,13 @@ const TOKEN_TO_ID = {
 /** ============================================================================
  *                          CACHE HELPERS
  * ========================================================================== */
+
+/**
+ * A price kept in the script's cache.
+ *
+ * @param {string} key - The cache key
+ * @returns {number|string|null} The price; "No data available (cached)" when a lookup that found nothing was cached; or null when nothing usable is cached
+ */
 function getCachedResult(key) {
   const cache = CacheService.getScriptCache();
   const cached = cache.get(key);
@@ -356,6 +363,15 @@ function getCachedResult(key) {
   return null;
 }
 
+/**
+ * Keeps a price in the script's cache, or NO_DATA when the value is not a
+ * number, so a lookup that found nothing is not asked again until it
+ * expires.
+ *
+ * @param {string} key - The cache key
+ * @param {*} value - The price found, or anything else for none
+ * @param {number} [ttl=CONFIG.CACHE_EXPIRY_SECONDS.DAILY_PRICE] - The seconds to keep it
+ */
 function setCachedResult(
   key,
   value,
@@ -446,7 +462,7 @@ function acquireLockWithRetry(apiDelayMs) {
       Utilities.sleep(apiDelayMs);
       return true;
     }
-    const backoff = CONFIG.LOCK_RETRY_BACKOFF[attempt] || 5000;
+    const backoff = CONFIG.LOCK_RETRY_BACKOFF[attempt] ?? 5000;
     Logger.log(`Lock timeout - backoff ${backoff}ms`);
     Utilities.sleep(backoff);
   }
@@ -464,7 +480,7 @@ function releaseLockIfHeld(lockAcquired) {
 
 /** Tries each provider in order, returns first valid price or null */
 function fetchPriceFromProviders(token, utcMs, target) {
-  const idMap = TOKEN_TO_ID[token] || { gecko: token, paprika: token };
+  const idMap = TOKEN_TO_ID[token] ?? { gecko: token, paprika: token };
   const providers = [
     { name: "MEXC", fn: () => getPriceFromMEXC(token, utcMs, target) },
     {
@@ -512,9 +528,9 @@ function cacheAndReturn(cacheKey, price) {
 
 /** The UTC offset in hours of a time zone abbreviation; UTC when none is given; null when the abbreviation is unknown */
 function getTimezoneOffsetHours(tz) {
-  const key = String(tz || "UTC")
-    .trim()
-    .toUpperCase();
+  // An empty cell arrives as "", and counts as no zone given, as a missing one does
+  const given = tz === undefined || tz === null ? "" : String(tz).trim();
+  const key = (given === "" ? "UTC" : given).toUpperCase();
   const offset = CONFIG.TIMEZONE_OFFSETS[key];
   if (offset === undefined) {
     Logger.log(`Unknown time zone: ${tz}`);
@@ -524,6 +540,15 @@ function getTimezoneOffsetHours(tz) {
   return offset;
 }
 
+/**
+ * The time a cell gives, as ms since 1970 UTC. The fields of a
+ * "YYYY-MM-DD HH:MM:SS" string, or a Date's UTC fields, are read as the
+ * time in a zone the given hours ahead of UTC.
+ *
+ * @param {string|Date} dateInput - The time, as text or a Date
+ * @param {number} offsetHours - The zone's offset from UTC, in hours
+ * @returns {number|string} The time in ms, or the error message the cell shows
+ */
 function parseInputToUtcMs(dateInput, offsetHours) {
   Logger.log(`Parsing dateInput: ${dateInput}, offsetHours: ${offsetHours}`);
 
@@ -563,6 +588,13 @@ function parseInputToUtcMs(dateInput, offsetHours) {
   return finalMs;
 }
 
+/**
+ * The fields of a "YYYY-MM-DD HH:MM:SS" string, on a 24-hour clock, each
+ * checked to be in range and the date to exist.
+ *
+ * @param {string} dateStr - The text
+ * @returns {{year: number, month: number, day: number, hour: number, minute: number, second: number}|string} The fields, or an error message
+ */
 function parseDateStringToComponents(dateStr) {
   Logger.log(`Parsing date string: ${dateStr}`);
   const regex = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/;
@@ -622,6 +654,12 @@ function logAndReturn(msg) {
   return msg;
 }
 
+/**
+ * The ms since 1970 UTC of date and time fields read as UTC.
+ *
+ * @param {{year: number, month: number, day: number, hour: number, minute: number, second: number}} components - The fields
+ * @returns {number|string} The time in ms, or an error message
+ */
 function createUtcTimestampFromComponents(components) {
   Logger.log(`Creating UTC timestamp from: ${JSON.stringify(components)}`);
   const date = new Date(

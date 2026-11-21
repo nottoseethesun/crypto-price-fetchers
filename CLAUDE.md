@@ -212,9 +212,9 @@ which checks the GitHub Actions workflow files; and knip, which finds files
 nothing uses), the tests with at least 80% of lines covered,
 crypto-price-filler's tests with the same floor, and the security audits
 (npm audit, npm's check of the installed packages against known
-vulnerabilities, with the check of DEX Screener's files; the security lint
-in `eslint-security.config.js`; and secretlint, which looks for keys and
-credentials in files). It must pass before a commit
+vulnerabilities, with the checks of DEX Screener's files and of
+actionlint's archives; the security lint in `eslint-security.config.js`;
+and secretlint, which looks for keys and credentials in files). It must pass before a commit
 and a push; husky, the package that runs scripts at git's hooks, runs
 `npm run lint` before each commit. The repo has no
 `prepare`, `install` or `postinstall` script, since npm runs a git
@@ -232,6 +232,15 @@ printing a name that may hold a secret, through `console`, a stream's
 `write` or `say`. A name that sounds like a secret but holds none is
 renamed, never excused. pulsechain-analytics and x1-validator-analytics run
 the rule from this repo (`crypto-price-fetchers/eslint-rules/no-secret-logging`).
+
+actionlint runs from its author's official release, never from an npm
+package that wraps it: the bin `run-actionlint` (`run-actionlint.js`,
+`actionlint/`) downloads the archive for its system, refuses it unless its
+SHA-256 is the one `actionlint/release.js` pins, and keeps the program in
+`node_modules/.cache/actionlint/`; `npm run audit:actionlint` checks every
+archive of the release. A newer release is taken by writing its version
+and SHA-256s there, from the release's checksums file. The three projects
+that install this repo run the bin in their lint.
 
 ## Supported versions of Node
 

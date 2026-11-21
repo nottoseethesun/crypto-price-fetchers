@@ -22,7 +22,10 @@
  *   request that gets no response at all throws.
  * - `CacheService`'s caches keep each value in memory until it expires:
  *   600 seconds unless the script asks otherwise, and at most Apps
- *   Script's limit of 21,600 seconds (six hours).
+ *   Script's limit of 21,600 seconds (six hours). They have each method of
+ *   Apps Script's cache: `get`, `put` and `remove` for one key, and
+ *   `getAll`, `putAll` and `removeAll` for several, `getAll` giving an
+ *   object that holds only the keys found.
  * - `LockService`'s locks are always free, since one script answers one
  *   call at a time, so nothing else can hold them.
  * - `PropertiesService`'s three stores, the script's, the user's and the
@@ -38,8 +41,9 @@
  * Caches and properties last as long as the services do: for the Node
  * versions, as long as the script stays open.
  *
- * Only the methods the scripts in these repos call are here. A script that
- * calls another gets "is not a function", which names the method.
+ * Of the other services, only the methods the scripts in these repos call
+ * are here. A script that calls another gets "is not a function", which
+ * names the method.
  *
  * Fit: `script-worker.js` builds these for each script it runs; tests build
  * them with a stand-in `fetchSync`.
@@ -155,41 +159,75 @@ function createUrlFetchApp(fetchSync) {
 }
 
 /**
- * Builds a cache that keeps each value until it expires.
+ * The seconds a cached value lasts, from the expiry a script gives: at most
+ * Apps Script's six hours.
+ *
+ * @param {string} method - The cache method asked, for the message
+ * @param {*} expirationInSeconds - The expiry the script gave
+ * @returns {number} The seconds
+ * @throws {Error} When the expiry is not a number of seconds from one up
+ */
+function cacheSeconds(method, expirationInSeconds) {
+  if (
+    typeof expirationInSeconds !== "number" ||
+    !Number.isFinite(expirationInSeconds) ||
+    expirationInSeconds < 1
+  ) {
+    throw new Error(
+      `Cache.${method} needs an expiry of one second or more, not ${String(expirationInSeconds)}`,
+    );
+  }
+  return Math.min(expirationInSeconds, MAX_CACHE_SECONDS);
+}
+
+/**
+ * Builds a cache that keeps each value until it expires, with each method
+ * of Apps Script's cache.
  *
  * @param {function(): number} now - The time now, in milliseconds
- * @returns {{get: function(string): ?string, put: function(string, *, number=): void, remove: function(string): void}} The cache
+ * @returns {{get: function(string): ?string, getAll: function(string[]): Object<string, string>, put: function(string, *, number=): void, putAll: function(Object<string, *>, number=): void, remove: function(string): void, removeAll: function(string[]): void}} The cache
  */
 function createCache(now) {
   const entries = new Map();
+  const get = (key) => {
+    const entry = entries.get(key);
+    if (entry === undefined) return null;
+    if (now() >= entry.expiresAtMs) {
+      entries.delete(key);
+      return null;
+    }
+    return entry.value;
+  };
+  const keep = (key, value, seconds) => {
+    entries.set(key, {
+      value: String(value),
+      expiresAtMs: now() + seconds * 1000,
+    });
+  };
   return {
-    get(key) {
-      const entry = entries.get(key);
-      if (entry === undefined) return null;
-      if (now() >= entry.expiresAtMs) {
-        entries.delete(key);
-        return null;
+    get,
+    getAll(keys) {
+      const found = {};
+      for (const key of keys) {
+        const value = get(key);
+        if (value !== null) found[key] = value;
       }
-      return entry.value;
+      return found;
     },
     put(key, value, expirationInSeconds = DEFAULT_CACHE_SECONDS) {
-      if (
-        typeof expirationInSeconds !== "number" ||
-        !Number.isFinite(expirationInSeconds) ||
-        expirationInSeconds < 1
-      ) {
-        throw new Error(
-          `Cache.put needs an expiry of one second or more, not ${String(expirationInSeconds)}`,
-        );
+      keep(key, value, cacheSeconds("put", expirationInSeconds));
+    },
+    putAll(values, expirationInSeconds = DEFAULT_CACHE_SECONDS) {
+      const seconds = cacheSeconds("putAll", expirationInSeconds);
+      for (const [key, value] of Object.entries(values)) {
+        keep(key, value, seconds);
       }
-      const seconds = Math.min(expirationInSeconds, MAX_CACHE_SECONDS);
-      entries.set(key, {
-        value: String(value),
-        expiresAtMs: now() + seconds * 1000,
-      });
     },
     remove(key) {
       entries.delete(key);
+    },
+    removeAll(keys) {
+      for (const key of keys) entries.delete(key);
     },
   };
 }

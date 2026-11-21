@@ -306,54 +306,50 @@ import os from "os";
 import { parse as csvParse } from "csv-parse/sync";
 import { createObjectCsvWriter } from "csv-writer";
 
-import { parseInputToUtcMs } from "./utils/date.js";
 import { getCryptoPrice } from "./sources/price.js";
 import { closeExchangeSources } from "./sources/exchange.js";
-import config from "./config.js";
-import { getCache, setCache } from "./utils/cache.js";
+import { loadConfig } from "./config.js";
 import { getProgressBar } from "./utils/progress.js";
 import { backfillPrices } from "./utils/backfill.js";
 import { logv } from "./utils/log.js";
 import { fileURLToPath } from "url";
 import { unlockProjectKeys } from "../../api-key-store/index.js";
 
-// Added missing luxon import (fixes DateTime is not defined)
 import { DateTime } from "luxon";
 
-// Import CLI setup from separate module
 import { parseArgs } from "./commander.js";
 import { readSupportedTokens } from "./supported-tokens.js";
 
-// Load the token list (the settings come from config.js)
+// The token list, and the settings: the committed ones, with the owner's laid over them
 const supportedTokens = readSupportedTokens();
+const config = loadConfig();
 
-// Parse CLI args using commander (moved to commander.js)
 const args = parseArgs();
 
 const token = args.token;
 let inputFile = args.input;
-const outputFile = args.output || "output.csv";
+const outputFile = args.output;
 // commander gives the defaults: close, and UTC
 const mode = args.mode;
 const tz = args.tz;
 const verbose = args.verbose || process.env.VERBOSE === "1";
 const backfillHighest =
-  args.backfillHighest || config.BACKFILL_HIGHEST || false;
-const backfillLowest = args.backfillLowest || config.BACKFILL_LOWEST || false;
+  args.backfillHighest ?? config.BACKFILL_HIGHEST ?? false;
+const backfillLowest = args.backfillLowest ?? config.BACKFILL_LOWEST ?? false;
 
 if (inputFile?.startsWith("~")) {
   inputFile = path.join(os.homedir(), inputFile.slice(1));
 }
 
 // Resolve CoinGecko and CoinPaprika IDs from central mapping
-const tokenConfig = supportedTokens.tokens?.[token.toLowerCase()] || {};
+const tokenConfig = supportedTokens.tokens?.[token.toLowerCase()] ?? {};
 const coingeckoId = tokenConfig.coingecko_id || token.toLowerCase();
 const coinpaprikaId = tokenConfig.coinpaprika_id || null;
 logv(verbose, 1, `Resolved CoinGecko ID for ${token}: ${coingeckoId}`);
 logv(
   verbose,
   1,
-  `Resolved CoinPaprika ID for ${token}: ${coinpaprikaId || "none"}`,
+  `Resolved CoinPaprika ID for ${token}: ${coinpaprikaId ?? "none"}`,
 );
 
 // No need for manual missing arg check — commander.requiredOption handles it
@@ -378,7 +374,7 @@ const records = csvParse(csvContent, {
   relax_column_count: true,
 });
 
-const headers = Object.keys(records[0] || {});
+const headers = Object.keys(records[0] ?? {});
 console.log(`Detected headers (${headers.length}): ${headers.join(", ")}`);
 
 // Add new columns if not already present
@@ -415,7 +411,7 @@ if (amountColName) console.log(`Using amount column: "${amountColName}"`);
 
 let lastValidDateIndex = -1;
 for (let i = rows.length - 1; i >= 0; i--) {
-  const dateStr = (rows[i][dateColName] || "").trim();
+  const dateStr = (rows[i][dateColName] ?? "").trim();
   logv(verbose, 2, `Checking row ${i + 1} date: "${dateStr}"`);
 
   if (dateStr && !dateStr.includes(",,,,") && !dateStr.includes("Total")) {
@@ -460,7 +456,7 @@ progressBar.start();
 
 for (let i = 0; i < rows.length; i++) {
   const row = { ...rows[i] };
-  const dateStr = (row[dateColName] || "").trim();
+  const dateStr = (row[dateColName] ?? "").trim();
 
   if (
     i > lastValidDateIndex ||
@@ -475,7 +471,7 @@ for (let i = 0; i < rows.length; i++) {
     continue;
   }
 
-  const amountStr = amountColName ? (row[amountColName] || "").trim() : "";
+  const amountStr = amountColName ? (row[amountColName] ?? "").trim() : "";
   let price = null;
 
   logv(verbose, 1, `Processing row ${i + 1}: "${dateStr}"`);
@@ -553,12 +549,3 @@ const csvWriter = createObjectCsvWriter({
 
 await csvWriter.writeRecords(outputRows);
 console.log(`Output CSV written to ${outputFile}`);
-
-// Export everything needed for tests
-export {
-  getCryptoPrice,
-  getCache,
-  setCache,
-  parseInputToUtcMs,
-  backfillPrices,
-};

@@ -1,3 +1,9 @@
+/**
+ * Tests that the command line refuses a token it has no sources for,
+ * naming the tokens it supports; it runs as a program of its own.
+ * @module tests/token-validation.test
+ */
+
 import { describe, it, expect } from "vitest";
 import { execSync } from "child_process";
 import path from "path";

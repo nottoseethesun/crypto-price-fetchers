@@ -73,7 +73,7 @@ export function parseInputToUtcMs(dateStr, timeZone, verbose = false) {
   if (!local.isValid) {
     if (verbose)
       console.log(
-        `[VERBOSE:1] Invalid date format: "${safeStr}" - ${local.invalidExplanation || "unknown reason"}`,
+        `[VERBOSE:1] Invalid date format: "${safeStr}" - ${local.invalidExplanation ?? "unknown reason"}`,
       );
     return null;
   }

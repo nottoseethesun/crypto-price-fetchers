@@ -129,9 +129,9 @@ function validateAndResolveOptions(options, config) {
   const outputFile = options.output || inputFile;
   const verbose = options.verbose || process.env.VERBOSE === "1";
   const backfillHighest =
-    options.backfillHighest || config.BACKFILL_HIGHEST || false;
+    options.backfillHighest ?? config.BACKFILL_HIGHEST ?? false;
   const backfillLowest =
-    options.backfillLowest || config.BACKFILL_LOWEST || false;
+    options.backfillLowest ?? config.BACKFILL_LOWEST ?? false;
 
   if (!backfillHighest && !backfillLowest) {
     throw new Error(
