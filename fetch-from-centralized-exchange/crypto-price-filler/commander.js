@@ -29,9 +29,9 @@
  * @license MIT (or your project's license)
  */
 
-import fs from "fs";
 import { InvalidArgumentError, program } from "commander";
 import { canonicalTimeZone, validTimeZones } from "./utils/date.js";
+import { readSupportedTokens } from "./supported-tokens.js";
 
 /**
  * Accepts a time zone named in full, such as America/Chicago, or UTC, in
@@ -56,8 +56,7 @@ export function parseTimeZone(value) {
  * @returns {Object} The tokens object keyed by lowercase symbol
  */
 function loadSupportedTokens() {
-  const data = JSON.parse(fs.readFileSync("./supported-tokens.json", "utf8"));
-  return data.tokens || {};
+  return readSupportedTokens().tokens || {};
 }
 
 /**

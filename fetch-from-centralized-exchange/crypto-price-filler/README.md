@@ -79,12 +79,18 @@ CoinPaprika's free server, and does not ask Moralis. See
 
 ### index.js: Price Fetching
 
-`index.js` prices every row of a CSV file. The file header in `./index.js`
-lists all its options.
+`index.js` prices every row of a CSV file. `node index.js --help` lists
+all its options, with examples and its exit codes, and the file header in
+`./index.js` says more about each.
 
 ```bash
 node index.js --token=grc --input=mining.csv --output=filled.csv
 ```
+
+The tool reads its own files, `supported-tokens.json`,
+`config-example.json` and `config.json`, from this folder, so it runs from
+any folder; the paths `--input` and `--output` name are taken from the
+folder it runs in.
 
 The dates are read in UTC unless `--tz` names another time zone in full, such
 as `America/Chicago`; each row gets the offset the zone had at that time,

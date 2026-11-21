@@ -349,10 +349,12 @@ describe("Price Fetching Orchestration", () => {
         expect(mockMoralis).not.toHaveBeenCalled();
       });
 
-      it("reads token config from supported-tokens.json", async () => {
+      it("reads token config from the supported-tokens.json in the tool's folder", async () => {
         await priceOf("btc");
         expect(mockReadFileSync).toHaveBeenCalledWith(
-          "./supported-tokens.json",
+          expect.stringMatching(
+            /crypto-price-filler[\\/]supported-tokens\.json$/,
+          ),
           "utf8",
         );
       });

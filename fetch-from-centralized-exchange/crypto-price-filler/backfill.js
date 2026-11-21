@@ -82,6 +82,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 
+import { fileURLToPath } from "url";
 import { Command } from "commander";
 import { parse as csvParse } from "csv-parse/sync";
 import { createObjectCsvWriter } from "csv-writer";
@@ -89,13 +90,16 @@ import { createObjectCsvWriter } from "csv-writer";
 import { backfillPrices, DEFAULT_COLUMNS } from "./utils/backfill.js";
 import { logv } from "./utils/log.js";
 
+/** The owner's `config.json`, beside this file, whichever folder the command runs in. */
+const CONFIG_PATH = fileURLToPath(new URL("./config.json", import.meta.url));
+
 /**
  * Loads configuration from config.json.
  * @returns {Object} Configuration object
  */
 function loadConfig() {
   try {
-    return JSON.parse(fs.readFileSync("./config.json", "utf8"));
+    return JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
   } catch (_e) {
     return {};
   }
