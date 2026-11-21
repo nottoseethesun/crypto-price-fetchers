@@ -23,7 +23,7 @@ describe("Token validation", () => {
       });
     } catch (err) {
       exitCode = err.status;
-      stderr = err.stderr || "";
+      stderr = err.stderr ?? "";
     }
 
     expect(exitCode).toBe(1);
@@ -46,7 +46,7 @@ describe("Token validation", () => {
         timeout: 2000,
       });
     } catch (err) {
-      stderr = err.stderr || "";
+      stderr = err.stderr ?? "";
     }
 
     // Should NOT contain the unknown token error (may still fail for other reasons like empty CSV)
@@ -63,7 +63,7 @@ describe("Token validation", () => {
         timeout: 2000,
       });
     } catch (err) {
-      stderr = err.stderr || "";
+      stderr = err.stderr ?? "";
     }
 
     expect(stderr).not.toContain("Unknown token symbol");

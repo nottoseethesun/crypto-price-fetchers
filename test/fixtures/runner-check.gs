@@ -40,7 +40,7 @@ function getOrMessage(path) {
 
 function countCalls(key) {
   const cache = CacheService.getScriptCache();
-  const count = Number(cache.get(key) || "0") + 1;
+  const count = Number(cache.get(key) ?? "0") + 1;
   cache.put(key, String(count), 60);
   return count;
 }
