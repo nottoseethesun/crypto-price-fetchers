@@ -333,6 +333,8 @@ functions inside the scripts that the owner runs by hand. crypto-price-filler's
 - `stand-in-fetch-preload.js` runs the real command line, `index.js`, in a
   child process against a stand-in MEXC, and a stand-in CoinGecko ping that
   takes the one key in `stand-in-coingecko-key.js`.
+- `regression-runs.js` holds the settings, stand-in answers and runs that
+  `tests/regressions.test.js` shares among its tests.
 
 ## Known bugs
 
@@ -345,11 +347,9 @@ filler's command lines and `tests/regressions.test.js` for the rest, and
 removes the row.
 
 Google stops a custom function, a function a cell calls, after 30 seconds,
-and the cell shows `#ERROR!`. The first two bugs below are waits longer
-than that.
+and the cell shows `#ERROR!`. Both bugs below are waits longer than that.
 
 | Bug | Test in `tests/known-bugs.test.js` |
 | --- | --- |
 | `dexToolsGetTokenPrice` and `dexToolsGetTokenFDV`, in `crypto-price-fetchers.gs`, wait up to `DEXTOOLS_CONFIG.LOCK_WAIT_MS`, 120 seconds, for the script lock, so a cell that waits more than 30 seconds shows `#ERROR!`, never the busy message the script returns when the wait ends. | dexToolsGetTokenPrice waits for the script lock no longer than Google lets a custom function run |
 | `getCryptoPrice`, in the exchange script, tries the script lock 3 times for 2 seconds each, waiting 5, 10 and 20 seconds after each failed try (`LOCK_RETRY_BACKOFF`): 41 seconds in all. | getCryptoPrice waits for the script lock, in all, no longer than Google lets a custom function run |
-| `getCryptoPrice` reads a date cell by the UTC fields of the Date Sheets hands it, which are the time the cell shows only in a spreadsheet set to UTC; in one set to Central time, the price comes from five or six hours after that time. | getCryptoPrice reads a date cell as the time it shows, in the spreadsheet's time zone |

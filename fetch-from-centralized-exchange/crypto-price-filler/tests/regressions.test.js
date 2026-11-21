@@ -23,19 +23,21 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { execFileSync, spawnSync } from "child_process";
+import { spawnSync } from "child_process";
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { pathToFileURL } from "url";
 import { ESLint } from "eslint";
 import { createAppsScriptServices } from "../../../apps-script-runner/apps-script-services.js";
-import { loadAppsScript } from "../../../apps-script-runner/load-apps-script.js";
+import {
+  callScriptFunction,
+  loadAppsScript,
+} from "../../../apps-script-runner/load-apps-script.js";
 import { getCryptoPrice } from "../sources/price.js";
 import { closeExchangeSources, exchangeSources } from "../sources/exchange.js";
 import { canonicalTimeZone, parseInputToUtcMs } from "../utils/date.js";
 import { answerWith, asked as askedByTool } from "./helpers/stand-in-fetch.js";
-import { loadSheetsScript, reply } from "./helpers/sheets-script.js";
+import { loadSheetsScript } from "./helpers/sheets-script.js";
 import { standInSpreadsheet } from "../../../test/helpers/stand-in-spreadsheet.js";
 
 // The Sheets script, opened by its Node version with the stand-in fetch
@@ -56,213 +58,22 @@ vi.mock("../config.js", async () => {
   return { loadConfig: () => committed };
 });
 
-const FILLER_DIR = path.resolve(__dirname, "..");
-/** The Sheets script's files its function needs, in the order Apps Script loads them. */
-const SHEETS_SCRIPT_PATH = [
-  "../../getCryptoPriceFromCentralizedExchange.gs",
-  "../../getCryptoPriceFromCentralizedExchange-sources.gs",
-].map((file) => path.resolve(__dirname, file));
-/** The menu and the DexTools script, as the build joins them, from the repo's top. */
-const MENU_AND_DEXTOOLS_SCRIPTS = [
-  "../../../crypto-price-fetchers-menu.gs",
-  "../../../crypto-price-fetchers.gs",
-].map((file) => path.resolve(__dirname, file));
-const PRELOAD_URL = pathToFileURL(
-  path.resolve(__dirname, "helpers/stand-in-fetch-preload.js"),
-).href;
-
-const ROW_UTC_MS = Date.UTC(2025, 5, 15, 12, 30, 0);
-const PAST_UTC_MS = Date.UTC(2025, 2, 15, 3, 0, 0);
-const LIVE_PRICE = 9.99;
-const DATED_PRICE = 1.23;
-
-/** An api key in CoinGecko's form. */
-const COINGECKO_KEY_PATTERN = /CG-[A-Za-z0-9]{20,}/;
-
-/**
- * Answers as MEXC does for XTM, a pair it lists: one candle per request,
- * with open 1.00, high 1.50, low 0.80 and close 1.10.
- *
- * @param {string} url - The requested url
- * @returns {Object|Array|null} The json body, or null for a 404
- */
-function answerMexcCandle(url) {
-  if (url.includes("/exchangeInfo")) {
-    return {
-      symbols: [{ symbol: "XTMUSDT", baseAsset: "XTM", quoteAsset: "USDT" }],
-    };
-  }
-  if (url.includes("/klines"))
-    return [[ROW_UTC_MS - 30000, "1.00", "1.50", "0.80", "1.10", "10"]];
-  return null;
-}
-
-/**
- * Answers for a coin MEXC does not list and CoinGecko lists against USD,
- * as it does Tezos: CoinGecko's hourly range has no prices, and its price
- * for the day asked says 1.23. Its live ticker says 9.99, so a tool that
- * put the live price on a past date would give 9.99.
- *
- * @param {string} url - The requested url
- * @returns {Object|null} The json body, or null for a 404
- */
-function answerCoinGeckoForPastDay(url) {
-  if (url.includes("/exchangeInfo")) return { symbols: [] };
-  if (url.includes("/market_chart/range")) return { prices: [] };
-  if (url.includes("/tickers")) {
-    return {
-      tickers: [
-        {
-          target: "USD",
-          last: LIVE_PRICE,
-          converted_last: { usd: LIVE_PRICE },
-          volume: 100,
-          is_stale: false,
-        },
-      ],
-    };
-  }
-  if (url.includes("/history"))
-    return { market_data: { current_price: { usd: DATED_PRICE } } };
-  return null;
-}
-
-/**
- * Answers as CoinPaprika's free plan does for a day older than a day:
- * it refuses the candle, as beyond the plan, and gives the day's price
- * at 00:00 UTC, 2.05 on 2025-06-15.
- *
- * @param {string} url - The requested url
- * @returns {*} The answer
- */
-function answerPaprikaBeyondCandles(url) {
-  if (url.includes("/ohlcv/historical")) {
-    return reply(402, {
-      error:
-        "Getting historical OHLCV data before 2026-11-19 is not allowed in this plan",
-    });
-  }
-  if (url.includes("/tickers/xtm-tari/historical"))
-    return [{ timestamp: "2025-06-15T00:00:00Z", price: 2.05 }];
-  return null;
-}
-
-/**
- * Runs the command line, `index.js`, over one XTM row (12:30 on 2025-06-15)
- * in a child process, with the stand-in MEXC of
- * `helpers/stand-in-fetch-preload.js`, in a temp folder removed afterwards.
- *
- * @param {string[]} options - Options beyond --token, --input and --output
- * @param {string} [cwd=FILLER_DIR] - The folder the command runs in
- * @returns {{price: string, candleUtc: string}} The row's price as written, and the UTC end time of the candle asked for
- */
-function runCommandLineForOneRow(options, cwd = FILLER_DIR) {
-  const dir = fs.mkdtempSync(
-    path.join(os.tmpdir(), "crypto-price-filler-test-"),
-  );
-  try {
-    const input = path.join(dir, "in.csv");
-    const output = path.join(dir, "out.csv");
-    const askedPath = path.join(dir, "asked.json");
-    fs.writeFileSync(
-      input,
-      "date (UTC),amount,description\n2025-06-15 12:30:00,10,one XTM reward\n",
-    );
-    execFileSync(
-      process.execPath,
-      [
-        "--import",
-        PRELOAD_URL,
-        path.join(FILLER_DIR, "index.js"),
-        "--token=xtm",
-        `--input=${input}`,
-        `--output=${output}`,
-        ...options,
-      ],
-      {
-        cwd,
-        env: { ...process.env, NODE_ENV: "test", STAND_IN_ASKED: askedPath },
-        stdio: "pipe",
-      },
-    );
-    const row = fs
-      .readFileSync(output, "utf8")
-      .trim()
-      .split("\n")[1]
-      .split(",");
-    const candleUrl = JSON.parse(fs.readFileSync(askedPath, "utf8")).find(
-      (url) => url.includes("/klines"),
-    );
-    const candleUtc = new Date(
-      Number(new URL(candleUrl).searchParams.get("endTime")),
-    ).toISOString();
-    return { price: row[3], candleUtc };
-  } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
-  }
-}
-
-/**
- * Runs the command line, `index.js`, with the arguments given, in a child
- * process with the stand-in MEXC, and gives back how it ended.
- *
- * @param {string[]} args - The arguments
- * @returns {{status: number, stdout: string, stderr: string}} The exit code and what it printed
- */
-function runCommandLine(args) {
-  const run = spawnSync(
-    process.execPath,
-    ["--import", PRELOAD_URL, "index.js", ...args],
-    {
-      cwd: FILLER_DIR,
-      env: { ...process.env, NODE_ENV: "test" },
-      encoding: "utf8",
-    },
-  );
-  return { status: run.status, stdout: run.stdout, stderr: run.stderr };
-}
-
-/**
- * Says whether git ignores a path, as it does a file it does not track
- * that an ignore rule names.
- *
- * @param {string} relativePath - The path, from the tool's folder
- * @returns {boolean} Whether git ignores it
- */
-function gitIgnores(relativePath) {
-  return (
-    spawnSync("git", ["check-ignore", "-q", relativePath], { cwd: FILLER_DIR })
-      .status === 0
-  );
-}
-
-/**
- * Runs a function with the computer's time zone set to another, then
- * restores it.
- *
- * @param {string} zone - The time zone, such as 'America/Chicago'
- * @param {function(): *} run - What to run in it
- * @returns {*} What it returned
- */
-function inTimeZone(zone, run) {
-  const saved = process.env.TZ;
-  /*-
-   *  TEST-ONLY global swap: the day under test would come from the time
-   *  zone the computer is set to, and the script offers no seam for it.
-   *  Restored pristine in the `finally` below, immediately after the call
-   *  that needed it.
-   */
-  process.env.TZ = zone;
-  try {
-    return run();
-  } finally {
-    if (saved === undefined) {
-      delete process.env.TZ;
-    } else {
-      process.env.TZ = saved;
-    }
-  }
-}
+import {
+  answerCoinGeckoForPastDay,
+  answerMexcCandle,
+  answerPaprikaBeyondCandles,
+  COINGECKO_KEY_PATTERN,
+  DATED_PRICE,
+  FILLER_DIR,
+  gitIgnores,
+  inTimeZone,
+  MENU_AND_DEXTOOLS_SCRIPTS,
+  PAST_UTC_MS,
+  ROW_UTC_MS,
+  runCommandLine,
+  runCommandLineForOneRow,
+  SHEETS_SCRIPT_PATH,
+} from "./helpers/regression-runs.js";
 
 describe("fixed bugs", () => {
   beforeEach(() => {
@@ -363,6 +174,62 @@ describe("fixed bugs", () => {
         .filter((url) => url.includes("/ohlcv/"))
         .map((url) => new URL(url).searchParams.get("start"));
       expect(paprikaDays).toEqual(["2025-03-15"]);
+    });
+  });
+
+  describe("a date cell is read as the time it shows, in the spreadsheet's time zone", () => {
+    /**
+     * Calls getCryptoPrice with a date cell from a spreadsheet in a time
+     * zone, the Date remade in the script's realm as Sheets hands it, and
+     * gives the minute asked of MEXC.
+     *
+     * @param {?string} spreadsheetZone - The spreadsheet's time zone, or null for no spreadsheet
+     * @param {Date} cell - The moment the cell holds
+     * @param {string} tz - The tz argument
+     * @returns {string} The url of the minute's candle asked of MEXC
+     */
+    function minuteAskedFor(spreadsheetZone, cell, tz) {
+      const asked = [];
+      const services =
+        spreadsheetZone === null
+          ? {}
+          : {
+              SpreadsheetApp: {
+                getActiveSpreadsheet: () => ({
+                  getSpreadsheetTimeZone: () => spreadsheetZone,
+                }),
+              },
+            };
+      const script = loadSheetsScript(
+        SHEETS_SCRIPT_PATH,
+        (url) => {
+          asked.push(url);
+          return answerMexcCandle(url);
+        },
+        { services },
+      );
+      callScriptFunction(script, "getCryptoPrice", ["xtm", cell, tz, "high"]);
+      return asked.find((url) => url.includes("interval=1m"));
+    }
+
+    it("reads a cell from a spreadsheet in Central time as its wall time, in the zone tz names", () => {
+      // The spreadsheet hands a cell that shows 2025-06-15 07:30:00 as
+      // 12:30 UTC; tz says that time is CDT
+      const cell = new Date(ROW_UTC_MS);
+      expect(minuteAskedFor("America/Chicago", cell, "CDT")).toContain(
+        `&endTime=${ROW_UTC_MS}&`,
+      );
+    });
+
+    it("reads a cell from a spreadsheet in UTC as it was read before, and with no spreadsheet reads it in UTC", () => {
+      // A cell that shows 2025-06-15 07:30:00 in a UTC spreadsheet, CDT by tz
+      const cell = new Date(Date.UTC(2025, 5, 15, 7, 30, 0));
+      expect(minuteAskedFor("UTC", cell, "CDT")).toContain(
+        `&endTime=${ROW_UTC_MS}&`,
+      );
+      expect(minuteAskedFor(null, cell, "CDT")).toContain(
+        `&endTime=${ROW_UTC_MS}&`,
+      );
     });
   });
 

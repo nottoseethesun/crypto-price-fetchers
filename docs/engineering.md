@@ -205,6 +205,11 @@ holds the stand-ins:
   child process against a stand-in MEXC, a centralized exchange, and a
   stand-in ping of CoinGecko, a service that gathers the exchanges' prices,
   that takes the one key in `stand-in-coingecko-key.js`.
+- `regression-runs.js` holds the settings, stand-in answers and runs that
+  `tests/regressions.test.js` shares among its tests: answers as MEXC,
+  CoinGecko and CoinPaprika give them, the command line run over one row
+  in a child process, and a call run with the computer's time zone set to
+  another.
 
 ### Test Files
 
