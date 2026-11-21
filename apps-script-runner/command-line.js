@@ -120,8 +120,11 @@ export async function runScriptCommandLine(
     stderr: deps.stderr ?? process.stderr,
   };
   let exitCode = 0;
+  // A command's help lists, under Global Options, the program's own
+  // options, which it takes too
   const program = new Command()
     .exitOverride()
+    .configureHelp({ showGlobalOptions: true })
     .configureOutput({
       writeOut: (text) => io.stdout.write(text),
       writeErr: (text) => io.stderr.write(text),

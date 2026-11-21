@@ -7,8 +7,9 @@
  * and then on this repo: its EVM addresses written in EIP-55's form, but
  * those its tests write otherwise on purpose (this file's own among them,
  * the forms it tests the check with), its npm targets named in
- * `docs/npm-project-commands.md`, and its test files and helpers named in
- * `docs/engineering.md` or `CLAUDE.md`.
+ * `docs/npm-project-commands.md`, its test files and helpers named in
+ * `docs/engineering.md` or `CLAUDE.md`, and its docs' links and paths
+ * pointing at what it keeps.
  */
 
 import { after, describe, it } from "node:test";
@@ -20,6 +21,8 @@ import { fileURLToPath } from "node:url";
 import {
   addressesNotInEip55,
   eip55,
+  headingAnchors,
+  localReferencesMissing,
   npmTargetsMissingFromDocs,
   testFilesMissingFromDocs,
   trackedFiles,
@@ -143,6 +146,88 @@ describe("the checks, on a repo made for the test", () => {
   });
 });
 
+describe("the anchors of a doc's headings", () => {
+  it("are GitHub's: lower case, each space a hyphen, each mark but a hyphen or an underscore left out, and a number after one that came before", () => {
+    const text = [
+      "# The Tool",
+      "## `npm run check`, the gate",
+      "### Node 24 and 26: what_runs",
+      "```bash",
+      "# not a heading",
+      "```",
+      "## The Tool",
+      "#### Closed ##",
+    ].join("\n");
+    assert.deepEqual(
+      [...headingAnchors(text)],
+      [
+        "the-tool",
+        "npm-run-check-the-gate",
+        "node-24-and-26-what_runs",
+        "the-tool-1",
+        "closed",
+      ],
+    );
+  });
+});
+
+describe("the check of the docs' pointers, on a repo made for the test", () => {
+  it("finds each link to a missing file, folder or heading, and each path from the doc's folder to a missing file or outside the repo, and passes over code blocks and sites", () => {
+    const top = repoWith({
+      "README.md": [
+        "# Top",
+        "See [the tool](tool/README.md), [its docs](docs/), and [the gate](docs/guide.md#the-gate).",
+        "A [lost page](docs/lost.md) and [a lost part](docs/guide.md#lost).",
+        "A [site](https://example.com/x.md) and [mail](mailto:a@example.com).",
+        "[Up here](#top) and [not here](#bottom).",
+        "```bash",
+        "cat ../outside.md",
+        "[not checked](nowhere.md)",
+        "```",
+      ].join("\n"),
+      "docs/guide.md": "# Guide\n\n## The gate\n",
+      "tool/README.md": [
+        "# Tool",
+        "Contributing is in `../README.md`; outside is `../../README.md`.",
+        "The script is `./run.sh`, and `./gone.sh` is not.",
+      ].join("\n"),
+      "tool/run.sh": "",
+    });
+    assert.deepEqual(localReferencesMissing(top), [
+      {
+        file: "README.md",
+        line: 3,
+        pointer: "docs/lost.md",
+        why: "the repo keeps no such file or folder",
+      },
+      {
+        file: "README.md",
+        line: 3,
+        pointer: "docs/guide.md#lost",
+        why: "docs/guide.md has no heading with that anchor",
+      },
+      {
+        file: "README.md",
+        line: 5,
+        pointer: "#bottom",
+        why: "README.md has no heading with that anchor",
+      },
+      {
+        file: "tool/README.md",
+        line: 2,
+        pointer: "../../README.md",
+        why: "it points outside the repo",
+      },
+      {
+        file: "tool/README.md",
+        line: 3,
+        pointer: "./gone.sh",
+        why: "the repo keeps no such file or folder",
+      },
+    ]);
+  });
+});
+
 describe("this repo", () => {
   it("writes every EVM address in EIP-55's form, but those its tests write otherwise on purpose", () => {
     const found = addressesNotInEip55(REPO_TOP)
@@ -169,5 +254,9 @@ describe("this repo", () => {
       testFilesMissingFromDocs(REPO_TOP, ["docs/engineering.md", "CLAUDE.md"]),
       [],
     );
+  });
+
+  it("points its docs' links and paths only at files, folders and headings it keeps", () => {
+    assert.deepEqual(localReferencesMissing(REPO_TOP), []);
   });
 });

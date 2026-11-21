@@ -245,7 +245,7 @@ that this section, or `CLAUDE.md`, names every one.
 | `no-or-default.test.js` | `eslint-rules/no-or-default.js`, the lint's rule against a default made with `\|\|`. |
 | `package-exports.test.js` | Every module the package exports, loaded by the package's name, as a project that installs this repo loads it, and shipped. |
 | `no-secret-logging.test.js` | `eslint-rules/no-secret-logging.js`, the security lint's rule against printing a name that may hold a secret. |
-| `repo-checks.test.js` | `lib/repo-checks.js`, on repos made in temp folders, and this repo held to it: its EVM addresses in EIP-55's form, and its npm targets and test files named in the docs. |
+| `repo-checks.test.js` | `lib/repo-checks.js`, on repos made in temp folders, and this repo held to it: its EVM addresses in EIP-55's form, its npm targets and test files named in the docs, and its docs' links and paths pointing at the files, folders and headings it keeps. |
 | `run-apps-script.test.js` | `openAppsScript`: a Sheets script run in a worker thread, with its web requests done on the caller's thread. |
 | `summ-csv.test.js` | The Summ CSV writer, part one: a header's columns, the rules a row must pass, and the text of a file. |
 | `summ-csv-values.test.js` | How the Summ CSV writer turns a row's values into the text of cells. |

@@ -201,8 +201,9 @@ such as `head`, ends with its exit code and no stack trace. A value a
 command line takes is checked as commander parses it, with
 `InvalidArgumentError`, so a mistake names its option before anything
 runs; `lib/calendar-day.js` checks a day and `lib/http-url.js` an http or
-https url, for every repo. The checks of a help, and of a help into a
-closed pipe, are in `lib/command-line-help.js`, exported as
+https url, for every repo. The checks of a help, every option its
+examples use listed in it among them, and of a help into a closed pipe,
+are in `lib/command-line-help.js`, exported as
 `crypto-price-fetchers/lib/command-line-help`:
 `test/command-line-help.test.js` runs them on every command line here,
 and the repos that install this one run them in their own tests.
@@ -285,8 +286,9 @@ command line's help (`test/command-line-help.test.js`), and the repo's
 tracked files (`test/repo-checks.test.js`) are tested from the repo's top
 folder, on Node's own test runner. The tracked files are held to the
 checks of `lib/repo-checks.js`: every EVM address in EIP-55's form, every
-npm target named in `docs/npm-project-commands.md`, and every test file
-and helper named in `docs/engineering.md` or here. The menu runs against a spreadsheet held in memory
+npm target named in `docs/npm-project-commands.md`, every test file and
+helper named in `docs/engineering.md` or here, and every link and path in
+a doc pointing at a file, folder or heading the repo keeps. The menu runs against a spreadsheet held in memory
 (`test/helpers/stand-in-spreadsheet.js`), and DEX Screener's part is
 built from stand-in sources written in its test, compiled with the real
 esbuild. Code
