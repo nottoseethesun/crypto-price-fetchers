@@ -39,7 +39,7 @@ The order of the sources, and what each gives, is in the file header of
 
 ## Prerequisites
 
-NodeJS 22+
+NodeJS 24+
 
 ## Installation
 

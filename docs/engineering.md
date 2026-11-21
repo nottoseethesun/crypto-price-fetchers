@@ -45,7 +45,7 @@ manages his 9mm V3 liquidity positions: its `CLAUDE.md` and
 
 ## Quick Start
 
-A working copy needs Node 22 or later, the packages of the repo and of
+A working copy needs Node 24 or later, the packages of the repo and of
 crypto-price-filler, and the api keys. `npm run api-keys` runs the key
 store's manager, `npm run check` the gate below, and
 `npm run build apps-script` the build step, which gives the Sheets scripts
@@ -86,7 +86,8 @@ that hold no key and none of the owner's own settings.
 `npm run check` runs every gate, in order, and stops at the first that
 fails: the lint, the tests with coverage, crypto-price-filler's tests with
 coverage, then the security audits. It must pass before every commit and
-push, and CI runs it on Node 22 and Node 24.
+push, and CI runs it on Node 26, the newest LTS (long-term support) version,
+and on Node 24, the oldest the repo supports.
 
 ---
 
@@ -393,8 +394,11 @@ request to `main`, and by hand:
 
 | Workflow | Job | Runs |
 | -------- | --- | ---- |
-| `ci.yml` | Check (Node 22), Check (Node 24) | `npm run check`, after installing the repo's packages and crypto-price-filler's. |
+| `ci.yml` | check-latest-nodejs-lts (Node 26), check-oldest-nodejs-supported (Node 24) | `npm run check`, after installing the repo's packages and crypto-price-filler's. |
 | `security-audit.yml` | Dependency Audit, Security Lint, Secret Scan | Each audit as a job of its own; Dependency Audit runs `npm run audit:deps`, so the check of DEX Screener's files with it. |
+
+The two checks of `ci.yml` are named for their roles, not their Node
+versions, so moving to newer versions renames no check.
 
 `main` is protected: a change reaches it only by a pull request whose five
 checks, those five jobs, have passed. Force pushes and deletion are
