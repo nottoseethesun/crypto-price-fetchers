@@ -12,6 +12,9 @@
 
 import { fileURLToPath } from "node:url";
 import { runBuild } from "./apps-script-build/index.js";
+import { endQuietlyWhenOutputCloses } from "./lib/closed-output.js";
+
+endQuietlyWhenOutputCloses();
 
 process.exitCode = await runBuild(process.argv, {
   projectTop: fileURLToPath(new URL(".", import.meta.url)),

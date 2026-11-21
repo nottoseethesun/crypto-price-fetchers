@@ -51,6 +51,7 @@ import {
   openScriptFunctions,
   runScriptCommandLine,
 } from "./apps-script-runner/index.js";
+import { endQuietlyWhenOutputCloses } from "./lib/closed-output.js";
 
 /** The Sheets script this runs. */
 export const SHEETS_SCRIPT = new URL(
@@ -273,5 +274,6 @@ export function runCommandLine(argv, deps = {}) {
 }
 
 if (isEntryPoint(import.meta.url)) {
+  endQuietlyWhenOutputCloses();
   process.exitCode = await runCommandLine(process.argv);
 }

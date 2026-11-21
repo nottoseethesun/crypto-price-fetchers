@@ -5,6 +5,7 @@
 
 import { describe, it, expect, vi } from "vitest";
 import {
+  backfillChoice,
   backfillPrices,
   isPriceEmpty,
   DEFAULT_COLUMNS,
@@ -390,5 +391,32 @@ describe("utils/backfill", () => {
         consoleSpy.mockRestore();
       });
     });
+  });
+});
+
+describe("backfillChoice", () => {
+  it("turns a mode on when its flag is given or config.json's setting is true", () => {
+    const none = { BACKFILL_HIGHEST: false, BACKFILL_LOWEST: false };
+    expect(backfillChoice({}, none)).toEqual({ highest: false, lowest: false });
+    expect(backfillChoice({ backfillHighest: true }, none)).toEqual({
+      highest: true,
+      lowest: false,
+    });
+    expect(backfillChoice({}, { BACKFILL_LOWEST: true })).toEqual({
+      highest: false,
+      lowest: true,
+    });
+    expect(
+      backfillChoice({ backfillLowest: true }, { BACKFILL_HIGHEST: true }),
+    ).toEqual({ highest: true, lowest: true });
+  });
+
+  it("takes only true as on, from a flag or a setting", () => {
+    expect(
+      backfillChoice(
+        { backfillHighest: "yes" },
+        { BACKFILL_HIGHEST: 1, BACKFILL_LOWEST: "true" },
+      ),
+    ).toEqual({ highest: false, lowest: false });
   });
 });

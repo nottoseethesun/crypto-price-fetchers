@@ -47,9 +47,9 @@ function loadTokenConfig(token) {
   const tokenConfig = supportedTokens.tokens?.[token.toLowerCase()] ?? {};
 
   return {
-    coingeckoId: tokenConfig.coingecko_id || null,
-    coinpaprikaId: tokenConfig.coinpaprika_id || null,
-    mexcSymbol: tokenConfig.mexc_symbol || null,
+    coingeckoId: tokenConfig.coingecko_id ?? null,
+    coinpaprikaId: tokenConfig.coinpaprika_id ?? null,
+    mexcSymbol: tokenConfig.mexc_symbol ?? null,
     poolToken: poolTokenOf(tokenConfig),
   };
 }

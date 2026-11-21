@@ -16,5 +16,8 @@
  */
 
 import { runActionlint } from "./actionlint/index.js";
+import { endQuietlyWhenOutputCloses } from "./lib/closed-output.js";
+
+endQuietlyWhenOutputCloses();
 
 process.exitCode = await runActionlint(process.argv);

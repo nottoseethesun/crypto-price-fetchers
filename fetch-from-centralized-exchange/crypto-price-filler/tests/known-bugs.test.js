@@ -5,7 +5,9 @@
  * Each test checks the behavior the code should have, so it fails while
  * the bug is there, and `it.fails` turns that failure into a pass. A fix
  * makes the test pass, so `it.fails` fails it: the same change declares the
- * test with `it` and moves it to `regressions.test.js`, and removes the
+ * test with `it` and moves it to `regressions.test.js`, or to
+ * `regressions-command-line.test.js` for the filler's command lines, and
+ * removes the
  * bug's row from the table in the repo's CLAUDE.md, which lists each test
  * here.
  *

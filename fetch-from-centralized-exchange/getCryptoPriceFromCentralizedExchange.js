@@ -59,6 +59,7 @@ import {
   runScriptCommandLine,
 } from "../apps-script-runner/index.js";
 import { unlockProjectKeys } from "../api-key-store/index.js";
+import { endQuietlyWhenOutputCloses } from "../lib/closed-output.js";
 
 /**
  * The Sheets script this runs: its two files the function needs, in the
@@ -309,5 +310,6 @@ export function runCommandLine(argv, deps = {}) {
 }
 
 if (isEntryPoint(import.meta.url)) {
+  endQuietlyWhenOutputCloses();
   process.exitCode = await runCommandLine(process.argv);
 }

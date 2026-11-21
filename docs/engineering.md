@@ -31,6 +31,7 @@ manages his 9mm V3 liquidity positions: its `CLAUDE.md` and
 - [The Gate: `npm run check`](#the-gate-npm-run-check)
 - [Lint](#lint)
 - [Tests](#tests)
+  - [Test Files](#test-files)
   - [How the Sheets Scripts (`.gs`) Are Tested](#how-the-sheets-scripts-gs-are-tested)
     - [The Node Tests](#the-node-tests)
     - [The Apps Script Tests](#the-apps-script-tests)
@@ -101,10 +102,10 @@ row explains:
 
 | Tool | Configured in | What it does, and what it holds the repo to |
 | ---- | ------------- | ------------------------------------------- |
-| ESLint | `eslint.config.js` | Checks JavaScript against rules: LP Ranger's, with no warning allowed: cyclomatic complexity ≤ 17, ≤ 500 lines of code a file (blank lines and comments not counted), lines ≤ 80 characters but strings, urls and comments, `===`, no unused name, no `var`, `const` where nothing is reassigned, no `Math.random`, no comment that tells Prettier, the formatter in the row below, to skip code, and every import resolved. It reads the Sheets scripts too, as the paragraph below the table says. |
+| ESLint | `eslint.config.js` | Checks JavaScript against rules: LP Ranger's, with no warning allowed: cyclomatic complexity ≤ 17, ≤ 500 lines of code a file (blank lines and comments not counted), lines ≤ 80 characters but strings, urls and comments, `===`, no unused name, no `var`, `const` where nothing is reassigned, no `Math.random`, no comment that tells Prettier, the formatter in the row below, to skip code, and every import resolved; and `no-or-default` (`eslint-rules/`), this repo's rule against `a \|\| b` whose value is kept, as a default is, when `b` is no boolean, since `\|\|` takes its fallback for every falsy value, a 0 or an empty string held on purpose among them: a default is written with `??` or an explicit check. It reads the Sheets scripts too, as the paragraph below the table says. |
 | markdownlint | `.markdownlint-cli2.jsonc` | Checks the form of Markdown files: LP Ranger's settings, over every Markdown file, such as one top heading first and no HTML. |
 | Prettier | `.prettierrc`, `.prettierignore` | Formats code; in check mode, it fails on any JavaScript, Sheets script, JSON or YAML file the repo keeps whose layout its formatting would change. |
-| actionlint | `actionlint/release.js` | Checks the GitHub Actions workflow files, in `.github/workflows/`, for mistakes in their syntax, their expressions and the shell scripts their steps run. The lint runs the official release of actionlint, rhysd's program, through this repo's bin `run-actionlint` (`run-actionlint.js`, `actionlint/`): the first run downloads the archive for its system, refuses it unless its SHA-256 is the one `actionlint/release.js` pins, and keeps the program in `node_modules/.cache/actionlint/`, which later runs use. |
+| actionlint | `actionlint/release.js` | Checks the GitHub Actions workflow files, in `.github/workflows/`, for mistakes in their syntax, their expressions and the shell scripts their steps run. The lint runs the official release of actionlint, rhysd's program, through this repo's bin `run-actionlint` (`run-actionlint.js`, `actionlint/`): the first run downloads the archive for its system, refuses it unless its SHA-256 is the one `actionlint/release.js` pins, refuses the program in it unless its own SHA-256 is the one pinned beside it, and keeps the program in `node_modules/.cache/actionlint/`; each later run checks the kept program's SHA-256 again, and downloads the archive again when the program has changed. |
 | knip | `knip.json` | Finds files nothing imports or runs, and fails on any. See [Dead Code Detection](#dead-code-detection). |
 
 The Sheets scripts are plain scripts, not modules: Apps Script loads them
@@ -143,10 +144,13 @@ runs a spreadsheet's price cells again; the price clients (`dex-prices/`),
 which ask the services that price a token from its chain's pools; the key
 store; `no-secret-logging`, the lint rule that refuses printing a name
 that may hold a secret; the versions tool (`github-project-deps/`); the
-Summ CSV writer (`summ-csv/`); the shared helpers (`lib/`); and every
-command line's help (`test/command-line-help.test.js`), with the checks
-in `lib/command-line-help.js`, which the repos that install this one run
-in their own tests. The scripts' and the clients' requests
+Summ CSV writer (`summ-csv/`); the actionlint runner (`actionlint/`);
+`no-or-default`, the lint rule that refuses a default made with `||`; the
+shared helpers (`lib/`); every command line's help, and its help into a
+closed pipe (`test/command-line-help.test.js`), with the checks in
+`lib/command-line-help.js`; and the repo's tracked files, with the checks
+in `lib/repo-checks.js`. The repos that install this one run both sets of
+checks in their own tests. The scripts' and the clients' requests
 go to a stand-in fetch or a stand-in server on the computer
 (`test/helpers/stand-in-web.js`; `test/helpers/gecko-terminal-stand-in.js`
 answers as GeckoTerminal, one of those services, does). The build step's tests stand in for the
@@ -201,6 +205,77 @@ holds the stand-ins:
   child process against a stand-in MEXC, a centralized exchange, and a
   stand-in ping of CoinGecko, a service that gathers the exchanges' prices,
   that takes the one key in `stand-in-coingecko-key.js`.
+
+### Test Files
+
+Each test file and helper, by folder. `test/repo-checks.test.js` checks
+that this section, or `CLAUDE.md`, names every one.
+
+**The top folder's** (`test/`):
+
+| File | What it covers |
+| ---- | -------------- |
+| `actionlint.test.js` | The actionlint runner (`actionlint/`), against archives built in the test: the archive for a system downloaded and refused unless its SHA-256 and its program's match the pinned ones, the tar file read, the program kept and checked on each run, and the command line. |
+| `api-key-store.test.js` | The key store (`api-key-store/`): keys encrypted with a password, saved, opened, and read from LP Ranger's key files. |
+| `apps-script-build-clipboard.test.js` | The build step's clipboard: the clipboard tool it finds, the install it offers, and the copy. |
+| `apps-script-build.test.js` | The build step, `npm run build apps-script`: its questions, the file it gives, and where it puts it. |
+| `apps-script-services.test.js` | The runner's Node versions of the Apps Script services. |
+| `built-script.test.js` | The joining of the built file's parts into one Apps Script project, on short scripts. |
+| `calendar-day.test.js` | `lib/calendar-day.js`: the start of a day in UTC, and a day the calendar does not have refused. |
+| `closed-output.test.js` | `lib/closed-output.js` and `helpIntoClosedPipe`: a command line that calls the helper ends with its exit code and writes nothing to stderr when its output's reader has closed the pipe, and one that does not shows the stack trace the check looks for. |
+| `command-line-help.test.js` | Every command line's help, `--help` and `-h`, and its help into a closed pipe; the list of command lines held to the repo; and the checks of `lib/command-line-help.js`. |
+| `config-file.test.js` | A Node version's config file read, and the opened keys laid over its values. |
+| `crypto-price-fetchers-menu.test.js` | The menu (`crypto-price-fetchers-menu.gs`), against a spreadsheet held in memory. |
+| `crypto-price-fetchers.test.js` | `crypto-price-fetchers.js`, the Node version of the script of current prices, and its command line. |
+| `dex-prices-geckoterminal.test.js` | The GeckoTerminal client, part one: its settings, the budget of requests every caller shares, a token's facts and pools, and the pool it reads a price from. |
+| `dex-prices-geckoterminal-candles.test.js` | The GeckoTerminal client, part two: a pool's candles, page by page, and the candle and price of a time. |
+| `dex-prices-moralis.test.js` | The Moralis client: the block a chain had at a time, and a token's price at a block. |
+| `dex-prices-web-request.test.js` | `dex-prices/web-request.js`: a request sent again after each wait while the service answers 429. |
+| `dex-screener.test.js` | DEX Screener's part of the build: its files downloaded at one commit, checked against their SHA-256, and compiled, from stand-in sources. |
+| `format-date.test.js` | `Utilities.formatDate` under Node. |
+| `get-crypto-price-from-centralized-exchange.test.js` | The exchange script's Node version, and its command line. |
+| `github-project-deps.test.js` | The versions tool, part one: the refs it sets and its runs. |
+| `github-project-deps-files.test.js` | The versions tool, part two: the package.json files a run reads, and what the package ships for the bin. |
+| `help-page.test.js` | The page the menu's Help item shows. |
+| `http-url.test.js` | `lib/http-url.js`: an http or https url taken, anything else refused. |
+| `key-manager.test.js` | The key store's services, a project's key list, the key manager, and this repo's `manage-api-keys.js`. |
+| `key-prompts.test.js` | The flows that open the saved keys with one password and save a key once its service takes it. |
+| `load-apps-script.test.js` | A Sheets script loaded into a `vm` context, configured and called, in the test's thread. |
+| `message-of.test.js` | `lib/message-of.js`, and that the package ships `lib/`. |
+| `no-or-default.test.js` | `eslint-rules/no-or-default.js`, the lint's rule against a default made with `\|\|`. |
+| `package-exports.test.js` | Every module the package exports, loaded by the package's name, as a project that installs this repo loads it, and shipped. |
+| `no-secret-logging.test.js` | `eslint-rules/no-secret-logging.js`, the security lint's rule against printing a name that may hold a secret. |
+| `repo-checks.test.js` | `lib/repo-checks.js`, on repos made in temp folders, and this repo held to it: its EVM addresses in EIP-55's form, and its npm targets and test files named in the docs. |
+| `run-apps-script.test.js` | `openAppsScript`: a Sheets script run in a worker thread, with its web requests done on the caller's thread. |
+| `summ-csv.test.js` | The Summ CSV writer, part one: a header's columns, the rules a row must pass, and the text of a file. |
+| `summ-csv-values.test.js` | How the Summ CSV writer turns a row's values into the text of cells. |
+| `summ-csv-files.test.js` | The Summ CSV writer, part two: the template it reads, the settings it ships, the file it writes, its command line, and what the package ships for it. |
+| `unlock-api-keys.test.js` | `unlock-api-keys.sh`, in bash, and in zsh where zsh is installed. |
+
+Its helpers (`test/helpers/`), besides those the paragraphs above name:
+`captured-output.js`, a stream stand-in that keeps what is written to it,
+for the tests of the command lines.
+
+**crypto-price-filler's** (`tests/`):
+
+| File | What it covers |
+| ---- | -------------- |
+| `backfill-cli.test.js` | `backfill.js`'s command and run, with stand-ins for `fs`, csv-writer and `loadConfig`. |
+| `backfill.test.js` | `utils/backfill.js`: the bracketing prices of a run of empty rows, the fill, the totals, and `backfillChoice`. |
+| `cache.test.js` | `utils/cache.js`, the cache held in memory, with each entry's expiry. |
+| `coingecko-api-key.test.js` | `index.js` opening the saved CoinGecko key before it prices anything. |
+| `exchange.test.js` | `sources/exchange.js`: the exchange script's price sources, opened once per run with the run's keys and closed at its end. |
+| `geckoterminal-source.test.js` | `sources/geckoterminal.js`: a token that trades in pools, priced from the GeckoTerminal candle that holds a row's time. |
+| `index.test.js` | The command line's helpers, the time zones and the reading of a date, and the command line, run as a program. |
+| `known-bugs.test.js` | The known bugs, each declared with `it.fails`. |
+| `moralis-source.test.js` | `sources/moralis.js`: a token that trades in pools, priced by Moralis at the block its chain had at a row's time. |
+| `price.test.js` | `sources/price.js`: the order the sources are asked in, and the cache. |
+| `progress.test.js` | `utils/progress.js`, the progress bar. |
+| `regressions.test.js` | The fixed bugs of the tool, its Sheets script and the menu. |
+| `regressions-command-line.test.js` | The fixed bugs of the two command lines: their checks of a value, and the settings they fall back to. |
+| `sheets-sources.test.js` | The exchange script's sources, MEXC, CoinGecko and CoinPaprika, which the sheet and the tool both price with. |
+| `token-validation.test.js` | A token with no sources refused, naming the tokens the tool supports. |
+| `xtm-coingecko-id.test.js` | XTM priced from CoinGecko under the id of Minotari, its project. |
 
 Code written to check something goes into the tests, so it is kept and run
 again rather than written again.
@@ -337,7 +412,7 @@ every file, through secretlint, which looks for keys and credentials.
 | ------- | ------------ | --------------- |
 | `npm run audit:deps` | `npm audit --audit-level=high --omit=dev`, for the repo and crypto-price-filler, then `npm run audit:dex-screener` and `npm run audit:actionlint` | Known vulnerabilities, of high severity or worse, in the packages that ship; then what the next two rows say. |
 | `npm run audit:dex-screener` | `audit-dex-screener.js`: downloads each file of DEX Screener's Google Sheets functions at the commit `apps-script-build/dex-screener-files.js` names | A file that cannot be downloaded, or whose SHA-256 differs from the one written there. npm audit covers only packages installed from npm, and this code is not one. The build step runs the same audit before it compiles those files. |
-| `npm run audit:actionlint` | `run-actionlint --check`: downloads every archive of the actionlint release `actionlint/release.js` names | An archive that cannot be downloaded, or whose SHA-256 differs from the one written there. npm audit does not cover actionlint, which is no npm package; the lint makes the same check on the one archive it runs. |
+| `npm run audit:actionlint` | `run-actionlint --check`: downloads every archive of the actionlint release `actionlint/release.js` names | An archive that cannot be downloaded, or whose SHA-256, or its program's, differs from the one written there. npm audit does not cover actionlint, which is no npm package; the lint makes the same checks on the one archive it runs. |
 | `npm run audit:security` | ESLint with `eslint-security.config.js` | Code open to attack (eslint-plugin-security), strings that look like keys (eslint-plugin-no-secrets), and printing a name that may hold a secret (`no-secret-logging`). |
 | `npm run audit:secrets` | secretlint, with `.secretlintrc.json` and `.secretlintignore` | Keys and credentials in any file. |
 
@@ -417,6 +492,8 @@ A bug found but not yet fixed is recorded as a test, which fails once the
 bug is gone, so the record cannot go stale. crypto-price-filler's
 `tests/known-bugs.test.js` declares each with `it.fails`: the test passes
 while the bug is present. The fix makes it fail. The same change declares
-it with `it` and moves it to `tests/regressions.test.js`, where it keeps
-the fixed behavior from coming back. The repo's `CLAUDE.md` lists the bugs
+it with `it` and moves it to the regression tests, where it keeps the
+fixed behavior from coming back: `tests/regressions-command-line.test.js`
+for the filler's two command lines, `tests/regressions.test.js` for the
+rest. The repo's `CLAUDE.md` lists the bugs
 known today, each with its test.

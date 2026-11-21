@@ -10,6 +10,24 @@
 import { logv } from "./log.js";
 
 /**
+ * Whether to backfill with the higher or the lower bracketing price: a
+ * flag given on the command line, else config.json's setting. The flags
+ * only turn backfill on, so each is true when its flag is given or its
+ * setting is true; when both are, the higher price is used.
+ *
+ * @param {{backfillHighest?: boolean, backfillLowest?: boolean}} options - The options, as commander parsed them
+ * @param {{BACKFILL_HIGHEST?: boolean, BACKFILL_LOWEST?: boolean}} config - The settings, as `loadConfig` read them
+ * @returns {{highest: boolean, lowest: boolean}} Whether each is on
+ */
+export function backfillChoice(options, config) {
+  return {
+    highest:
+      options.backfillHighest === true || config.BACKFILL_HIGHEST === true,
+    lowest: options.backfillLowest === true || config.BACKFILL_LOWEST === true,
+  };
+}
+
+/**
  * Checks if a price value should be considered empty/missing.
  * @param {*} price - The price value to check
  * @returns {boolean} True if the price is empty, 'Error', or missing

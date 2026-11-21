@@ -307,6 +307,15 @@ A project runs it as `npm run github-project-deps -- main` or
 [Which version they install](docs/architecture.md#which-version-they-install)
 explains how it works.
 
+The projects also take their checks from here. Their lint runs this repo's
+bin `run-actionlint`, which runs actionlint, the checker of GitHub Actions
+workflow files, from its author's release, refused unless its SHA-256 is
+the one this repo pins, and `no-or-default`, this repo's ESLint rule
+against a default made with `||`. Their tests hold each command line's
+help to the owner's rule, and their tracked files to his rules on
+addresses and docs, with `crypto-price-fetchers/lib/command-line-help` and
+`crypto-price-fetchers/lib/repo-checks`.
+
 ## Summ CSV files
 
 Summ, the crypto tax service, imports a CSV file in its own layout and
@@ -343,8 +352,10 @@ script's header, so the headers say the same:
 
 The repo's tests run on a computer, before every commit, in one gate,
 LP Ranger's: the lint, the tests of the runner, the Node versions, the
-build step, the price clients, the key store, the versions tool and the
-Summ CSV writer, crypto-price-filler's tests, and the security audits. From the repo's top folder:
+build step, the menu, the price clients, the key store, the versions tool,
+the Summ CSV writer, the actionlint runner, the lint rules, the shared
+helpers and every command line's help, crypto-price-filler's tests, and
+the security audits. From the repo's top folder:
 
 ```bash
 npm ci

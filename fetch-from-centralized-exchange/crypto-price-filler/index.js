@@ -310,7 +310,7 @@ import { getCryptoPrice } from "./sources/price.js";
 import { closeExchangeSources } from "./sources/exchange.js";
 import { loadConfig } from "./config.js";
 import { getProgressBar } from "./utils/progress.js";
-import { backfillPrices } from "./utils/backfill.js";
+import { backfillChoice, backfillPrices } from "./utils/backfill.js";
 import { logv } from "./utils/log.js";
 import { fileURLToPath } from "url";
 import { unlockProjectKeys } from "../../api-key-store/index.js";
@@ -319,6 +319,9 @@ import { DateTime } from "luxon";
 
 import { parseArgs } from "./commander.js";
 import { readSupportedTokens } from "./supported-tokens.js";
+import { endQuietlyWhenOutputCloses } from "../../lib/closed-output.js";
+
+endQuietlyWhenOutputCloses();
 
 // The token list, and the settings: the committed ones, with the owner's laid over them
 const supportedTokens = readSupportedTokens();
@@ -332,10 +335,11 @@ const outputFile = args.output;
 // commander gives the defaults: close, and UTC
 const mode = args.mode;
 const tz = args.tz;
-const verbose = args.verbose || process.env.VERBOSE === "1";
-const backfillHighest =
-  args.backfillHighest ?? config.BACKFILL_HIGHEST ?? false;
-const backfillLowest = args.backfillLowest ?? config.BACKFILL_LOWEST ?? false;
+const verbose = args.verbose === true || process.env.VERBOSE === "1";
+const { highest: backfillHighest, lowest: backfillLowest } = backfillChoice(
+  args,
+  config,
+);
 
 if (inputFile?.startsWith("~")) {
   inputFile = path.join(os.homedir(), inputFile.slice(1));
@@ -343,8 +347,8 @@ if (inputFile?.startsWith("~")) {
 
 // Resolve CoinGecko and CoinPaprika IDs from central mapping
 const tokenConfig = supportedTokens.tokens?.[token.toLowerCase()] ?? {};
-const coingeckoId = tokenConfig.coingecko_id || token.toLowerCase();
-const coinpaprikaId = tokenConfig.coinpaprika_id || null;
+const coingeckoId = tokenConfig.coingecko_id ?? token.toLowerCase();
+const coinpaprikaId = tokenConfig.coinpaprika_id ?? null;
 logv(verbose, 1, `Resolved CoinGecko ID for ${token}: ${coingeckoId}`);
 logv(
   verbose,
@@ -397,7 +401,7 @@ rows
   );
 
 const dateColName =
-  headers.find((h) => h.includes("date") && h.includes("UTC")) ||
+  headers.find((h) => h.includes("date") && h.includes("UTC")) ??
   headers.find((h) => h.toLowerCase().includes("date"));
 logv(verbose, 1, `Searching for date column in headers: ${headers.join(", ")}`);
 if (!dateColName) {

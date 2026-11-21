@@ -11,7 +11,8 @@
  * CoinGecko without a key.
  *
  * Nothing is read as this module loads: the entry point, `index.js`, and
- * the pool source, when it first needs a setting, call `loadConfig`. *
+ * the pool source, when it first needs a setting, call `loadConfig`.
+ *
  * @version 1.0.0
  * @author Christopher M. Balz with Grok and Claude.ai
  */

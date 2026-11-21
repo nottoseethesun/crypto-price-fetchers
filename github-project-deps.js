@@ -14,6 +14,9 @@
  */
 
 import { runGithubProjectDeps } from "./github-project-deps/index.js";
+import { endQuietlyWhenOutputCloses } from "./lib/closed-output.js";
+
+endQuietlyWhenOutputCloses();
 
 process.exitCode = await runGithubProjectDeps(process.argv, {
   projectTop: process.cwd(),

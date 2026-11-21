@@ -89,10 +89,12 @@ const RELEASE = Object.freeze({
     "linux-x64": {
       file: "actionlint_9.9.9_linux_amd64.tar.gz",
       sha256: sha256(ARCHIVE),
+      programSha256: sha256(Buffer.from(PROGRAM)),
     },
     "darwin-arm64": {
       file: "actionlint_9.9.9_darwin_arm64.tar.gz",
       sha256: sha256(ARCHIVE),
+      programSha256: sha256(Buffer.from(PROGRAM)),
     },
   },
 });
@@ -165,8 +167,20 @@ describe("fileFromTar", () => {
       tarOf([{ name: "README.md", bytes: Buffer.from("x") }]),
     );
     assert.throws(
-      () => programFromArchive(empty, "some.tar.gz"),
-      /some\.tar\.gz holds no file named actionlint/,
+      () => programFromArchive(empty, RELEASE.archives["linux-x64"]),
+      /actionlint_9\.9\.9_linux_amd64\.tar\.gz holds no file named actionlint/,
+    );
+  });
+
+  it("refuses a program whose SHA-256 differs from the one pinned for it, naming the one it has", () => {
+    const other = gzipSync(
+      tarOf([
+        { name: "actionlint", bytes: Buffer.from("#!/bin/sh\nexit 0\n") },
+      ]),
+    );
+    assert.throws(
+      () => programFromArchive(other, RELEASE.archives["linux-x64"]),
+      /The program in actionlint_9\.9\.9_linux_amd64\.tar\.gz is not the one crypto-price-fetchers pins: its SHA-256 is [0-9a-f]{64}, not the [0-9a-f]{64} written in actionlint\/release\.js/,
     );
   });
 });
@@ -188,6 +202,16 @@ describe("installedActionlint", () => {
     assert.equal(await install(fetch, cacheTop), programPath);
     assert.equal(fetch.requests.length, 1);
     assert.deepEqual(fs.readdirSync(path.dirname(programPath)), ["actionlint"]);
+  });
+
+  it("downloads the archive again when the kept program has changed since it was checked, and keeps the pinned one", async () => {
+    const fetch = serving(SERVED);
+    const cacheTop = makeTempFolder("actionlint-tampered");
+    const programPath = await install(fetch, cacheTop);
+    fs.writeFileSync(programPath, "#!/bin/sh\necho changed\n");
+    assert.equal(await install(fetch, cacheTop), programPath);
+    assert.equal(fetch.requests.length, 2);
+    assert.equal(fs.readFileSync(programPath, "utf8"), PROGRAM);
   });
 
   it("refuses an archive whose SHA-256 differs, keeping nothing", async () => {
@@ -330,7 +354,7 @@ describe("runActionlint, the command line", () => {
     );
     assert.equal(
       output.stdout.text,
-      "actionlint 9.9.9's 2 archives match the SHA-256 crypto-price-fetchers pins.\n",
+      "actionlint 9.9.9's 2 archives, and the program in each, match the SHA-256 crypto-price-fetchers pins.\n",
     );
     assert.equal(
       await runActionlint(["node", "run-actionlint.js", "--check"], {
@@ -366,7 +390,7 @@ describe("runActionlint, the command line", () => {
 });
 
 describe("ACTIONLINT", () => {
-  it("names one release of actionlint and the SHA-256 of its archives for Linux and macOS, on x64 and arm64", () => {
+  it("names one release of actionlint and the SHA-256 of its archives for Linux and macOS, on x64 and arm64, and of the program in each", () => {
     assert.match(ACTIONLINT.version, /^\d+\.\d+\.\d+$/);
     assert.deepEqual(Object.keys(ACTIONLINT.archives).sort(), [
       "darwin-arm64",
@@ -382,6 +406,7 @@ describe("ACTIONLINT", () => {
         `actionlint_${ACTIONLINT.version}_${platform}_${name}.tar.gz`,
       );
       assert.match(archive.sha256, /^[0-9a-f]{64}$/);
+      assert.match(archive.programSha256, /^[0-9a-f]{64}$/);
     }
     assert.equal(
       archiveUrl(ACTIONLINT, "a.tar.gz"),

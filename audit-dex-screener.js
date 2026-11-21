@@ -16,5 +16,8 @@
  */
 
 import { runDexScreenerAudit } from "./apps-script-build/dex-screener-files.js";
+import { endQuietlyWhenOutputCloses } from "./lib/closed-output.js";
+
+endQuietlyWhenOutputCloses();
 
 process.exitCode = await runDexScreenerAudit(process.argv);

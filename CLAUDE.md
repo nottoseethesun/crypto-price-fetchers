@@ -194,8 +194,15 @@ exit codes. An npm target that runs one passes the flag through, as
 `npm run <target> -- --help`. Each is declared with commander, the package
 that parses command lines, so the options its help lists come from the
 declaration the program parses; the examples and exit codes go in the
-help's closing text (`addHelpText("after", …)`). The checks of a help
-are in `lib/command-line-help.js`, exported as
+help's closing text (`addHelpText("after", …)`). Each entry point calls
+`endQuietlyWhenOutputCloses` (`lib/closed-output.js`) before it starts, so
+a command line whose output is piped into a program that stops reading,
+such as `head`, ends with its exit code and no stack trace. A value a
+command line takes is checked as commander parses it, with
+`InvalidArgumentError`, so a mistake names its option before anything
+runs; `lib/calendar-day.js` checks a day and `lib/http-url.js` an http or
+https url, for every repo. The checks of a help, and of a help into a
+closed pipe, are in `lib/command-line-help.js`, exported as
 `crypto-price-fetchers/lib/command-line-help`:
 `test/command-line-help.test.js` runs them on every command line here,
 and the repos that install this one run them in their own tests.
@@ -206,7 +213,8 @@ example. LP Ranger's rules do not yet ask for the examples; this repo does.
 ## Gates and CI
 
 `npm run check` is the one gate, LP Ranger's: the lint (ESLint, which
-checks JavaScript against rules, here LP Ranger's; markdownlint, which
+checks JavaScript against rules, here LP Ranger's and `no-or-default`,
+this repo's rule against a default made with `||`; markdownlint, which
 checks the form of Markdown files; Prettier, which formats code; actionlint,
 which checks the GitHub Actions workflow files; and knip, which finds files
 nothing uses), the tests with at least 80% of lines covered,
@@ -233,13 +241,23 @@ printing a name that may hold a secret, through `console`, a stream's
 renamed, never excused. pulsechain-analytics and x1-validator-analytics run
 the rule from this repo (`crypto-price-fetchers/eslint-rules/no-secret-logging`).
 
+The lint runs `eslint-rules/no-or-default.js`, which refuses `a || b`
+whose value is kept, as a default is, unless `b` is a boolean: `||` takes
+its fallback for every falsy value, a 0, an empty string or a false held
+on purpose among them, so a default is written with `??` or an explicit
+check, as LP Ranger's rules ask. The other three repos run it from here
+(`crypto-price-fetchers/eslint-rules/no-or-default`).
+
 actionlint runs from its author's official release, never from an npm
 package that wraps it: the bin `run-actionlint` (`run-actionlint.js`,
 `actionlint/`) downloads the archive for its system, refuses it unless its
-SHA-256 is the one `actionlint/release.js` pins, and keeps the program in
-`node_modules/.cache/actionlint/`; `npm run audit:actionlint` checks every
-archive of the release. A newer release is taken by writing its version
-and SHA-256s there, from the release's checksums file. The three projects
+SHA-256 is the one `actionlint/release.js` pins, refuses the program in it
+unless its own SHA-256 is the one pinned beside it, and keeps the program
+in `node_modules/.cache/actionlint/`, whose SHA-256 it checks again on each
+run; `npm run audit:actionlint` checks every archive of the release and
+its program. A newer release is taken by writing its version and the
+archives' SHA-256s there, from the release's checksums file, and then the
+programs' SHA-256s, which `run-actionlint --check` names. The three projects
 that install this repo run the bin in their lint.
 
 ## Supported versions of Node
@@ -261,18 +279,24 @@ file's name, so `main`'s required checks stay as they are.
 ## Tests
 
 The runner, the Node versions, the build step, the menu, the price
-clients, the key store, the lint rule, the versions tool, the shared
-helpers in `lib/` and every command line's help
-(`test/command-line-help.test.js`) are tested from the repo's top folder, on Node's own test
-runner. The menu runs against a spreadsheet held in memory
+clients, the key store, the two lint rules, the versions tool, the Summ
+csv utility, the actionlint runner, the shared helpers in `lib/`, every
+command line's help (`test/command-line-help.test.js`), and the repo's
+tracked files (`test/repo-checks.test.js`) are tested from the repo's top
+folder, on Node's own test runner. The tracked files are held to the
+checks of `lib/repo-checks.js`: every EVM address in EIP-55's form, every
+npm target named in `docs/npm-project-commands.md`, and every test file
+and helper named in `docs/engineering.md` or here. The menu runs against a spreadsheet held in memory
 (`test/helpers/stand-in-spreadsheet.js`), and DEX Screener's part is
 built from stand-in sources written in its test, compiled with the real
 esbuild. Code
 that more than one part uses lives once, in `lib/`, which ships with the
-package; `messageOf` is exported as `crypto-price-fetchers/lib/message-of`,
-and the checks of a command line's help as
-`crypto-price-fetchers/lib/command-line-help`, for the projects that
-install this repo. The tests ask no
+package, and the projects that install this repo import each by the
+package's name, as `exports` in package.json names it:
+`crypto-price-fetchers/lib/message-of`, `…/lib/command-line-help`,
+`…/lib/closed-output`, `…/lib/calendar-day`, `…/lib/http-url` and
+`…/lib/repo-checks` (`test/package-exports.test.js` loads each by that
+name). The tests ask no
 outside service: the scripts' requests go to a stand-in fetch or a stand-in
 server on the computer (`test/helpers/stand-in-web.js`). The key store's
 tests save keys in temp folders of their own
@@ -313,9 +337,10 @@ functions inside the scripts that the owner runs by hand. crypto-price-filler's
 A bug found gets a test in crypto-price-filler's
 `tests/known-bugs.test.js`, declared with `it.fails`, so it passes while the
 bug is present, and a row in the table below. Its fix makes the test fail;
-the same change declares the test with `it`, moves it to
-`tests/regressions.test.js`, which guards the fixed bugs, and removes the
-row.
+the same change declares the test with `it`, moves it to the tests that
+guard the fixed bugs, `tests/regressions-command-line.test.js` for the
+filler's command lines and `tests/regressions.test.js` for the rest, and
+removes the row.
 
 Google stops a custom function, a function a cell calls, after 30 seconds,
 and the cell shows `#ERROR!`. Both bugs below are waits longer than that.

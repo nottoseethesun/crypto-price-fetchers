@@ -2,8 +2,9 @@
  * ESLint's settings for crypto-price-fetchers, with LP Ranger's rules: no
  * function above cyclomatic complexity 17, no file above 500 lines of code,
  * no line above 80 characters but strings, urls and comments, `===` always,
- * no unused name, no comment that tells Prettier to skip code, and no
- * `Math.random`.
+ * no unused name, no comment that tells Prettier to skip code, no
+ * `Math.random`, and no default made with `||` (`no-or-default`, in
+ * `eslint-rules/`), which takes its fallback for every falsy value.
  * @file eslint.config.js
  *
  * Every JavaScript file in the repo is linted, crypto-price-filler's among
@@ -30,6 +31,7 @@ import js from "@eslint/js";
 import prettierConfig from "eslint-config-prettier";
 import nPlugin from "eslint-plugin-n";
 import globals from "globals";
+import noOrDefault from "./eslint-rules/no-or-default.js";
 
 /** The rules every file is held to: LP Ranger's. */
 const SHARED_RULES = {
@@ -69,6 +71,7 @@ const SHARED_RULES = {
     "error",
     { terms: ["prettier-ignore"], location: "anywhere" },
   ],
+  "local/no-or-default": "error",
   "no-restricted-syntax": [
     "error",
     {
@@ -79,6 +82,9 @@ const SHARED_RULES = {
     },
   ],
 };
+
+/** This repo's own rules, which every file is held to. */
+const LOCAL_RULES = { rules: { "no-or-default": noOrDefault } };
 
 /** The services Apps Script gives a Sheets script, as globals. */
 const APPS_SCRIPT_GLOBALS = {
@@ -97,7 +103,7 @@ export default [
   { ignores: ["**/node_modules/**", "**/coverage/**", "build/**"] },
   {
     files: ["**/*.js"],
-    plugins: { n: nPlugin },
+    plugins: { n: nPlugin, local: LOCAL_RULES },
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "module",
@@ -107,6 +113,7 @@ export default [
   },
   {
     files: ["**/*.gs"],
+    plugins: { local: LOCAL_RULES },
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "script",

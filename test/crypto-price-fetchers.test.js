@@ -123,6 +123,17 @@ describe("openCryptoPriceFetchers", () => {
     });
   });
 
+  it("prices the token itself when the pool's cell is empty, or the range names no pool", async () => {
+    await withFetchers(async (fetchers) => {
+      for (const noPool of [[[""]], [["", 0]], [[0, 0]], [], undefined]) {
+        assert.equal(
+          await fetchers.dexToolsGetTokenPrice("ether", TOKEN, noPool),
+          1.23,
+        );
+      }
+    });
+  });
+
   it("gives a token's FDV from DexTools", async () => {
     await withFetchers(async (fetchers) => {
       assert.equal(await fetchers.dexToolsGetTokenFDV("pulse", TOKEN), 5000000);

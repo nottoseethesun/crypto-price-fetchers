@@ -248,6 +248,20 @@ const CACHE = CacheService.getScriptCache();
    ───────────────────────────────────────────────────────────────────────────── */
 
 /**
+ * The pool a cell names in the third argument of a DexTools function,
+ * `[[poolAddress, unused]]`: a range of one row, whose first cell holds the
+ * pool's address.
+ *
+ * @param {*} poolAddresses - The argument, or anything else when the cell names no pool
+ * @returns {?string} The pool's address, or null when the cell names none
+ */
+function poolNamed(poolAddresses) {
+  const firstRow = Array.isArray(poolAddresses) ? poolAddresses[0] : undefined;
+  const pool = Array.isArray(firstRow) ? firstRow[0] : undefined;
+  return typeof pool === "string" && pool !== "" ? pool : null;
+}
+
+/**
  * An address as DexTools is asked for it: an EVM address, 0x and 40 hex
  * digits, in lower case, since its letters' case only checksums it; any
  * other, such as an X1 address in base58, whose case matters, as given.
@@ -296,9 +310,9 @@ function dexToolsGetTokenPrice(
   cacheSeconds = DEXTOOLS_CONFIG.CACHE_SECONDS,
 ) {
   const isX1 = String(blockchain ?? "").toLowerCase() === "x1";
-  const pool = Array.isArray(poolAddresses) && poolAddresses[0]?.[0];
-  const address = dexToolsAddress(pool || tokenAddress);
-  const isPool = !!pool;
+  const pool = poolNamed(poolAddresses);
+  const address = dexToolsAddress(pool ?? tokenAddress);
+  const isPool = pool !== null;
   const provider = isX1 ? "x1" : "dt";
   const cacheKey = `${provider}_price_${blockchain}_${address}_${isPool ? "pool" : "token"}`;
 
@@ -350,9 +364,9 @@ function dexToolsGetTokenFDV(
   cacheSeconds = DEXTOOLS_CONFIG.CACHE_SECONDS,
 ) {
   const isX1 = String(blockchain ?? "").toLowerCase() === "x1";
-  const pool = Array.isArray(poolAddresses) && poolAddresses[0]?.[0];
-  const address = dexToolsAddress(pool || tokenAddress);
-  const isPool = !!pool;
+  const pool = poolNamed(poolAddresses);
+  const address = dexToolsAddress(pool ?? tokenAddress);
+  const isPool = pool !== null;
   const provider = isX1 ? "x1" : "dt";
   const cacheKey = `${provider}_fdv_${blockchain}_${address}_${isPool ? "pool" : "token"}`;
 
