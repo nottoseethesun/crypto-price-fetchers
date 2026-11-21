@@ -266,9 +266,11 @@ the same change declares the test with `it`, moves it to
 row.
 
 Google stops a custom function, a function a cell calls, after 30 seconds,
-and the cell shows `#ERROR!`. Both bugs below are waits longer than that.
+and the cell shows `#ERROR!`. The first two bugs below are waits longer
+than that.
 
 | Bug | Test in `tests/known-bugs.test.js` |
 | --- | --- |
 | `dexToolsGetTokenPrice` and `dexToolsGetTokenFDV`, in `crypto-price-fetchers.gs`, wait up to `DEXTOOLS_CONFIG.LOCK_WAIT_MS`, 120 seconds, for the script lock, so a cell that waits more than 30 seconds shows `#ERROR!`, never the busy message the script returns when the wait ends. | dexToolsGetTokenPrice waits for the script lock no longer than Google lets a custom function run |
 | `getCryptoPrice`, in the exchange script, tries the script lock 3 times for 2 seconds each, waiting 5, 10 and 20 seconds after each failed try (`LOCK_RETRY_BACKOFF`): 41 seconds in all. | getCryptoPrice waits for the script lock, in all, no longer than Google lets a custom function run |
+| crypto-price-filler's `index.js`, `commander.js` and `sources/price.js` read `supported-tokens.json`, and `backfill.js` its `config.json`, from the folder the command runs in, not from the tool's own, so `index.js --help`, or any run, from another folder stops with Node's ENOENT error, and `backfill.js` there leaves out the owner's settings. | index.js answers --help when run from a folder other than its own |

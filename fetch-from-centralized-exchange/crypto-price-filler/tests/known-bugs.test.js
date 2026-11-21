@@ -11,12 +11,18 @@
  *
  * The Sheets scripts run unchanged in the test's thread, through
  * `tests/helpers/sheets-script.js`, with a stand-in for the Apps Script
- * service each test is about: the script lock.
+ * service each test is about: the script lock. The command line,
+ * `index.js`, runs in a child process, from a folder other than its own.
  */
 
 import { describe, it, expect } from "vitest";
+import { spawnSync } from "child_process";
+import os from "os";
 import path from "path";
 import { loadSheetsScript } from "./helpers/sheets-script.js";
+
+/** The tool's folder, which holds `index.js` and the files it reads. */
+const FILLER_DIR = path.resolve(__dirname, "..");
 
 /** How long Google lets a custom function run before it stops it. */
 const CUSTOM_FUNCTION_LIMIT_MS = 30000;
@@ -81,6 +87,22 @@ describe("waits inside a custom function", () => {
       const waited = [...waits, ...sleeps].reduce((sum, ms) => sum + ms, 0);
       expect(waits.length).toBeGreaterThan(0);
       expect(waited).toBeLessThanOrEqual(CUSTOM_FUNCTION_LIMIT_MS);
+    },
+  );
+});
+
+describe("the command line, run from another folder", () => {
+  it.fails(
+    "index.js answers --help when run from a folder other than its own",
+    () => {
+      const run = spawnSync(
+        process.execPath,
+        [path.join(FILLER_DIR, "index.js"), "--help"],
+        { cwd: os.tmpdir(), encoding: "utf8" },
+      );
+      expect(run.stderr).toBe("");
+      expect(run.status).toBe(0);
+      expect(run.stdout).toMatch(/^Usage: /);
     },
   );
 });
