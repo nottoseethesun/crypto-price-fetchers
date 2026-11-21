@@ -132,7 +132,7 @@ describe("openCryptoPriceFetchers", () => {
       await fetchers.dexToolsGetTokenPrice("ether", TOKEN);
       assert.equal(
         fetch.requests[0].headers["x-api-key"],
-        "paste_your_dextools_api_key_here",
+        "set_by_the_build_step",
       );
     }, {});
   });
@@ -276,7 +276,7 @@ describe("crypto-price-fetchers.js, the command line", () => {
     );
     assert.equal(
       result.fetch.requests[0].headers["x-api-key"],
-      "paste_your_dextools_api_key_here",
+      "set_by_the_build_step",
     );
   });
 

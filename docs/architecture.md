@@ -48,10 +48,10 @@ liquidity positions.
 
 | Part | Where | What it is |
 | ---- | ----- | ---------- |
-| The Sheets scripts | `crypto-price-fetchers.gs`, `fetch-from-centralized-exchange/*.gs` | Apps Script functions a sheet's cells call. |
+| The Sheets scripts | `crypto-price-fetchers.gs`, `fetch-from-centralized-exchange/*.gs`, `crypto-price-fetchers-menu.gs` | Apps Script functions a sheet's cells call, and the menu that runs them again and shows their help. |
 | The runner | `apps-script-runner/` | Runs a Sheets script under Node, unchanged. |
 | The Node versions | `crypto-price-fetchers.js`, `fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.js` | Each Sheets script as a Node module and a command line, through the runner. |
-| The build step | `build.js`, `apps-script-build/` | Gives each Sheets script with the saved api keys set in it, on the clipboard, for pasting into Apps Script. |
+| The build step | `build.js`, `apps-script-build/`, `audit-dex-screener.js` | Joins the Sheets scripts, and DEX Screener's functions when asked, into one file with the saved api keys set at its end, on the clipboard, for one paste into Apps Script; and audits DEX Screener's files. |
 | crypto-price-filler | `fetch-from-centralized-exchange/crypto-price-filler/` | A Node tool that fills a CSV's price columns, row by row, from the pools' price services and the exchange script's sources. A package of its own. |
 | The price clients | `dex-prices/` | Moralis and GeckoTerminal, which price a token from a blockchain's pools, and the one loop that sends a refused request again. |
 | The key store | `api-key-store/`, `manage-api-keys.js`, `unlock-api-keys.sh` | Api keys kept encrypted with a password: LP Ranger's design, as a module. |
@@ -87,8 +87,32 @@ editor (`-tests.gs`). Each file names what it uses from the others in a
 `/* global */` comment, for the lint. How both scripts are tested is in
 [`docs/engineering.md`](engineering.md#how-the-sheets-scripts-gs-are-tested).
 
-The owner pastes the scripts into Apps Script, as the build step gives
-them; the repo is where they change.
+`crypto-price-fetchers-menu.gs` adds the Crypto Price Fetchers menu, which
+its `onOpen` builds when the spreadsheet opens. Google stops a custom
+function, a function a cell calls, after 30 seconds, and Sheets runs a
+cell again only when its formula is edited or a cell it names changes, so
+a cell stopped that way keeps showing `#ERROR!`. The menu's items make
+that edit: each adds a `!` to a cell's formula, which Sheets saves as a
+formula it cannot read, then puts the formula back, which Sheets runs as
+a new one. They work 20 cells at a time, and wait for those to finish
+before the next 20, since Google runs at most 30 calls of one person at
+once. Before each write, the cell's formula is read again, so a cell that
+changed during the run, as when the tab is sorted, is left alone and
+reported. Clean up errors does this for the cells that show `#ERROR!` or
+a price script's busy message, which the menu reads from the scripts' own
+constants (`DEXTOOLS_BUSY_MESSAGE`, `EXCHANGE_BUSY_MESSAGE`); Refresh for
+every cell that asks for a current value; and Refresh & freeze historical
+prices for the past prices of one tab, whose numbers it keeps in place of
+their formulas block by block, within the run's time. A current value
+that Refresh runs again may come from a script's cache: the scripts keep
+a DexTools or x1.ninja price or FDV above 0 for 5 minutes, and a DEX
+Screener answer for 30 seconds, and ask again for a 0, an error or a busy
+message. Help shows the page the build step
+makes from the help sections of the scripts' headers. No Node version
+loads the menu, since it gives no price.
+
+The owner pastes the one file the build step gives into a spreadsheet's
+Apps Script project; the repo is where the scripts change.
 
 ---
 
@@ -135,7 +159,7 @@ daily cap on requests; the cache lasts while the script is open; and the
 api keys come from the key store, not the script. Each Node version lays
 the keys it opens over the script's config: `crypto-price-fetchers.js`
 opens only the key its call needs, DexTools' or x1.ninja's, for
-`CONFIG.API_KEY` or `X1_CONFIG.API_KEY`;
+`DEXTOOLS_CONFIG.API_KEY` or `X1_CONFIG.API_KEY`;
 `getCryptoPriceFromCentralizedExchange.js` opens CoinGecko's and
 CoinPaprika's, for `CONFIG.COINGECKO_API_KEY` and
 `CONFIG.COINPAPRIKA_API_KEY`. Its `openCentralizedExchangeSources` opens
@@ -146,25 +170,59 @@ crypto-price-filler.
 
 ## The Build Step
 
-Apps Script cannot read the key file, so a key reaches a sheet only inside
-the script pasted there. `npm run build apps-script` writes it in, so no
-key is typed into a script by hand (`apps-script-build/`).
+A spreadsheet runs its scripts from its Apps Script project, where the
+owner pastes them. Apps Script cannot read the key file, so a key reaches
+a sheet only inside the script pasted there, and it runs every script file
+of a project in one global scope, so the scripts must work as one.
+`npm run build apps-script` (`build.js`, `apps-script-build/`) gives one
+file that holds them all, with the keys written in, for one paste.
 
-- Each Node version exports a build spec, `APPS_SCRIPT_BUILD`: the
-  script's files, in Apps Script's order, the services whose keys it
-  sends, and the function that lays the keys over its config.
-- The build opens the keys as the programs do (`unlockProjectKeys`), and
-  sets, as the last statements of each script's first file, the values
-  the Node version would set: those of the config.json it reads, with the
-  keys laid over them. It first loads the script with the runner and
-  applies the values, so a field the script lacks stops the build, as it
-  stops the Node version (`built-script.js`).
-- It puts each file on the clipboard in turn, through the desktop's tool
-  (`clipboard.js`), says where to paste it, waits for Enter, and clears
-  the clipboard after the last. With no tool installed, it offers to
-  install one with `sudo apt install`; declined, it warns that the keys go
-  to disk in the clear, then writes the files to `build/apps-script/`,
-  which git ignores, readable by the owner alone.
+- **The parts**, in the order they run: the menu
+  (`crypto-price-fetchers-menu.gs`); then each script whose Node version
+  exports a build spec, `APPS_SCRIPT_BUILD`, which names the script's
+  files in Apps Script's order, the services whose keys it sends, and the
+  function that lays the keys over its config: `crypto-price-fetchers.gs`,
+  then the exchange script's three files, its in-editor tests included;
+  then DEX Screener's functions, when the owner asks for them.
+- **DEX Screener's functions.** DEX Screener, a service that lists the
+  pairs of decentralized exchanges with their prices, published Google
+  Sheets functions of its own, such as `DEX_SCREENER_PAIR_PROP`, in a repo
+  that carries no license, so this repo holds none of their code. Every
+  build asks whether to include them; Enter includes them. The build then
+  runs the audit that `npm run audit:dex-screener` runs
+  (`dex-screener-files.js`): it downloads their files from
+  raw.githubusercontent.com at the commit written there, checks each
+  file's SHA-256 against the one written beside it, and says its line. It
+  compiles only the files the audit gave, with esbuild, as DEX Screener's
+  own build does, with this repo's development packages zod and lodash
+  (`dex-screener.js`). Their code runs inside a function of its own in the
+  file, so its names, its own `onOpen` among them, stay inside it, and a
+  top-level function of each custom function's name hands a cell's call
+  on. A failed download, a file that differs, or a failed compile stops
+  the build with the advice to run it again and answer n. npm audit does
+  not cover that code, so `npm run audit:dex-screener`
+  (`audit-dex-screener.js`), which `npm run audit:deps` runs after npm
+  audit, runs the same audit on its own.
+- **The values.** The build opens the keys as the programs do
+  (`unlockProjectKeys`), and sets, as the file's last statements, the
+  values each Node version would set: those of the config.json it reads,
+  with the keys laid over them. Code a script runs as it loads has run by
+  then, so a field it reads there keeps the value written in the script,
+  as under Node. The last value is the page the menu's Help item shows,
+  made from the help section of each script's header (`help-page.js`).
+- **The checks.** Before it hands the file over, the build checks that the
+  parts make one Apps Script project (`built-script.js`). Each part,
+  loaded alone, must declare no function or `var` that another part
+  declares, since the one that runs later would replace the other without
+  a word; the whole file must load, which a name declared twice with
+  `const` prevents; each value must name a field the scripts have; and DEX
+  Screener's functions, when asked for, must be functions.
+- **The hand-over.** The build puts the file on the clipboard, through the
+  desktop's tool (`clipboard.js`), says how to paste it, waits for Enter,
+  and clears the clipboard. With no tool installed, it offers to install
+  one with `sudo apt install`; declined, it warns that the keys go to disk
+  in the clear, then writes the file to `build/apps-script/`, which git
+  ignores, readable by the owner alone.
 
 No line it prints holds a key.
 
@@ -350,6 +408,10 @@ development packages.
   the Node versions and the key store; vitest for crypto-price-filler,
   whose tests are written for it.
 - **commander** for every command line.
+- **esbuild**, a development package, for the build step's compile of DEX
+  Screener's TypeScript, as DEX Screener's own build compiles it; zod and
+  lodash, the two packages that code imports, are development packages
+  too, and only the built file holds them.
 - **Node's `crypto`** for the key store: no package between the password
   and the cipher.
 - **Worker threads and `Atomics.wait`** for the runner, rather than a

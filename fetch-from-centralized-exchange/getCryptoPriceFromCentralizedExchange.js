@@ -39,9 +39,10 @@
  *
  * What differs from the sheet: it runs on this computer, so there is no
  * 30-second limit per call and no daily cap on requests. The cache lasts
- * while the script is open: one run of the command line. The sheet's menu
- * is not here. The script waits its 200 milliseconds before each lookup,
- * as in the sheet.
+ * while the script is open: one run of the command line. The sheet's menu,
+ * which the build step adds from `crypto-price-fetchers-menu.gs`, is not
+ * here. The script waits its 200 milliseconds before each lookup, as in
+ * the sheet.
  *
  * Fit: beside `getCryptoPriceFromCentralizedExchange.gs`, which stays the
  * one copy of its logic. crypto-price-filler, in the folder below, is a
@@ -117,26 +118,18 @@ export function keyConfig(apiKeys) {
 }
 
 /**
- * What `npm run build apps-script` gives of this script for the sheet
- * (`apps-script-build/`): its three files, the first with the CoinGecko
- * and CoinPaprika keys set at its end as `keyConfig` sets them here.
+ * What `npm run build apps-script` puts of this script in the one file it
+ * gives for the sheet (`apps-script-build/`): its three files, the in-editor
+ * tests included, the first one's header holding a help section, with the
+ * CoinGecko and CoinPaprika keys set at the end of the built file as
+ * `keyConfig` sets them here.
  */
 export const APPS_SCRIPT_BUILD = Object.freeze({
   name: "getCryptoPriceFromCentralizedExchange",
   files: Object.freeze([
-    Object.freeze({
-      path: fileURLToPath(SHEETS_SCRIPT[0]),
-      appsScriptName: "getCryptoPriceFromCentralizedExchange",
-    }),
-    Object.freeze({
-      path: fileURLToPath(SHEETS_SCRIPT[1]),
-      appsScriptName: "getCryptoPriceFromCentralizedExchange-sources",
-    }),
-    Object.freeze({
-      path: fileURLToPath(SHEETS_TESTS),
-      appsScriptName: "getCryptoPriceFromCentralizedExchange-tests",
-      optional: true,
-    }),
+    Object.freeze({ path: fileURLToPath(SHEETS_SCRIPT[0]), help: true }),
+    Object.freeze({ path: fileURLToPath(SHEETS_SCRIPT[1]) }),
+    Object.freeze({ path: fileURLToPath(SHEETS_TESTS) }),
   ]),
   services: Object.freeze(["coingecko", "coinpaprika"]),
   keyConfig,
