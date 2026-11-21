@@ -64,7 +64,7 @@
  * - `token`: the coin's ticker symbol, in any case, such as `"btc"`,
  *   `"grc"`, `"xmr"` or `"xtm"`.
  * - `dateStr`: the time, written `"YYYY-MM-DD HH:MM:SS"` (24-hour), or a
- *   cell that holds a date and time.
+ *   cell that holds a date and time, read as the time it shows.
  * - `tz`: the time zone of that time, by its abbreviation (see Time
  *   zones); left empty, UTC.
  * - `mode`: `"high"`, `"low"` or `"close"`; any other value, or none,
@@ -435,11 +435,34 @@ function getCryptoPrice(
   }
 }
 
-/** Normalizes dateStr to string format, returns {error} on failure */
+/**
+ * The time zone a date cell's time is shown in: the spreadsheet's. With no
+ * spreadsheet, as when the script runs from the editor or under Node, the
+ * script's, or UTC when that is not known either.
+ *
+ * @return {string} The time zone, as `Utilities.formatDate` takes it
+ */
+function cellTimeZone() {
+  const spreadsheet =
+    typeof SpreadsheetApp === "undefined"
+      ? null
+      : SpreadsheetApp.getActiveSpreadsheet();
+  if (spreadsheet) return spreadsheet.getSpreadsheetTimeZone();
+  return typeof Session === "undefined" ? "UTC" : Session.getScriptTimeZone();
+}
+
+/**
+ * The time a cell gives, as "YYYY-MM-DD HH:MM:SS" text. Sheets hands a date
+ * cell as the moment the cell shows in the spreadsheet's time zone, so the
+ * time the cell shows is that moment written in that zone.
+ *
+ * @param {string|Date} dateStr - The time, as text or a date cell's Date
+ * @return {string|{error: string}} The text, or an error when it is neither
+ */
 function normalizeDateStr(dateStr) {
   if (typeof dateStr === "string") return dateStr;
   if (dateStr instanceof Date && !isNaN(dateStr.getTime())) {
-    return Utilities.formatDate(dateStr, "UTC", "yyyy-MM-dd HH:mm:ss");
+    return Utilities.formatDate(dateStr, cellTimeZone(), "yyyy-MM-dd HH:mm:ss");
   }
   Logger.log(`Invalid dateStr type: ${typeof dateStr}`);
   return { error: "Invalid date format" };
@@ -541,39 +564,20 @@ function getTimezoneOffsetHours(tz) {
 }
 
 /**
- * The time a cell gives, as ms since 1970 UTC. The fields of a
- * "YYYY-MM-DD HH:MM:SS" string, or a Date's UTC fields, are read as the
- * time in a zone the given hours ahead of UTC.
+ * The time a "YYYY-MM-DD HH:MM:SS" text gives, as ms since 1970 UTC: its
+ * fields read as the time in a zone the given hours ahead of UTC.
  *
- * @param {string|Date} dateInput - The time, as text or a Date
+ * @param {string} dateText - The time, as `normalizeDateStr` writes it
  * @param {number} offsetHours - The zone's offset from UTC, in hours
  * @returns {number|string} The time in ms, or the error message the cell shows
  */
-function parseInputToUtcMs(dateInput, offsetHours) {
-  Logger.log(`Parsing dateInput: ${dateInput}, offsetHours: ${offsetHours}`);
+function parseInputToUtcMs(dateText, offsetHours) {
+  Logger.log(`Parsing date text: ${dateText}, offsetHours: ${offsetHours}`);
 
-  let components;
-  if (typeof dateInput === "string") {
-    components = parseDateStringToComponents(dateInput);
-    if (typeof components === "string") {
-      Logger.log(`Date string parse failed: ${components}`);
-      return components;
-    }
-  } else if (dateInput instanceof Date && !isNaN(dateInput.getTime())) {
-    components = {
-      year: dateInput.getUTCFullYear(),
-      month: dateInput.getUTCMonth() + 1,
-      day: dateInput.getUTCDate(),
-      hour: dateInput.getUTCHours(),
-      minute: dateInput.getUTCMinutes(),
-      second: dateInput.getUTCSeconds(),
-    };
-    Logger.log(`Parsed Date object: ${JSON.stringify(components)}`);
-  } else {
-    const err =
-      'Error: dateStr must be string "YYYY-MM-DD HH:MM:SS" or valid Date';
-    Logger.log(err);
-    return err;
+  const components = parseDateStringToComponents(dateText);
+  if (typeof components === "string") {
+    Logger.log(`Date string parse failed: ${components}`);
+    return components;
   }
 
   const utcMs = createUtcTimestampFromComponents(components);

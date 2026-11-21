@@ -333,6 +333,8 @@ functions inside the scripts that the owner runs by hand. crypto-price-filler's
 - `stand-in-fetch-preload.js` runs the real command line, `index.js`, in a
   child process against a stand-in MEXC, and a stand-in CoinGecko ping that
   takes the one key in `stand-in-coingecko-key.js`.
+- `regression-runs.js` holds the settings, stand-in answers and runs that
+  `tests/regressions.test.js` shares among its tests.
 
 ## Known bugs
 
