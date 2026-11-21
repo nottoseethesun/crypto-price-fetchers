@@ -108,8 +108,8 @@
  *   for 5 minutes.
  * - `No data available for future dates`: the time is after now.
  * - `Rate limit busy - retry later`: other cells kept the script busy;
- *   choose Refresh & freeze historical prices, or edit the cell, to run it
- *   again.
+ *   choose Clean up errors in the Crypto Price Fetchers menu, which runs
+ *   the cell again.
  * - `Unknown time zone`, or `Invalid` with a part of the date: check
  *   `tz` or `dateStr`.
  * - `#ERROR!`: choose Clean up errors in the Crypto Price Fetchers menu.
@@ -308,6 +308,14 @@ const CONFIG = {
 
 const API_LOCK = LockService.getScriptLock();
 
+/**
+ * What a cell shows when the call got no script lock in its tries. The
+ * menu's Clean up errors runs again each cell that shows it.
+ *
+ * @type {string}
+ */
+const EXCHANGE_BUSY_MESSAGE = "Rate limit busy - retry later";
+
 /** ============================================================================
  *                       TOKEN MAPPINGS FOR FALLBACKS
  * ========================================================================== */
@@ -391,7 +399,7 @@ function getCryptoPrice(
 
   // Acquire lock with retry
   const lockAcquired = acquireLockWithRetry(apiDelayMs);
-  if (!lockAcquired) return "Rate limit busy - retry later";
+  if (!lockAcquired) return EXCHANGE_BUSY_MESSAGE;
 
   try {
     const price = fetchPriceFromProviders(token, utcMs, target);

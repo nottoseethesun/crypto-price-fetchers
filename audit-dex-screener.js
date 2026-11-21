@@ -11,9 +11,10 @@
  * checks, and exits with 1 when a file cannot be downloaded or differs.
  *
  * How: `runDexScreenerAudit` in `apps-script-build/dex-screener-files.js`,
- * which holds the commit and the checksums.
+ * which holds the commit and the checksums, declares the command line with
+ * commander: `--help` gives the rest, its exit codes included.
  */
 
 import { runDexScreenerAudit } from "./apps-script-build/dex-screener-files.js";
 
-process.exitCode = await runDexScreenerAudit();
+process.exitCode = await runDexScreenerAudit(process.argv);

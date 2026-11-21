@@ -19,9 +19,9 @@
  * `dexToolsGetTokenPrice(chain, tokenAddress, [pool])` gives a token's
  * current price in USD. `dexToolsGetTokenFDV(chain, tokenAddress, [pool])`
  * gives its fully diluted value (FDV): its price times its total supply.
- * Both ask DexTools, or x1.ninja for X1. The script keeps each number for 5
- * minutes, so a cell that runs again within that time gives the number it
- * gave before.
+ * Both ask DexTools, or x1.ninja for X1. The script keeps each price above
+ * 0 for 5 minutes, so a cell that runs again within that time gives the
+ * price it gave before.
  *
  * Each function gives one of these:
  *
@@ -30,7 +30,7 @@
  *   with an error; a 0 keeps the sums of the sheet working, and you can
  *   type a number over it;
  * - `⌛ Rate limit / busy – retry soon`, when other cells kept the script
- *   busy for longer than it waits;
+ *   busy for longer than it waits for them;
  * - `⚠️ API error – check logs`, when the request failed in a way the
  *   script does not handle.
  *
@@ -52,7 +52,7 @@
  *
  * The third argument names one pool, written as the pool's address and a
  * 0 in double braces: `{{"<pool-address>", 0}}`. Sheets hands a function
- * one value as that value and several values as an array, and the script
+ * one value as that value and two or more values as an array, and the script
  * reads the pool from an array, so the 0 is needed. With a pool, the price
  * is that pool's; without one, it is from the pools DexTools picks.
  * DexTools' FDV belongs to the token, so `dexToolsGetTokenFDV` sends
@@ -103,10 +103,11 @@
  * ### When a cell shows 0 or a message
  *
  * - 0: check that the chain is named as DexTools names it, and that the
- *   address is the token's, not a wallet's. DexTools has no data for some
- *   tokens with little trading, and 0 is then its answer.
- * - `⌛ Rate limit / busy – retry soon`: choose Refresh in the Crypto Price
- *   Fetchers menu, which runs the cell again.
+ *   address is the token's, not a wallet's. DexTools has no data for a token
+ *   it has not indexed, such as one with little trading, and 0 is then its
+ *   answer.
+ * - `⌛ Rate limit / busy – retry soon`: choose Clean up errors, or Refresh,
+ *   in the Crypto Price Fetchers menu; each runs the cell again.
  * - `#ERROR!`: choose Clean up errors in the Crypto Price Fetchers menu.
  * - To see what the services answered, open Extensions > Apps Script,
  *   choose `testDexToolsVerbose` in the list of functions at the top, and
@@ -150,12 +151,14 @@
  *   allows 500,000 requests a month and 60 a minute.
  *
  * RATE LIMITING
- *   Sheets runs the custom function of each cell as a separate call, many
- *   at the same time. Each call that asks a service takes the script lock
+ *   Sheets runs the custom function of each cell as a separate call, up to
+ *   30 of one person's at the same time. Each call that asks a service takes the script lock
  *   (LockService), waits until MIN_SECONDS_BETWEEN_CALLS have passed since
  *   the last request, whose time the script properties keep, sends its
  *   request, records the time, and gives the lock back. A call that gets
- *   no lock within LOCK_WAIT_MS gives the busy message. LOCK_WAIT_MS, 120
+ *   no lock within LOCK_WAIT_MS gives the busy message,
+ *   DEXTOOLS_BUSY_MESSAGE, which the menu's Clean up errors looks for in the
+ *   cells it runs again. LOCK_WAIT_MS, 120
  *   seconds, is longer than the 30 seconds Google gives a custom function,
  *   so a cell that waits that long shows #ERROR! instead: a known bug, in
  *   the repo's CLAUDE.md. Only a number above 0 is cached, so a failed
@@ -217,6 +220,14 @@ const X1_CONFIG = {
   API_HOST: "https://api.x1.ninja",
   API_VERSION: "v1",
 };
+
+/**
+ * What a cell shows when the call got no script lock within LOCK_WAIT_MS.
+ * The menu's Clean up errors runs again each cell that shows it.
+ *
+ * @type {string}
+ */
+const DEXTOOLS_BUSY_MESSAGE = "⌛ Rate limit / busy – retry soon";
 
 /* ─────────────────────────────────────────────────────────────────────────────
    COMPUTED CONSTANTS & SERVICES
@@ -379,7 +390,7 @@ function withRateLimitProtection(callback) {
         DEXTOOLS_CONFIG.LOCK_WAIT_MS / 1000 +
         "s – another execution is holding it",
     );
-    return "⌛ Rate limit / busy – retry soon"; // Visible in cell
+    return DEXTOOLS_BUSY_MESSAGE; // Visible in cell
   }
 
   try {

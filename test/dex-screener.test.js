@@ -33,6 +33,9 @@ import {
 import { capturedOutput } from "./helpers/captured-output.js";
 import { standInFetch } from "./helpers/stand-in-web.js";
 
+/** The audit's command line, with no arguments, shaped as `process.argv`. */
+const AUDIT_ARGV = Object.freeze(["node", "audit-dex-screener.js"]);
+
 /** This repo's top folder, whose packages hold zod and lodash. */
 const PROJECT_TOP = fileURLToPath(new URL("..", import.meta.url));
 
@@ -276,7 +279,7 @@ describe("the audit of DEX Screener's files", () => {
       SOURCES,
     );
     const stdout = capturedOutput();
-    const code = await runDexScreenerAudit({
+    const code = await runDexScreenerAudit(AUDIT_ARGV, {
       fetch: serving(SOURCES),
       version: VERSION,
       stdout,
@@ -296,7 +299,7 @@ describe("the audit of DEX Screener's files", () => {
       "src/pairs.ts": "changed",
     };
     const stderr = capturedOutput();
-    const code = await runDexScreenerAudit({
+    const code = await runDexScreenerAudit(AUDIT_ARGV, {
       fetch: serving(changed),
       version: VERSION,
       stdout: capturedOutput(),
@@ -321,6 +324,35 @@ describe("the audit of DEX Screener's files", () => {
     assert.ok(
       lines.some((line) => /src\/lib\/index\.ts: status 404/.test(line)),
     );
+  });
+});
+
+describe("the audit's command line", () => {
+  it("answers --help with what it checks and its exit codes, downloading nothing", async () => {
+    const fetch = serving(SOURCES);
+    const stdout = capturedOutput();
+    const code = await runDexScreenerAudit([...AUDIT_ARGV, "--help"], {
+      fetch,
+      version: VERSION,
+      stdout,
+      stderr: capturedOutput(),
+    });
+    assert.equal(code, 0);
+    assert.match(stdout.text, /^Usage: audit-dex-screener \[options\]/);
+    assert.match(stdout.text, /Exit codes: 0 when every file matches; 1 when/);
+    assert.deepEqual(fetch.requests, []);
+  });
+
+  it("refuses an argument, with exit code 1", async () => {
+    const stderr = capturedOutput();
+    const code = await runDexScreenerAudit([...AUDIT_ARGV, "extra"], {
+      fetch: serving(SOURCES),
+      version: VERSION,
+      stdout: capturedOutput(),
+      stderr,
+    });
+    assert.equal(code, 1);
+    assert.match(stderr.text, /too many arguments/);
   });
 });
 

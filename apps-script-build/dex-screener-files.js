@@ -14,8 +14,9 @@
  * one commit of that repo and the SHA-256 of each file the build takes from
  * it, and one audit downloads those files and checks each checksum:
  * `npm run audit:dex-screener` (`audit-dex-screener.js` at the repo's
- * top), which `npm run audit:deps` runs after npm audit, runs it, and so
- * does the build (`dex-screener.js`) before it compiles the files.
+ * top, whose command line `runDexScreenerAudit` declares), which
+ * `npm run audit:deps` runs after npm audit, runs it, and so does the build
+ * (`dex-screener.js`) before it compiles the files.
  *
  * How:
  *
@@ -34,6 +35,7 @@
  */
 
 import { createHash } from "node:crypto";
+import { Command, CommanderError } from "commander";
 import { messageOf } from "../lib/message-of.js";
 
 /**
@@ -213,28 +215,64 @@ export async function auditDexScreenerFiles({
   );
 }
 
+/** What the audit's help says after its usage. */
+const AUDIT_HELP_AFTER = `
+npm audit checks only the packages installed from npm, and the build step's
+DEX Screener functions are not one, so this downloads each of their files
+at the commit the build uses and checks its SHA-256 against the one written
+in apps-script-build/dex-screener-files.js.
+
+Exit codes: 0 when every file matches; 1 when a file cannot be downloaded
+or its SHA-256 differs, or the arguments are wrong.`;
+
 /**
- * Runs the audit and says how it went: `npm run audit:dex-screener`.
+ * Runs the audit's command line and says how it went:
+ * `npm run audit:dex-screener`.
  *
+ * @param {string[]} argv - The arguments, shaped as `process.argv`
  * @param {Object} [deps] - What a test replaces
  * @param {function(string): Promise<Response>} [deps.fetch=globalThis.fetch] - Does the downloads
  * @param {DexScreenerVersion} [deps.version=DEX_SCREENER] - The version
- * @param {{write: function(string): void}} [deps.stdout=process.stdout] - Where a pass is said
+ * @param {{write: function(string): void}} [deps.stdout=process.stdout] - Where the help and a pass are said
  * @param {{write: function(string): void}} [deps.stderr=process.stderr] - Where the failures are said
- * @returns {Promise<number>} The exit code: 0 when every file matches, 1 otherwise
+ * @returns {Promise<number>} The exit code: 0 when every file matches or the help was asked for, 1 otherwise
  */
-export async function runDexScreenerAudit({
-  fetch = globalThis.fetch,
-  version = DEX_SCREENER,
-  stdout = process.stdout,
-  stderr = process.stderr,
-} = {}) {
+export async function runDexScreenerAudit(
+  argv,
+  {
+    fetch = globalThis.fetch,
+    version = DEX_SCREENER,
+    stdout = process.stdout,
+    stderr = process.stderr,
+  } = {},
+) {
+  let exitCode = 0;
+  const program = new Command()
+    .name("audit-dex-screener")
+    .description(
+      "Checks the files of DEX Screener's Google Sheets functions, which the build step downloads, against their SHA-256.",
+    )
+    .allowExcessArguments(false)
+    .exitOverride()
+    .configureOutput({
+      writeOut: (text) => stdout.write(text),
+      writeErr: (text) => stderr.write(text),
+    })
+    .addHelpText("after", AUDIT_HELP_AFTER)
+    .action(async () => {
+      try {
+        const sources = await auditDexScreenerFiles({ fetch, version });
+        stdout.write(`${auditPassed(Object.keys(sources).length, version)}\n`);
+      } catch (error) {
+        stderr.write(`${messageOf(error)}\n`);
+        exitCode = 1;
+      }
+    });
   try {
-    const sources = await auditDexScreenerFiles({ fetch, version });
-    stdout.write(`${auditPassed(Object.keys(sources).length, version)}\n`);
-    return 0;
-  } catch (error) {
-    stderr.write(`${messageOf(error)}\n`);
-    return 1;
+    await program.parseAsync(argv);
+  } catch (thrown) {
+    if (thrown instanceof CommanderError) return thrown.exitCode;
+    throw thrown;
   }
+  return exitCode;
 }

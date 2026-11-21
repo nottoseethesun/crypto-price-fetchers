@@ -20,8 +20,11 @@
  *   ending in `!`, which Sheets cannot read, shows `#ERROR!` at once. At
  *   the flush, each waiting formula runs: the test's `evaluate` gives its
  *   value, and the run is counted for its cell (`runsOf`). After a run, a
- *   cell shows `Loading...` for the number of `getDisplayValue` reads the
- *   test sets (`loadingReads`), as a custom function still running does.
+ *   cell shows `Loading...`, or the test's `loadingText`, for the number of
+ *   `getDisplayValue` reads the test sets (`loadingReads`), as a custom
+ *   function still running does.
+ * - Each formula and value written is recorded with `seq`, its place in
+ *   the order of all writes, so a test can tell which came first.
  * - `onSetFormula`, when given, is called after each formula written, so a
  *   test can change other cells mid-run, as a person sorting the tab
  *   would.
@@ -77,7 +80,8 @@ function cellOf(text) {
  * @param {Object} options - The spreadsheet
  * @param {Object<string, CellText[][]>} options.tabs - Each tab's rows, by the tab's name, in order
  * @param {function(string, {tab: string, a1: string}): *} [options.evaluate] - The value a formula gives when it runs; 0 when absent
- * @param {number} [options.loadingReads=0] - How many reads of a cell's display show `Loading...` after it runs
+ * @param {number} [options.loadingReads=0] - How many reads of a cell's display show `loadingText` after it runs
+ * @param {string} [options.loadingText="Loading..."] - What a cell still running shows
  * @param {string} [options.activeTab] - The tab the person is on; the first when absent
  * @param {string} [options.answer="YES"] - The button `alert` answers with
  * @param {function({tab: string, a1: string, formula: string}, Object): void} [options.onSetFormula] - Called after each formula written, with the spreadsheet's `cellAt`
@@ -87,6 +91,7 @@ export function standInSpreadsheet({
   tabs,
   evaluate = () => 0,
   loadingReads = 0,
+  loadingText = "Loading...",
   activeTab,
   answer = "YES",
   onSetFormula,
@@ -101,6 +106,7 @@ export function standInSpreadsheet({
     dialogs: [],
   };
   const runs = new Map();
+  let writes = 0;
   const waiting = [];
   const grid = new Map(
     Object.entries(tabs).map(([name, rows]) => [
@@ -109,6 +115,14 @@ export function standInSpreadsheet({
     ]),
   );
 
+  /**
+   * A cell by its tab, row and column, made empty where the tab has none.
+   *
+   * @param {string} tab - The tab's name
+   * @param {number} row - The row, from 1
+   * @param {number} column - The column, from 1
+   * @returns {Object} The cell
+   */
   const cellAt = (tab, row, column) => {
     const rows = grid.get(tab);
     while (rows.length < row) rows.push([]);
@@ -116,8 +130,24 @@ export function standInSpreadsheet({
     while (cells.length < column) cells.push(cellOf(""));
     return cells[column - 1];
   };
+  /**
+   * A cell's A1 notation.
+   *
+   * @param {number} row - The row, from 1
+   * @param {number} column - The column, from 1
+   * @returns {string} Such as "B2"
+   */
   const a1Of = (row, column) => `${columnLetters(column)}${row}`;
 
+  /**
+   * The range of one cell, with the methods of Apps Script's that the
+   * scripts call.
+   *
+   * @param {string} tab - The tab's name
+   * @param {number} row - The row, from 1
+   * @param {number} column - The column, from 1
+   * @returns {Object} The range
+   */
   const cellRange = (tab, row, column) => ({
     getFormula: () => cellAt(tab, row, column).formula,
     getValue: () => cellAt(tab, row, column).value,
@@ -125,7 +155,7 @@ export function standInSpreadsheet({
       const cell = cellAt(tab, row, column);
       if (cell.loadingLeft > 0) {
         cell.loadingLeft -= 1;
-        return "Loading...";
+        return loadingText;
       }
       return cell.display;
     },
@@ -138,7 +168,8 @@ export function standInSpreadsheet({
         cell.value = "#ERROR!";
         cell.display = "#ERROR!";
       } else waiting.push({ tab, row, column });
-      record.formulasWritten.push({ tab, a1, formula });
+      writes += 1;
+      record.formulasWritten.push({ tab, a1, formula, seq: writes });
       onSetFormula?.({ tab, a1, formula }, { cellAt: cellAtA1 });
     },
     setValue: (value) => {
@@ -146,10 +177,23 @@ export function standInSpreadsheet({
       cell.formula = "";
       cell.value = value;
       cell.display = String(value);
-      record.valuesWritten.push({ tab, a1: a1Of(row, column), value });
+      writes += 1;
+      record.valuesWritten.push({
+        tab,
+        a1: a1Of(row, column),
+        value,
+        seq: writes,
+      });
     },
   });
 
+  /**
+   * A cell by its tab and A1 notation.
+   *
+   * @param {string} tab - The tab's name
+   * @param {string} a1 - Such as "B2"
+   * @returns {Object} The cell
+   */
   const cellAtA1 = (tab, a1) => {
     const [, letters, digits] = /^([A-Z]+)(\d+)$/.exec(a1);
     const column = [...letters].reduce(
@@ -159,6 +203,12 @@ export function standInSpreadsheet({
     return cellAt(tab, Number(digits), column);
   };
 
+  /**
+   * A tab, with the methods of Apps Script's sheet that the scripts call.
+   *
+   * @param {string} tab - The tab's name
+   * @returns {Object} The sheet
+   */
   const sheetOf = (tab) => ({
     getName: () => tab,
     getRange: (row, column) => cellRange(tab, row, column),

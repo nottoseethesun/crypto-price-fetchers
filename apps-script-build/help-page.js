@@ -79,6 +79,12 @@ function escapeHtml(text) {
  */
 export function helpSection(source, name) {
   const lines = source.split("\n");
+  /**
+   * The indexes of the lines that hold a marker.
+   *
+   * @param {string} marker - The marker
+   * @returns {number[]} The indexes, in order
+   */
   const at = (marker) =>
     lines.flatMap((line, index) => (line.includes(marker) ? [index] : []));
   const starts = at(HELP_START);
@@ -135,12 +141,22 @@ function sectionHtml(markdown) {
   let paragraph = [];
   let list = null;
   let fence = null;
+  /**
+   * Writes the paragraph gathered so far, if any, and starts a new one.
+   *
+   * @returns {void}
+   */
   const closeParagraph = () => {
     if (paragraph.length > 0) {
       html.push(`<p>${inlineHtml(paragraph.join(" "))}</p>`);
     }
     paragraph = [];
   };
+  /**
+   * Writes the list gathered so far, if any, and ends it.
+   *
+   * @returns {void}
+   */
   const closeList = () => {
     if (list !== null) {
       html.push(

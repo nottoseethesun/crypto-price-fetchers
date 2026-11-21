@@ -7,9 +7,9 @@
  *   a spreadsheet's Apps Script project. This file is that file's first
  *   part: the Crypto Price Fetchers menu, which `onOpen` builds each time
  *   the spreadsheet opens, and what its items do. They run the price cells
- *   again, clear cells stuck on #ERROR!, freeze historical prices, and show
- *   Help, a page the build makes from the help section below and those of
- *   the other scripts' headers.
+ *   again, clear cells stuck on #ERROR! or on a busy message, freeze
+ *   historical prices, and show Help, a page the build makes from the help
+ *   section below and those of the other scripts' headers.
  *
  * <!-- HELP START -->
  * ## The Crypto Price Fetchers menu
@@ -17,15 +17,19 @@
  * The menu appears each time the spreadsheet opens. When an item ends, a
  * message at the bottom right of the sheet says what it did.
  *
- * - Clean up errors: runs again every cell, in every tab, that shows
- *   `#ERROR!` and whose own formula calls `dexToolsGetTokenPrice`,
- *   `dexToolsGetTokenFDV`, `getCryptoPrice` or a `DEX_SCREENER_` function.
- *   A cell that shows `#ERROR!` only because it reads such a cell clears
- *   once that cell has run again.
+ * - Clean up errors: runs again every cell, in every tab, whose own formula
+ *   calls `dexToolsGetTokenPrice`, `dexToolsGetTokenFDV`, `getCryptoPrice`
+ *   or a `DEX_SCREENER_` function, and that shows `#ERROR!` or one of the
+ *   two busy messages, `⌛ Rate limit / busy – retry soon` and
+ *   `Rate limit busy - retry later`. A cell that shows `#ERROR!` only
+ *   because it reads such a cell clears once that cell has run again.
  * - Refresh: runs again every cell, in every tab, that calls
  *   `dexToolsGetTokenPrice`, `dexToolsGetTokenFDV` or a `DEX_SCREENER_`
- *   function, so each shows the current value. Cells that call
- *   `getCryptoPrice`, a price at a past time, are left as they are.
+ *   function. The scripts keep each answer for a time and give it again
+ *   when asked within it: a DexTools or x1.ninja price above 0 for 5
+ *   minutes, and a DEX Screener answer for 30 seconds. So a cell shows a
+ *   value at most that old. Cells that call `getCryptoPrice`, a price at a
+ *   past time, are left as they are.
  * - Refresh & freeze historical prices (this tab): on the tab you are on,
  *   runs every cell that calls `getCryptoPrice` again, then replaces each
  *   formula that gave a number with that number. A cell that gave a
@@ -58,11 +62,23 @@
  *     the tabs that hold calls (`getDisplayValues`). A formula counts when
  *     it calls one of `PRICE_CALLS`' functions, whatever the case of its
  *     name, since Sheets ignores the case of a custom function's name.
+ *   - Clean up errors takes the cells that show `#ERROR!` or a busy
+ *     message. The busy messages are the other scripts' own constants,
+ *     `DEXTOOLS_BUSY_MESSAGE` and `EXCHANGE_BUSY_MESSAGE`, which the built
+ *     file declares after this part, so they are read when the item runs
+ *     (`stuckDisplays_`), never as this file loads.
  *   - A cell runs again when its formula is broken and put back
  *     (`rerunInBlocks_`), in blocks of `MENU_CONFIG.BLOCK_SIZE`. Before each
  *     write, the cell's formula is read again, so a cell that changed, as
  *     when a sort moves the rows, is skipped and reported, never written
- *     into.
+ *     into. After a block's formulas are back, the item waits while any of
+ *     its cells shows `MENU_CONFIG.LOADING_TEXT`, Sheets' text for a custom
+ *     function still running. That text is English as written here; a
+ *     spreadsheet set to another language shows its own, which goes in that
+ *     field instead, or no block waits for its cells.
+ *   - Refresh & freeze historical prices freezes each block's numbers as
+ *     soon as the block has run again, so the freeze, too, falls inside the
+ *     run's time.
  *   - Every item starts and ends by putting back any formula of these
  *     functions that a stopped run left with a `!` at its end
  *     (`restoreLeftovers_`), so no formula stays broken.
@@ -80,14 +96,20 @@
  * NODE
  *
  *   No Node version of the scripts loads this file, since nothing here
- *   gives a price. The repo's tests load it with a stand-in of the
- *   spreadsheet (`test/helpers/stand-in-spreadsheet.js`).
+ *   gives a price. The repo's tests load it, with the scripts whose busy
+ *   messages it reads, against a stand-in of the spreadsheet
+ *   (`test/helpers/stand-in-spreadsheet.js`).
  *
  * PROJECT & LICENSE INFORMATION
  *
  *   Part of https://github.com/nottoseethesun/crypto-price-fetchers, under
  *   the Apache 2.0 License. Use at your own risk.
  */
+
+// Declared in crypto-price-fetchers.gs and
+// getCryptoPriceFromCentralizedExchange.gs, which the built file holds
+// after this part:
+/* global DEXTOOLS_BUSY_MESSAGE, EXCHANGE_BUSY_MESSAGE */
 
 /* ─────────────────────────────────────────────────────────────────────────────
    SETTINGS
@@ -100,6 +122,7 @@
  * @property {number} BLOCK_WAIT_MS  The longest wait for a block's cells to finish; Google stops a call after 30 s
  * @property {number} POLL_MS        How often a block's cells are looked at while they run
  * @property {number} RUN_BUDGET_MS  No new block starts after this long, inside Google's 6 minutes for one run
+ * @property {string} LOADING_TEXT   What Sheets shows in a cell whose custom function is still running, in the spreadsheet's language
  */
 const MENU_CONFIG = {
   BLOCK_SIZE: 20,
@@ -107,6 +130,7 @@ const MENU_CONFIG = {
   BLOCK_WAIT_MS: 30000,
   POLL_MS: 1000,
   RUN_BUDGET_MS: 300000,
+  LOADING_TEXT: "Loading...",
 };
 
 /**
@@ -127,19 +151,28 @@ const HELP_PAGE = {
     "the one file to paste.</p></body></html>",
 };
 
-/** The calls the items look for: current values, past prices, and either. */
+/** A call of a function that gives a current value. */
+const CURRENT_CALLS =
+  /\b(?:dexToolsGetTokenPrice|dexToolsGetTokenFDV|DEX_SCREENER_\w*)\s*\(/i;
+
+/** A call of the function that gives a price at a past time. */
+const HISTORICAL_CALLS = /\bgetCryptoPrice\s*\(/i;
+
+/**
+ * The calls the items look for: current values, past prices, and either,
+ * each with the `test` of a regular expression.
+ */
 const PRICE_CALLS = Object.freeze({
-  current:
-    /\b(?:dexToolsGetTokenPrice|dexToolsGetTokenFDV|DEX_SCREENER_\w*)\s*\(/i,
-  historical: /\bgetCryptoPrice\s*\(/i,
-  any: /\b(?:dexToolsGetTokenPrice|dexToolsGetTokenFDV|DEX_SCREENER_\w*|getCryptoPrice)\s*\(/i,
+  current: CURRENT_CALLS,
+  historical: HISTORICAL_CALLS,
+  any: Object.freeze({
+    test: (formula) =>
+      CURRENT_CALLS.test(formula) || HISTORICAL_CALLS.test(formula),
+  }),
 });
 
 /** What Sheets shows in a cell whose custom function failed. */
 const ERROR_DISPLAY = "#ERROR!";
-
-/** What Sheets shows in a cell whose custom function is still running. */
-const LOADING_DISPLAY = "Loading...";
 
 /* ─────────────────────────────────────────────────────────────────────────────
    THE MENU
@@ -182,15 +215,16 @@ function showCryptoPriceFetchersHelp() {
 
 /**
  * The Clean up errors item: runs again every cell, in every tab, that
- * shows #ERROR! and calls one of the price functions.
+ * calls one of the price functions and shows #ERROR! or a busy message.
  *
  * @return {void}
  */
 function cleanUpErrors() {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   const sheets = spreadsheet.getSheets();
+  const stuck = stuckDisplays_();
   runItem_(spreadsheet, "Clean up errors", sheets, () =>
-    findCalls_(sheets, PRICE_CALLS.any, true),
+    findCalls_(sheets, PRICE_CALLS.any, stuck),
   );
 }
 
@@ -204,7 +238,7 @@ function refreshCurrentPrices() {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   const sheets = spreadsheet.getSheets();
   runItem_(spreadsheet, "Refresh", sheets, () =>
-    findCalls_(sheets, PRICE_CALLS.current, false),
+    findCalls_(sheets, PRICE_CALLS.current, null),
   );
 }
 
@@ -231,8 +265,8 @@ function freezeHistoricalPrices() {
     spreadsheet,
     "Refresh & freeze historical prices",
     [sheet],
-    () => findCalls_([sheet], PRICE_CALLS.historical, false),
-    freezeNumbers_,
+    () => findCalls_([sheet], PRICE_CALLS.historical, null),
+    { eachBlock: freezeNumbers_, notes: freezeNotes_ },
   );
 }
 
@@ -251,36 +285,53 @@ function freezeHistoricalPrices() {
  */
 
 /**
+ * What an item does after each block, beside running its cells again.
+ *
+ * @typedef {Object} BlockStep
+ * @property {function(CallCell[]): Object} eachBlock  Takes the block's cells once they have run again; gives what it did
+ * @property {function(Object[]): string[]} notes      What the message says of what `eachBlock` gave, block by block
+ */
+
+/**
  * What a run did.
  *
  * @typedef {Object} RunResult
  * @property {CallCell[]} reran    The cells run again
  * @property {CallCell[]} skipped  The cells left alone, since their formulas changed during the run
  * @property {CallCell[]} left     The cells no block reached within the run's time
- * @property {number} repaired     How many broken formulas left by an earlier run it put back
- * @property {string[]} notes      What a step after the run adds to the message
+ * @property {Object[]} outcomes   What the item's step gave for each block, in order
  */
 
 /**
+ * What a cell shows when it needs to run again: Sheets' error, or one of
+ * the price scripts' busy messages.
+ *
+ * @return {string[]} The texts
+ */
+function stuckDisplays_() {
+  return [ERROR_DISPLAY, DEXTOOLS_BUSY_MESSAGE, EXCHANGE_BUSY_MESSAGE];
+}
+
+/**
  * Runs one item: puts back broken formulas left behind, finds the cells,
- * runs them again, hands the result to the item's last step, puts back any
- * broken formula left again, and reports.
+ * runs them again, a block at a time with the item's step after each, puts
+ * back any broken formula left again, and reports.
  *
  * @param {Object} spreadsheet - The spreadsheet
  * @param {string} title - The item's name, for the message
  * @param {Object[]} sheets - The tabs it works on
  * @param {function(): CallCell[]} find - Finds the cells to run again
- * @param {function(RunResult): void} [finish] - The item's last step, given what the run did
- * @return {RunResult} What the run did
+ * @param {BlockStep} [step] - What it does after each block
+ * @return {void}
  */
-function runItem_(spreadsheet, title, sheets, find, finish) {
+function runItem_(spreadsheet, title, sheets, find, step) {
   const startedAt = Date.now();
   const repairedBefore = restoreLeftovers_(sheets);
-  const result = rerunInBlocks_(find(), startedAt);
-  if (finish !== undefined) finish(result);
-  result.repaired = repairedBefore + restoreLeftovers_(sheets);
-  report_(spreadsheet, title, result);
-  return result;
+  const eachBlock = step === undefined ? undefined : step.eachBlock;
+  const run = rerunInBlocks_(find(), startedAt, eachBlock);
+  const repaired = repairedBefore + restoreLeftovers_(sheets);
+  const notes = step === undefined ? [] : step.notes(run.outcomes);
+  report_(spreadsheet, title, run, notes, repaired);
 }
 
 /**
@@ -288,11 +339,11 @@ function runItem_(spreadsheet, title, sheets, find, finish) {
  * names.
  *
  * @param {Object[]} sheets - The tabs to look in
- * @param {RegExp} pattern - Matches a call in a formula
- * @param {boolean} errorsOnly - Whether only cells showing #ERROR! count
+ * @param {{test: function(string): boolean}} pattern - Tells whether a formula holds a call, as `PRICE_CALLS`' members do
+ * @param {?string[]} shownAs - The displayed texts a cell must show to count, or null for any
  * @return {CallCell[]} The cells, tab by tab, row by row
  */
-function findCalls_(sheets, pattern, errorsOnly) {
+function findCalls_(sheets, pattern, shownAs) {
   const cells = [];
   for (const sheet of sheets) {
     const range = sheet.getDataRange();
@@ -305,9 +356,11 @@ function findCalls_(sheets, pattern, errorsOnly) {
       }),
     );
     if (hits.length === 0) continue;
-    const displays = errorsOnly ? range.getDisplayValues() : null;
+    const displays = shownAs === null ? null : range.getDisplayValues();
     for (const hit of hits) {
-      if (errorsOnly && displays[hit.r][hit.c] !== ERROR_DISPLAY) continue;
+      if (shownAs !== null && !shownAs.includes(displays[hit.r][hit.c])) {
+        continue;
+      }
       cells.push({
         sheet,
         row: range.getRow() + hit.r,
@@ -350,30 +403,35 @@ function restoreLeftovers_(sheets) {
 
 /**
  * Runs the cells again, a block at a time: breaks each formula, pauses so
- * Sheets saves the edit, puts each formula back, and waits for the block's
- * cells to finish before the next block.
+ * Sheets saves the edit, puts each formula back, waits for the block's
+ * cells to finish, and hands them to the item's step, before the next
+ * block.
  *
  * @param {CallCell[]} cells - The cells
  * @param {number} startedAt - When the run started, in ms since 1970
- * @return {RunResult} What the run did, with nothing repaired yet
+ * @param {function(CallCell[]): Object} [eachBlock] - The item's step after each block
+ * @return {RunResult} What the run did
  */
-function rerunInBlocks_(cells, startedAt) {
-  const result = { reran: [], skipped: [], left: [], repaired: 0, notes: [] };
+function rerunInBlocks_(cells, startedAt, eachBlock) {
+  const reran = [];
+  const skipped = [];
+  const outcomes = [];
   for (let start = 0; start < cells.length; start += MENU_CONFIG.BLOCK_SIZE) {
     if (Date.now() - startedAt > MENU_CONFIG.RUN_BUDGET_MS) {
-      result.left = cells.slice(start);
-      break;
+      return { reran, skipped, left: cells.slice(start), outcomes };
     }
     const block = cells.slice(start, start + MENU_CONFIG.BLOCK_SIZE);
-    const broken = breakFormulas_(block, result.skipped);
+    const broke = breakFormulas_(block);
     SpreadsheetApp.flush();
     Utilities.sleep(MENU_CONFIG.PAUSE_MS);
-    const restored = restoreFormulas_(broken, result.skipped);
+    const put = restoreFormulas_(broke.broken);
     SpreadsheetApp.flush();
-    waitForCells_(restored);
-    result.reran.push(...restored);
+    waitForCells_(put.restored);
+    if (eachBlock !== undefined) outcomes.push(eachBlock(put.restored));
+    reran.push(...put.restored);
+    skipped.push(...broke.changed, ...put.changed);
   }
-  return result;
+  return { reran, skipped, left: [], outcomes };
 }
 
 /**
@@ -381,46 +439,46 @@ function rerunInBlocks_(cells, startedAt) {
  * did when the run found it.
  *
  * @param {CallCell[]} block - The cells
- * @param {CallCell[]} skipped - Takes each cell whose formula changed
- * @return {CallCell[]} The cells broken
+ * @return {{broken: CallCell[], changed: CallCell[]}} The cells broken, and those whose formula had changed
  */
-function breakFormulas_(block, skipped) {
+function breakFormulas_(block) {
   const broken = [];
+  const changed = [];
   for (const cell of block) {
     const range = cell.sheet.getRange(cell.row, cell.column);
     if (range.getFormula() !== cell.formula) {
-      skipped.push(cell);
+      changed.push(cell);
       continue;
     }
     range.setFormula(`${cell.formula}!`);
     broken.push(cell);
   }
-  return broken;
+  return { broken, changed };
 }
 
 /**
  * Puts back each broken formula that is still where it was broken.
  *
  * @param {CallCell[]} broken - The cells broken
- * @param {CallCell[]} skipped - Takes each cell whose formula changed
- * @return {CallCell[]} The cells put back
+ * @return {{restored: CallCell[], changed: CallCell[]}} The cells put back, and those whose formula had changed
  */
-function restoreFormulas_(broken, skipped) {
+function restoreFormulas_(broken) {
   const restored = [];
+  const changed = [];
   for (const cell of broken) {
     const range = cell.sheet.getRange(cell.row, cell.column);
     if (range.getFormula() !== `${cell.formula}!`) {
-      skipped.push(cell);
+      changed.push(cell);
       continue;
     }
     range.setFormula(cell.formula);
     restored.push(cell);
   }
-  return restored;
+  return { restored, changed };
 }
 
 /**
- * Waits until no cell shows that its function is still running, or until
+ * Waits until no cell shows `MENU_CONFIG.LOADING_TEXT`, or until
  * `MENU_CONFIG.BLOCK_WAIT_MS` has passed.
  *
  * @param {CallCell[]} cells - The cells
@@ -432,7 +490,7 @@ function waitForCells_(cells) {
     const running = cells.some(
       (cell) =>
         cell.sheet.getRange(cell.row, cell.column).getDisplayValue() ===
-        LOADING_DISPLAY,
+        MENU_CONFIG.LOADING_TEXT,
     );
     if (!running) return;
     Utilities.sleep(MENU_CONFIG.POLL_MS);
@@ -440,28 +498,41 @@ function waitForCells_(cells) {
 }
 
 /**
- * The last step of Refresh & freeze historical prices: replaces the
- * formula of each cell run again that gave a number with that number.
+ * Refresh & freeze historical prices' step after each block: replaces the
+ * formula of each cell that gave a number with that number.
  *
- * @param {RunResult} result - What the run did; takes a note of the cells kept
- * @return {void}
+ * @param {CallCell[]} cells - The block's cells, run again
+ * @return {{frozen: number, kept: number}} How many it froze, and how many formulas it kept
  */
-function freezeNumbers_(result) {
-  let kept = 0;
-  for (const cell of result.reran) {
+function freezeNumbers_(cells) {
+  let frozen = 0;
+  for (const cell of cells) {
     const range = cell.sheet.getRange(cell.row, cell.column);
     const value = range.getValue();
     if (typeof value === "number" && range.getFormula() === cell.formula) {
       range.setValue(value);
-    } else kept += 1;
+      frozen += 1;
+    }
   }
   SpreadsheetApp.flush();
-  result.notes.push(
-    `froze ${counted_(result.reran.length - kept, "price")}`,
-    ...(kept > 0
-      ? [`kept ${counted_(kept, "formula")} that gave no number`]
-      : []),
-  );
+  return { frozen, kept: cells.length - frozen };
+}
+
+/**
+ * What the message of Refresh & freeze historical prices says of its
+ * blocks.
+ *
+ * @param {Array<{frozen: number, kept: number}>} outcomes - What `freezeNumbers_` gave, block by block
+ * @return {string[]} The notes
+ */
+function freezeNotes_(outcomes) {
+  const frozen = outcomes.reduce((sum, outcome) => sum + outcome.frozen, 0);
+  const kept = outcomes.reduce((sum, outcome) => sum + outcome.kept, 0);
+  const notes = [`froze ${counted_(frozen, "price")}`];
+  if (kept > 0) {
+    notes.push(`kept ${counted_(kept, "formula")} that gave no number`);
+  }
+  return notes;
 }
 
 /**
@@ -470,29 +541,28 @@ function freezeNumbers_(result) {
  *
  * @param {Object} spreadsheet - The spreadsheet
  * @param {string} title - The item's name
- * @param {RunResult} result - What the run did
+ * @param {RunResult} run - What the run did
+ * @param {string[]} notes - What the item's step adds
+ * @param {number} repaired - How many formulas an earlier run left broken it put back
  * @return {void}
  */
-function report_(spreadsheet, title, result) {
+function report_(spreadsheet, title, run, notes, repaired) {
   const where = (cell) =>
     `${cell.sheet.getName()}!${cell.sheet.getRange(cell.row, cell.column).getA1Notation()}`;
-  const parts = [
-    `ran ${counted_(result.reran.length, "cell")} again`,
-    ...result.notes,
-  ];
-  if (result.skipped.length > 0) {
+  const parts = [`ran ${counted_(run.reran.length, "cell")} again`, ...notes];
+  if (run.skipped.length > 0) {
     parts.push(
-      `left ${counted_(result.skipped.length, "cell")} alone, since the formulas changed during the run: ${result.skipped.map(where).join(", ")}`,
+      `left ${counted_(run.skipped.length, "cell")} alone, since the formulas changed during the run: ${run.skipped.map(where).join(", ")}`,
     );
   }
-  if (result.left.length > 0) {
+  if (run.left.length > 0) {
     parts.push(
-      `${counted_(result.left.length, "more cell")} did not fit in Google's time for one run; choose the item again for them`,
+      `${counted_(run.left.length, "more cell")} did not fit in Google's time for one run; choose the item again for them`,
     );
   }
-  if (result.repaired > 0) {
+  if (repaired > 0) {
     parts.push(
-      `put back ${counted_(result.repaired, "formula")} an earlier run left broken`,
+      `put back ${counted_(repaired, "formula")} an earlier run left broken`,
     );
   }
   const message = `${parts.join("; ")}.`;

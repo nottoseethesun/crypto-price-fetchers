@@ -131,7 +131,8 @@ statements of the one file it gives, from each Node version's
 clipboard tool is installed and the owner declines the install it offers,
 writes it to `build/apps-script/`, which git ignores, as do the lint, the
 format check and secretlint, readable by the owner alone. It prints no
-key.
+key. crypto-price-filler reads `config-example.json`, its committed
+settings, with its own `config.json`, which git ignores, laid over them.
 
 ## DEX Screener's functions
 
@@ -148,9 +149,7 @@ audit gave, with esbuild and this repo's development packages zod and
 lodash, and wraps them in a function of their own in the built file, so
 their `onOpen` never replaces the menu's. `npm run audit:deps` runs
 `npm run audit:dex-screener` after npm audit, which does not cover that
-code. crypto-price-filler reads `config-example.json`, its
-committed settings, with its own `config.json`, which git ignores, laid over
-them.
+code.
 
 ## Docs
 

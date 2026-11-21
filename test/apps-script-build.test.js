@@ -221,7 +221,10 @@ describe("npm run build apps-script, on a desktop with a clipboard tool", () => 
     const result = await build(["apps-script"]);
     assert.equal(result.exitCode, 0, result.output);
     const question = result.questions[0];
-    assert.match(question, /DEX Screener's Google Sheets functions/);
+    assert.match(
+      question,
+      /DEX Screener's Google Sheets functions \(DEX_SCREENER_PAIR_PROP, DEX_SCREENER_PAIR and DEX_SCREENER_REFRESH_INTERVAL\)/,
+    );
     assert.ok(question.includes(`https://github.com/${DEX_SCREENER.repo}`));
     assert.ok(question.includes(`commit ${DEX_SCREENER.commit}`));
     assert.match(
@@ -255,6 +258,14 @@ describe("npm run build apps-script, on a desktop with a clipboard tool", () => 
       ...COMMITTED,
       STAND_IN_DEX_SCREENER.text,
     ]);
+    for (const name of [
+      "crypto-price-fetchers-menu.gs",
+      "crypto-price-fetchers.gs",
+      "fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange-tests.gs",
+    ]) {
+      assert.ok(file.includes(`\n// ${name}\n`), name);
+    }
+    assert.ok(!file.includes("\n// ../"));
     assert.match(file, /\nDEXTOOLS_CONFIG\.API_KEY = "dex-key-3";\n/);
     assert.match(file, /\nX1_CONFIG\.API_KEY = "x1-key-4";\n/);
     assert.match(file, /\nCONFIG\.COINGECKO_API_KEY = "gecko-key-1";\n/);
@@ -310,7 +321,7 @@ describe("npm run build apps-script, on a desktop with a clipboard tool", () => 
     const file = result.copies[0].text;
     assert.ok(!file.includes("DEX_SCREENER_FUNCTIONS"));
     assert.ok(!file.includes("<h2>DEX Screener"));
-    assert.match(result.stdout, /keep it above crypto-price-fetchers/);
+    assert.match(result.stdout, /either menu can be the one that appears/);
     assert.ok(!result.stdout.includes("DEX Screener's own file."));
   });
 
@@ -402,6 +413,10 @@ describe("npm run build apps-script, on a desktop with a clipboard tool", () => 
     assert.equal(result.exitCode, 0);
     assert.match(result.stdout, /Usage: build apps-script \[options\]\n/);
     assert.match(result.stdout, /DEX Screener's Google Sheets functions/);
+    assert.match(
+      result.stdout,
+      /Exit codes: 0 once the file is on the clipboard or written; 1 when DEX/,
+    );
     assert.deepEqual(result.questions, []);
   });
 });

@@ -3,7 +3,8 @@
  * that the build step puts first in the one file it gives.
  * @module test/crypto-price-fetchers-menu.test
  *
- * The menu's file runs unchanged under Node with the runner's services and
+ * The menu's file runs unchanged under Node, with the price scripts whose
+ * busy messages it reads, as in the built file, the runner's services, and
  * a spreadsheet held in memory (`helpers/stand-in-spreadsheet.js`), which
  * records each formula written, each flush and each message. The runner's
  * sleep is replaced by one that records each wait and returns at once.
@@ -20,11 +21,16 @@ import {
 } from "../apps-script-runner/load-apps-script.js";
 import { standInSpreadsheet } from "./helpers/stand-in-spreadsheet.js";
 
-/** The menu's file, as committed. */
-const MENU_SOURCE = fs.readFileSync(
-  new URL("../crypto-price-fetchers-menu.gs", import.meta.url),
-  "utf8",
-);
+/** The menu's file and the price scripts after it, in the built file's order. */
+const SCRIPT_FILES = [
+  "../crypto-price-fetchers-menu.gs",
+  "../crypto-price-fetchers.gs",
+  "../fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.gs",
+  "../fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange-sources.gs",
+].map((file) => ({
+  source: fs.readFileSync(new URL(file, import.meta.url), "utf8"),
+  filename: file.slice(3),
+}));
 
 /** A current price, as a cell calls for it. */
 const PRICE = '=dexToolsGetTokenPrice("pulse", "0x1")';
@@ -46,14 +52,11 @@ function loadMenu(spreadsheet, config = {}) {
     fetchSync: () => ({ failure: "the menu asks nothing of the web" }),
     sleep: (milliseconds) => sleeps.push(milliseconds),
   });
-  const script = loadAppsScript(
-    [{ source: MENU_SOURCE, filename: "crypto-price-fetchers-menu.gs" }],
-    {
-      ...services,
-      SpreadsheetApp: sheet.SpreadsheetApp,
-      HtmlService: sheet.HtmlService,
-    },
-  );
+  const script = loadAppsScript(SCRIPT_FILES, {
+    ...services,
+    SpreadsheetApp: sheet.SpreadsheetApp,
+    HtmlService: sheet.HtmlService,
+  });
   applyConfig(script, config);
   return { script, sheet, sleeps };
 }
@@ -182,6 +185,19 @@ describe("Refresh", () => {
     assert.equal(stuck.sheet.record.toasts.length, 1);
   });
 
+  it("waits for the loading text of the spreadsheet's language, set in LOADING_TEXT", () => {
+    const { script, sleeps } = loadMenu(
+      {
+        tabs: { Prices: [[PRICE]] },
+        loadingReads: 2,
+        loadingText: "Cargando...",
+      },
+      { MENU_CONFIG: { LOADING_TEXT: "Cargando..." } },
+    );
+    script.refreshCurrentPrices();
+    assert.deepEqual(sleeps, [1000, 1000, 1000]);
+  });
+
   it("leaves alone, and names, a cell whose formula changes during the run", () => {
     const sorted = loadMenu({
       tabs: { Prices: [[PRICE], ['=dexToolsGetTokenPrice("pulse", "0x2")']] },
@@ -249,32 +265,50 @@ describe("Refresh", () => {
 });
 
 describe("Clean up errors", () => {
-  it("runs again only the cells that show #ERROR! and whose own formula calls a price function", () => {
-    const error = (formula) => ({ formula, display: "#ERROR!" });
+  it("runs again only the cells that show #ERROR! or a busy message and whose own formula calls a price function", () => {
+    const shown = (formula, display) => ({ formula, display });
     const { script, sheet } = loadMenu({
       tabs: {
         Prices: [
           [
-            error(PRICE),
-            error(PAST),
+            shown(PRICE, "#ERROR!"),
+            shown(PAST, "#ERROR!"),
             { formula: '=dexToolsGetTokenFDV("pulse", "0x1")', value: 12.5 },
           ],
           [
-            error("=A1*2"),
-            error("=myOwnFunction()"),
-            error('=DEX_SCREENER_PAIR("bsc", "0x3")'),
+            shown("=A1*2", "#ERROR!"),
+            shown("=myOwnFunction()", "#ERROR!"),
+            shown('=DEX_SCREENER_PAIR("bsc", "0x3")', "#ERROR!"),
+          ],
+          [
+            shown(
+              '=dexToolsGetTokenPrice("pulse", "0x4")',
+              "⌛ Rate limit / busy – retry soon",
+            ),
+            shown(
+              '=getCryptoPrice("xmr", "2026-01-15 14:30:00", "UTC")',
+              "Rate limit busy - retry later",
+            ),
+            shown("=B3", "Rate limit busy - retry later"),
           ],
         ],
       },
     });
     script.cleanUpErrors();
-    for (const key of ["Prices!A1", "Prices!B1", "Prices!C2"]) {
+    for (const key of [
+      "Prices!A1",
+      "Prices!B1",
+      "Prices!C2",
+      "Prices!A3",
+      "Prices!B3",
+    ]) {
       assert.equal(sheet.runsOf(key), 1, key);
     }
-    for (const key of ["Prices!C1", "Prices!A2", "Prices!B2"]) {
+    for (const key of ["Prices!C1", "Prices!A2", "Prices!B2", "Prices!C3"]) {
       assert.equal(sheet.runsOf(key), 0, key);
     }
     assert.equal(sheet.record.toasts[0].title, "Clean up errors");
+    assert.equal(sheet.record.toasts[0].message, "ran 5 cells again.");
   });
 });
 
@@ -326,6 +360,30 @@ describe("Refresh & freeze historical prices", () => {
       sheet.record.toasts[0].message,
       "ran 2 cells again; froze 1 price; kept 1 formula that gave no number.",
     );
+  });
+
+  it("freezes each block's numbers as soon as the block has run again, before the next block", () => {
+    const { script, sheet } = loadMenu(
+      {
+        tabs: {
+          Trades: [
+            [PAST],
+            ['=getCryptoPrice("btc", "2026-02-01 00:00:00", "UTC")'],
+          ],
+        },
+        evaluate: () => 42000.5,
+      },
+      { MENU_CONFIG: { BLOCK_SIZE: 1 } },
+    );
+    script.freezeHistoricalPrices();
+    const frozenA1 = sheet.record.valuesWritten.find(
+      (write) => write.a1 === "A1",
+    );
+    const brokeA2 = sheet.record.formulasWritten.find(
+      (write) => write.a1 === "A2" && write.formula.endsWith("!"),
+    );
+    assert.ok(frozenA1.seq < brokeA2.seq);
+    assert.equal(sheet.cellAt("Trades", "A2").formula, "");
   });
 
   it("does nothing when the question is answered No", () => {

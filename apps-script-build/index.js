@@ -98,6 +98,9 @@ import { helpPage, helpSection } from "./help-page.js";
 /** The Sheets scripts the build joins, after the menu. */
 export const APPS_SCRIPTS = Object.freeze([DEXTOOLS_SCRIPT, EXCHANGE_SCRIPT]);
 
+/** This repo's top folder, from which each part is named. */
+const REPO_TOP = fileURLToPath(new URL("..", import.meta.url));
+
 /** The menu, the file's first part. */
 const MENU_FILE = Object.freeze({
   path: fileURLToPath(
@@ -134,7 +137,12 @@ saves them), opened with the password in API_KEYS_PASSWORD (source
 line printed shows a key: the file goes to the clipboard, which is cleared
 once you press Enter, or, with no clipboard tool installed and none
 installed when offered, to ${BUILD_FOLDER}/${BUILT_FILE_NAME}, which only
-you can read.`;
+you can read.
+
+Exit codes: 0 once the file is on the clipboard or written; 1 when DEX
+Screener's functions cannot be downloaded, checked or compiled, the keys
+cannot be opened, a service refuses its key, the parts do not make one
+Apps Script project, or the arguments are wrong.`;
 
 /**
  * Asks a question at the terminal and gives the line typed.
@@ -184,9 +192,14 @@ function runInstall(install) {
  * @returns {Promise<boolean>} Whether to include them
  */
 async function askDexScreener(run) {
-  const { repo, commit, date } = run.dexScreenerVersion;
+  const { repo, commit, date, functions } = run.dexScreenerVersion;
+  const names = functions.map((fn) => fn.name);
+  const listed =
+    names.length > 1
+      ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`
+      : names.join("");
   const question =
-    "DEX Screener's Google Sheets functions (DEX_SCREENER_PAIR_PROP and others) can go in the file,\n" +
+    `DEX Screener's Google Sheets functions (${listed}) can go in the file,\n` +
     `downloaded from https://github.com/${repo} at commit ${commit} (${date}) and compiled here.\n` +
     "This step is optional: if the build fails, run it again and answer n.\n" +
     "Include DEX Screener's functions? (Y/n) ";
@@ -210,7 +223,7 @@ async function askDexScreener(run) {
 function partsOf(run, dexScreener) {
   const files = [MENU_FILE, ...run.scripts.flatMap((spec) => spec.files)];
   const parts = files.map((file) => ({
-    name: path.relative(run.projectTop, file.path).split(path.sep).join("/"),
+    name: path.relative(REPO_TOP, file.path).split(path.sep).join("/"),
     source: fs.readFileSync(file.path, "utf8"),
     help: file.help === true,
   }));
@@ -366,9 +379,8 @@ function pasteSteps(withDexScreener) {
   ];
   if (!withDexScreener) {
     lines.push(
-      "     To keep using DEX Screener's own file, keep it above " +
-        `${APPS_SCRIPT_FILE} in the Files list (its menu has Move file up),`,
-      "     since Apps Script runs the files in that order and its own onOpen would otherwise replace this menu.",
+      "     DEX Screener's own file, if you keep it, sets an onOpen of its own, so either menu can be the one that appears;",
+      "     build again and press Enter at the first question to have DEX Screener's functions under this menu.",
     );
   }
   lines.push(

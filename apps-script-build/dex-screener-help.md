@@ -22,10 +22,10 @@ address. The id is the one in the pair's url on dexscreener.com, such as
   gives one field of the pair, such as `priceUsd`, `fdv` or
   `liquidity.usd`.
 - `DEX_SCREENER_PAIR(chainId, pairAddress, [props], [direction], [includePropName], [refreshTime])`
-  fills several cells with the fields named in `props`, separated by
-  commas, or all of them for `"all"`: across a row for `"horizontal"`, the
-  default, or down a column for `"vertical"`, each after its name unless
-  `includePropName` is `FALSE`.
+  fills one cell for each field named in `props`, separated by commas, or
+  for every field with `"all"`: across a row for `"horizontal"`, the
+  default, or down a column for `"vertical"`, each after a cell with its
+  name unless `includePropName` is `FALSE`.
 - `DEX_SCREENER_REFRESH_INTERVAL([seconds])` gives the time `seconds` from
   now, 30 when left out.
 

@@ -98,10 +98,14 @@ a new one. They work 20 cells at a time, and wait for those to finish
 before the next 20, since Google runs at most 30 calls of one person at
 once. Before each write, the cell's formula is read again, so a cell that
 changed during the run, as when the tab is sorted, is left alone and
-reported. Clean up errors does this for the cells that show `#ERROR!`,
-Refresh for every cell that asks for a current value, and Refresh &
-freeze historical prices for the past prices of one tab, whose numbers it
-then keeps in place of their formulas. Help shows the page the build step
+reported. Clean up errors does this for the cells that show `#ERROR!` or
+a price script's busy message, which the menu reads from the scripts' own
+constants (`DEXTOOLS_BUSY_MESSAGE`, `EXCHANGE_BUSY_MESSAGE`); Refresh for
+every cell that asks for a current value, which the scripts' caches
+answer for up to 5 minutes (DexTools and x1.ninja) or 30 seconds (DEX
+Screener); and Refresh & freeze historical prices for the past prices of
+one tab, whose numbers it keeps in place of their formulas block by
+block, within the run's time. Help shows the page the build step
 makes from the help sections of the scripts' headers. No Node version
 loads the menu, since it gives no price.
 

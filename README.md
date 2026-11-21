@@ -46,7 +46,8 @@ Apps Script's limits, it handles about 100 calls at a time.
 
 `crypto-price-fetchers-menu.gs` adds the Crypto Price Fetchers menu to the
 spreadsheet. Its items run the price cells again, clear cells stuck on
-`#ERROR!`, replace past prices' formulas with their numbers, and show Help:
+`#ERROR!` or on a busy message, replace past prices' formulas with their
+numbers, and show Help:
 how to use each function, made from the help section of each script's
 header.
 
@@ -176,11 +177,12 @@ npm run build apps-script
    its Help item says how to use each function. The first item you choose
    asks you to approve what the script may do.
 
-Built without DEX Screener's functions, DEX Screener's own file can stay
-in the project, above `crypto-price-fetchers` in the Files list (its menu
-in the list has Move file up). Apps Script runs the files in that order,
-and DEX Screener's file sets an `onOpen` of its own as it runs, which
-would replace the Crypto Price Fetchers menu if it ran last.
+DEX Screener's own file sets an `onOpen` of its own as it runs. Of two
+functions with one name, the one that runs last replaces the other, and
+Google's documentation does not say in which order Apps Script runs a
+project's files. So with DEX Screener's own file kept beside the pasted
+one, either menu can be the one that appears. To have DEX Screener's
+functions under the Crypto Price Fetchers menu, build with them included.
 
 The clipboard is reached through the desktop's own tool: xclip or wl-copy
 on Linux, pbcopy on macOS, clip on Windows. When none is installed, the
