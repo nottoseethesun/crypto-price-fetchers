@@ -369,6 +369,26 @@ describe("crypto-price-fetchers.js, the command line", () => {
     assert.equal(result.stderr, "");
   });
 
+  it("says, in its help and each command's, what a 0 it prints means, and lists the whole command's options in each command's", async () => {
+    for (const command of [[], ["price"], ["fdv"]]) {
+      const result = await run([...command, "--help"], {
+        env: { API_KEYS_FILE_PATH: keyFile },
+        ask: askNothing,
+      });
+      assert.match(
+        result.stdout,
+        /What it prints:\n {2}The number the script would give a cell: the price, or the FDV, in USD\.\n {2}A 0 means that DexTools, or x1\.ninja for x1, has no data for the token or\n {2}pool, or answered with an error/,
+      );
+      if (command.length > 0) {
+        const globalOptions = result.stdout.indexOf("\nGlobal Options:\n");
+        assert.ok(globalOptions > 0, "it has a Global Options section");
+        const listed = result.stdout.slice(globalOptions);
+        assert.ok(listed.includes("\n  -c, --config <file> "));
+        assert.ok(listed.includes("\n  -v, --verbose "));
+      }
+    }
+  });
+
   it("refuses a missing argument on stderr, with exit code 1", async () => {
     const result = await run(["price", "ether", "--config", configFile]);
     assert.equal(result.exitCode, 1);

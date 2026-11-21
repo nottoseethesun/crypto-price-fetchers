@@ -130,6 +130,15 @@ Api keys:
   which source ./unlock-api-keys.sh keeps for a terminal, or else asks for
   the password on stderr.`;
 
+/** What the help says of the number printed, for the top command and each command. */
+const RESULT_HELP = `
+What it prints:
+  The number the script would give a cell: the price, or the FDV, in USD.
+  A 0 means that DexTools, or x1.ninja for x1, has no data for the token or
+  pool, or answered with an error: the script gives 0 then, so that a
+  sheet's sums keep working. --verbose shows the script's log, with what
+  the service answered.`;
+
 /** The examples of the top command's help: one of each common use. */
 const EXAMPLES_HELP = `
 Examples:
@@ -196,6 +205,7 @@ function describeCommandLine(program, runCall) {
         "worked out by crypto-price-fetchers.gs run under Node.",
     )
     .addHelpText("after", KEY_HELP)
+    .addHelpText("after", RESULT_HELP)
     .addHelpText("after", EXAMPLES_HELP);
   const commands = [
     [
@@ -222,6 +232,7 @@ function describeCommandLine(program, runCall) {
       )
       .argument("<token>", "the token's address", notEmpty)
       .option("-p, --pool <address>", poolHelp, notEmpty)
+      .addHelpText("after", RESULT_HELP)
       .addHelpText("after", COMMAND_EXAMPLES_HELP[commandName])
       .action((chain, token, options, command) =>
         runCall(functionName, [chain, token, poolCells(options.pool)], command),

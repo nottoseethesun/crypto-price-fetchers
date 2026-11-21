@@ -166,6 +166,68 @@ describe("the checks of a help", () => {
     );
   });
 
+  it("name each option an example uses that the help does not list", () => {
+    const help = (examples) => ({
+      ...GOOD_HELP,
+      stdout: [
+        "Usage: tool [options] [command]",
+        "",
+        "Options:",
+        "  -o, --out <file>  the file to write",
+        "                    (default: out.csv)",
+        "  --dry-run         write nothing",
+        "  -h, --help        display help for command",
+        "",
+        "Commands:",
+        "  run [options]     runs it",
+        "  help [command]    display help for command",
+        "",
+        "Examples:",
+        ...examples.map((example) => `    $ ${example}`),
+        "",
+        "Exit codes: 0 when it ran; 1 when it did not.",
+        "",
+      ].join("\n"),
+    });
+    const listedOnly = [
+      "node tool.js --out x.csv -o y.csv --dry-run",
+      "node tool.js --out=x.csv",
+      "node --test tool.js",
+      "node tool.js run --fast",
+      "node tool.js --out x.csv | head -n 3",
+      "npm start -- --dry-run",
+      "npm run tool -- --help",
+    ];
+    assert.deepEqual(helpProblems(help(listedOnly)), []);
+    assert.deepEqual(
+      helpProblems(
+        help([
+          "node tool.js --verbose --verbose",
+          "npm start -- -v",
+          "tool --since 2026-01-01",
+        ]),
+      ),
+      [
+        'its example "node tool.js --verbose --verbose" uses --verbose, which its options do not list',
+        'its example "npm start -- -v" uses -v, which its options do not list',
+        'its example "tool --since 2026-01-01" uses --since, which its options do not list',
+      ],
+    );
+  });
+
+  it("count the options of a program that a subcommand's help lists under Global Options", () => {
+    const subcommandHelp = {
+      ...GOOD_HELP,
+      stdout: GOOD_HELP.stdout
+        .replace(
+          "  -h, --help  display help for command\n",
+          "  -h, --help  display help for command\n\nGlobal Options:\n  -v, --verbose  log each step\n",
+        )
+        .replace("$ node tool.js", "$ node tool.js --verbose fdv"),
+    };
+    assert.deepEqual(helpProblems(subcommandHelp), []);
+  });
+
   it("are exported, so a project that installs this repo runs this one copy", async () => {
     const shared = await import("crypto-price-fetchers/lib/command-line-help");
     assert.equal(shared.helpProblems, helpProblems);

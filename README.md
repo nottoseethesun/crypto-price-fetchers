@@ -245,8 +245,11 @@ node fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.js xt
 ```
 
 Each prints the number, with exit code 0, or the script's message on
-stderr, with exit code 1. `--help` lists the options, `--config <file>`
-reads another config file, and `--verbose` shows the script's log on stderr.
+stderr, with exit code 1. A 0 from `crypto-price-fetchers.js` is the
+script's answer when DexTools, or x1.ninja, has no data for the token or
+answered with an error, as it gives a cell. `--help` lists the options,
+`--config <file>` reads another config file, and `--verbose` shows the
+script's log on stderr.
 
 ### From Node
 
