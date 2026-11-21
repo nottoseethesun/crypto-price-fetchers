@@ -9,9 +9,14 @@
     "./dex-prices/geckoterminal": "./dex-prices/geckoterminal.js",
     "./dex-prices/moralis": "./dex-prices/moralis.js",
     "./dex-prices/web-request": "./dex-prices/web-request.js",
+    "./eslint-rules/no-or-default": "./eslint-rules/no-or-default.js",
     "./eslint-rules/no-secret-logging": "./eslint-rules/no-secret-logging.js",
+    "./lib/calendar-day": "./lib/calendar-day.js",
+    "./lib/closed-output": "./lib/closed-output.js",
     "./lib/command-line-help": "./lib/command-line-help.js",
+    "./lib/http-url": "./lib/http-url.js",
     "./lib/message-of": "./lib/message-of.js",
+    "./lib/repo-checks": "./lib/repo-checks.js",
     "./summ-csv": "./summ-csv/index.js"
   },
   "bin": {
@@ -56,6 +61,7 @@
   "author": "Christopher M. Balz with Grok and Claude",
   "license": "Apache-2.0",
   "dependencies": {
+    "@noble/hashes": "^2.4.0",
     "commander": "^12.1.0",
     "lodash": "^4.18.1",
     "zod": "^4.6.7"

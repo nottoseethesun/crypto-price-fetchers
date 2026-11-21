@@ -10,12 +10,15 @@
  * a program built for each system. `run-actionlint` takes the release
  * `release.js` names: the first time, it downloads the archive for the
  * system it runs on, refuses it unless its SHA-256 is the one written
- * there, takes the program out, and keeps it in `node_modules/.cache/`
- * of the project it runs in; then it runs the program on the files given
- * and exits with its exit code. With `--check` it runs nothing: it
- * downloads every archive `release.js` names and checks each SHA-256, the
- * check `npm run audit:actionlint` runs beside npm audit, which covers
- * only what npm installs.
+ * there, takes the program out, refuses it unless its own SHA-256 is the
+ * one written beside the archive's, and keeps it in `node_modules/.cache/`
+ * of the project it runs in. Each run checks the kept program's SHA-256
+ * again before it runs it, and downloads the archive again when the
+ * program has changed. Then it runs the program on the files given and
+ * exits with its exit code. With `--check` it runs nothing: it downloads
+ * every archive `release.js` names and checks each SHA-256 and its
+ * program's, the check `npm run audit:actionlint` runs beside npm audit,
+ * which covers only what npm installs.
  *
  * How:
  *
@@ -51,23 +54,27 @@ const TAR_BLOCK = 512;
 /** What the help says after the options: examples and exit codes. */
 const HELP_AFTER = `
 The first run downloads actionlint ${ACTIONLINT.version} for this system from
-its GitHub release, checks the archive's SHA-256 against the one written in
-crypto-price-fetchers' actionlint/release.js, and keeps the program in
-node_modules/.cache/actionlint/; later runs use that copy. A download with
-no answer within ${DOWNLOAD_LIMIT_MS / 1000} seconds is stopped and counted as failed.
+its GitHub release, checks the archive's SHA-256, and the program's in it,
+against those written in crypto-price-fetchers' actionlint/release.js, and
+keeps the program in node_modules/.cache/actionlint/. Later runs check the
+kept program's SHA-256 again and run it, or download it again when it has
+changed. A download with no answer within ${DOWNLOAD_LIMIT_MS / 1000} seconds is stopped and
+counted as failed.
 
 Examples:
   Check the repo's workflow files, as npm run lint does:
     $ run-actionlint .github/workflows/*.yml
   Check one workflow file:
     $ run-actionlint .github/workflows/ci.yml
-  Check every archive of the release against its SHA-256, running nothing:
+  Check every archive of the release, and its program, against their SHA-256,
+  running nothing:
     $ run-actionlint --check
 
 Exit codes: actionlint's own: 0 when it finds no problem, 1 when it finds
 one or more, 2 when its arguments are wrong, 3 when it fails. 1 also when
-an archive cannot be downloaded, its SHA-256 differs, or it has no
-program for this system; 0 for --check when every archive matches.`;
+an archive cannot be downloaded, its SHA-256 or its program's differs, or
+the release has no archive for this system; 0 for --check when every
+archive and program matches.`;
 
 /**
  * The SHA-256 of some bytes.
@@ -174,24 +181,48 @@ export function fileFromTar(tar, name) {
 }
 
 /**
- * The program in an archive of a release.
+ * The program in an archive of a release, checked against the SHA-256
+ * pinned for it.
  *
  * @param {Buffer} archiveBytes - The archive, compressed with gzip
- * @param {string} file - The archive's file name, for the message
+ * @param {import('./release.js').ActionlintArchive} archive - The archive's pins
  * @returns {Buffer} The program
- * @throws {Error} When the archive holds no program named actionlint
+ * @throws {Error} When the archive holds no program named actionlint, or
+ *   its SHA-256 differs, naming the one it has
  */
-export function programFromArchive(archiveBytes, file) {
+export function programFromArchive(archiveBytes, archive) {
   const program = fileFromTar(gunzipSync(archiveBytes), "actionlint");
   if (program === null) {
-    throw new Error(`${file} holds no file named actionlint.`);
+    throw new Error(`${archive.file} holds no file named actionlint.`);
+  }
+  const sha256 = sha256Of(program);
+  if (sha256 !== archive.programSha256) {
+    throw new Error(
+      `The program in ${archive.file} is not the one crypto-price-fetchers pins: its SHA-256 is ${sha256}, not the ${archive.programSha256} written in actionlint/release.js.`,
+    );
   }
   return program;
 }
 
 /**
+ * Whether a kept program is the one pinned: a file whose SHA-256 is the
+ * one written for it.
+ *
+ * @param {string} programPath - The program's path
+ * @param {import('./release.js').ActionlintArchive} archive - The archive's pins
+ * @returns {boolean} Whether it is
+ */
+function keptProgramMatches(programPath, archive) {
+  return (
+    fs.existsSync(programPath) &&
+    sha256Of(fs.readFileSync(programPath)) === archive.programSha256
+  );
+}
+
+/**
  * The path of actionlint's program for this system, downloaded, checked
- * and kept the first time it is asked for.
+ * and kept the first time it is asked for, and again whenever the kept
+ * program's SHA-256 is not the one pinned.
  *
  * @param {Object} options - Where and how
  * @param {import('./release.js').ActionlintRelease} options.release - The release
@@ -212,10 +243,10 @@ export async function installedActionlint({
 }) {
   const folder = path.join(cacheTop, release.version, `${platform}-${arch}`);
   const programPath = path.join(folder, "actionlint");
-  if (fs.existsSync(programPath)) return programPath;
   const archive = archiveFor(release, platform, arch);
+  if (keptProgramMatches(programPath, archive)) return programPath;
   const bytes = await downloadArchive(release, archive, fetch, limitMs);
-  const program = programFromArchive(bytes, archive.file);
+  const program = programFromArchive(bytes, archive);
   fs.mkdirSync(folder, { recursive: true });
   const partPath = `${programPath}.${process.pid}.part`;
   fs.writeFileSync(partPath, program, { mode: 0o755 });
@@ -224,7 +255,8 @@ export async function installedActionlint({
 }
 
 /**
- * Downloads every archive of a release and checks each SHA-256.
+ * Downloads every archive of a release and checks each SHA-256, and the
+ * SHA-256 of the program in it.
  *
  * @param {Object} options - What and how
  * @param {import('./release.js').ActionlintRelease} options.release - The release
@@ -238,7 +270,10 @@ export async function checkArchives({ release, fetch, limitMs }) {
   const problems = [];
   for (const archive of archives) {
     try {
-      await downloadArchive(release, archive, fetch, limitMs);
+      programFromArchive(
+        await downloadArchive(release, archive, fetch, limitMs),
+        archive,
+      );
     } catch (error) {
       problems.push(messageOf(error));
     }
@@ -290,7 +325,7 @@ export async function runActionlint(
     .argument("[files...]", "the workflow files to check")
     .option(
       "--check",
-      "download every archive of the release and check its SHA-256, running nothing",
+      "download every archive of the release and check its SHA-256 and its program's, running nothing",
     )
     .exitOverride()
     .configureOutput({
@@ -303,7 +338,7 @@ export async function runActionlint(
         if (options.check === true) {
           const count = await checkArchives({ release, fetch, limitMs });
           stdout.write(
-            `actionlint ${release.version}'s ${count} archives match the SHA-256 crypto-price-fetchers pins.\n`,
+            `actionlint ${release.version}'s ${count} archives, and the program in each, match the SHA-256 crypto-price-fetchers pins.\n`,
           );
           return;
         }
