@@ -61,6 +61,7 @@ liquidity positions.
 | The key store | `api-key-store/`, `manage-api-keys.js`, `unlock-api-keys.sh` | Api keys kept encrypted with a password: LP Ranger's design, as a module. |
 | The security lint's rule | `eslint-rules/no-secret-logging.js` | Refuses printing a name that may hold a secret. |
 | The versions tool | `github-project-deps.js`, `github-project-deps/` | The bin `github-project-deps`, which sets a project's dependencies from GitHub to their projects' main branch or latest release. |
+| The actionlint runner | `run-actionlint.js`, `actionlint/` | The bin `run-actionlint`, which runs actionlint, the checker of GitHub Actions workflow files, from its official release, refused unless its SHA-256 is the one this repo pins: every repo's lint runs it. |
 | The Summ CSV writer | `summ-csv.js`, `summ-csv/` | Writes the CSV files the owner imports into Summ, once every row has passed its rules: `npm run summ-csv`, the bin `summ-csv`, and `writeSummCsv` for a program. |
 | The shared helpers | `lib/` | Code more than one part uses: `messageOf`, which gives the message of something thrown, for the runner, the key store, the build step, the versions tool and the Summ CSV writer's command line. The package exports it as `crypto-price-fetchers/lib/message-of`, for the projects that install this repo. And the checks of a command line's help, which every repo's tests make on each of its command lines: `crypto-price-fetchers/lib/command-line-help`. |
 
@@ -374,7 +375,8 @@ dependency their `npm install` installs:
 
 All three use the key store, run `no-secret-logging` in their security
 lint, keep a copy of `unlock-api-keys.sh`, which their tests hold to this
-one, and run the versions tool.
+one, run the versions tool, and run actionlint on their workflow files
+through `run-actionlint`.
 
 ### Which Version They Install
 
@@ -422,6 +424,13 @@ development packages.
   lodash, the two packages that code imports, are dependencies: the built
   file holds their code, and the gate's npm audit checks dependencies
   only.
+- **actionlint's official release**, through `run-actionlint`, for the
+  check of the workflow files, rather than an npm package that wraps it:
+  the program comes from its author's GitHub release, and the run refuses
+  an archive whose SHA-256 differs from the one `actionlint/release.js`
+  pins, so no package between the release and the run decides what runs.
+  Node's zlib opens the archive, and `actionlint/index.js` reads the tar
+  file inside, so the download and unpacking add no package either.
 - **Node's `crypto`**, its built-in module of ciphers and hashes, for the
   key store: no package between the password
   and the cipher.

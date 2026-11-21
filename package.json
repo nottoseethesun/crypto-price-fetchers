@@ -16,9 +16,11 @@
   },
   "bin": {
     "github-project-deps": "github-project-deps.js",
+    "run-actionlint": "run-actionlint.js",
     "summ-csv": "summ-csv.js"
   },
   "files": [
+    "actionlint/",
     "api-key-store/",
     "apps-script-runner/",
     "dex-prices/",
@@ -26,6 +28,7 @@
     "github-project-deps.js",
     "github-project-deps/",
     "lib/",
+    "run-actionlint.js",
     "summ-csv.js",
     "summ-csv/",
     "unlock-api-keys.sh"
@@ -35,7 +38,7 @@
     "build": "node build.js",
     "summ-csv": "node summ-csv.js",
     "prelint": "husky",
-    "lint": "eslint . --max-warnings 0 && markdownlint-cli2 && npm run format:check && github-actionlint .github/workflows/*.yml && npm run knip:files",
+    "lint": "eslint . --max-warnings 0 && markdownlint-cli2 && npm run format:check && node run-actionlint.js .github/workflows/*.yml && npm run knip:files",
     "lint:fix": "eslint . --fix && markdownlint-cli2 --fix && npm run format",
     "format": "prettier --write \"**/*.{js,gs,json,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{js,gs,json,yml,yaml}\"",
@@ -43,8 +46,9 @@
     "test": "node --test \"test/*.test.js\"",
     "test:coverage": "node --test --experimental-test-coverage --test-coverage-lines=80 \"test/*.test.js\"",
     "test:filler": "npm run test:strict --prefix fetch-from-centralized-exchange/crypto-price-filler",
-    "audit:deps": "npm audit --audit-level=high --omit=dev && npm audit --audit-level=high --omit=dev --prefix fetch-from-centralized-exchange/crypto-price-filler && npm run audit:dex-screener",
+    "audit:deps": "npm audit --audit-level=high --omit=dev && npm audit --audit-level=high --omit=dev --prefix fetch-from-centralized-exchange/crypto-price-filler && npm run audit:dex-screener && npm run audit:actionlint",
     "audit:dex-screener": "node audit-dex-screener.js",
+    "audit:actionlint": "node run-actionlint.js --check",
     "audit:security": "eslint -c eslint-security.config.js . --max-warnings 0",
     "audit:secrets": "secretlint \"**/*\"",
     "check": "npm run lint && npm run test:coverage && npm run test:filler && npm run audit:deps && npm run audit:security && npm run audit:secrets"
@@ -65,7 +69,6 @@
     "eslint-plugin-n": "^17.24.0",
     "eslint-plugin-no-secrets": "^2.3.3",
     "eslint-plugin-security": "^4.2.1",
-    "github-actionlint": "^1.7.12",
     "globals": "^17.14.0",
     "husky": "^9.1.7",
     "knip": "^5.88.1",
