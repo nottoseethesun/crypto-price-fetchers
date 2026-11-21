@@ -1,19 +1,27 @@
 /**
  * getCryptoPriceFromCentralizedExchange-sources.gs: the price sources of
- * getCryptoPriceFromCentralizedExchange.gs, MEXC, CoinGecko and CoinPaprika.
+ * getCryptoPriceFromCentralizedExchange.gs: MEXC, a centralized exchange,
+ * and CoinGecko and CoinPaprika, two services that gather the exchanges'
+ * prices.
  *
- * Paste it into the same Apps Script project as
- * getCryptoPriceFromCentralizedExchange.gs, as a script file of its own:
- * Apps Script loads every script file of a project into one global scope,
- * so these functions read CONFIG and the cache declared there, and
- * getCryptoPrice calls them. The script is in three files to keep each
- * under LP Ranger's 500 lines of code; its header, in
- * getCryptoPriceFromCentralizedExchange.gs, says what it does.
+ * The repo's build step, `npm run build apps-script` (npm is the package
+ * manager of Node, the program that runs JavaScript outside a browser),
+ * joins it with
+ * getCryptoPriceFromCentralizedExchange.gs into the one file pasted into a
+ * spreadsheet's project in Apps Script, Google's platform for scripts that
+ * run inside its apps, such as Google Sheets, its spreadsheet app. Apps
+ * Script loads every
+ * script file of a project into one global scope, so these functions read
+ * CONFIG and the cache declared there, and getCryptoPrice calls them. The
+ * script is in three files to keep each under the 500 lines of code that
+ * LP Ranger's rules allow (LP Ranger, the owner's bot that manages his 9mm
+ * V3 liquidity positions, sets the repo's coding standards); its header,
+ * in getCryptoPriceFromCentralizedExchange.gs, says what it does.
  *
  * Each source takes the time as UTC milliseconds and a target, "high",
  * "low" or "close", and returns the price in USD, or null when it has
- * none. crypto-price-filler, the Node tool for whole CSV files, calls the
- * three sources itself, through getCryptoPriceFromCentralizedExchange.js,
+ * none. crypto-price-filler, the repo's tool for whole CSV files, which
+ * runs on Node, calls the three sources itself, through getCryptoPriceFromCentralizedExchange.js,
  * so they are its price sources too.
  *
  * @see https://github.com/nottoseethesun/crypto-price-fetchers

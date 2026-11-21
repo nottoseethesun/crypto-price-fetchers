@@ -11,19 +11,25 @@ never change anything in LP Ranger.
 Work in this repo, never in a copy of it. Code written to check something goes
 into the tests, so that later sessions reuse it instead of writing it again.
 
-The Sheets scripts (`.gs`) change only here. The owner pastes the one file
-the build step gives (`npm run build apps-script`, below) into a
-spreadsheet's Apps Script project, which runs every script file in one
-scope; the build joins the menu, `crypto-price-fetchers-menu.gs`, then
-`crypto-price-fetchers.gs`, then the exchange script's three files:
+The Sheets scripts (`.gs`) price crypto tokens in the cells of Google
+Sheets, Google's spreadsheet app, and run there as Apps Script, Google's
+platform for scripts that run inside its apps. They change only here. The
+build step, `npm run build apps-script` (below), joins them into one file,
+which the owner pastes into a spreadsheet's Apps Script project, where
+every script file runs in one scope; npm, the package manager of Node, the
+program that runs JavaScript outside a browser, runs the commands
+`package.json` names. The build joins the menu,
+`crypto-price-fetchers-menu.gs`, which runs a spreadsheet's price cells
+again; then `crypto-price-fetchers.gs`, a token's price now; then the
+exchange script, a token's price at a past time, in three files:
 `getCryptoPriceFromCentralizedExchange.gs`, its `-sources.gs` and its
 `-tests.gs`. A name one file uses from another is declared in a
 `/* global */` comment, and no two files declare one top-level name.
 
 ## Node versions of the Sheets scripts
 
-Each `.gs` that gives a price has a Node version beside it, of the same
-name ending in `.js`: `crypto-price-fetchers.js` and
+Each `.gs` that gives a price has a Node version beside it, which runs it
+on Node, under the same name ending in `.js`: `crypto-price-fetchers.js` and
 `fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.js`.
 The menu gives none and has none; its tests run it with a stand-in
 spreadsheet.
@@ -40,11 +46,13 @@ version's `openCentralizedExchangeSources` (`sources/exchange.js`).
 Apps Script's `UrlFetchApp.fetch` returns the response, where Node's
 `fetch` returns a promise that a script's code cannot wait for on its own
 thread. So the runner loads a script, one file or several in Apps Script's
-order, in a worker thread, with Node versions of the Apps Script services.
+order, in a worker thread, a second thread of JavaScript that Node runs
+beside the main one, with Node versions of the Apps Script services.
 It does each web request on the caller's thread, with the caller's fetch,
 while the worker blocks; the file headers in `apps-script-runner/` explain
 how. pulsechain-analytics, the owner's tools for questions about
-PulseChain, installs this repo from GitHub for the runner
+PulseChain, installs this repo from GitHub, the website that hosts it,
+for the runner
 (`crypto-price-fetchers/apps-script-runner`), which runs
 pulsechain-analytics' own Sheets script. A change to the runner reaches it
 once its lockfile is made again, below.
@@ -103,7 +111,7 @@ No api key is committed. The keys the programs send (CoinGecko's,
 CoinPaprika's and Moralis', for past prices; DexTools' and x1.ninja's, the
 services `crypto-price-fetchers.gs` asks for current prices; as the top
 `config.json` lists them under `apiKeys`) are kept in `api-keys.json` at
-the repo's top, which git ignores,
+the repo's top, which git, the version-control program, ignores,
 encrypted with one password the owner types: LP Ranger's design, built as a
 module any project can use, `api-key-store/` (its README shows how).
 `npm run api-keys` runs the key manager, `manage-api-keys.js`. A program
@@ -130,15 +138,17 @@ statements of the one file it gives, from each Node version's
 `APPS_SCRIPT_BUILD` spec. It puts the file on the clipboard, or, when no
 clipboard tool is installed and the owner declines the install it offers,
 writes it to `build/apps-script/`, which git ignores, as do the lint, the
-format check and secretlint, readable by the owner alone. It prints no
+format check and the secret scan (Gates and CI, below), readable by the
+owner alone. It prints no
 key. crypto-price-filler reads `config-example.json`, its committed
 settings, with its own `config.json`, which git ignores, laid over them.
 
 ## DEX Screener's functions
 
-DEX Screener's Google Sheets functions (`DEX_SCREENER_PAIR_PROP` and two
-more) are DEX Screener's code, from its repo `dexscreener/google-sheets`,
-which carries no license: none of it is ever committed here. At every
+DEX Screener, a service that lists the pairs of decentralized exchanges
+with their prices, publishes Google Sheets functions of its own
+(`DEX_SCREENER_PAIR_PROP` and two more) in its repo
+`dexscreener/google-sheets`, which carries no license: none of it is ever committed here. At every
 build, `npm run build apps-script` asks whether to include them, Enter
 meaning yes, and says the step is optional and that a failed build should
 be run again with n. On a yes, it checks that their files are the ones
@@ -146,16 +156,21 @@ this repo pinned: it downloads each, at the commit
 `apps-script-build/dex-screener-files.js` names, within 30 seconds, and
 compares it with the SHA-256 written there, the check
 `npm run audit:dex-screener` also runs on its own. Then it compiles only
-the files the check gave, with esbuild and this repo's development
-packages zod and lodash, and wraps them in a function of their own in the
+the files the check gave, with esbuild, the program that compiles
+TypeScript and JavaScript into one file, and this repo's development
+packages zod, a library that checks data against a schema, and lodash, a
+library of helper functions, which DEX Screener's code imports, and wraps
+them in a function of their own in the
 built file, so their `onOpen` never replaces the menu's.
 `npm run audit:deps` runs `npm run audit:dex-screener` after npm audit,
-which does not cover that code.
+npm's check of the installed packages against known vulnerabilities, which
+does not cover that code.
 
 ## Docs
 
 `docs/architecture.md` says how the parts fit, `docs/engineering.md`
-covers the files, the gates, the tests and CI, and
+covers the files, the gates, the tests and CI (the gates, run by GitHub
+Actions at each push), and
 `docs/npm-project-commands.md` lists every npm command, as LP Ranger's
 `docs/` does. A change keeps them true.
 
@@ -185,12 +200,16 @@ example. LP Ranger's rules do not yet ask for the examples; this repo does.
 
 ## Gates and CI
 
-`npm run check` is the one gate, LP Ranger's: the lint (ESLint with LP
-Ranger's rules, markdownlint, Prettier, actionlint, knip's unused files),
-the tests with at least 80% of lines covered, crypto-price-filler's tests
-with the same floor, and the security audits (npm audit with the check of
-DEX Screener's files, the security lint in `eslint-security.config.js`,
-secretlint). It must pass before a commit
+`npm run check` is the one gate, LP Ranger's: the lint (ESLint, which
+checks JavaScript against rules, here LP Ranger's; markdownlint, which
+checks the form of Markdown files; Prettier, which formats code; actionlint,
+which checks the GitHub Actions workflow files; and knip, which finds files
+nothing uses), the tests with at least 80% of lines covered,
+crypto-price-filler's tests with the same floor, and the security audits
+(npm audit, npm's check of the installed packages against known
+vulnerabilities, with the check of DEX Screener's files; the security lint
+in `eslint-security.config.js`; and secretlint, which looks for keys and
+credentials in files). It must pass before a commit
 and a push; husky, the package that runs scripts at git's hooks, runs
 `npm run lint` before each commit. The repo has no
 `prepare`, `install` or `postinstall` script, since npm runs a git
@@ -212,8 +231,9 @@ the rule from this repo (`crypto-price-fetchers/eslint-rules/no-secret-logging`)
 ## Tests
 
 The runner, the Node versions, the build step, the menu, the price
-clients, the key store, the lint rule, the versions tool and the shared
-helpers in `lib/` are tested from the repo's top folder, on Node's own test
+clients, the key store, the lint rule, the versions tool, the shared
+helpers in `lib/` and every command line's help
+(`test/command-line-help.test.js`) are tested from the repo's top folder, on Node's own test
 runner. The menu runs against a spreadsheet held in memory
 (`test/helpers/stand-in-spreadsheet.js`), and DEX Screener's part is
 built from stand-in sources written in its test, compiled with the real

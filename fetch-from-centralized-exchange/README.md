@@ -7,9 +7,9 @@
 This directory contains utilities for fetching historical
 cryptocurrency prices in USD. They are built for tokens that trade
 on centralized exchanges (CEXs), such as Bitcoin (BTC), Monero (XMR)
-and Tari (XTM), and crypto-price-filler, the Node tool here that fills a
-CSV's price columns, prices tokens that trade in a blockchain's pools as
-well.
+and Tari (XTM), and crypto-price-filler, the tool here that fills a CSV's
+price columns on Node, the program that runs JavaScript outside a browser,
+prices tokens that trade in a blockchain's pools as well.
 
 A token that trades only on centralized exchanges has no pool, so its
 price has to come from an exchange's API, or from a service that
@@ -22,13 +22,15 @@ price a token from its chain's pools, for it before those three.
 ## Tools
 
 This directory contains two tools for different uses, and a Node
-version of the first:
+version of the first. The first runs in Google Sheets, Google's
+spreadsheet app, as Apps Script, Google's platform for scripts that run
+inside its apps:
 
-| Tool                                | Use Case                          | Capacity              |
-| ----------------------------------- | --------------------------------- | --------------------- |
-| **Google Apps Script**              | Google Sheets                     | ~100 calls per run    |
-| **Node.js CLI**                     | Batch processing CSVs             | Thousands of rows     |
-| **Node version of the Apps Script** | Node programs and one-off lookups | No Apps Script limits |
+| Tool | Use | Limits |
+| ---- | --- | ------ |
+| **The Sheets script**, `getCryptoPriceFromCentralizedExchange.gs` | A price in a spreadsheet's cell | Google stops a cell's call after 30 seconds, and runs at most 30 calls of one person at once. |
+| **crypto-price-filler**, `crypto-price-filler/index.js` | Every row of a CSV file, in one run | None of Apps Script's. |
+| **The Sheets script's Node version**, `getCryptoPriceFromCentralizedExchange.js` | One price, from the command line or a Node program | None of Apps Script's. |
 
 ---
 
@@ -50,9 +52,11 @@ every script file of a project in one global scope:
 - [`getCryptoPriceFromCentralizedExchange-tests.gs`](./getCryptoPriceFromCentralizedExchange-tests.gs):
   the tests to run from the Apps Script editor.
 
-The repo's build step, `npm run build apps-script`, puts the three files,
-with the repo's other Sheets scripts and the Crypto Price Fetchers menu,
-in one file to paste into a spreadsheet, with the CoinGecko and
+The repo's build step, `npm run build apps-script` (npm, Node's package
+manager, runs the commands the repo's `package.json` names), puts the
+three files, with the repo's other Sheets scripts and the Crypto Price
+Fetchers menu, which runs a spreadsheet's price cells again, in one file
+to paste into a spreadsheet, with the CoinGecko and
 CoinPaprika keys saved in the repo set at its end: see
 [Install in Google Sheets](../README.md#3-install-in-google-sheets) in the
 repo's README. Without saved keys, the script asks both services without
@@ -128,13 +132,13 @@ crypto-price-filler.
 
 ## Contributing
 
-Contributions are welcome: fork the repo on GitHub and open a
-pull request.
+Contributions are welcome: fork the repo on GitHub, the website that
+hosts it, and open a pull request.
 
 **Requirements:**
 
 - All tests must pass
-- Code must maintain low cyclomatic complexity (~17 max)
+- Each function's cyclomatic complexity is at most 17, as the lint checks
 - New features should include tests
 
 ## Authors

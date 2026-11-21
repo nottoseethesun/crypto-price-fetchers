@@ -17,8 +17,12 @@ such tokens trade: the centralized exchanges that list them, and, for a
 token that trades in a blockchain's pools, the services that price those
 pools.
 
-Each Google Sheets script here (`.gs`) has a Node version beside it, with the
-same name ending in `.js`, for Node programs and the command line. The Node
+The scripts run in Google Sheets, Google's spreadsheet app, as Apps
+Script, Google's platform for scripts that run inside its apps: a cell
+calls a script's function as it calls a built-in one. Each Google Sheets
+script here (`.gs`) has a Node version beside it, with the same name
+ending in `.js`, for programs and the command line on a computer, where
+Node, the program that runs JavaScript outside a browser, runs it. The Node
 version runs the same `.gs` file, unchanged, so the two always give the same
 answers, and a fix to the script is a fix to both. See
 [Node versions of the Sheets scripts](#node-versions-of-the-sheets-scripts)
@@ -53,9 +57,11 @@ header.
 
 The build step puts these scripts in one file, with the saved api keys set
 in it, for one paste into a spreadsheet (see
-[Install in Google Sheets](#3-install-in-google-sheets)). It can add DEX
-Screener's own Google Sheets functions, such as `DEX_SCREENER_PAIR_PROP`,
-downloaded from DEX Screener's repo; this repo holds none of their code.
+[Install in Google Sheets](#3-install-in-google-sheets)). It can add the
+Google Sheets functions of DEX Screener, a service that lists the pairs of
+decentralized exchanges with their prices, such as
+`DEX_SCREENER_PAIR_PROP`, downloaded from DEX Screener's repo; this repo
+holds none of their code.
 
 crypto-price-filler, `fetch-from-centralized-exchange/crypto-price-filler/index.js`,
 does that job on a computer, for a CSV file of any length: it fills in the
@@ -79,8 +85,11 @@ gives.
 
 ### 1. Node and the packages
 
-The tools need Node 22 or later. From the repo's top folder, install the
-repo's packages, then crypto-price-filler's, which uses both:
+The tools need Node 22 or later. npm, Node's package manager, installs
+the packages each folder's `package.json` lists, at the versions its
+`package-lock.json` keeps, and runs the repo's commands. From the repo's
+top folder, install the repo's packages, then crypto-price-filler's, which
+uses both:
 
 ```bash
 npm ci
@@ -90,7 +99,9 @@ npm ci --prefix fetch-from-centralized-exchange/crypto-price-filler
 ### 2. The api keys
 
 The keys the tools send are kept in `api-keys.json` at the repo's top,
-which git ignores, encrypted with one password you choose, by this repo's
+which git ignores (git, the version-control program, keeps the repo's
+history and leaves out the files `.gitignore` names), encrypted with one
+password you choose, by this repo's
 key store, `api-key-store/`, which keeps keys as LP Ranger, the owner's bot
 that manages his 9mm V3 liquidity positions, keeps its own. The top
 `config.json` lists the services they are for:
@@ -206,7 +217,8 @@ function, and get what its cell would show. It runs the Sheets script
 itself. The runner in `apps-script-runner/` loads the `.gs` file under
 Node, and supplies the Apps Script services the script calls: web
 requests, cache, lock, script properties, sleep, date formatting and logs.
-It runs the script in a worker thread, so the script can wait for each web
+It runs the script in a worker thread, a second thread of JavaScript that
+Node runs beside the main one, so the script can wait for each web
 request as it does in Apps Script ([why](docs/architecture.md#the-runner)).
 
 What differs from the sheet:
@@ -277,7 +289,8 @@ clients, as `crypto-price-fetchers/dex-prices/geckoterminal`,
 
 ## Projects that install this one
 
-Three of the owner's projects install this repo from GitHub:
+Three of the owner's projects install this repo from GitHub, the website
+that hosts it:
 pulsechain-analytics, his tools for questions about PulseChain;
 pulsechain-validator-analytics, for his PulseChain validators' withdrawal
 addresses and payments; and x1-validator-analytics, for his X1
@@ -349,6 +362,7 @@ The `docs/` folder holds three references:
 
 - [`docs/architecture.md`](docs/architecture.md): how the parts fit.
 - [`docs/engineering.md`](docs/engineering.md): the files, the gates, the
-  tests and CI.
+  tests and CI: the checks GitHub runs, through its GitHub Actions
+  service, at each push.
 - [`docs/npm-project-commands.md`](docs/npm-project-commands.md): every npm
   command.

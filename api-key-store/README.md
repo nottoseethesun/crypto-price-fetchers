@@ -2,10 +2,12 @@
 
 An api key must not be committed, and should not sit on disk in plain
 text. This module, part of crypto-price-fetchers, the owner's repo of code
-his projects share, keeps a project's api keys in a JSON file git ignores,
+his projects share, keeps a project's api keys in a JSON file that git,
+the version-control program, ignores,
 each encrypted with one password the owner types. It is the way LP Ranger,
 the owner's bot that manages his 9mm V3 liquidity positions, keeps its api
-keys, as a module any Node project can use.
+keys, as a module any project on Node, the program that runs JavaScript
+outside a browser, can use.
 
 ## How it keeps a key
 
@@ -19,8 +21,9 @@ each key, and saves it encrypted once its service takes it:
   { "apiKeys": ["coingecko", "dextools", "x1ninja"] }
   ```
 
-- `npm run api-keys`, the project's key manager, lists those keys, each
-  saved or not, and asks for each one not saved. Nothing it prints shows a
+- The project's key manager, which `npm run api-keys` runs (npm, Node's
+  package manager, runs the commands a project's `package.json` names),
+  lists those keys, each saved or not, and asks for each one not saved. Nothing it prints shows a
   key's characters. Each key is saved only once its service takes it.
 - The key and the password are typed at a prompt that shows nothing of what
   is typed. Neither is ever a command-line argument, which shell history
@@ -69,7 +72,8 @@ file the other wrote:
 
 ## Using it in another project
 
-Another project installs this repo from GitHub, then calls the store from
+Another project installs this repo from GitHub, the website that hosts
+it, then calls the store from
 its own key manager and programs:
 
 1. Install this repo from GitHub, pinned to a commit, as a dependency, so

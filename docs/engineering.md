@@ -1,18 +1,21 @@
 # crypto-price-fetchers — Engineering Reference
 
 The files the programs read and write, the gates every change passes, the
-tests, and CI. The programs are this repo's parts: the Sheets scripts and
-their Node versions, which price tokens in USD; crypto-price-filler, the
-Node tool that fills a CSV's price columns; the build step, which joins
+tests, and CI: the same gates, run at each push by GitHub Actions, the
+service of GitHub, the website that hosts the repo. The programs are this
+repo's parts. The Sheets scripts run in Google Sheets, Google's spreadsheet
+app, as Apps Script, Google's platform for scripts that run inside its
+apps, and their Node versions run them on Node, the program that runs
+JavaScript outside a browser; both price tokens in USD. crypto-price-filler
+is the Node tool that fills a CSV's price columns; the build step joins
 the Sheets scripts into one file, with the saved api keys set in it, for
-one paste into Apps Script; the key
-store, which keeps the api keys encrypted; the versions tool, which sets
-a project's dependencies from GitHub to a branch or a release; and the
-Summ CSV writer, which writes the CSV files the owner imports into Summ,
-the crypto tax calculator he keeps his books in.
+one paste into Apps Script; the key store keeps the api keys encrypted;
+the versions tool sets a project's dependencies from GitHub to a branch or
+a release; and the Summ CSV writer writes the CSV files the owner imports
+into Summ, the crypto tax calculator he keeps his books in.
 For how the parts fit, see [`docs/architecture.md`](architecture.md); for
-every npm command, see
-[`docs/npm-project-commands.md`](npm-project-commands.md).
+every command the repo's `package.json` gives npm, Node's package manager,
+to run, see [`docs/npm-project-commands.md`](npm-project-commands.md).
 
 The repo follows the coding standards of LP Ranger, the owner's bot that
 manages his 9mm V3 liquidity positions: its `CLAUDE.md` and
@@ -59,8 +62,9 @@ npm run build apps-script   # the Sheets scripts as one file, for Apps Script
 
 ## Files on Disk
 
-The programs and their tests read and write these files. Git keeps only
-the ones that hold no key and none of the owner's own settings.
+The programs and their tests read and write these files. Git, the
+version-control program that keeps the repo's history, keeps only the ones
+that hold no key and none of the owner's own settings.
 
 | File | In git | What it holds |
 | ---- | ------ | ------------- |
@@ -70,7 +74,7 @@ the ones that hold no key and none of the owner's own settings.
 | `summ-csv/settings.json` | yes | The Summ CSV writer's facts of each chain, by Summ's name for it (its own coin, the forms of its hashes and addresses), and the fiat currencies a reference price may be in. |
 | `crypto-price-filler/config-example.json` | yes | The filler's settings. |
 | `crypto-price-filler/config.json` | no | The owner's settings, laid over `config-example.json`. |
-| `build/apps-script/` | no | `crypto-price-fetchers.gs`, the one file `npm run build apps-script` writes when the owner declines a clipboard tool: it holds the api keys in the clear, readable by the owner alone. ESLint, Prettier and secretlint pass over the folder. |
+| `build/apps-script/` | no | `crypto-price-fetchers.gs`, the one file `npm run build apps-script` writes when the owner declines a clipboard tool: it holds the api keys in the clear, readable by the owner alone. The lint and the secret scan, below, pass over the folder. |
 | `coverage/` | no | A test run's coverage report. |
 
 ---
@@ -88,15 +92,15 @@ push, and CI runs it on Node 22 and Node 24.
 
 The lint checks each file's form before any test runs: the rules the code
 follows, its formatting, the workflows, and files nothing uses.
-`npm run lint` runs five tools:
+`npm run lint` runs five tools, each an npm package:
 
-| Tool | Configured in | What it holds the repo to |
-| ---- | ------------- | ------------------------- |
-| ESLint | `eslint.config.js` | LP Ranger's rules, with no warning allowed: cyclomatic complexity ≤ 17, ≤ 500 lines of code a file (blank lines and comments not counted), lines ≤ 80 characters but strings, urls and comments, `===`, no unused name, no `var`, `const` where nothing is reassigned, no `Math.random`, no comment that tells Prettier to skip code, and every import resolved. It reads the Sheets scripts too, as the paragraph below the table says. |
-| markdownlint | `.markdownlint-cli2.jsonc` | LP Ranger's settings, over every Markdown file. |
-| Prettier | `.prettierrc`, `.prettierignore` | Its formatting, in check mode, over every JavaScript, Sheets script, JSON and YAML file the repo keeps. |
-| actionlint | — | The GitHub workflows. |
-| knip | `knip.json` | No file nothing reaches. See [Dead Code Detection](#dead-code-detection). |
+| Tool | Configured in | What it does, and what it holds the repo to |
+| ---- | ------------- | ------------------------------------------- |
+| ESLint | `eslint.config.js` | Checks JavaScript against rules: LP Ranger's, with no warning allowed: cyclomatic complexity ≤ 17, ≤ 500 lines of code a file (blank lines and comments not counted), lines ≤ 80 characters but strings, urls and comments, `===`, no unused name, no `var`, `const` where nothing is reassigned, no `Math.random`, no comment that tells Prettier, the formatter in the row below, to skip code, and every import resolved. It reads the Sheets scripts too, as the paragraph below the table says. |
+| markdownlint | `.markdownlint-cli2.jsonc` | Checks the form of Markdown files: LP Ranger's settings, over every Markdown file, such as one top heading first and no HTML. |
+| Prettier | `.prettierrc`, `.prettierignore` | Formats code; in check mode, it fails on any JavaScript, Sheets script, JSON or YAML file the repo keeps whose layout its formatting would change. |
+| actionlint | — | Checks the GitHub Actions workflow files, in `.github/workflows/`, for mistakes in their syntax and expressions. |
+| knip | `knip.json` | Finds files nothing imports or runs, and fails on any. See [Dead Code Detection](#dead-code-detection). |
 
 The Sheets scripts are plain scripts, not modules: Apps Script loads them
 without imports, with its services as globals. ESLint reads them the same
@@ -113,8 +117,9 @@ file stops the commit; `npm run format` or
 no file git keeps is left out of the lint, and a file over 500 lines is
 split, not excused. The one folder the lint passes over is `build/`, which
 git ignores: the build step writes its file there when there is no
-clipboard, and that file holds DEX Screener's compiled code and the api
-keys.
+clipboard, and that file holds the compiled code of DEX Screener, a
+service that lists the pairs of decentralized exchanges with their prices,
+and the api keys.
 
 ---
 
@@ -125,18 +130,23 @@ test runner, and crypto-price-filler's, on vitest, a test runner its tests
 were written for. Neither asks a service
 outside the computer, and neither reads the owner's key file or password.
 
-**The top folder's tests** (`test/`, Node's test runner) cover the runner,
-the Node versions, the build step, the menu, the price clients
-(`dex-prices/`), the key store, `no-secret-logging`, the versions tool
-(`github-project-deps/`), the Summ CSV writer (`summ-csv/`) and the shared
-helpers (`lib/`). The scripts' and the clients' requests
+**The top folder's tests** (`test/`, Node's test runner) cover the runner
+(`apps-script-runner/`), which runs a Sheets script under Node; the Node
+versions; the build step; the menu (`crypto-price-fetchers-menu.gs`), which
+runs a spreadsheet's price cells again; the price clients (`dex-prices/`),
+which ask the services that price a token from its chain's pools; the key
+store; `no-secret-logging`, the lint rule that refuses printing a name
+that may hold a secret; the versions tool (`github-project-deps/`); the
+Summ CSV writer (`summ-csv/`); the shared helpers (`lib/`); and every
+command line's help (`test/command-line-help.test.js`). The scripts' and the clients' requests
 go to a stand-in fetch or a stand-in server on the computer
 (`test/helpers/stand-in-web.js`; `test/helpers/gecko-terminal-stand-in.js`
-answers as GeckoTerminal does). The build step's tests stand in for the
+answers as GeckoTerminal, one of those services, does). The build step's tests stand in for the
 clipboard, the install, the questions and DEX Screener's part.
 `test/dex-screener.test.js` builds that part from stand-in TypeScript
 sources, written in the test with their checksums, served by a stand-in
-fetch, and compiled with the real esbuild; `test/built-script.test.js`
+fetch, and compiled with the real esbuild, the program that compiles
+TypeScript and JavaScript into one file; `test/built-script.test.js`
 checks the joining of parts on short scripts. The menu's tests run
 `crypto-price-fetchers-menu.gs` unchanged against a spreadsheet held in
 memory (`test/helpers/stand-in-spreadsheet.js`), which records each
@@ -180,8 +190,9 @@ holds the stand-ins:
   exchange sources, whose Sheets script then runs for real in the runner's
   worker, and the pool sources, whose shared clients then ask it.
 - `stand-in-fetch-preload.js` runs the real command line, `index.js`, in a
-  child process against a stand-in MEXC, and a stand-in CoinGecko ping that
-  takes the one key in `stand-in-coingecko-key.js`.
+  child process against a stand-in MEXC, a centralized exchange, and a
+  stand-in ping of CoinGecko, a service that gathers the exchanges' prices,
+  that takes the one key in `stand-in-coingecko-key.js`.
 
 Code written to check something goes into the tests, so it is kept and run
 again rather than written again.
@@ -224,14 +235,16 @@ in three ways, and the runner, `apps-script-runner/`, bridges each one:
 2. **One scope.** Apps Script loads all of a project's files into one
    global scope. So the exchange script's files call each other's
    functions with no import. The runner runs a script's files, in Apps
-   Script's order, in one `vm` context (`load-apps-script.js`).
+   Script's order, in one context of Node's `vm` module, which runs code
+   in a global scope of its own (`load-apps-script.js`).
 3. **Waiting for a web request.** In Apps Script, `UrlFetchApp.fetch` holds
    the script until the response arrives, then returns it. In Node, `fetch`
    returns a promise at once, and the response comes only after the running
    code has finished and Node's event loop has run. A script's code cannot
    finish without its response. So if the script ran on Node's main
    thread, the response could never arrive. The runner therefore runs the
-   script in a worker thread. For each request, the worker hands the
+   script in a worker thread, a second thread of JavaScript that Node runs
+   beside the main one. For each request, the worker hands the
    request to the main thread and blocks. The main thread, whose event loop
    keeps running, does the request with Node's `fetch`, hands the response
    back and wakes the worker. To the script, `UrlFetchApp.fetch` has
@@ -244,7 +257,7 @@ answered at once.
 
 | Tests | How the script runs | What they check |
 | ----- | ------------------- | --------------- |
-| `test/crypto-price-fetchers.test.js`, `test/get-crypto-price-from-centralized-exchange.test.js` | Through its Node version, in the worker thread. Each request goes to `standInFetch` (`test/helpers/stand-in-web.js`), which answers as DexTools, x1.ninja, MEXC or CoinGecko does. | What each Sheets function returns, as its cell would show it, and the Node versions' command lines. |
+| `test/crypto-price-fetchers.test.js`, `test/get-crypto-price-from-centralized-exchange.test.js` | Through its Node version, in the worker thread. Each request goes to `standInFetch` (`test/helpers/stand-in-web.js`), which answers as DexTools or x1.ninja, the services that give current prices, or MEXC or CoinGecko, which give past ones, does. | What each Sheets function returns, as its cell would show it, and the Node versions' command lines. |
 | `test/run-apps-script.test.js` | A small script, `test/fixtures/runner-check.gs`, in the worker thread. Its requests go through Node's own `fetch` to a web server on this computer. | The hand-off between the threads: the worker waits, the main thread does the request, and each response reaches the request it answers. |
 | crypto-price-filler's `tests/sheets-sources.test.js`, `tests/regressions.test.js`, `tests/xtm-coingecko-id.test.js` | In the test's own thread (`tests/helpers/sheets-script.js`). `UrlFetchApp.fetch` answers at once from a function the test gives, so nothing waits. | What each price source gives, the cases the regression tests cover, and that no file of the exchange script holds a CoinGecko api key. |
 | crypto-price-filler's `tests/regressions.test.js`, `tests/xtm-coingecko-id.test.js`, through the tool | Through the exchange script's Node version, in the worker thread, as the tool runs it (`tests/helpers/stand-in-fetch.js`). | The same cases, reached through the tool's provider chain. |
@@ -306,8 +319,11 @@ log. No automated run calls them.
 ## Security Audits
 
 Four audits look for security problems: in the packages the repo
-installs, in the code DEX Screener publishes that the build step can put
-in its file, in the repo's code, and in the text of every file.
+installs, through npm audit, npm's check of installed packages against
+known vulnerabilities; in the code DEX Screener publishes that the build
+step can put in its file; in the repo's code, through ESLint with security
+rules; and in the text of every file, through secretlint, which looks for
+keys and credentials.
 
 | Command | What it runs | What it catches |
 | ------- | ------------ | --------------- |

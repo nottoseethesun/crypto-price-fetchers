@@ -85,18 +85,24 @@ const NOT_SEARCHED = new Set([
  * @returns {{status: number, stdout: string, stderr: string}} How it ended and what it printed
  */
 function helpOf({ file, command }, flag) {
+  // NODE_V8_COVERAGE is set empty: Node hands a child the variable when
+  // its environment lacks it, and a child with it adds its coverage to
+  // this suite's report, where crypto-price-filler's files, which have a
+  // suite of their own, would count, run only as far as their help.
+  const env = {
+    ...process.env,
+    NODE_V8_COVERAGE: "",
+    API_KEYS_PASSWORD: "",
+    API_KEYS_FILE_PATH: path.join(
+      os.tmpdir(),
+      "command-line-help-no-key-file.json",
+    ),
+  };
   const run = spawnSync(process.execPath, [file, ...command, flag], {
     cwd: REPO_TOP,
     encoding: "utf8",
     timeout: 30000,
-    env: {
-      ...process.env,
-      API_KEYS_PASSWORD: "",
-      API_KEYS_FILE_PATH: path.join(
-        os.tmpdir(),
-        "command-line-help-no-key-file.json",
-      ),
-    },
+    env,
   });
   return { status: run.status, stdout: run.stdout, stderr: run.stderr };
 }

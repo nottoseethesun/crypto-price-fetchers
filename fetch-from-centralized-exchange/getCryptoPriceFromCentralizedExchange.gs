@@ -4,28 +4,34 @@
  *
  * @fileoverview Fetches historical high, low or closing cryptocurrency
  *   prices (USD) from centralized exchanges for use directly in Google
- *   Sheets.
+ *   Sheets, Google's spreadsheet app.
  * @author Christopher M. Balz, with Grok and Claude
  * @version 2.17.0
  * @lastModified November 20, 2026
  *
  * OVERVIEW
  * --------
- * Custom Google Sheets function that returns the historical high, low or
- * closing USD price for a cryptocurrency at a given time. Queries multiple
- * exchange APIs in sequence until a price is found. crypto-price-filler,
- * the Node tool for whole CSV files, asks these same price sources through
- * the repo's runner, so a fix here fixes both.
+ * A custom function for Google Sheets, written in Apps Script, Google's
+ * platform for scripts that run inside its apps. It
+ * returns the historical high, low or closing USD price for a
+ * cryptocurrency at a given time, asking one source after another until
+ * one has a price: MEXC, a centralized exchange, then CoinGecko and
+ * CoinPaprika, two services that gather the exchanges' prices.
+ * crypto-price-filler, the repo's tool for whole CSV files, which runs on
+ * Node, the program that runs JavaScript outside a browser, asks these
+ * same price sources through the repo's runner, so a fix here fixes both.
  *
  * INSTALLATION
  * ------------
- * The script is in three files, to keep each under LP Ranger's 500 lines of
- * code: this one, getCryptoPriceFromCentralizedExchange-sources.gs, the
+ * The script is in three files, to keep each under the 500 lines of code
+ * that LP Ranger's rules allow (LP Ranger, the owner's bot that manages his
+ * 9mm V3 liquidity positions, sets the coding standards the repo follows): this one, getCryptoPriceFromCentralizedExchange-sources.gs, the
  * price sources, MEXC, CoinGecko and CoinPaprika, and
  * getCryptoPriceFromCentralizedExchange-tests.gs, the tests run from the
  * Apps Script editor. Apps Script runs every script file of a project in
  * one global scope, so the three work as one. The build step of the
- * crypto-price-fetchers repo, `npm run build apps-script`, joins them with
+ * crypto-price-fetchers repo, `npm run build apps-script` (npm, Node's
+ * package manager, runs the repo's commands), joins them with
  * the repo's other Sheets scripts into the one file to paste into a
  * spreadsheet; the repo's README, under Install, says how.
  *
