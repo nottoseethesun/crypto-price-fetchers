@@ -90,6 +90,8 @@ import { parse as csvParse } from "csv-parse/sync";
 import { createObjectCsvWriter } from "csv-writer";
 
 import { loadConfig } from "./config.js";
+import { isEntryPoint } from "../../apps-script-runner/command-line.js";
+import { endQuietlyWhenOutputCloses } from "../../lib/closed-output.js";
 import {
   backfillChoice,
   backfillPrices,
@@ -328,10 +330,9 @@ export async function runBackfill(options, config = loadConfig()) {
   return stats;
 }
 
-// Main entry point - only run if this is the main module
-const isMainModule = import.meta.url === `file://${process.argv[1]}`;
-
-if (isMainModule) {
+// Main entry point - only run if this is the program node was given
+if (isEntryPoint(import.meta.url)) {
+  endQuietlyWhenOutputCloses();
   try {
     const args = parseBackfillArgs();
     await runBackfill(args);

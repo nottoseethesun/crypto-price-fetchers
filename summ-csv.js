@@ -13,5 +13,8 @@
  */
 
 import { runSummCsv } from "./summ-csv/command-line.js";
+import { endQuietlyWhenOutputCloses } from "./lib/closed-output.js";
+
+endQuietlyWhenOutputCloses();
 
 process.exitCode = runSummCsv(process.argv);

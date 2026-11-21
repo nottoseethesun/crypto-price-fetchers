@@ -319,6 +319,9 @@ import { DateTime } from "luxon";
 
 import { parseArgs } from "./commander.js";
 import { readSupportedTokens } from "./supported-tokens.js";
+import { endQuietlyWhenOutputCloses } from "../../lib/closed-output.js";
+
+endQuietlyWhenOutputCloses();
 
 // The token list, and the settings: the committed ones, with the owner's laid over them
 const supportedTokens = readSupportedTokens();

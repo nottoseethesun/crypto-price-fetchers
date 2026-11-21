@@ -16,6 +16,9 @@
 
 import { fileURLToPath } from "node:url";
 import { runKeyManager } from "./api-key-store/index.js";
+import { endQuietlyWhenOutputCloses } from "./lib/closed-output.js";
+
+endQuietlyWhenOutputCloses();
 
 process.exitCode = await runKeyManager(process.argv, {
   projectTop: fileURLToPath(new URL(".", import.meta.url)),
