@@ -29,6 +29,8 @@ import os from "os";
 import path from "path";
 import { pathToFileURL } from "url";
 import { ESLint } from "eslint";
+import { createAppsScriptServices } from "../../../apps-script-runner/apps-script-services.js";
+import { loadAppsScript } from "../../../apps-script-runner/load-apps-script.js";
 import { getCryptoPrice } from "../sources/price.js";
 import { closeExchangeSources, exchangeSources } from "../sources/exchange.js";
 import { canonicalTimeZone, parseInputToUtcMs } from "../utils/date.js";
@@ -591,5 +593,28 @@ describe("the gate's checks of the file the build step writes", () => {
     });
     const built = path.join(top, "build/apps-script/crypto-price-fetchers.gs");
     expect(await eslint.isPathIgnored(built)).toBe(true);
+  });
+});
+
+describe("the runner's Apps Script services", () => {
+  it("the runner's cache has getAll, putAll and removeAll, as Apps Script's has", () => {
+    const source = [
+      "function rememberAndForget() {",
+      "  const cache = CacheService.getScriptCache();",
+      '  cache.putAll({ price: "1.5", pool: "0xabc" }, 60);',
+      '  const found = cache.getAll(["price", "pool", "missing"]);',
+      '  cache.removeAll(["price"]);',
+      '  return JSON.stringify([found, cache.get("price"), cache.get("pool")]);',
+      "}",
+    ].join("\n");
+    const context = loadAppsScript(
+      [{ source, filename: "cache-check.gs" }],
+      createAppsScriptServices({ fetchSync: () => ({ failure: "no web" }) }),
+    );
+    expect(JSON.parse(context.rememberAndForget())).toEqual([
+      { price: "1.5", pool: "0xabc" },
+      null,
+      "0xabc",
+    ]);
   });
 });
