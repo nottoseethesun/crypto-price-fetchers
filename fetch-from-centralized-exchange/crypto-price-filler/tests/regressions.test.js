@@ -50,11 +50,10 @@ vi.mock(
 // The committed settings, read afresh for this file, whatever a config.json holds
 vi.mock("../config.js", async () => {
   const { readFileSync } = await import("node:fs");
-  return {
-    default: JSON.parse(
-      readFileSync(new URL("../config-example.json", import.meta.url), "utf8"),
-    ),
-  };
+  const committed = JSON.parse(
+    readFileSync(new URL("../config-example.json", import.meta.url), "utf8"),
+  );
+  return { loadConfig: () => committed };
 });
 
 const FILLER_DIR = path.resolve(__dirname, "..");

@@ -133,7 +133,7 @@ Api keys:
 const EXAMPLES_HELP = `
 Examples:
   USDC's price on Ethereum, from the pools DexTools picks:
-    $ node crypto-price-fetchers.js price ether 0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48
+    $ node crypto-price-fetchers.js price ether 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48
   Wrapped XNT's price on X1, in its pool with USDC.X, which x1 needs:
     $ node crypto-price-fetchers.js price x1 So11111111111111111111111111111111111111112 --pool CAJeVEoSm1QQZccnCqYu9cnNF7TTD2fcUA3E5HQoxRvR
   A token's fully diluted value on PulseChain:
@@ -144,9 +144,9 @@ const COMMAND_EXAMPLES_HELP = Object.freeze({
   price: `
 Examples:
   USDC's price on Ethereum, from the pools DexTools picks:
-    $ node crypto-price-fetchers.js price ether 0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48
+    $ node crypto-price-fetchers.js price ether 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48
   HEX's price on Ethereum, in one of its pools:
-    $ node crypto-price-fetchers.js price ether 0x2b591e99afe9f32eaa6214f7b7629768c40eeb39 --pool 0x69d91b94f0aaf8e8a2586909fa77a5c2c89818d5
+    $ node crypto-price-fetchers.js price ether 0x2b591e99afE9f32eAA6214f7B7629768c40Eeb39 --pool 0x69D91B94f0AaF8e8A2586909fA77A5c2c89818d5
   Wrapped XNT's price on X1, in its pool with USDC.X, which x1 needs:
     $ node crypto-price-fetchers.js price x1 So11111111111111111111111111111111111111112 --pool CAJeVEoSm1QQZccnCqYu9cnNF7TTD2fcUA3E5HQoxRvR`,
   fdv: `

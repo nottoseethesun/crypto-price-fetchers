@@ -44,7 +44,7 @@ function poolTokenOf(tokenConfig) {
  */
 function loadTokenConfig(token) {
   const supportedTokens = readSupportedTokens();
-  const tokenConfig = supportedTokens.tokens?.[token.toLowerCase()] || {};
+  const tokenConfig = supportedTokens.tokens?.[token.toLowerCase()] ?? {};
 
   return {
     coingeckoId: tokenConfig.coingecko_id || null,
@@ -225,9 +225,9 @@ export async function getCryptoPrice(
     loadTokenConfig(token);
 
   // Log resolved IDs
-  const coingeckoStatus = coingeckoId || "skipped since set to null";
-  const coinpaprikaStatus = coinpaprikaId || "skipped since set to null";
-  const mexcStatus = mexcSymbol || "skipped since set to null";
+  const coingeckoStatus = coingeckoId ?? "skipped since set to null";
+  const coinpaprikaStatus = coinpaprikaId ?? "skipped since set to null";
+  const mexcStatus = mexcSymbol ?? "skipped since set to null";
   logv(
     verbose,
     1,

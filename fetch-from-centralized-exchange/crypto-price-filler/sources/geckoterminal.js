@@ -40,7 +40,7 @@ import {
   geckoTerminalSettings,
   tokenPools,
 } from "../../../dex-prices/geckoterminal.js";
-import config from "../config.js";
+import { loadConfig } from "../config.js";
 import { getCache, setCache } from "../utils/cache.js";
 import { logv } from "../utils/log.js";
 
@@ -63,7 +63,7 @@ async function poolFor(token, settings) {
     { network: token.network, token: token.contract },
     settings,
   );
-  const best = bestPool(pools, config.GECKOTERMINAL_TOP_POOLS_CONSIDERED);
+  const best = bestPool(pools, loadConfig().GECKOTERMINAL_TOP_POOLS_CONSIDERED);
   const pool =
     best === null ? null : { address: best.address, side: best.side };
   setCache(cacheKey, pool);

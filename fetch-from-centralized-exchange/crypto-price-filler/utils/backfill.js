@@ -92,7 +92,7 @@ export function recalculateTotals(
   let grandTotalUsd = 0;
   for (const row of rows) {
     const price = parseFloat(row[priceColName]);
-    const amount = parseFloat((row[amountColName] || "").trim());
+    const amount = parseFloat((row[amountColName] ?? "").trim());
     if (!isNaN(price) && !isNaN(amount)) {
       const usdAmount = amount * price;
       row[usdAmountColName] = usdAmount.toFixed(8);

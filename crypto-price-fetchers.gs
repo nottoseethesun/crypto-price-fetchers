@@ -66,7 +66,7 @@
  * A. A token's price: USDC on Ethereum, about 1.00.
  *
  * ```
- * =dexToolsGetTokenPrice("ether", "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48")
+ * =dexToolsGetTokenPrice("ether", "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48")
  * ```
  *
  * B. A token's FDV, on PulseChain.
@@ -78,13 +78,13 @@
  * C. HEX's price on Ethereum, in one of its pools.
  *
  * ```
- * =dexToolsGetTokenPrice("ether", "0x2b591e99afe9f32eaa6214f7b7629768c40eeb39", {{"0x69d91b94f0aaf8e8a2586909fa77a5c2c89818d5", 0}})
+ * =dexToolsGetTokenPrice("ether", "0x2b591e99afE9f32eAA6214f7B7629768c40Eeb39", {{"0x69D91B94f0AaF8e8A2586909fA77A5c2c89818d5", 0}})
  * ```
  *
  * D. WBNB's price on BNB Smart Chain.
  *
  * ```
- * =dexToolsGetTokenPrice("bsc", "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c")
+ * =dexToolsGetTokenPrice("bsc", "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c")
  * ```
  *
  * E. Wrapped XNT's price on X1, in its pool with USDC.X. The pool is
@@ -248,6 +248,18 @@ const CACHE = CacheService.getScriptCache();
    ───────────────────────────────────────────────────────────────────────────── */
 
 /**
+ * An address as DexTools is asked for it: an EVM address, 0x and 40 hex
+ * digits, in lower case, since its letters' case only checksums it; any
+ * other, such as an X1 address in base58, whose case matters, as given.
+ *
+ * @param {string} address - The address, as a cell gives it
+ * @returns {string} The address to ask for
+ */
+function dexToolsAddress(address) {
+  return /^0x[0-9a-fA-F]{40}$/.test(address) ? address.toLowerCase() : address;
+}
+
+/**
  * Gets the current price of a token in USD.
  *
  * Routes by `blockchain`:
@@ -283,9 +295,9 @@ function dexToolsGetTokenPrice(
   poolAddresses = [],
   cacheSeconds = DEXTOOLS_CONFIG.CACHE_SECONDS,
 ) {
-  const isX1 = String(blockchain || "").toLowerCase() === "x1";
+  const isX1 = String(blockchain ?? "").toLowerCase() === "x1";
   const pool = Array.isArray(poolAddresses) && poolAddresses[0]?.[0];
-  const address = pool || tokenAddress;
+  const address = dexToolsAddress(pool || tokenAddress);
   const isPool = !!pool;
   const provider = isX1 ? "x1" : "dt";
   const cacheKey = `${provider}_price_${blockchain}_${address}_${isPool ? "pool" : "token"}`;
@@ -337,9 +349,9 @@ function dexToolsGetTokenFDV(
   poolAddresses = [],
   cacheSeconds = DEXTOOLS_CONFIG.CACHE_SECONDS,
 ) {
-  const isX1 = String(blockchain || "").toLowerCase() === "x1";
+  const isX1 = String(blockchain ?? "").toLowerCase() === "x1";
   const pool = Array.isArray(poolAddresses) && poolAddresses[0]?.[0];
-  const address = pool || tokenAddress;
+  const address = dexToolsAddress(pool || tokenAddress);
   const isPool = !!pool;
   const provider = isX1 ? "x1" : "dt";
   const cacheKey = `${provider}_fdv_${blockchain}_${address}_${isPool ? "pool" : "token"}`;
@@ -351,7 +363,10 @@ function dexToolsGetTokenFDV(
     if (isX1) {
       return fetchX1NinjaFDV(address);
     }
-    const info = fetchDexToolsTokenInfo(blockchain, tokenAddress);
+    const info = fetchDexToolsTokenInfo(
+      blockchain,
+      dexToolsAddress(tokenAddress),
+    );
     return (
       info?.fdv ??
       info?.fullyDilutedValue ??
@@ -452,7 +467,7 @@ function fetchDexToolsPrice(blockchain, address, isPool) {
     }
 
     const json = JSON.parse(response.getContentText());
-    console.log(`[PRICE] Data keys: ${Object.keys(json?.data || {})}`);
+    console.log(`[PRICE] Data keys: ${Object.keys(json?.data ?? {})}`);
 
     const price = json?.data?.price ?? json?.data?.priceUsd ?? json?.price ?? 0;
     console.log(`[PRICE] Parsed value: ${price}`);
@@ -488,7 +503,7 @@ function fetchDexToolsTokenInfo(blockchain, tokenAddress) {
     }
 
     const json = JSON.parse(response.getContentText());
-    console.log(`[INFO] Data keys: ${Object.keys(json?.data || {})}`);
+    console.log(`[INFO] Data keys: ${Object.keys(json?.data ?? {})}`);
 
     return json?.data ?? {};
   } catch (err) {
@@ -544,7 +559,8 @@ function fetchX1NinjaPrice(poolAddress) {
     }
 
     const json = JSON.parse(response.getContentText());
-    const price = Number(json?.pool?.priceUsd) || 0;
+    const priceUsd = Number(json?.pool?.priceUsd);
+    const price = Number.isFinite(priceUsd) ? priceUsd : 0;
     console.log(`[X1 PRICE] Pool ${json?.pool?.address}: priceUsd=${price}`);
     return price;
   } catch (err) {
@@ -587,7 +603,8 @@ function fetchX1NinjaFDV(poolAddress) {
     }
 
     const json = JSON.parse(response.getContentText());
-    const fdv = Number(json?.pool?.fdv) || 0;
+    const fdvUsd = Number(json?.pool?.fdv);
+    const fdv = Number.isFinite(fdvUsd) ? fdvUsd : 0;
     console.log(`[X1 FDV] Pool ${json?.pool?.address}: fdv=${fdv}`);
     return fdv;
   } catch (err) {
@@ -617,8 +634,9 @@ function getX1Options() {
    ───────────────────────────────────────────────────────────────────────────── */
 
 /**
- * Comprehensive test function – run this from the script editor
- * to verify everything is working correctly.
+ * Runs each DexTools function on a set of known tokens and pools, and
+ * logs what each gives: run it from the script editor to check the
+ * script's api key, its calls and its cache.
  *
  * @param {boolean} verbose - When true, logs maximum detail (lock attempts,
  *                            raw JSON responses, full data keys, cache status, etc.)
@@ -652,7 +670,7 @@ function testDexToolsFunctions(verbose = false) {
       fn: () =>
         dexToolsGetTokenPrice(
           "ether",
-          "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+          "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
         ),
     },
     {
@@ -660,7 +678,7 @@ function testDexToolsFunctions(verbose = false) {
       fn: () =>
         dexToolsGetTokenFDV(
           "ether",
-          "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+          "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
         ),
     },
     {
@@ -668,8 +686,8 @@ function testDexToolsFunctions(verbose = false) {
       fn: () =>
         dexToolsGetTokenPrice(
           "ether",
-          "0x2b591e99afe9f32eaa6214f7b7629768c40eeb39",
-          [["0x69d91b94f0aaf8e8a2586909fa77a5c2c89818d5", 0]],
+          "0x2b591e99afE9f32eAA6214f7B7629768c40Eeb39",
+          [["0x69D91B94f0AaF8e8A2586909fA77A5c2c89818d5", 0]],
         ),
     },
     {

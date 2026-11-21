@@ -56,7 +56,7 @@ export function parseTimeZone(value) {
  * @returns {Object} The tokens object keyed by lowercase symbol
  */
 function loadSupportedTokens() {
-  return readSupportedTokens().tokens || {};
+  return readSupportedTokens().tokens ?? {};
 }
 
 /**

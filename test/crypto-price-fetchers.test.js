@@ -52,11 +52,11 @@ function answerAsDexToolsAndX1Ninja({ url, headers }) {
       ? { statusCode: 200, data: [] }
       : { status: 403, text: '{"message":"Forbidden"}' };
   }
-  if (url === `${DEXTOOLS}/token/ether/${TOKEN}/price`)
+  if (url === `${DEXTOOLS}/token/ether/${TOKEN.toLowerCase()}/price`)
     return { statusCode: 200, data: { price: 1.23 } };
-  if (url === `${DEXTOOLS}/pool/ether/${POOL}/price`)
+  if (url === `${DEXTOOLS}/pool/ether/${POOL.toLowerCase()}/price`)
     return { statusCode: 200, data: { price: 4.56 } };
-  if (url === `${DEXTOOLS}/token/pulse/${TOKEN}/info`)
+  if (url === `${DEXTOOLS}/token/pulse/${TOKEN.toLowerCase()}/info`)
     return { statusCode: 200, data: { fdv: 5000000 } };
   if (url === `${X1_NINJA}/pools/${X1_POOL}`)
     return { pool: { address: X1_POOL, priceUsd: "0.27", fdv: 123456 } };
@@ -90,6 +90,27 @@ describe("openCryptoPriceFetchers", () => {
     await withFetchers(async (fetchers, fetch) => {
       assert.equal(await fetchers.dexToolsGetTokenPrice("ether", TOKEN), 1.23);
       assert.equal(fetch.requests[0].headers["x-api-key"], "dextools-key");
+    });
+  });
+
+  it("asks DexTools for an EVM address in lower case, whatever case it was given in, and for an X1 address as given", async () => {
+    await withFetchers(async (fetchers, fetch) => {
+      await fetchers.dexToolsGetTokenPrice("ether", TOKEN);
+      await fetchers.dexToolsGetTokenPrice(
+        "ether",
+        TOKEN.toUpperCase().replace("0X", "0x"),
+      );
+      await fetchers.dexToolsGetTokenFDV("pulse", TOKEN);
+      await fetchers.dexToolsGetTokenPrice("x1", X1_MINT, [[X1_POOL, 0]]);
+      const asked = fetch.requests.map((request) => request.url);
+      assert.ok(
+        asked.includes(`${DEXTOOLS}/token/ether/${TOKEN.toLowerCase()}/price`),
+      );
+      assert.ok(
+        asked.includes(`${DEXTOOLS}/token/pulse/${TOKEN.toLowerCase()}/info`),
+      );
+      assert.ok(asked.every((url) => !url.includes(TOKEN)));
+      assert.ok(asked.some((url) => url.includes(X1_POOL)));
     });
   });
 
@@ -225,7 +246,10 @@ describe("crypto-price-fetchers.js, the command line", () => {
       ]),
       [
         ["/standard/v2/blockchain", "dextools-key"],
-        [`/standard/v2/token/ether/${TOKEN}/price`, "dextools-key"],
+        [
+          `/standard/v2/token/ether/${TOKEN.toLowerCase()}/price`,
+          "dextools-key",
+        ],
       ],
     );
   });

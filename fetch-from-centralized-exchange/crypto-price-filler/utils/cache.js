@@ -1,80 +1,61 @@
 /**
- * Simple in-memory cache for Crypto Price Filler
+ * The run's cache of lookups: the prices, and the pool a token's
+ * GeckoTerminal price is read from, with the token's side of it
+ * (`sources/geckoterminal.js`).
  * @module utils/cache
- * @description Provides a shared Map instance for the run's lookups: the
- * prices, and the pool a token's GeckoTerminal price is read from, with the
- * token's side of it (`sources/geckoterminal.js`).
- * Uses singleton pattern so all parts of the app share the same cache.
- * Global shared cache for Crypto Price Filler
- * Uses globalThis to ensure the same Map instance across all modules/workers.
- * @version 1.0.0
+ *
+ * One Map, held at this module's scope: each module of a run imports this
+ * one module, so all of them share the Map. A value kept with a time to
+ * live is dropped the first time it is asked for after that time.
+ *
  * @author Christopher M. Balz with Grok and Claude.ai
  */
 
-if (!globalThis.__crypto_price_cache__) {
-  globalThis.__crypto_price_cache__ = new Map();
-}
-
-const cacheInstance = globalThis.__crypto_price_cache__;
+/** The cached entries, by key: each value, and when it expires in ms, or null. */
+const entries = new Map();
 
 /**
- * Get the cached value for a specific key, or the entire cache Map if no key is provided.
- * Returns the raw cached value (a price, a pool, or null) or undefined if not found/expired.
- * For backward compatibility with tests that expect the whole Map.
- *
- * @param {string} [key] - Optional cache key to lookup
- * @returns {number|Object|null|undefined|Map} Cached value, undefined, or the full Map
- */
-export function getCache(key = null) {
-  if (key === null) {
-    return cacheInstance; // return whole Map for backward compatibility with tests
-  }
-
-  const entry = cacheInstance.get(key);
-  if (!entry) return undefined;
-
-  const now = Date.now();
-  if (entry.expires && now > entry.expires) {
-    cacheInstance.delete(key);
-    return undefined;
-  }
-
-  return entry.value; // return primitive price value for normal CLI usage
-}
-
-/**
- * Set a value in the cache for a specific key with optional TTL.
+ * The value cached for a key: a price, a pool, or null as it was cached.
  *
  * @param {string} key - The cache key
- * @param {number|Object|null} value - The value to cache: a price, or a pool as `{address, side}`
- * @param {number} [ttlMs] - Time to live in ms (optional)
+ * @returns {number|Object|null|undefined} The value, or undefined when nothing is cached for the key or its time to live is up
+ */
+export function getCache(key) {
+  const entry = entries.get(key);
+  if (entry === undefined) return undefined;
+  if (entry.expiresAtMs !== null && Date.now() > entry.expiresAtMs) {
+    entries.delete(key);
+    return undefined;
+  }
+  return entry.value;
+}
+
+/**
+ * Keeps a value for a key, for a time to live or for the whole run.
+ *
+ * @param {string} key - The cache key
+ * @param {number|Object|null} value - The value: a price, a pool as `{address, side}`, or null
+ * @param {?number} [ttlMs=null] - How long to keep it, in ms, or null for the whole run
  */
 export function setCache(key, value, ttlMs = null) {
-  const expires = ttlMs ? Date.now() + ttlMs : null;
-  cacheInstance.set(key, { value, expires });
+  const expiresAtMs =
+    ttlMs === null || ttlMs === undefined ? null : Date.now() + ttlMs;
+  entries.set(key, { value, expiresAtMs });
 }
 
 /**
- * Replace the entire cache with a new Map (used in tests).
- * @param {Map} newCache - New cache instance
- * @returns {Map} The new cache
- */
-export function replaceCache(newCache) {
-  globalThis.__crypto_price_cache__ = newCache;
-  return newCache;
-}
-
-/**
- * Clear the entire cache (useful for tests or reset).
+ * Empties the cache.
  */
 export function clearCache() {
-  cacheInstance.clear();
+  entries.clear();
 }
 
 /**
- * Get current cache size (for debugging).
- * @returns {number} Number of entries
+ * The number of entries the cache holds, an expired one included until it
+ * is asked for.
+ *
+ * @returns {number} The count
  */
 export function cacheSize() {
-  return cacheInstance.size;
+  return entries.size;
 }

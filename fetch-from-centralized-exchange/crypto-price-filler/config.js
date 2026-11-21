@@ -10,6 +10,8 @@
  * differ, and without it the tool runs on the committed settings, asking
  * CoinGecko without a key.
  *
+ * Nothing is read as this module loads: the entry point, `index.js`, and
+ * the pool source, when it first needs a setting, call `loadConfig`. *
  * @version 1.0.0
  * @author Christopher M. Balz with Grok and Claude.ai
  */
@@ -42,7 +44,3 @@ export function loadConfig() {
   const own = fs.existsSync(OWN_SETTINGS) ? readSettings(OWN_SETTINGS) : {};
   return { ...readSettings(COMMITTED_SETTINGS), ...own };
 }
-
-const config = loadConfig();
-
-export default config;
