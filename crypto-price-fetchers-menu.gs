@@ -2,9 +2,13 @@
  * Crypto Price Fetchers – the menu of the one pasted script
  *
  * PURPOSE
- *   `npm run build apps-script`, the build step of the crypto-price-fetchers
- *   repo, joins every Sheets script of the repo into one file to paste into
- *   a spreadsheet's Apps Script project. This file is that file's first
+ *   The crypto-price-fetchers repo's Sheets scripts price crypto tokens in
+ *   Google Sheets, Google's spreadsheet app, as Apps Script, Google's
+ *   platform for scripts that run inside its apps. Its build step,
+ *   `npm run build apps-script` (npm is the package manager of Node, the
+ *   program that runs JavaScript outside a browser), joins every Sheets
+ *   script of the repo into one file to paste into a spreadsheet's Apps
+ *   Script project. This file is that file's first
  *   part: the Crypto Price Fetchers menu, which `onOpen` builds each time
  *   the spreadsheet opens, and what its items do. They run the price cells
  *   again, clear cells stuck on #ERROR! or on a busy message, freeze
@@ -14,8 +18,16 @@
  * <!-- HELP START -->
  * ## The Crypto Price Fetchers menu
  *
- * The menu appears each time the spreadsheet opens. When an item ends, a
- * message at the bottom right of the sheet says what it did.
+ * The menu appears each time the spreadsheet opens. Its items run again
+ * the cells that call this file's price functions: `dexToolsGetTokenPrice`
+ * and `dexToolsGetTokenFDV`, a token's price and fully diluted value now,
+ * from DexTools, a service that prices tokens from the pools of
+ * decentralized exchanges, or from x1.ninja, which does the same for X1;
+ * `getCryptoPrice`, a token's price at a past time, from centralized
+ * exchanges; and the `DEX_SCREENER_` functions of DEX Screener, a service
+ * that lists the pairs of decentralized exchanges with their prices, when
+ * the file includes them. When an item ends, a message at the bottom right
+ * of the sheet says what it did.
  *
  * - Clean up errors: runs again every cell, in every tab, whose own formula
  *   calls `dexToolsGetTokenPrice`, `dexToolsGetTokenFDV`, `getCryptoPrice`

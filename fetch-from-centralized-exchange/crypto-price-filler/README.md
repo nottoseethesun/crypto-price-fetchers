@@ -4,7 +4,8 @@
 
 USE AT YOUR OWN RISK: SEE LICENSE FILE, INCLUDED TWO DIRECTORIES UP.
 
-This Node tool fills in a token's prices in a CSV file. It reads a CSV
+This tool, which runs on Node, the program that runs JavaScript outside
+a browser, fills in a token's prices in a CSV file. It reads a CSV
 whose rows each hold a timestamp, finds the token's USD price at each
 time, down to the minute, and writes `output.csv`, with each row's
 timestamp and price.
@@ -15,7 +16,9 @@ It prices two kinds of token, each where it trades:
   as Bitcoin and Monero, has no pool for a pool's price service to read.
   The tool asks MEXC, a centralized exchange, then CoinGecko, then
   CoinPaprika, two services that gather the exchanges' prices, through the
-  price sources of the Sheets script beside this folder,
+  price sources of the script beside this folder for Google Sheets,
+  Google's spreadsheet app, written in Apps Script, Google's platform for
+  scripts that run inside its apps:
   `getCryptoPriceFromCentralizedExchange-sources.gs`, which it runs
   unchanged under Node (`sources/exchange.js`), so the sheet and the tool
   price alike.
@@ -40,9 +43,11 @@ NodeJS 22+
 
 ## Installation
 
-The tool uses the runner and the key store of crypto-price-fetchers, the
-repo this folder is in, from the repo's top folder, so it needs the
-packages of both folders. From the repo's top folder:
+The tool uses two parts of crypto-price-fetchers, the repo this folder is
+in: the runner, which runs a Sheets script under Node, and the key store,
+which keeps the api keys encrypted. Both come from the repo's top folder,
+so the tool needs the packages of both folders, which npm, Node's package
+manager, installs. From the repo's top folder:
 
 ```bash
 npm ci
@@ -54,7 +59,8 @@ See [Install](../../README.md#install) in the repo's README.
 ## Configuration
 
 `config-example.json` holds the tool's settings as committed. Your own
-settings go in `config.json` beside it, which git ignores: each setting there
+settings go in `config.json` beside it, which git, the version-control
+program, ignores: each setting there
 takes the place of the same one in `config-example.json`, so it needs only
 those that differ. The file header in `./index.js` describes every setting.
 The exchange sources run on the Sheets script's own settings, its `CONFIG`.
@@ -79,12 +85,18 @@ CoinPaprika's free server, and does not ask Moralis. See
 
 ### index.js: Price Fetching
 
-`index.js` prices every row of a CSV file. The file header in `./index.js`
-lists all its options.
+`index.js` prices every row of a CSV file. `node index.js --help` lists
+all its options, with examples and its exit codes, and the file header in
+`./index.js` says more about each.
 
 ```bash
 node index.js --token=grc --input=mining.csv --output=filled.csv
 ```
+
+The tool reads its own files, `supported-tokens.json`,
+`config-example.json` and `config.json`, from this folder, so it runs from
+any folder; the paths `--input` and `--output` name are taken from the
+folder it runs in.
 
 The dates are read in UTC unless `--tz` names another time zone in full, such
 as `America/Chicago`; each row gets the offset the zone had at that time,
@@ -114,7 +126,8 @@ node backfill.js --input=output.csv --backfill-lowest
 
 The repo's lint, run from its top folder, covers this tool too, with LP
 Ranger's rules: no function above cyclomatic complexity 17, no file above
-500 lines of code, Prettier's formatting, and the rest that
+500 lines of code, the formatting of Prettier, the package that formats
+code, and the rest that
 [`docs/engineering.md`](../../docs/engineering.md) lists.
 
 ```bash
@@ -165,6 +178,9 @@ ready to copy.
 
 `aha --black -y 'body { font-size: 14px; }' < test.log > test.html && xdg-open test.html`
 
+`xdg-open`, the Linux command that opens a file with its default program,
+shows the page.
+
 ##### Optionally Add To Your Shell Alias File
 
 ```bash
@@ -176,11 +192,11 @@ alias swtlog="aha --black -y 'body { font-size: 14px; }' < test.log > test.html 
 
 ## Contributing
 
-Fork me on GitHub. :) Contributions are welcome but note that any contributions are subject to the license as defined in the LICENSE file here.
+Fork the repo on GitHub, the website that hosts it. Contributions are welcome, and each is subject to the license in the LICENSE file here.
 
 To be accepted for pull request:
 
-- **ESLint must pass** (`npm run lint`) - enforces cyclomatic complexity max 17
+- **ESLint, which checks JavaScript against rules, must pass** (`npm run lint`): it allows a cyclomatic complexity of at most 17
 - **All tests must pass** (`npm run test:strict`)
 - Any major new functionality must have a test runnable from the current approach
 - Line coverage must remain at or above 80%

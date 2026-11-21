@@ -322,11 +322,10 @@ import { DateTime } from "luxon";
 
 // Import CLI setup from separate module
 import { parseArgs } from "./commander.js";
+import { readSupportedTokens } from "./supported-tokens.js";
 
 // Load the token list (the settings come from config.js)
-const supportedTokens = JSON.parse(
-  fs.readFileSync("./supported-tokens.json", "utf8"),
-);
+const supportedTokens = readSupportedTokens();
 
 // Parse CLI args using commander (moved to commander.js)
 const args = parseArgs();

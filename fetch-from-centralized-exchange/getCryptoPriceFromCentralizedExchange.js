@@ -195,6 +195,16 @@ Api keys:
   source ./unlock-api-keys.sh keeps for a terminal, or else asks for the
   password on stderr. Without a key, it asks that service without one.`;
 
+/** The examples of the help: one of each common use. */
+const EXAMPLES_HELP = `
+Examples:
+  Bitcoin's high in the period around 14:30 UTC on 15 January 2026:
+    $ node getCryptoPriceFromCentralizedExchange.js btc "2026-01-15 14:30:00"
+  Gridcoin's close at a time given in US Central time:
+    $ node getCryptoPriceFromCentralizedExchange.js grc "2026-01-15 08:30:00" --tz CST --mode close
+  Monero's low, with the script's log on stderr, to see which service answered:
+    $ node getCryptoPriceFromCentralizedExchange.js xmr "2026-01-15 14:30:00" --mode low --verbose`;
+
 /**
  * Checks that an argument is not empty.
  *
@@ -245,6 +255,7 @@ function describeCommandLine(program, runCall) {
         .default("high"),
     )
     .addHelpText("after", KEY_HELP)
+    .addHelpText("after", EXAMPLES_HELP)
     .action((token, date, options, command) =>
       runCall(
         "getCryptoPrice",

@@ -158,7 +158,7 @@ describe("backfill.js CLI", () => {
       ).rejects.toThrow("Input CSV is empty");
     });
 
-    it("uses config.json defaults when available", async () => {
+    it("uses the defaults in the config.json beside it, whichever folder it runs in", async () => {
       mockReadFileSync.mockImplementation((filePath) => {
         if (filePath.toString().includes("config.json")) {
           return JSON.stringify({ BACKFILL_HIGHEST: true });
@@ -174,6 +174,10 @@ describe("backfill.js CLI", () => {
       });
 
       expect(stats.emptyRowsFilled).toBe(1);
+      expect(mockReadFileSync).toHaveBeenCalledWith(
+        expect.stringMatching(/crypto-price-filler[\\/]config\.json$/),
+        "utf8",
+      );
 
       consoleSpy.mockRestore();
     });

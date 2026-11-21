@@ -144,7 +144,9 @@ export async function runScriptCommandLine(
     });
   };
   describe(program, runCall);
-  program.addHelpText("after", EXIT_CODES_HELP);
+  for (const command of [program, ...program.commands]) {
+    command.addHelpText("after", EXIT_CODES_HELP);
+  }
   try {
     await program.parseAsync(argv);
   } catch (thrown) {

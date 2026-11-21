@@ -6,8 +6,10 @@ gas on two rows reaches the books as written. This utility, part of
 crypto-price-fetchers, the owner's repo of code his projects share, writes
 those files. It checks every row against the rules below and writes nothing while
 any row breaks one, naming each problem and its row. Every csv for Summ is
-made with it, by `npm run summ-csv` or from a Node program, rather than by
-a script written for the occasion, so every file passes the same checks.
+made with it, by `npm run summ-csv` (npm, the package manager of Node, the
+program that runs JavaScript outside a browser, runs the commands a
+`package.json` names) or from a Node program, rather than by a script
+written for the occasion, so every file passes the same checks.
 
 ## Contents
 
@@ -122,7 +124,8 @@ template's header.
 
 ### From a project that installs this repo
 
-A project that installs this repo from GitHub imports
+A project that installs this repo from GitHub, the website that hosts
+it, imports
 `crypto-price-fetchers/summ-csv`, as above, and has the bin `summ-csv`,
 which a script in its `package.json` runs, such as
 `"summ-csv": "summ-csv"`.

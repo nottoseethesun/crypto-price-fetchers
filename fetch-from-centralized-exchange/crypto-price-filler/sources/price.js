@@ -20,7 +20,7 @@ import { exchangeSources } from "./exchange.js";
 import { getCache, setCache } from "../utils/cache.js";
 import { parseInputToUtcMs } from "../utils/date.js";
 import { logv } from "../utils/log.js";
-import fs from "fs";
+import { readSupportedTokens } from "../supported-tokens.js";
 
 /**
  * Reads the pool facts of a token's entry: its contract, and the ids
@@ -43,9 +43,7 @@ function poolTokenOf(tokenConfig) {
  * @returns {Object} Token configuration with coingeckoId, coinpaprikaId, mexcSymbol, and poolToken for a token that trades in pools
  */
 function loadTokenConfig(token) {
-  const supportedTokens = JSON.parse(
-    fs.readFileSync("./supported-tokens.json", "utf8"),
-  );
+  const supportedTokens = readSupportedTokens();
   const tokenConfig = supportedTokens.tokens?.[token.toLowerCase()] || {};
 
   return {

@@ -1,13 +1,17 @@
 /**
  * getCryptoPriceFromCentralizedExchange-tests.gs: the tests of
- * getCryptoPriceFromCentralizedExchange.gs that run in Apps Script, against
- * the real services, from the editor's "Run" button: test, which runs them
- * all, testCoinGeckoDeadlockRegression and testGetCryptoPrice.
+ * getCryptoPriceFromCentralizedExchange.gs that run in Apps Script,
+ * Google's platform for scripts that run inside its apps, against the real
+ * services, from the editor's "Run" button: test, which runs them all,
+ * testCoinGeckoDeadlockRegression and testGetCryptoPrice.
  *
- * Paste it into the same Apps Script project as
+ * The repo's build step, `npm run build apps-script` (npm is the package
+ * manager of Node, the program that runs JavaScript outside a browser),
+ * joins it with
  * getCryptoPriceFromCentralizedExchange.gs and
- * getCryptoPriceFromCentralizedExchange-sources.gs, as a script file of its
- * own, to run them; the sheet needs it for nothing else.
+ * getCryptoPriceFromCentralizedExchange-sources.gs into the one file
+ * pasted into a spreadsheet's Apps Script project; the sheet needs it for
+ * nothing but these tests.
  *
  * @see https://github.com/nottoseethesun/crypto-price-fetchers
  */

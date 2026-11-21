@@ -1,11 +1,12 @@
 # DEX Screener's functions: their help section
 
-This file holds the section that `npm run build apps-script`, the build
-step of this repo, puts on the Help page of the file it gives when DEX
-Screener's Google Sheets functions go in that file. DEX Screener, a
-service that lists the pairs of decentralized exchanges with their prices,
-wrote those functions; `dex-screener.js`, beside this file, says how the
-build downloads and compiles them. The section, between the two markers
+This file holds the section that the build step of this repo,
+`npm run build apps-script`, which npm, Node's package manager, runs, puts
+on the Help page of the file it gives when it includes the functions for
+Google Sheets, Google's spreadsheet app, that DEX Screener, a service that
+lists the pairs of decentralized exchanges with their prices, wrote.
+`dex-screener.js`, beside this file, says how the build downloads and
+compiles them. The section, between the two markers
 below, is written in the part of Markdown that `help-page.js` turns into
 the page.
 

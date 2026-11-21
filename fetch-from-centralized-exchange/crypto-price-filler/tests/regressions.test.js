@@ -151,9 +151,10 @@ function answerPaprikaBeyondCandles(url) {
  * `helpers/stand-in-fetch-preload.js`, in a temp folder removed afterwards.
  *
  * @param {string[]} options - Options beyond --token, --input and --output
+ * @param {string} [cwd=FILLER_DIR] - The folder the command runs in
  * @returns {{price: string, candleUtc: string}} The row's price as written, and the UTC end time of the candle asked for
  */
-function runCommandLineForOneRow(options) {
+function runCommandLineForOneRow(options, cwd = FILLER_DIR) {
   const dir = fs.mkdtempSync(
     path.join(os.tmpdir(), "crypto-price-filler-test-"),
   );
@@ -170,14 +171,14 @@ function runCommandLineForOneRow(options) {
       [
         "--import",
         PRELOAD_URL,
-        "index.js",
+        path.join(FILLER_DIR, "index.js"),
         "--token=xtm",
         `--input=${input}`,
         `--output=${output}`,
         ...options,
       ],
       {
-        cwd: FILLER_DIR,
+        cwd,
         env: { ...process.env, NODE_ENV: "test", STAND_IN_ASKED: askedPath },
         stdio: "pipe",
       },
@@ -559,5 +560,23 @@ describe("fixed bugs", () => {
       script.refreshCurrentPrices();
       expect(sheet.runsOf("Prices!B2")).toBe(1);
     });
+  });
+});
+
+describe("the command line, run from another folder", () => {
+  it("index.js answers --help when run from a folder other than its own", () => {
+    const run = spawnSync(
+      process.execPath,
+      [path.join(FILLER_DIR, "index.js"), "--help"],
+      { cwd: os.tmpdir(), encoding: "utf8" },
+    );
+    expect(run.stderr).toBe("");
+    expect(run.status).toBe(0);
+    expect(run.stdout).toMatch(/^Usage: /);
+  });
+
+  it("index.js prices a row when run from a folder other than its own", () => {
+    const { price } = runCommandLineForOneRow([], os.tmpdir());
+    expect(Number(price)).toBeGreaterThan(0);
   });
 });

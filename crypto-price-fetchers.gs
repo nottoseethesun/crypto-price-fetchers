@@ -3,14 +3,16 @@
  * (FDV) in USD, from DexTools, or from x1.ninja for X1
  *
  * PURPOSE
- *   Two custom functions for Google Sheets, `dexToolsGetTokenPrice` and
- *   `dexToolsGetTokenFDV`. They ask DexTools, a service that prices tokens
+ *   Two custom functions for Google Sheets, Google's spreadsheet app,
+ *   `dexToolsGetTokenPrice` and `dexToolsGetTokenFDV`. They ask DexTools, a service that prices tokens
  *   from the pools of decentralized exchanges, through its public api v2.
  *   For X1, a chain DexTools does not list, they ask x1.ninja, a service
  *   that does the same for X1 (see X1 ROUTING below). The build step of the
- *   crypto-price-fetchers repo, `npm run build apps-script`, puts this file
- *   in the one file to paste into a spreadsheet's Apps Script project, with
- *   the api keys set at that file's end; the repo's README says how to
+ *   crypto-price-fetchers repo, `npm run build apps-script` (npm is the
+ *   package manager of Node, the program that runs JavaScript outside a
+ *   browser), puts this file in the one file to paste into a spreadsheet's
+ *   project in Apps Script, Google's platform for scripts that run inside
+ *   its apps, with the api keys set at that file's end; the repo's README says how to
  *   install it.
  *
  * <!-- HELP START -->

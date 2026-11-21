@@ -1,11 +1,12 @@
 # crypto-price-fetchers — System Architecture
 
-crypto-price-fetchers prices crypto tokens that Google Sheets cannot price
-by itself, in USD: the price now, from a pool on a decentralized exchange,
+crypto-price-fetchers prices crypto tokens that Google Sheets, Google's
+spreadsheet app, cannot price by itself, in USD: the price now, from a pool on a decentralized exchange,
 and the price at a past minute, from centralized exchanges and, for a token
 that trades in pools, from the services that price those pools. It does so
-in Google Sheets, as Apps Script, and on a computer, as Node programs that
-run the same scripts. Three other projects of the owner's build on it:
+in Google Sheets, as Apps Script, Google's platform for scripts that run
+inside its apps, and on a computer, as programs that run the same scripts
+on Node, the program that runs JavaScript outside a browser. Three other projects of the owner's build on it:
 pulsechain-analytics, his tools for questions about PulseChain;
 pulsechain-validator-analytics, for his PulseChain validators' withdrawal
 addresses and payments; and x1-validator-analytics, for his X1
@@ -14,9 +15,11 @@ validator's rewards.
 Two companion references sit alongside this one:
 
 - [`docs/engineering.md`](engineering.md): the files on disk, the gates,
-  the tests and CI.
-- [`docs/npm-project-commands.md`](npm-project-commands.md): every npm
-  command and its flags.
+  the tests and CI, the checks GitHub, the website that hosts the repo,
+  runs at each push.
+- [`docs/npm-project-commands.md`](npm-project-commands.md): every command
+  the repo's `package.json` gives npm, Node's package manager, to run, and
+  its flags.
 
 ---
 
@@ -42,8 +45,9 @@ The Sheets scripts do the pricing. The other parts run the scripts on a
 computer, price a whole CSV file, keep the api keys, stop a key from being
 printed, choose which version of this repo the projects that use it
 install, and write the CSV files the owner imports into Summ, the crypto
-tax calculator he keeps his books in. The key store and the price
-clients' order follow LP Ranger, the owner's bot that manages his 9mm V3
+tax calculator he keeps his books in. The key store, which keeps the api
+keys encrypted, and the order in which the price clients ask the services
+that price pools follow LP Ranger, the owner's bot that manages his 9mm V3
 liquidity positions.
 
 | Part | Where | What it is |
@@ -130,7 +134,7 @@ returns it. In Node, `fetch` returns a promise, and the response arrives
 only after the running code has finished. A script's code cannot finish
 without its response, so the script cannot run on the thread that does
 the request. The runner therefore loads the script in a worker thread of
-its own. The worker blocks on each web request while the caller's thread
+its own, a second thread of JavaScript that Node runs beside the main one. The worker blocks on each web request while the caller's thread
 does it, with the caller's `fetch`, and wakes with the response
 (`run-apps-script.js`, `script-worker.js`). The caller's thread never
 blocks, so a program that uses the runner goes on with its other work.
@@ -193,14 +197,17 @@ file that holds them all, with the keys written in, for one paste.
   (`dex-screener-files.js`): it downloads their files from
   raw.githubusercontent.com at the commit written there, checks each
   file's SHA-256 against the one written beside it, and says its line. It
-  compiles only the files the audit gave, with esbuild, as DEX Screener's
-  own build does, with this repo's development packages zod and lodash
-  (`dex-screener.js`). Their code runs inside a function of its own in the
+  compiles only the files the audit gave with esbuild, the program that
+  compiles TypeScript and JavaScript into one file, as DEX Screener's own
+  build does, with this repo's development packages zod, a library that
+  checks data against a schema, and lodash, a library of helper functions,
+  which DEX Screener's code imports (`dex-screener.js`). Their code runs inside a function of its own in the
   file, so its names, its own `onOpen` among them, stay inside it, and a
   top-level function of each custom function's name hands a cell's call
   on. A failed download, a file that differs, or a failed compile stops
-  the build with the advice to run it again and answer n. npm audit does
-  not cover that code, so `npm run audit:dex-screener`
+  the build with the advice to run it again and answer n. npm audit,
+  npm's check of the installed packages against known vulnerabilities,
+  does not cover that code, so `npm run audit:dex-screener`
   (`audit-dex-screener.js`), which `npm run audit:deps` runs after npm
   audit, runs the same audit on its own.
 - **The values.** The build opens the keys as the programs do
@@ -220,9 +227,10 @@ file that holds them all, with the keys written in, for one paste.
 - **The hand-over.** The build puts the file on the clipboard, through the
   desktop's tool (`clipboard.js`), says how to paste it, waits for Enter,
   and clears the clipboard. With no tool installed, it offers to install
-  one with `sudo apt install`; declined, it warns that the keys go to disk
-  in the clear, then writes the file to `build/apps-script/`, which git
-  ignores, readable by the owner alone.
+  one with `sudo apt install`, the installer of Debian and Ubuntu Linux;
+  declined, it warns that the keys go to disk in the clear, then writes the
+  file to `build/apps-script/`, which git, the version-control program that
+  keeps the repo's history, ignores, readable by the owner alone.
 
 No line it prints holds a key.
 
@@ -405,16 +413,19 @@ development packages.
 ## Technology Choices
 
 - **Node 22 or later**, ES modules, Node's own test runner for the runner,
-  the Node versions and the key store; vitest for crypto-price-filler,
-  whose tests are written for it.
-- **commander** for every command line.
+  the Node versions and the key store; vitest, a test runner for
+  JavaScript, for crypto-price-filler, whose tests are written for it.
+- **commander**, the package that parses a command line and writes its
+  help, for every command line.
 - **esbuild**, a development package, for the build step's compile of DEX
   Screener's TypeScript, as DEX Screener's own build compiles it; zod and
   lodash, the two packages that code imports, are development packages
   too, and only the built file holds them.
-- **Node's `crypto`** for the key store: no package between the password
+- **Node's `crypto`**, its built-in module of ciphers and hashes, for the
+  key store: no package between the password
   and the cipher.
-- **Worker threads and `Atomics.wait`** for the runner, rather than a
+- **Worker threads and `Atomics.wait`**, the call that blocks a thread
+  until another thread wakes it, for the runner, rather than a
   package such as synckit. synckit does the waited-for work in a worker of
   its own, and a function cannot be passed to another thread. Doing the
   request on the caller's thread lets a caller hand in its own `fetch`, as

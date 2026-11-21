@@ -57,9 +57,43 @@ typed, and no line shows a key's characters. Every key is saved with one
 password: the one in ${UNLOCK_VARIABLE} when it is set (${UNLOCK_COMMAND}
 sets it for a terminal), else one typed.
 
+Examples:
+  List each service's key, saved or not, and ask for each one not saved:
+    $ npm run api-keys
+  Replace the saved DexTools key, as after DexTools issues a new one:
+    $ npm run api-keys -- set dextools
+  Check that the password kept for this terminal opens every saved key:
+    $ source ./unlock-api-keys.sh
+    $ npm run api-keys -- check-password
+
 Exit codes:
   0  every key asked for is saved or skipped; check-password: the password opens the keys
   1  a key was not saved, the password does not open the keys, or the arguments were wrong`;
+
+/** What the help of `set` says after its arguments. */
+const SET_HELP_AFTER = `
+Examples:
+  Replace the saved CoinGecko key, after CoinGecko answers 401 to it:
+    $ npm run api-keys -- set coingecko
+  Save a Moralis key for the first time, in a project whose config.json
+  names Moralis:
+    $ npm run api-keys -- set moralis
+
+Exit codes:
+  0  the key is saved
+  1  the key was not saved, as when its service refuses it, or the project names no such service`;
+
+/** What the help of `check-password` says after its usage. */
+const CHECK_PASSWORD_HELP_AFTER = `
+Examples:
+  Check the password kept for this terminal, before a long run that needs
+  the keys:
+    $ source ./unlock-api-keys.sh
+    $ npm run api-keys -- check-password
+
+Exit codes:
+  0  the password opens every saved key
+  1  it does not, or no password is set`;
 
 /**
  * Runs `use` with the test's prompt, or with one prompt on the terminal
@@ -251,6 +285,7 @@ export async function runKeyManager(argv, project, deps = {}) {
       "<service>",
       `the service, as ${PROJECT_CONFIG_FILE} names it under apiKeys`,
     )
+    .addHelpText("after", SET_HELP_AFTER)
     .action(async (name) => {
       exitCode = await setOne(run, name);
     });
@@ -259,6 +294,7 @@ export async function runKeyManager(argv, project, deps = {}) {
     .description(
       `says whether the password in ${UNLOCK_VARIABLE} opens every key saved`,
     )
+    .addHelpText("after", CHECK_PASSWORD_HELP_AFTER)
     .action(async () => {
       exitCode = await checkPassword(run);
     });
