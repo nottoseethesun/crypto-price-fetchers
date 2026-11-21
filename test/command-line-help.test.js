@@ -4,23 +4,27 @@
  * then its exit codes.
  * @module test/command-line-help.test
  *
- * Each command line runs in a child process, from the repo's top folder,
- * with an empty password and a key file that does not exist, so none can
- * reach the owner's keys; a help is printed before anything is opened or
- * asked. `COMMAND_LINES` lists every command line, each subcommand on its
- * own. A second test holds the list to the repo: every npm target and bin
- * that runs a JavaScript file, and every file that declares a command with
+ * The checks are those of `lib/command-line-help.js`, which the repos that
+ * install this one use in their own tests. Each command line runs in a
+ * child process, from the repo's top folder, with no way to the owner's
+ * keys; a help is printed before anything is opened or asked.
+ * `COMMAND_LINES` lists every command line, each subcommand on its own. A
+ * second test holds the list to the repo: every npm target and bin that
+ * runs a JavaScript file, and every file that declares a command with
  * commander, must be in it, so a command line added later is held to the
- * rule as well.
+ * rule as well. A third checks that the checks find what a help lacks.
  */
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
-import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  filesRunBy,
+  filesUsingCommander,
+  helpOf,
+  helpProblems,
+} from "../lib/command-line-help.js";
 
 /** The repo's top folder. */
 const REPO_TOP = fileURLToPath(new URL("..", import.meta.url));
@@ -67,108 +71,32 @@ const COMMAND_MODULES = Object.freeze({
   [`${FILLER}/commander.js`]: `${FILLER}/index.js`,
 });
 
-/** The folders the search for commander's users passes over. */
-const NOT_SEARCHED = new Set([
-  "node_modules",
-  "coverage",
-  "build",
-  ".git",
-  "test",
-  "tests",
-]);
-
-/**
- * Runs a command line's help in a child process.
- *
- * @param {{file: string, command: string[]}} commandLine - The command line
- * @param {string} flag - `--help` or `-h`
- * @returns {{status: number, stdout: string, stderr: string}} How it ended and what it printed
- */
-function helpOf({ file, command }, flag) {
-  // NODE_V8_COVERAGE is set empty: Node hands a child the variable when
-  // its environment lacks it, and a child with it adds its coverage to
-  // this suite's report, where crypto-price-filler's files, which have a
-  // suite of their own, would count, run only as far as their help.
-  const env = {
-    ...process.env,
-    NODE_V8_COVERAGE: "",
-    API_KEYS_PASSWORD: "",
-    API_KEYS_FILE_PATH: path.join(
-      os.tmpdir(),
-      "command-line-help-no-key-file.json",
-    ),
-  };
-  const run = spawnSync(process.execPath, [file, ...command, flag], {
-    cwd: REPO_TOP,
-    encoding: "utf8",
-    timeout: 30000,
-    env,
-  });
-  return { status: run.status, stdout: run.stdout, stderr: run.stderr };
-}
-
-/**
- * The JavaScript files an npm target or a bin of a package runs.
- *
- * @param {string} folder - The package's folder, from the repo's top
- * @returns {string[]} The files, from the repo's top
- */
-function filesRunBy(folder) {
-  const pkg = JSON.parse(
-    fs.readFileSync(path.join(REPO_TOP, folder, "package.json"), "utf8"),
-  );
-  const fromScripts = Object.values(pkg.scripts ?? {}).flatMap((script) =>
-    [...script.matchAll(/(?:^|&&\s*)node\s+([\w./-]+\.js)\b/g)].map(
-      (match) => match[1],
-    ),
-  );
-  const fromBins = Object.values(pkg.bin ?? {});
-  return [...fromScripts, ...fromBins].map((file) =>
-    path.posix.join(folder, file),
-  );
-}
-
-/**
- * The JavaScript files that import commander, outside tests and installed
- * packages.
- *
- * @returns {string[]} The files, from the repo's top
- */
-function filesUsingCommander() {
-  return fs
-    .readdirSync(REPO_TOP, { recursive: true })
-    .map((entry) => entry.split(path.sep).join("/"))
-    .filter(
-      (file) =>
-        file.endsWith(".js") &&
-        !file.split("/").some((part) => NOT_SEARCHED.has(part)),
-    )
-    .filter((file) =>
-      /from "commander"/.test(
-        fs.readFileSync(path.join(REPO_TOP, file), "utf8"),
-      ),
-    );
-}
+/** A help that meets the rule, for the tests of the checks. */
+const GOOD_HELP = Object.freeze({
+  status: 0,
+  stderr: "",
+  stdout: [
+    "Usage: tool [options]",
+    "",
+    "Options:",
+    "  -h, --help  display help for command",
+    "",
+    "Examples:",
+    "  Run it:",
+    "    $ node tool.js",
+    "",
+    "Exit codes: 0 when it ran; 1 when it did not.",
+    "",
+  ].join("\n"),
+});
 
 describe("every command line's help", () => {
   for (const commandLine of COMMAND_LINES) {
     const name = [commandLine.file, ...commandLine.command].join(" ");
     it(`${name} answers --help with its options, examples of its uses and its exit codes, and -h with the same`, () => {
-      const help = helpOf(commandLine, "--help");
-      assert.equal(help.stderr, "");
-      assert.equal(help.status, 0);
-      assert.match(help.stdout, /^Usage: /);
-      assert.match(help.stdout, /\nOptions:\n/);
-      const examples = help.stdout.indexOf("\nExamples:\n");
-      const exitCodes = help.stdout.search(/\nExit codes:/);
-      assert.ok(examples > 0, "the help has an Examples section");
-      assert.ok(exitCodes > examples, "Exit codes come after the examples");
-      const exampleCommands = help.stdout
-        .slice(examples, exitCodes)
-        .split("\n")
-        .filter((line) => /^\s+\$ \S/.test(line));
-      assert.ok(exampleCommands.length > 0, "each example is a command");
-      assert.deepEqual(helpOf(commandLine, "-h"), help);
+      const help = helpOf(REPO_TOP, commandLine, "--help");
+      assert.deepEqual(helpProblems(help), []);
+      assert.deepEqual(helpOf(REPO_TOP, commandLine, "-h"), help);
     });
   }
 });
@@ -176,14 +104,62 @@ describe("every command line's help", () => {
 describe("the list of command lines", () => {
   it("holds every file an npm target or a bin runs, and every file that declares a command with commander", () => {
     const listed = new Set(COMMAND_LINES.map(({ file }) => file));
-    for (const file of [...filesRunBy("."), ...filesRunBy(FILLER)]) {
+    for (const file of [
+      ...filesRunBy(REPO_TOP, "."),
+      ...filesRunBy(REPO_TOP, FILLER),
+    ]) {
       assert.ok(listed.has(path.posix.normalize(file)), `${file} is listed`);
     }
-    for (const file of filesUsingCommander()) {
+    for (const file of filesUsingCommander(REPO_TOP)) {
       assert.ok(
         listed.has(file) || listed.has(COMMAND_MODULES[file]),
         `${file} declares a command; list its command line`,
       );
     }
+  });
+});
+
+describe("the checks of a help", () => {
+  it("find nothing missing in a help that meets the rule", () => {
+    assert.deepEqual(helpProblems(GOOD_HELP), []);
+  });
+
+  it("name each thing a help lacks", () => {
+    const noExamples = GOOD_HELP.stdout.replace(
+      "Examples:\n  Run it:\n    $ node tool.js\n",
+      "",
+    );
+    assert.deepEqual(helpProblems({ ...GOOD_HELP, stdout: noExamples }), [
+      "it has no Examples section",
+      "its Examples section shows no command",
+    ]);
+    const noExitCodes = GOOD_HELP.stdout.replace(/Exit codes:.*\n/, "");
+    assert.deepEqual(helpProblems({ ...GOOD_HELP, stdout: noExitCodes }), [
+      "it has no Exit codes section after its examples",
+    ]);
+    assert.deepEqual(
+      helpProblems({ status: 1, stderr: "error: unknown option", stdout: "" }),
+      [
+        "it exits with 1, not 0",
+        "it writes to stderr",
+        "it does not start with its usage line",
+        "it lists no options",
+        "it has no Examples section",
+        "its Examples section shows no command",
+        "it has no Exit codes section after its examples",
+      ],
+    );
+  });
+
+  it("are exported, so a project that installs this repo runs this one copy", async () => {
+    const shared = await import("crypto-price-fetchers/lib/command-line-help");
+    assert.equal(shared.helpProblems, helpProblems);
+  });
+
+  it("find the files that import commander, and only those", () => {
+    const users = filesUsingCommander(REPO_TOP);
+    assert.ok(users.includes("apps-script-runner/index.js"));
+    assert.ok(users.includes("api-key-store/key-manager.js"));
+    assert.ok(!users.includes("lib/command-line-help.js"));
   });
 });

@@ -138,7 +138,9 @@ which ask the services that price a token from its chain's pools; the key
 store; `no-secret-logging`, the lint rule that refuses printing a name
 that may hold a secret; the versions tool (`github-project-deps/`); the
 Summ CSV writer (`summ-csv/`); the shared helpers (`lib/`); and every
-command line's help (`test/command-line-help.test.js`). The scripts' and the clients' requests
+command line's help (`test/command-line-help.test.js`), with the checks
+in `lib/command-line-help.js`, which the repos that install this one run
+in their own tests. The scripts' and the clients' requests
 go to a stand-in fetch or a stand-in server on the computer
 (`test/helpers/stand-in-web.js`; `test/helpers/gecko-terminal-stand-in.js`
 answers as GeckoTerminal, one of those services, does). The build step's tests stand in for the
