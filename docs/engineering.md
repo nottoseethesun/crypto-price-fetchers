@@ -76,7 +76,7 @@ that hold no key and none of the owner's own settings.
 | `summ-csv/settings.json` | yes | The Summ CSV writer's facts of each chain, by Summ's name for it (its own coin, the forms of its hashes and addresses), and the fiat currencies a reference price may be in. |
 | `crypto-price-filler/config-example.json` | yes | The filler's settings. |
 | `crypto-price-filler/config.json` | no | The owner's settings, laid over `config-example.json`. |
-| `build/apps-script/` | no | `crypto-price-fetchers.gs`, the one file `npm run build apps-script` writes when the owner declines a clipboard tool: it holds the api keys in the clear, readable by the owner alone. The lint and the secret scan, below, pass over the folder. |
+| `build/apps-script/` | no | `crypto-price-fetchers.gs`, the one file `npm run build apps-script` writes when the owner declines a clipboard tool: it holds the api keys in the clear, readable by the owner alone. The lint, the security lint and the secret scan, below, pass over the folder. |
 | `coverage/` | no | A test run's coverage report. |
 
 ---
@@ -117,8 +117,9 @@ before each commit (`.husky/pre-commit`), so an unformatted or failing
 file stops the commit; `npm run format` or
 `npm run lint:fix` fixes formatting. No rule is ever switched off in a file,
 no file git keeps is left out of the lint, and a file over 500 lines is
-split, not excused. The one folder the lint passes over is `build/`, which
-git ignores: the build step writes its file there when there is no
+split, not excused. The one folder the lint and the security lint pass
+over is `build/`, which git ignores: the build step writes its file there
+when there is no
 clipboard, and that file holds the compiled code of DEX Screener, a
 service that lists the pairs of decentralized exchanges with their prices,
 and the api keys.

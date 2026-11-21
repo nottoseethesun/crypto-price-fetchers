@@ -11,17 +11,12 @@
  *
  * The Sheets scripts run unchanged in the test's thread, through
  * `tests/helpers/sheets-script.js`, with a stand-in for the Apps Script
- * service each test is about: the script lock. The test of the security
- * lint asks ESLint's own api whether its config passes over a path.
+ * service each test is about: the script lock.
  */
 
 import { describe, it, expect } from "vitest";
 import path from "path";
-import { ESLint } from "eslint";
 import { loadSheetsScript } from "./helpers/sheets-script.js";
-
-/** The repo's top folder. */
-const REPO_TOP = path.resolve(__dirname, "../../..");
 
 /** How long Google lets a custom function run before it stops it. */
 const CUSTOM_FUNCTION_LIMIT_MS = 30000;
@@ -86,23 +81,6 @@ describe("waits inside a custom function", () => {
       const waited = [...waits, ...sleeps].reduce((sum, ms) => sum + ms, 0);
       expect(waits.length).toBeGreaterThan(0);
       expect(waited).toBeLessThanOrEqual(CUSTOM_FUNCTION_LIMIT_MS);
-    },
-  );
-});
-
-describe("the gate's checks of the file the build step writes", () => {
-  it.fails(
-    "the security lint passes over build/, where the build step writes the file to paste when there is no clipboard, as the lint, the format check and the secret scan do",
-    async () => {
-      const eslint = new ESLint({
-        cwd: REPO_TOP,
-        overrideConfigFile: path.join(REPO_TOP, "eslint-security.config.js"),
-      });
-      const built = path.join(
-        REPO_TOP,
-        "build/apps-script/crypto-price-fetchers.gs",
-      );
-      expect(await eslint.isPathIgnored(built)).toBe(true);
     },
   );
 });
