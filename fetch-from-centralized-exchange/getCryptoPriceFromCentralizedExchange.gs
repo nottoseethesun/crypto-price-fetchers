@@ -2,19 +2,21 @@
  * Google Apps Script: Get Crypto Price from Centralized Exchange
  * ==============================================================
  *
- * @fileoverview Fetches historical high, low or closing cryptocurrency
- *   prices (USD) from centralized exchanges for use directly in Google
- *   Sheets, Google's spreadsheet app.
+ * @fileoverview Fetches historical cryptocurrency prices (USD) from
+ *   centralized exchanges, the average of a period's high and low or its
+ *   high, low or close, for use directly in Google Sheets, Google's
+ *   spreadsheet app.
  * @author Christopher M. Balz, with Grok and Claude
- * @version 2.17.0
- * @lastModified November 20, 2026
+ * @version 2.18.0
+ * @lastModified November 21, 2026
  *
  * OVERVIEW
  * --------
  * A custom function for Google Sheets, written in Apps Script, Google's
  * platform for scripts that run inside its apps. It
- * returns the historical high, low or closing USD price for a
- * cryptocurrency at a given time, asking one source after another until
+ * returns a cryptocurrency's historical USD price at a given time, the
+ * average of the high and the low of a period around it, or the high, the
+ * low or the close, asking one source after another until
  * one has a price: MEXC, a centralized exchange, then CoinGecko and
  * CoinPaprika, two services that gather the exchanges' prices.
  * crypto-price-filler, the repo's tool for whole CSV files, which runs on
@@ -58,8 +60,9 @@
  * ## Past prices: getCryptoPrice
  *
  * `getCryptoPrice(token, dateStr, tz, mode)` gives a coin's price in USD at
- * a past time: the highest, the lowest or the closing price of a short
- * period around that time, from centralized exchanges.
+ * a past time, from a short period around that time: the average of its
+ * highest and lowest price, or the highest, the lowest or the closing
+ * price, from centralized exchanges.
  *
  * - `token`: the coin's ticker symbol, in any case, such as `"btc"`,
  *   `"grc"`, `"xmr"` or `"xtm"`.
@@ -67,8 +70,8 @@
  *   cell that holds a date and time, read as the time it shows.
  * - `tz`: the time zone of that time, by its abbreviation (see Time
  *   zones); left empty, UTC.
- * - `mode`: `"high"`, `"low"` or `"close"`; any other value, or none,
- *   means `"high"`.
+ * - `mode`: `"average"`, `"high"`, `"low"` or `"close"`; any other value,
+ *   or none, means `"average"`.
  *
  * ```
  * =getCryptoPrice("btc", "2026-01-15 14:30:00", "CST", "high")
@@ -83,19 +86,23 @@
  * prices, in the Crypto Price Fetchers menu, can replace these formulas
  * with their numbers.
  *
- * ### High, low and close
+ * ### Average, high, low and close
  *
  * Each source prices a period around the time. `"high"` gives the
  * highest price recorded in that period and `"low"` the lowest, which
- * bound what a trade at that time was worth. `"close"` gives the price at
- * the end of the period, the nearest to the time the source records. The
- * period depends on the source that answers:
+ * bound what a trade at that time was worth, and `"average"` the average
+ * of the two. `"close"` gives the price at the end of the period, the
+ * nearest to the time the source records. The period depends on the
+ * source that answers:
  *
  * - MEXC, an exchange, asked first: the minute that holds the time, when
  *   the time falls in about the last 30 days, for which MEXC keeps minute
- *   candles; for an older time, the hour that holds it. A minute or an
- *   hour in which nothing traded has the last trade's price as its high,
- *   low and close.
+ *   candles; for an older time, the hour that holds it. When nothing
+ *   traded in that minute or hour, the script goes up one period at a
+ *   time, through the hour, 2 hours, 4 hours, day, week (from Monday),
+ *   month and year, in UTC, that hold the time, and the first in which
+ *   something traded gives the average of its high and low, whatever the
+ *   mode. When nothing traded in that year, the next source answers.
  * - CoinGecko, a service that gathers the exchanges' prices, asked next:
  *   24 hours of hourly prices, from 12 hours before the time to 12 hours
  *   after; for `"close"` only, the day's price at 00:00 UTC.
@@ -135,21 +142,30 @@
  *     the 60-minute candle of the hour containing the timestamp. MEXC
  *     gives a candle for every period it keeps: one in which nothing
  *     traded has volume 0, and open, high, low and close all at the last
- *     trade's price. Returns the high, low or close of the candle given.
- *     A coin MEXC trades only against BTC is priced in USD with BTC/USDT's
- *     candle at the same time.
+ *     trade's price. When the candle's volume is above 0, the script gives
+ *     the mode's price from it. When it is 0, the script asks for the
+ *     candles of the next window up, in MEXC_WINDOWS (-sources.gs): the
+ *     hour, 2 hours, 4 hours, day, week, month and year containing the
+ *     timestamp. MEXC serves no 2-hour or yearly candle, so the 2 hours
+ *     join their two hour candles and the year its twelve month candles.
+ *     The first window whose volume is above 0 gives the average of its
+ *     high and low, whatever the mode. A coin MEXC trades only against BTC
+ *     is priced in USD with BTC/USDT's candle of the same window, read the
+ *     same way.
  *
  *   CoinGecko market_chart/range: Fetches hourly data points over a
  *     24-hour window centered on the requested time (12 hours before to
- *     12 hours after): the highest of them for high, the lowest for low,
- *     and the one nearest the time for close.
+ *     12 hours after): the average of the highest and the lowest for
+ *     average, the highest for high, the lowest for low, and the one
+ *     nearest the time for close.
  *
  *   CoinGecko history: The day's single price, recorded at 00:00 UTC.
- *     One price is not a range, so it answers close only; high and low go
- *     on to CoinPaprika.
+ *     One price is not a range, so it answers close only; average, high
+ *     and low go on to CoinPaprika.
  *
  *   CoinPaprika: The day's OHLCV candle (00:00 to 23:59:59 UTC) holding
- *     the requested time: its high, low or close. A plan reaches only so
+ *     the requested time: the average of its high and low, or its high,
+ *     low or close. A plan reaches only so
  *     many days back for candles (the free plan, the last 24 hours). For
  *     an older day, close takes the day's price at 00:00 UTC instead, which
  *     the free plan has for the last 365 days; that one price answers close
@@ -163,9 +179,10 @@
  * sent again after each wait in RETRY_DELAYS_MS.
  *
  *   1. MEXC       - Primary. Real OHLCV candles (1-minute for about the
- *                   last 30 days, else 1-hour). Queries exchangeInfo to
- *                   verify the trading pair exists. Skip list: grc (not
- *                   listed on MEXC).
+ *                   last 30 days, else 1-hour; up to the year when
+ *                   nothing traded). Queries exchangeInfo to verify the
+ *                   trading pair exists. Skip list: grc (not listed on
+ *                   MEXC).
  *
  *   2. CoinGecko  - Tries two sub-endpoints in order, both dated:
  *                   a) market_chart/range (24h window, hourly data points)
@@ -195,10 +212,6 @@
  *
  *   EXCHANGE_BASE_URL    - MEXC REST API base ("https://api.mexc.com/api/v3")
  *   QUOTE_CURRENCY       - Quote side of the pair ("USDT")
- *   DEFAULT_INTERVAL     - First kline resolution to try ("1m")
- *   FALLBACK_INTERVAL    - Second kline resolution ("60m")
- *                          (each an interval whose length MEXC_INTERVAL_MS,
- *                          in -sources.gs, gives)
  *
  *   TIMEZONE_OFFSETS     - Map of abbreviation to UTC offset in hours
  *                          (see Time zones, in the help section above)
@@ -263,8 +276,6 @@
 const CONFIG = {
   EXCHANGE_BASE_URL: "https://api.mexc.com/api/v3",
   QUOTE_CURRENCY: "USDT",
-  DEFAULT_INTERVAL: "1m",
-  FALLBACK_INTERVAL: "60m",
   TIMEZONE_OFFSETS: {
     UTC: 0,
     GMT: 0,
@@ -400,7 +411,7 @@ function getCryptoPrice(
   token,
   dateStr,
   tz,
-  mode = "high",
+  mode = "average",
   apiDelayMs = CONFIG.GENERAL_DELAY_MS,
 ) {
   Logger.log(
@@ -477,10 +488,10 @@ function normalizeDateStr(dateStr) {
   return { error: "Invalid date format" };
 }
 
-/** The price a mode asks for: "low" or "close" as named, in any letter case, and "high" for any other value */
+/** The price a mode asks for: "high", "low" or "close" as named, in any letter case, and "average" for any other value */
 function priceTarget(mode) {
   const named = String(mode).toLowerCase();
-  return named === "low" || named === "close" ? named : "high";
+  return ["high", "low", "close"].includes(named) ? named : "average";
 }
 
 /** Attempts to acquire lock with exponential backoff retry */

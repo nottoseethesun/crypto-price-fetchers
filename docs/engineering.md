@@ -188,7 +188,8 @@ bash, and in zsh where zsh is installed. `npm run test:coverage` fails below
 **crypto-price-filler's tests** (`tests/`, vitest) cover the tool, its
 sources and its command line, and run the exchange script unchanged under
 Node: its price sources in `sheets-sources.test.js`, which carries what
-each source must do for both tools. Its `vitest.config.js` names a key file
+each source must do for both tools, and the windows the script asks MEXC
+for in `mexc-windows.test.js`. Its `vitest.config.js` names a key file
 that does not exist and empties `API_KEYS_PASSWORD`, so no test finds the
 owner's key, and fails a coverage run below 80% of lines. `tests/helpers/`
 holds the stand-ins:
@@ -276,6 +277,7 @@ MEXC does.
 | `geckoterminal-source.test.js` | `sources/geckoterminal.js`: a token that trades in pools, priced from the GeckoTerminal candle that holds a row's time. |
 | `index.test.js` | The command line's helpers, the time zones and the reading of a date, and the command line, run as a program. |
 | `known-bugs.test.js` | The known bugs, each declared with `it.fails`. |
+| `mexc-windows.test.js` | The windows the exchange script asks MEXC for: the minute, or for an older time the hour, and, when nothing traded in it, each window up to the year, whose average of high and low then answers. |
 | `moralis-source.test.js` | `sources/moralis.js`: a token that trades in pools, priced by Moralis at the block its chain had at a row's time. |
 | `price.test.js` | `sources/price.js`: the order the sources are asked in, and the cache. |
 | `progress.test.js` | `utils/progress.js`, the progress bar. |
@@ -350,7 +352,7 @@ answered at once.
 | ----- | ------------------- | --------------- |
 | `test/crypto-price-fetchers.test.js`, `test/get-crypto-price-from-centralized-exchange.test.js` | Through its Node version, in the worker thread. Each request goes to `standInFetch` (`test/helpers/stand-in-web.js`), which answers as DexTools or x1.ninja, the services that give current prices, or MEXC or CoinGecko, which give past ones, does. | What each Sheets function returns, as its cell would show it, and the Node versions' command lines. |
 | `test/run-apps-script.test.js` | A small script, `test/fixtures/runner-check.gs`, in the worker thread. Its requests go through Node's own `fetch` to a web server on this computer. | The hand-off between the threads: the worker waits, the main thread does the request, and each response reaches the request it answers. |
-| crypto-price-filler's `tests/sheets-sources.test.js`, `tests/regressions.test.js`, `tests/xtm-coingecko-id.test.js` | In the test's own thread (`tests/helpers/sheets-script.js`). `UrlFetchApp.fetch` answers at once from a function the test gives, so nothing waits. | What each price source gives, the cases the regression tests cover, and that no file of the exchange script holds a CoinGecko api key. |
+| crypto-price-filler's `tests/sheets-sources.test.js`, `tests/mexc-windows.test.js`, `tests/regressions.test.js`, `tests/xtm-coingecko-id.test.js` | In the test's own thread (`tests/helpers/sheets-script.js`). `UrlFetchApp.fetch` answers at once from a function the test gives, so nothing waits. | What each price source gives, the cases the regression tests cover, and that no file of the exchange script holds a CoinGecko api key. |
 | crypto-price-filler's `tests/regressions.test.js`, `tests/xtm-coingecko-id.test.js`, through the tool | Through the exchange script's Node version, in the worker thread, as the tool runs it (`tests/helpers/stand-in-fetch.js`). | The same cases, reached through the tool's provider chain. |
 | `test/load-apps-script.test.js`, `test/apps-script-services.test.js` | Small scripts in `test/fixtures/`, in the test's own thread, with requests answered at once. | That a script's files load into one scope, in order, and that each Node service acts as Apps Script's does. |
 | `test/crypto-price-fetchers-menu.test.js`; crypto-price-filler's `tests/regressions.test.js` and `tests/known-bugs.test.js` | In the test's own thread, with a spreadsheet held in memory (`test/helpers/stand-in-spreadsheet.js`) or a stand-in lock in place of Apps Script's. | What each menu item writes, in which order, and what it reports; and the waits of the price functions that the known bugs are about. |

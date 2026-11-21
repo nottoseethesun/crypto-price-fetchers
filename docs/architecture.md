@@ -79,9 +79,12 @@ x1.ninja, which does the same for X1, which DexTools does not list. A cell
 names the chain and the token, or a pool.
 
 `getCryptoPriceFromCentralizedExchange.gs` gives a token's price at a past
-minute: the candle's high, low or close, from MEXC, a centralized
-exchange, first, then CoinGecko, then CoinPaprika, two services that
-gather the exchanges' prices. Apps Script runs the calls of many cells at
+minute: by default the average of the high and the low of the candle
+that holds it, or else the candle's high, low or close, from MEXC, a
+centralized exchange, first, then CoinGecko, then CoinPaprika, two
+services that gather the exchanges' prices. When nothing traded in that
+minute, MEXC's price comes from the first larger period around it, up to
+a year, in which something did. Apps Script runs the calls of many cells at
 the same time. The script's lock makes those calls take turns at the
 services, and its cache answers a question already asked without asking
 again. So a sheet full of cells keeps within the services' rate limits.

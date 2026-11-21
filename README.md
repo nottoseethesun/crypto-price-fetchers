@@ -42,8 +42,10 @@ that does the same for X1, instead.
 
 `fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.gs`,
 with its price sources in `getCryptoPriceFromCentralizedExchange-sources.gs`
-beside it, is a Google Apps Script that gives a token's high, low or
-closing price at a past time, as recent as a minute ago. It asks MEXC, a
+beside it, is a Google Apps Script that gives a token's price at a past
+time, as recent as a minute ago: by default the average of the high and
+the low of a period around that time, or else its high, low or close. It
+asks MEXC, a
 centralized exchange, then CoinGecko, then CoinPaprika, two services that
 gather the exchanges' prices, so it covers the tokens they price. Within
 Apps Script's limits, it handles about 100 calls at a time.

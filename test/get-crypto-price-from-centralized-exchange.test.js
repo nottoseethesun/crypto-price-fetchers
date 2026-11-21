@@ -377,8 +377,16 @@ describe("getCryptoPriceFromCentralizedExchange.js, the command line", () => {
     return { exitCode, stdout, stderr };
   }
 
-  it("prints the high in UTC unless told otherwise, with exit code 0", async () => {
+  it("prints the average of the high and the low in UTC unless told otherwise, with exit code 0", async () => {
     assert.deepEqual(printed(await run(["xtm", ROW_TIME])), {
+      exitCode: 0,
+      stdout: "1.15\n",
+      stderr: "",
+    });
+  });
+
+  it("prints the high with --mode high", async () => {
+    assert.deepEqual(printed(await run(["xtm", ROW_TIME, "--mode", "high"])), {
       exitCode: 0,
       stdout: "1.5\n",
       stderr: "",
@@ -411,7 +419,7 @@ describe("getCryptoPriceFromCentralizedExchange.js, the command line", () => {
     });
     assert.deepEqual(printed(result), {
       exitCode: 0,
-      stdout: "2.5\n",
+      stdout: "2.25\n",
       stderr: "",
     });
     assert.deepEqual(
@@ -448,7 +456,7 @@ describe("getCryptoPriceFromCentralizedExchange.js, the command line", () => {
     });
     assert.deepEqual(printed(result), {
       exitCode: 0,
-      stdout: "2.5\n",
+      stdout: "2.25\n",
       stderr: "",
     });
     assert.deepEqual(asked, [`Password for the api keys in ${savedKeyFile}: `]);
@@ -466,7 +474,7 @@ describe("getCryptoPriceFromCentralizedExchange.js, the command line", () => {
     });
     assert.deepEqual(printed(result), {
       exitCode: 0,
-      stdout: "2.5\n",
+      stdout: "2.25\n",
       stderr: "",
     });
   });
@@ -516,10 +524,13 @@ describe("getCryptoPriceFromCentralizedExchange.js, the command line", () => {
     );
   });
 
-  it("refuses a mode other than high, low or close", async () => {
+  it("refuses a mode other than average, high, low or close", async () => {
     const result = await run(["xtm", ROW_TIME, "--mode", "middle"]);
     assert.equal(result.exitCode, 1);
-    assert.match(result.stderr, /Allowed choices are high, low, close/);
+    assert.match(
+      result.stderr,
+      /Allowed choices are average, high, low, close/,
+    );
   });
 
   it("answers --help on stdout, with exit code 0, asking no password", async () => {

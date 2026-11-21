@@ -8,9 +8,10 @@
  * by the same code, because this file runs
  * `getCryptoPriceFromCentralizedExchange.gs` itself, unchanged, through the
  * shared runner (`../apps-script-runner/`). The `.gs` file's header says
- * what the function takes and returns: the high, low or closing price of
- * the period around the time, from MEXC, then CoinGecko, then CoinPaprika,
- * or a message for the cell when there is none.
+ * what the function takes and returns: the average of the high and the
+ * low of the period around the time, or its high, low or close, from MEXC,
+ * then CoinGecko, then CoinPaprika, or a message for the cell when there
+ * is none.
  *
  * How:
  *
@@ -20,7 +21,8 @@
  * - `openCentralizedExchangeSources` opens it the same way and returns its
  *   three price sources instead, `getPriceFromMEXC`, `getPriceFromCoinGecko`
  *   and `getPriceFromCoinPaprika`, each taking an id, the time in UTC
- *   milliseconds and "high", "low" or "close". crypto-price-filler prices
+ *   milliseconds and "average", "high", "low" or "close".
+ *   crypto-price-filler prices
  *   its rows with them.
  * - Either takes the CoinGecko demo api key and the CoinPaprika api key,
  *   and sets each in the script's `CONFIG` (`keyConfig`), as the repo's
@@ -177,8 +179,9 @@ export function openCentralizedExchangePrices(options = {}) {
 /**
  * Opens the script and returns its three price sources as async calls.
  * Each takes an id (the ticker for MEXC, the coin's id at CoinGecko or
- * CoinPaprika), the time in UTC milliseconds, and "high", "low" or
- * "close", and gives the price in USD, or null when the source has none.
+ * CoinPaprika), the time in UTC milliseconds, and "average", "high", "low"
+ * or "close", and gives the price in USD, or null when the source has
+ * none.
  *
  * @param {OpenOptions} [options] - How to open it
  * @returns {Promise<{getPriceFromMEXC: function(string, number, string): Promise<?number>, getPriceFromCoinGecko: function(string, number, string): Promise<?number>, getPriceFromCoinPaprika: function(string, number, string): Promise<?number>, close: function(): Promise<void>}>} The sources
@@ -199,7 +202,7 @@ Api keys:
 /** The examples of the help: one of each common use. */
 const EXAMPLES_HELP = `
 Examples:
-  Bitcoin's high in the period around 14:30 UTC on 15 January 2026:
+  Bitcoin's average price in the period around 14:30 UTC on 15 January 2026:
     $ node getCryptoPriceFromCentralizedExchange.js btc "2026-01-15 14:30:00"
   Gridcoin's close at a time given in US Central time:
     $ node getCryptoPriceFromCentralizedExchange.js grc "2026-01-15 08:30:00" --tz CST --mode close
@@ -250,10 +253,10 @@ function describeCommandLine(program, runCall) {
     .addOption(
       new Option(
         "-m, --mode <mode>",
-        "the high, the low or the close of the period the price comes from",
+        "the average of the high and the low of the period the price comes from, or its high, low or close",
       )
-        .choices(["high", "low", "close"])
-        .default("high"),
+        .choices(["average", "high", "low", "close"])
+        .default("average"),
     )
     .addHelpText("after", KEY_HELP)
     .addHelpText("after", EXAMPLES_HELP)

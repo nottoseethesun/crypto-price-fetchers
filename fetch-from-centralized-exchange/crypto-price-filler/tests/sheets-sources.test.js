@@ -76,9 +76,13 @@ function mexcAnswering(pairs, klines) {
 const XTM_USDT = [{ baseAsset: "XTM", quoteAsset: "USDT" }];
 
 describe("MEXC (getPriceFromMEXC)", () => {
-  it("gives the high, the low or the close of the 1-minute candle holding the time", () => {
+  it("gives the average of the high and the low, the high, the low or the close of the minute's candle holding the time, when something traded in it", () => {
     const { script } = scriptAnswering(
       mexcAnswering(XTM_USDT, () => XTM_PRICES),
+    );
+    expect(script.getPriceFromMEXC("XTM", TIME_MS, "average")).toBeCloseTo(
+      1.15,
+      10,
     );
     expect(script.getPriceFromMEXC("XTM", TIME_MS, "high")).toBe(1.5);
     expect(script.getPriceFromMEXC("XTM", TIME_MS, "low")).toBe(0.8);
@@ -149,7 +153,7 @@ describe("MEXC (getPriceFromMEXC)", () => {
     expect(script.getPriceFromMEXC("XMR", TIME_MS, "high")).toBeNull();
   });
 
-  it("takes the candle of the hour that holds the time when MEXC keeps no candle of its minute", () => {
+  it("takes the candle of the hour that holds the time, by the target, when MEXC keeps no candle of its minute", () => {
     const { script, asked } = scriptAnswering(
       mexcAnswering(XTM_USDT, (url) =>
         url.includes("interval=1m")
@@ -158,6 +162,10 @@ describe("MEXC (getPriceFromMEXC)", () => {
       ),
     );
     expect(script.getPriceFromMEXC("XTM", TIME_MS, "high")).toBe(1.7);
+    expect(script.getPriceFromMEXC("XTM", TIME_MS, "average")).toBeCloseTo(
+      1.3,
+      10,
+    );
     const hour = asked.find((request) => request.url.includes("interval=60m"));
     const query = new URL(hour.url).searchParams;
     expect([query.get("startTime"), query.get("endTime")]).toEqual([
@@ -166,22 +174,14 @@ describe("MEXC (getPriceFromMEXC)", () => {
     ]);
   });
 
-  it("refuses an interval in CONFIG whose length it does not know, asking MEXC for no candle", () => {
+  it("gives null when MEXC keeps no candle of any window that holds the time, having asked for each", () => {
     const { script, asked } = scriptAnswering(
-      mexcAnswering(XTM_USDT, () => XTM_PRICES),
-      { config: { CONFIG: { DEFAULT_INTERVAL: "5m" } } },
+      mexcAnswering(XTM_USDT, () => null),
     );
-    expect(() => script.getPriceFromMEXC("XTM", TIME_MS, "high")).toThrow(
-      "MEXC interval 5m is not one the script knows",
-    );
-    expect(asked.some((request) => request.url.includes("/klines"))).toBe(
-      false,
-    );
-  });
-
-  it("gives null when neither interval has a candle", () => {
-    const { script } = scriptAnswering(mexcAnswering(XTM_USDT, () => null));
     expect(script.getPriceFromMEXC("XTM", TIME_MS, "high")).toBeNull();
+    expect(
+      asked.filter((request) => request.url.includes("/klines")),
+    ).toHaveLength(8);
   });
 
   it("asks again after each wait in RETRY_DELAYS_MS while MEXC answers 429, and gives up after the last", () => {
@@ -272,8 +272,11 @@ describe("CoinGecko (getPriceFromCoinGecko)", () => {
     expect(to).toBeLessThanOrEqual(Math.floor(Date.now() / 1000));
   });
 
-  it("gives the highest point for high, the lowest for low, and the one nearest the time for close", () => {
+  it("gives the average of the highest and lowest points for average, the highest for high, the lowest for low, and the one nearest the time for close", () => {
     const { script } = scriptAnswering(coinGeckoAnswering(HOURLY_POINTS, null));
+    expect(
+      script.getPriceFromCoinGecko("tezos", TIME_MS, "average"),
+    ).toBeCloseTo(2.1, 10);
     expect(script.getPriceFromCoinGecko("tezos", TIME_MS, "high")).toBe(2.4);
     expect(script.getPriceFromCoinGecko("tezos", TIME_MS, "low")).toBe(1.8);
     expect(script.getPriceFromCoinGecko("tezos", TIME_MS, "close")).toBe(2.4);
@@ -296,8 +299,11 @@ describe("CoinGecko (getPriceFromCoinGecko)", () => {
     );
   });
 
-  it("gives no high or low from the day's single price, asking no history", () => {
+  it("gives no average, high or low from the day's single price, asking no history", () => {
     const { script, asked } = scriptAnswering(coinGeckoAnswering([], 1.23));
+    expect(
+      script.getPriceFromCoinGecko("tezos", TIME_MS, "average"),
+    ).toBeNull();
     expect(script.getPriceFromCoinGecko("tezos", TIME_MS, "high")).toBeNull();
     expect(script.getPriceFromCoinGecko("tezos", TIME_MS, "low")).toBeNull();
     expect(asked.some((request) => request.url.includes("/history"))).toBe(
@@ -398,10 +404,13 @@ const BEYOND_PLAN = reply(402, {
 });
 
 describe("CoinPaprika (getPriceFromCoinPaprika)", () => {
-  it("asks the free server for the day's candle and gives its high, low or close", () => {
+  it("asks the free server for the day's candle and gives the average of its high and low, or its high, low or close", () => {
     const { script, asked } = scriptAnswering(
       paprikaAnswering([PAPRIKA_CANDLE], PAPRIKA_DAY_TICK),
     );
+    expect(
+      script.getPriceFromCoinPaprika("xtm-tari", TIME_MS, "average"),
+    ).toBeCloseTo(2.25, 10);
     expect(script.getPriceFromCoinPaprika("xtm-tari", TIME_MS, "high")).toBe(
       2.5,
     );
@@ -436,10 +445,13 @@ describe("CoinPaprika (getPriceFromCoinPaprika)", () => {
     );
   });
 
-  it("gives no high or low from the day's single price, asking for none", () => {
+  it("gives no average, high or low from the day's single price, asking for none", () => {
     const { script, asked } = scriptAnswering(
       paprikaAnswering(BEYOND_PLAN, PAPRIKA_DAY_TICK),
     );
+    expect(
+      script.getPriceFromCoinPaprika("xtm-tari", TIME_MS, "average"),
+    ).toBeNull();
     expect(
       script.getPriceFromCoinPaprika("xtm-tari", TIME_MS, "high"),
     ).toBeNull();
@@ -544,14 +556,22 @@ describe("CoinPaprika (getPriceFromCoinPaprika)", () => {
 });
 
 describe("the sheet's getCryptoPrice and its mode", () => {
-  it("gives the candle close for close, in any letter case, and the high for any mode it does not know", () => {
+  it("gives the average with no mode or any mode it does not know, and the high, low or close as named, in any letter case", () => {
     const { script } = scriptAnswering(
       mexcAnswering(XTM_USDT, () => XTM_PRICES),
     );
     const at = "2025-06-15 12:30:00";
-    expect(script.getCryptoPrice("xtm", at, "UTC", "close", 0)).toBe(1.1);
+    expect(script.getCryptoPrice("xtm", at, "UTC")).toBeCloseTo(1.15, 10);
+    expect(script.getCryptoPrice("xtm", at, "UTC", "Average", 0)).toBeCloseTo(
+      1.15,
+      10,
+    );
+    expect(script.getCryptoPrice("xtm", at, "UTC", "mid", 0)).toBeCloseTo(
+      1.15,
+      10,
+    );
+    expect(script.getCryptoPrice("xtm", at, "UTC", "High", 0)).toBe(1.5);
     expect(script.getCryptoPrice("xtm", at, "UTC", "LOW", 0)).toBe(0.8);
-    expect(script.getCryptoPrice("xtm", at, "UTC", "average", 0)).toBe(1.5);
-    expect(script.getCryptoPrice("xtm", at, "UTC")).toBe(1.5);
+    expect(script.getCryptoPrice("xtm", at, "UTC", "close", 0)).toBe(1.1);
   });
 });
