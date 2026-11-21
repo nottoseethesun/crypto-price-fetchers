@@ -13,11 +13,13 @@
  *
  * The Sheets scripts run unchanged in the test's thread, through
  * `tests/helpers/sheets-script.js`, with a stand-in for the Apps Script
- * service each test is about: the script lock.
+ * service each test is about: the script lock, or the spreadsheet whose
+ * time zone a date cell's time is shown in.
  */
 
 import { describe, it, expect } from "vitest";
 import path from "path";
+import { callScriptFunction } from "../../../apps-script-runner/load-apps-script.js";
 import { loadSheetsScript } from "./helpers/sheets-script.js";
 
 /** How long Google lets a custom function run before it stops it. */
@@ -83,6 +85,49 @@ describe("waits inside a custom function", () => {
       const waited = [...waits, ...sleeps].reduce((sum, ms) => sum + ms, 0);
       expect(waits.length).toBeGreaterThan(0);
       expect(waited).toBeLessThanOrEqual(CUSTOM_FUNCTION_LIMIT_MS);
+    },
+  );
+});
+
+describe("a date cell", () => {
+  it.fails(
+    "getCryptoPrice reads a date cell as the time it shows, in the spreadsheet's time zone",
+    () => {
+      const asked = [];
+      const script = loadSheetsScript(
+        EXCHANGE_SCRIPT,
+        (url) => {
+          asked.push(url);
+          return url.includes("/exchangeInfo")
+            ? {
+                symbols: [
+                  { symbol: "XTMUSDT", baseAsset: "XTM", quoteAsset: "USDT" },
+                ],
+              }
+            : null;
+        },
+        {
+          services: {
+            SpreadsheetApp: {
+              getActiveSpreadsheet: () => ({
+                getSpreadsheetTimeZone: () => "America/Chicago",
+              }),
+            },
+          },
+        },
+      );
+      // A spreadsheet set to Central time hands a cell that shows
+      // 2025-06-15 07:30:00, CDT, as this moment: 12:30 UTC; the runner
+      // remakes it as the script's own Date, as Sheets hands it
+      const cell = new Date(Date.UTC(2025, 5, 15, 12, 30, 0));
+      callScriptFunction(script, "getCryptoPrice", [
+        "xtm",
+        cell,
+        "CDT",
+        "high",
+      ]);
+      const minute = asked.find((url) => url.includes("interval=1m"));
+      expect(minute).toContain(`&endTime=${Date.UTC(2025, 5, 15, 12, 30, 0)}&`);
     },
   );
 });
