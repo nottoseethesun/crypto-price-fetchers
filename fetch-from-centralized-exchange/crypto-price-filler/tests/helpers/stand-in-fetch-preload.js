@@ -5,10 +5,11 @@
  *
  * A test starts `node --import <this file> index.js ...`. This file replaces
  * the global fetch with a stand-in MEXC that lists the XTMUSDT pair and
- * answers every candle request with one candle at the requested end time:
- * open 1.00, high 1.50, low 0.80, close 1.10. CoinGecko's ping, which checks
- * a saved api key, takes the key of `stand-in-coingecko-key.js` alone, sent
- * in its header, and refuses any other. Each url the tool asks for is recorded,
+ * answers every candle request with the candle of the period asked
+ * (`test/helpers/stand-in-mexc.js`): open 1.00, high 1.50, low 0.80, close
+ * 1.10. CoinGecko's ping, which checks a saved api key, takes the key of
+ * `stand-in-coingecko-key.js` alone, sent in its header, and refuses any
+ * other. Each url the tool asks for is recorded,
  * and written as json, when the process exits, to the file named by the
  * environment variable `STAND_IN_ASKED`, so the test can read what the tool
  * asked for.
@@ -16,6 +17,7 @@
 
 import fs from "fs";
 import { STAND_IN_GECKO_KEY } from "./stand-in-coingecko-key.js";
+import { mexcKlines } from "../../../../test/helpers/stand-in-mexc.js";
 
 const asked = [];
 
@@ -56,8 +58,7 @@ globalThis.fetch = async (url, init = {}) => {
       symbols: [{ symbol: "XTMUSDT", baseAsset: "XTM", quoteAsset: "USDT" }],
     });
   }
-  const end = Number(new URL(href).searchParams.get("endTime"));
-  return respond(200, [[end - 30000, "1.00", "1.50", "0.80", "1.10", "10"]]);
+  return respond(200, mexcKlines(href, ["1.00", "1.50", "0.80", "1.10", "10"]));
 };
 
 process.on("exit", () => {

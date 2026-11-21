@@ -17,6 +17,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { reply } from "./sheets-script.js";
+import { mexcKlines } from "../../../../test/helpers/stand-in-mexc.js";
 
 export const FILLER_DIR = fileURLToPath(new URL("../..", import.meta.url));
 /** The Sheets script's files its function needs, in the order Apps Script loads them. */
@@ -41,8 +42,9 @@ export const DATED_PRICE = 1.23;
 export const COINGECKO_KEY_PATTERN = /CG-[A-Za-z0-9]{20,}/;
 
 /**
- * Answers as MEXC does for XTM, a pair it lists: one candle per request,
- * with open 1.00, high 1.50, low 0.80 and close 1.10.
+ * Answers as MEXC does for XTM, a pair it lists: the candle of the period
+ * asked (`test/helpers/stand-in-mexc.js`), with open 1.00, high 1.50, low
+ * 0.80 and close 1.10.
  *
  * @param {string} url - The requested url
  * @returns {Object|Array|null} The json body, or null for a 404
@@ -54,7 +56,7 @@ export function answerMexcCandle(url) {
     };
   }
   if (url.includes("/klines"))
-    return [[ROW_UTC_MS - 30000, "1.00", "1.50", "0.80", "1.10", "10"]];
+    return mexcKlines(url, ["1.00", "1.50", "0.80", "1.10", "10"]);
   return null;
 }
 
@@ -115,7 +117,7 @@ export function answerPaprikaBeyondCandles(url) {
  *
  * @param {string[]} options - Options beyond --token, --input and --output
  * @param {string} [cwd=FILLER_DIR] - The folder the command runs in
- * @returns {{price: string, candleUtc: string}} The row's price as written, and the UTC end time of the candle asked for
+ * @returns {{price: string, candleUtc: string}} The row's price as written, and the UTC time the candle asked for opens at
  */
 export function runCommandLineForOneRow(options, cwd = FILLER_DIR) {
   const dir = fs.mkdtempSync(
@@ -155,7 +157,7 @@ export function runCommandLineForOneRow(options, cwd = FILLER_DIR) {
       (url) => url.includes("/klines"),
     );
     const candleUtc = new Date(
-      Number(new URL(candleUrl).searchParams.get("endTime")),
+      Number(new URL(candleUrl).searchParams.get("startTime")),
     ).toISOString();
     return { price: row[3], candleUtc };
   } finally {

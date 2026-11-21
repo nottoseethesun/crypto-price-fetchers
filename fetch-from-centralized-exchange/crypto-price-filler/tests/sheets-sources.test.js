@@ -13,6 +13,7 @@
 import { describe, it, expect } from "vitest";
 import path from "path";
 import { loadSheetsScript, rawReply, reply } from "./helpers/sheets-script.js";
+import { mexcKlines } from "../../../test/helpers/stand-in-mexc.js";
 
 const SHEETS_SCRIPT_PATH = [
   "../../getCryptoPriceFromCentralizedExchange.gs",
@@ -22,8 +23,8 @@ const SHEETS_SCRIPT_PATH = [
 /** 12:30 UTC on 2025-06-15, the time most tests price. */
 const TIME_MS = Date.UTC(2025, 5, 15, 12, 30, 0);
 
-/** The candle MEXC gives for XTMUSDT: open 1.00, high 1.50, low 0.80, close 1.10. */
-const XTM_CANDLE = [TIME_MS - 30000, "1.00", "1.50", "0.80", "1.10", "10"];
+/** The prices of XTMUSDT's candles: open 1.00, high 1.50, low 0.80, close 1.10, volume 10. */
+const XTM_PRICES = ["1.00", "1.50", "0.80", "1.10", "10"];
 
 /**
  * Loads the script with an answer function, recording each request asked.
@@ -47,10 +48,11 @@ function scriptAnswering(answer, options = {}) {
 }
 
 /**
- * Answers as MEXC does for pairs it lists.
+ * Answers as MEXC does for pairs it lists, a klines request with the
+ * candle of the period asked (`test/helpers/stand-in-mexc.js`).
  *
  * @param {Array<{baseAsset: string, quoteAsset: string}>} pairs - The pairs exchangeInfo lists
- * @param {function(string): (Array|null)} klines - The candles for a klines url
+ * @param {function(string): ?string[]} klines - The prices of the candles MEXC keeps for a klines url's pair and interval, or null when it keeps none
  * @returns {function(string): *} The answer function
  */
 function mexcAnswering(pairs, klines) {
@@ -63,7 +65,10 @@ function mexcAnswering(pairs, klines) {
         })),
       };
     }
-    if (url.includes("/klines")) return klines(url);
+    if (url.includes("/klines")) {
+      const prices = klines(url);
+      return prices === null ? [] : mexcKlines(url, prices);
+    }
     return null;
   };
 }
@@ -73,7 +78,7 @@ const XTM_USDT = [{ baseAsset: "XTM", quoteAsset: "USDT" }];
 describe("MEXC (getPriceFromMEXC)", () => {
   it("gives the high, the low or the close of the 1-minute candle holding the time", () => {
     const { script } = scriptAnswering(
-      mexcAnswering(XTM_USDT, () => [XTM_CANDLE]),
+      mexcAnswering(XTM_USDT, () => XTM_PRICES),
     );
     expect(script.getPriceFromMEXC("XTM", TIME_MS, "high")).toBe(1.5);
     expect(script.getPriceFromMEXC("XTM", TIME_MS, "low")).toBe(0.8);
@@ -82,7 +87,7 @@ describe("MEXC (getPriceFromMEXC)", () => {
 
   it("gives null for a target it does not know", () => {
     const { script } = scriptAnswering(
-      mexcAnswering(XTM_USDT, () => [XTM_CANDLE]),
+      mexcAnswering(XTM_USDT, () => XTM_PRICES),
     );
     expect(script.getPriceFromMEXC("XTM", TIME_MS, "open")).toBeNull();
   });
@@ -96,19 +101,20 @@ describe("MEXC (getPriceFromMEXC)", () => {
 
   it("gives null for a coin it lists no USDT or BTC pair for", () => {
     const { script } = scriptAnswering(
-      mexcAnswering([{ baseAsset: "XTM", quoteAsset: "ETH" }], () => [
-        XTM_CANDLE,
-      ]),
+      mexcAnswering(
+        [{ baseAsset: "XTM", quoteAsset: "ETH" }],
+        () => XTM_PRICES,
+      ),
     );
     expect(script.getPriceFromMEXC("XTM", TIME_MS, "high")).toBeNull();
   });
 
-  it("prices a BTC pair in USD with BTC/USDT's candle at the same time, target for target", () => {
+  it("prices a BTC pair in USD with BTC/USDT's candle of the same minute, target for target", () => {
     const { script, asked } = scriptAnswering(
       mexcAnswering([{ baseAsset: "XMR", quoteAsset: "BTC" }], (url) =>
         url.includes("symbol=BTCUSDT")
-          ? [[TIME_MS - 30000, "60000", "62000", "59000", "61000", "1"]]
-          : [[TIME_MS - 30000, "0.005", "0.006", "0.004", "0.0055", "1"]],
+          ? ["60000", "62000", "59000", "61000", "1"]
+          : ["0.005", "0.006", "0.004", "0.0055", "1"],
       ),
     );
     expect(script.getPriceFromMEXC("XMR", TIME_MS, "high")).toBeCloseTo(
@@ -119,41 +125,62 @@ describe("MEXC (getPriceFromMEXC)", () => {
       0.0055 * 61000,
       8,
     );
-    const btcCandle = asked.find((request) =>
-      request.url.includes("symbol=BTCUSDT"),
-    );
-    expect(new URL(btcCandle.url).searchParams.get("endTime")).toBe(
+    const windowAsked = (symbol) => {
+      const query = new URL(
+        asked.find((request) => request.url.includes(`symbol=${symbol}`)).url,
+      ).searchParams;
+      return [query.get("startTime"), query.get("endTime")];
+    };
+    expect(windowAsked("BTCUSDT")).toEqual([
       String(TIME_MS),
-    );
+      String(TIME_MS + 59999),
+    ]);
+    expect(windowAsked("XMRBTC")).toEqual(windowAsked("BTCUSDT"));
   });
 
   it("gives null for a BTC pair when MEXC has no BTC/USDT candle for the time", () => {
     const { script } = scriptAnswering(
       mexcAnswering([{ baseAsset: "XMR", quoteAsset: "BTC" }], (url) =>
         url.includes("symbol=BTCUSDT")
-          ? []
-          : [[TIME_MS - 30000, "0.005", "0.006", "0.004", "0.0055", "1"]],
+          ? null
+          : ["0.005", "0.006", "0.004", "0.0055", "1"],
       ),
     );
     expect(script.getPriceFromMEXC("XMR", TIME_MS, "high")).toBeNull();
   });
 
-  it("takes the 60-minute candle when the 1-minute one opens more than two minutes from the time", () => {
+  it("takes the candle of the hour that holds the time when MEXC keeps no candle of its minute", () => {
     const { script, asked } = scriptAnswering(
       mexcAnswering(XTM_USDT, (url) =>
         url.includes("interval=1m")
-          ? [[TIME_MS - 600000, "9", "9", "9", "9", "1"]]
-          : [[TIME_MS - 1800000, "1.00", "1.70", "0.90", "1.20", "60"]],
+          ? null
+          : ["1.00", "1.70", "0.90", "1.20", "60"],
       ),
     );
     expect(script.getPriceFromMEXC("XTM", TIME_MS, "high")).toBe(1.7);
-    expect(asked.some((request) => request.url.includes("interval=60m"))).toBe(
-      true,
+    const hour = asked.find((request) => request.url.includes("interval=60m"));
+    const query = new URL(hour.url).searchParams;
+    expect([query.get("startTime"), query.get("endTime")]).toEqual([
+      String(TIME_MS - 1800000),
+      String(TIME_MS + 1799999),
+    ]);
+  });
+
+  it("refuses an interval in CONFIG whose length it does not know, asking MEXC for no candle", () => {
+    const { script, asked } = scriptAnswering(
+      mexcAnswering(XTM_USDT, () => XTM_PRICES),
+      { config: { CONFIG: { DEFAULT_INTERVAL: "5m" } } },
+    );
+    expect(() => script.getPriceFromMEXC("XTM", TIME_MS, "high")).toThrow(
+      "MEXC interval 5m is not one the script knows",
+    );
+    expect(asked.some((request) => request.url.includes("/klines"))).toBe(
+      false,
     );
   });
 
   it("gives null when neither interval has a candle", () => {
-    const { script } = scriptAnswering(mexcAnswering(XTM_USDT, () => []));
+    const { script } = scriptAnswering(mexcAnswering(XTM_USDT, () => null));
     expect(script.getPriceFromMEXC("XTM", TIME_MS, "high")).toBeNull();
   });
 
@@ -164,7 +191,7 @@ describe("MEXC (getPriceFromMEXC)", () => {
         refusals -= 1;
         return reply(429);
       }
-      return mexcAnswering(XTM_USDT, () => [XTM_CANDLE])(url);
+      return mexcAnswering(XTM_USDT, () => XTM_PRICES)(url);
     });
     expect(retried.script.getPriceFromMEXC("XTM", TIME_MS, "close")).toBe(1.1);
     expect(retried.waits).toEqual([5000, 5000]);
@@ -182,7 +209,7 @@ describe("MEXC (getPriceFromMEXC)", () => {
     const badKlines = scriptAnswering((url) =>
       url.includes("/klines")
         ? rawReply(200, "<html>")
-        : mexcAnswering(XTM_USDT, () => [])(url),
+        : mexcAnswering(XTM_USDT, () => null)(url),
     );
     expect(
       badKlines.script.getPriceFromMEXC("XTM", TIME_MS, "high"),
@@ -519,7 +546,7 @@ describe("CoinPaprika (getPriceFromCoinPaprika)", () => {
 describe("the sheet's getCryptoPrice and its mode", () => {
   it("gives the candle close for close, in any letter case, and the high for any mode it does not know", () => {
     const { script } = scriptAnswering(
-      mexcAnswering(XTM_USDT, () => [XTM_CANDLE]),
+      mexcAnswering(XTM_USDT, () => XTM_PRICES),
     );
     const at = "2025-06-15 12:30:00";
     expect(script.getCryptoPrice("xtm", at, "UTC", "close", 0)).toBe(1.1);

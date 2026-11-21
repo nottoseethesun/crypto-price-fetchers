@@ -28,6 +28,7 @@ import {
   runCommandLine,
 } from "../fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.js";
 import { capturedOutput } from "./helpers/captured-output.js";
+import { mexcKlines } from "./helpers/stand-in-mexc.js";
 import { standInFetch } from "./helpers/stand-in-web.js";
 import { makeTempFolder, removeTempFolders } from "./helpers/temp-folders.js";
 
@@ -40,8 +41,9 @@ const ROW_UTC_MS = Date.UTC(2025, 5, 15, 12, 30, 0);
 const ROW_TIME = "2025-06-15 12:30:00";
 
 /**
- * Answers as MEXC does for XTM, a pair it lists: one candle per request,
- * with open 1.00, high 1.50, low 0.80 and close 1.10.
+ * Answers as MEXC does for XTM, a pair it lists: the candle of the minute
+ * asked (`helpers/stand-in-mexc.js`), with open 1.00, high 1.50, low 0.80
+ * and close 1.10.
  *
  * @param {{url: string}} request - The request
  * @returns {Object|Array|null} The json body, or null for a 404
@@ -52,7 +54,7 @@ function answerMexcCandle({ url }) {
       symbols: [{ symbol: "XTMUSDT", baseAsset: "XTM", quoteAsset: "USDT" }],
     };
   if (url.startsWith(`${MEXC}/klines?symbol=XTMUSDT&interval=1m&`)) {
-    return [[ROW_UTC_MS - 30000, "1.00", "1.50", "0.80", "1.10", "10"]];
+    return mexcKlines(url, ["1.00", "1.50", "0.80", "1.10", "10"]);
   }
   return null;
 }

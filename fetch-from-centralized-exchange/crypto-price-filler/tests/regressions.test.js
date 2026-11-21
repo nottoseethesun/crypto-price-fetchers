@@ -39,6 +39,7 @@ import { canonicalTimeZone, parseInputToUtcMs } from "../utils/date.js";
 import { answerWith, asked as askedByTool } from "./helpers/stand-in-fetch.js";
 import { loadSheetsScript } from "./helpers/sheets-script.js";
 import { standInSpreadsheet } from "../../../test/helpers/stand-in-spreadsheet.js";
+import { mexcCandleOpen } from "../../../test/helpers/stand-in-mexc.js";
 
 // The Sheets script, opened by its Node version with the stand-in fetch
 vi.mock(
@@ -115,6 +116,32 @@ describe("fixed bugs", () => {
       expect(
         script.getCryptoPrice("xtm", "2025-06-15 12:30:00", "UTC", "close", 0),
       ).toBe(1.1);
+    });
+  });
+
+  describe("MEXC's candle is that of the minute, or the hour, that holds the time", () => {
+    it("getCryptoPrice prices the minute that holds a time on a whole minute, and in its fallback the hour that holds a time on a whole hour", () => {
+      const minuteAsked = Date.UTC(2025, 5, 15, 12, 30, 0);
+      const hourAsked = Date.UTC(2025, 5, 15, 12, 0, 0);
+      // Each candle's high is 1.5 when it holds the time asked, else 9.9.
+      // MEXC keeps no candle of the minute of 12:00, as for a time older
+      // than the 30 days or so of minute candles it keeps, so its hour
+      // answers
+      const answer = (url) => {
+        if (!url.includes("/klines")) return answerMexcCandle(url);
+        const open = mexcCandleOpen(url);
+        const isMinute = url.includes("interval=1m");
+        if (open === null || (isMinute && open === hourAsked)) return [];
+        const holds = open === (isMinute ? minuteAsked : hourAsked);
+        return [[open, "1.00", holds ? "1.50" : "9.90", "0.80", "1.10", "10"]];
+      };
+      const script = loadSheetsScript(SHEETS_SCRIPT_PATH, answer);
+      expect(
+        script.getCryptoPrice("xtm", "2025-06-15 12:30:00", "UTC", "high"),
+      ).toBe(1.5);
+      expect(
+        script.getCryptoPrice("xtm", "2025-06-15 12:00:00", "UTC", "high"),
+      ).toBe(1.5);
     });
   });
 
@@ -212,24 +239,23 @@ describe("fixed bugs", () => {
       return asked.find((url) => url.includes("interval=1m"));
     }
 
+    /** The window of the minute that holds the row's time, as the script asks MEXC for it. */
+    const ROW_MINUTE = `&startTime=${ROW_UTC_MS}&endTime=${ROW_UTC_MS + 59999}&`;
+
     it("reads a cell from a spreadsheet in Central time as its wall time, in the zone tz names", () => {
       // The spreadsheet hands a cell that shows 2025-06-15 07:30:00 as
       // 12:30 UTC; tz says that time is CDT
       const cell = new Date(ROW_UTC_MS);
       expect(minuteAskedFor("America/Chicago", cell, "CDT")).toContain(
-        `&endTime=${ROW_UTC_MS}&`,
+        ROW_MINUTE,
       );
     });
 
     it("reads a cell from a spreadsheet in UTC as it was read before, and with no spreadsheet reads it in UTC", () => {
       // A cell that shows 2025-06-15 07:30:00 in a UTC spreadsheet, CDT by tz
       const cell = new Date(Date.UTC(2025, 5, 15, 7, 30, 0));
-      expect(minuteAskedFor("UTC", cell, "CDT")).toContain(
-        `&endTime=${ROW_UTC_MS}&`,
-      );
-      expect(minuteAskedFor(null, cell, "CDT")).toContain(
-        `&endTime=${ROW_UTC_MS}&`,
-      );
+      expect(minuteAskedFor("UTC", cell, "CDT")).toContain(ROW_MINUTE);
+      expect(minuteAskedFor(null, cell, "CDT")).toContain(ROW_MINUTE);
     });
   });
 

@@ -91,8 +91,11 @@
  * the end of the period, the nearest to the time the source records. The
  * period depends on the source that answers:
  *
- * - MEXC, an exchange, asked first: the minute that holds the time, or, if
- *   no trade happened in that minute, the hour.
+ * - MEXC, an exchange, asked first: the minute that holds the time, when
+ *   the time falls in about the last 30 days, for which MEXC keeps minute
+ *   candles; for an older time, the hour that holds it. A minute or an
+ *   hour in which nothing traded has the last trade's price as its high,
+ *   low and close.
  * - CoinGecko, a service that gathers the exchanges' prices, asked next:
  *   24 hours of hourly prices, from 12 hours before the time to 12 hours
  *   after; for `"close"` only, the day's price at 00:00 UTC.
@@ -126,12 +129,15 @@
  * The help section above says what each mode gives. Each provider works it
  * out from its own data:
  *
- *   MEXC: Tries a 1-minute candle first (the single minute containing
- *     the requested timestamp). If no trades occurred in that minute, it
- *     falls back to a 60-minute candle. Returns the real OHLCV high, low
- *     or close of whichever candle matched. A coin MEXC trades only
- *     against BTC is priced in USD with BTC/USDT's candle at the same
- *     time.
+ *   MEXC: Asks for the 1-minute candle of the minute containing the
+ *     requested timestamp. MEXC keeps 1-minute candles for about the last
+ *     30 days and gives none for an older minute; the script then asks for
+ *     the 60-minute candle of the hour containing the timestamp. MEXC
+ *     gives a candle for every period it keeps: one in which nothing
+ *     traded has volume 0, and open, high, low and close all at the last
+ *     trade's price. Returns the high, low or close of the candle given.
+ *     A coin MEXC trades only against BTC is priced in USD with BTC/USDT's
+ *     candle at the same time.
  *
  *   CoinGecko market_chart/range: Fetches hourly data points over a
  *     24-hour window centered on the requested time (12 hours before to
@@ -156,9 +162,10 @@
  * past date. A request a provider refuses as one too many (status 429) is
  * sent again after each wait in RETRY_DELAYS_MS.
  *
- *   1. MEXC       - Primary. Real OHLCV candles (1-minute, then 1-hour
- *                   fallback). Queries exchangeInfo to verify the trading
- *                   pair exists. Skip list: grc (not listed on MEXC).
+ *   1. MEXC       - Primary. Real OHLCV candles (1-minute for about the
+ *                   last 30 days, else 1-hour). Queries exchangeInfo to
+ *                   verify the trading pair exists. Skip list: grc (not
+ *                   listed on MEXC).
  *
  *   2. CoinGecko  - Tries two sub-endpoints in order, both dated:
  *                   a) market_chart/range (24h window, hourly data points)
@@ -190,6 +197,8 @@
  *   QUOTE_CURRENCY       - Quote side of the pair ("USDT")
  *   DEFAULT_INTERVAL     - First kline resolution to try ("1m")
  *   FALLBACK_INTERVAL    - Second kline resolution ("60m")
+ *                          (each an interval whose length MEXC_INTERVAL_MS,
+ *                          in -sources.gs, gives)
  *
  *   TIMEZONE_OFFSETS     - Map of abbreviation to UTC offset in hours
  *                          (see Time zones, in the help section above)
