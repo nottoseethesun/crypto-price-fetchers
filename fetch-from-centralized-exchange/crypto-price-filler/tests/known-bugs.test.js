@@ -11,12 +11,15 @@
  *
  * The Sheets scripts run unchanged in the test's thread, through
  * `tests/helpers/sheets-script.js`, with a stand-in for the Apps Script
- * service each test is about: the script lock.
+ * service each test is about: the script lock. The test of the runner's
+ * cache loads a short script with the runner's own services.
  */
 
 import { describe, it, expect } from "vitest";
 import path from "path";
 import { loadSheetsScript } from "./helpers/sheets-script.js";
+import { createAppsScriptServices } from "../../../apps-script-runner/apps-script-services.js";
+import { loadAppsScript } from "../../../apps-script-runner/load-apps-script.js";
 
 /** How long Google lets a custom function run before it stops it. */
 const CUSTOM_FUNCTION_LIMIT_MS = 30000;
@@ -81,6 +84,32 @@ describe("waits inside a custom function", () => {
       const waited = [...waits, ...sleeps].reduce((sum, ms) => sum + ms, 0);
       expect(waits.length).toBeGreaterThan(0);
       expect(waited).toBeLessThanOrEqual(CUSTOM_FUNCTION_LIMIT_MS);
+    },
+  );
+});
+
+describe("the runner's Apps Script services", () => {
+  it.fails(
+    "the runner's cache has getAll, putAll and removeAll, as Apps Script's has",
+    () => {
+      const source = [
+        "function rememberAndForget() {",
+        "  const cache = CacheService.getScriptCache();",
+        '  cache.putAll({ price: "1.5", pool: "0xabc" }, 60);',
+        '  const found = cache.getAll(["price", "pool", "missing"]);',
+        '  cache.removeAll(["price"]);',
+        '  return JSON.stringify([found, cache.get("price"), cache.get("pool")]);',
+        "}",
+      ].join("\n");
+      const context = loadAppsScript(
+        [{ source, filename: "cache-check.gs" }],
+        createAppsScriptServices({ fetchSync: () => ({ failure: "no web" }) }),
+      );
+      expect(JSON.parse(context.rememberAndForget())).toEqual([
+        { price: "1.5", pool: "0xabc" },
+        null,
+        "0xabc",
+      ]);
     },
   );
 });
