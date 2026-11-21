@@ -417,6 +417,8 @@ A bug found but not yet fixed is recorded as a test, which fails once the
 bug is gone, so the record cannot go stale. crypto-price-filler's
 `tests/known-bugs.test.js` declares each with `it.fails`: the test passes
 while the bug is present. The fix makes it fail. The same change declares
-it with `it` and moves it to `tests/regressions.test.js`, where it keeps
-the fixed behavior from coming back. The repo's `CLAUDE.md` lists the bugs
+it with `it` and moves it to the regression tests, where it keeps the
+fixed behavior from coming back: `tests/regressions-command-line.test.js`
+for the filler's two command lines, `tests/regressions.test.js` for the
+rest. The repo's `CLAUDE.md` lists the bugs
 known today, each with its test.

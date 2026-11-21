@@ -1,35 +1,20 @@
 /**
- * @file commander.js
+ * crypto-price-filler's command line, declared with commander: its
+ * options, each checked as it is parsed, and its help.
  * @module commander
- * @description
- * Centralized Commander.js CLI configuration for crypto-price-filler.
  *
- * This module defines the CLI interface using the commander library.
- * It handles argument parsing, validation, help text, and version display.
- *
- * Main exports:
- * - {@link setupCommander} → returns configured program instance
- * - {@link parseArgs}      → parses process.argv and returns options object
- *
- * Usage in index.js (recommended):
- * ```js
- * import { parseArgs } from './commander.js';
- *
- * const options = parseArgs();
- * // then use options.token, options.input, etc.
- * ```
- *
- * @example
- * node index.js --help
- * node index.js --token=grc --input=mining.csv --output=prices.csv --verbose
- *
- * @requires commander
- * @version 1.0.0
- * @author Your Name / Project Maintainer
- * @license MIT (or your project's license)
+ * `setupCommander` builds the command anew for each parse, so a test can
+ * parse several argument lists. A mistake in an option names the option,
+ * on stderr, and stops the run, with exit code 1, before any price is asked
+ * for: a token supported-tokens.json does not list (the message lists the
+ * ones it does), a mode other than high, low or close, or a time zone not
+ * named in full. `--list-valid-timezones` prints every zone `--tz` takes and
+ * exits, as `--help` does. The backfill flags take no default, so a flag
+ * not given leaves config.json's setting to decide (`backfillChoice`, in
+ * `utils/backfill.js`). `parseArgs` parses the process's arguments.
  */
 
-import { InvalidArgumentError, program } from "commander";
+import { Command, InvalidArgumentError } from "commander";
 import { canonicalTimeZone, validTimeZones } from "./utils/date.js";
 import { readSupportedTokens } from "./supported-tokens.js";
 
@@ -51,6 +36,9 @@ export function parseTimeZone(value) {
   );
 }
 
+/** The prices a row can take from its candle. */
+const PRICE_TARGETS = Object.freeze(["high", "low", "close"]);
+
 /**
  * Loads the supported token symbols from supported-tokens.json.
  * @returns {Object} The tokens object keyed by lowercase symbol
@@ -60,17 +48,45 @@ function loadSupportedTokens() {
 }
 
 /**
- * Configures and returns the Commander program instance.
+ * Checks a token's symbol, as commander parses it.
  *
- * This function defines:
- * - program name, description, version
- * - all required & optional options
- * - custom help text & examples
+ * @param {string} value - The symbol typed, in any case
+ * @returns {string} The symbol, in lower case
+ * @throws {InvalidArgumentError} When supported-tokens.json does not list it, naming the ones it does
+ */
+export function tokenSymbol(value) {
+  const symbol = value.toLowerCase();
+  const tokens = loadSupportedTokens();
+  if (Object.hasOwn(tokens, symbol)) return symbol;
+  const supported = Object.entries(tokens)
+    .map(([sym, cfg]) => `  ${sym}\t${cfg.name}`)
+    .join("\n");
+  throw new InvalidArgumentError(
+    `Unknown token symbol "${value}".\n\nSupported tokens:\n${supported}\n\n` +
+      "To add a new token, edit supported-tokens.json. See --help for details.",
+  );
+}
+
+/**
+ * Checks the price a row takes from its candle, as commander parses it.
  *
- * @returns {import('commander').Command} Configured Commander program
+ * @param {string} value - The price typed, in any case
+ * @returns {string} high, low or close
+ * @throws {InvalidArgumentError} When it is none of them
+ */
+export function priceTarget(value) {
+  const target = value.toLowerCase();
+  if (PRICE_TARGETS.includes(target)) return target;
+  throw new InvalidArgumentError("Give high, low or close.");
+}
+
+/**
+ * Builds the command line.
+ *
+ * @returns {import('commander').Command} The command
  */
 export function setupCommander() {
-  program
+  const command = new Command()
     .name("crypto-price-filler")
     .description(
       "Fetch historical crypto prices from centralized exchanges and fill CSV with USD values",
@@ -81,22 +97,7 @@ export function setupCommander() {
     .requiredOption(
       "--token <symbol>",
       "Crypto token symbol (e.g. grc, xtm, btc)",
-      (value) => {
-        const symbol = value.toLowerCase();
-        const tokens = loadSupportedTokens();
-        if (!tokens[symbol]) {
-          const supported = Object.entries(tokens)
-            .map(([sym, cfg]) => `  ${sym}\t${cfg.name}`)
-            .join("\n");
-          console.error(`\nError: Unknown token symbol "${value}".`);
-          console.error(`\nSupported tokens:\n${supported}`);
-          console.error(
-            `\nTo add a new token, edit supported-tokens.json. See --help for details.`,
-          );
-          process.exit(1);
-        }
-        return symbol;
-      },
+      tokenSymbol,
     )
     .requiredOption(
       "--input <path>",
@@ -108,13 +109,7 @@ export function setupCommander() {
     .option(
       "--mode <mode>",
       "Price target to fetch: high, low, or close",
-      (value) => {
-        const valid = ["high", "low", "close"];
-        if (!valid.includes(value.toLowerCase())) {
-          throw new Error(`--mode must be one of: high, low, close`);
-        }
-        return value.toLowerCase();
-      },
+      priceTarget,
       "close",
     )
     .option(
@@ -129,16 +124,14 @@ export function setupCommander() {
       "--list-valid-timezones",
       "Print every name --tz takes, one per line, and exit",
     )
-    .option("--verbose", "Enable detailed logging during processing", false)
+    .option("--verbose", "Enable detailed logging during processing")
     .option(
       "--backfill-highest",
-      "Fill empty prices with highest bracketing price (conservative tax estimates)",
-      false,
+      "Fill empty prices with highest bracketing price (conservative tax estimates); config.json's BACKFILL_HIGHEST when not given",
     )
     .option(
       "--backfill-lowest",
-      "Fill empty prices with lowest bracketing price (budgeting: avoid over-estimating income)",
-      false,
+      "Fill empty prices with lowest bracketing price (budgeting: avoid over-estimating income); config.json's BACKFILL_LOWEST when not given",
     )
 
     // Custom help formatting
@@ -173,30 +166,22 @@ Exit codes:
 
   // --list-valid-timezones works on its own, as --help does: it prints the
   // list while the options are parsed, before the required ones are checked.
-  program.on("option:list-valid-timezones", () => {
+  command.on("option:list-valid-timezones", () => {
     console.log(validTimeZones().join("\n"));
     process.exit(0);
   });
 
-  return program;
+  return command;
 }
 
 /**
- * Parses process.argv using the configured Commander program and returns the options object.
+ * Parses the process's arguments with the command line. `--help` and
+ * `--list-valid-timezones` print and exit with 0; a mistake prints its
+ * message and exits with 1.
  *
- * Automatically handles:
- * - --help / -h → prints help and exits 0
- * - missing required options → prints error + help and exits 1
- * - invalid values → throws error (Commander validation)
- *
- * @returns {Object} Parsed options (e.g. { token: 'grc', input: '...', output: 'output.csv', ... })
- * @throws {Error} If parsing fails (Commander already prints error + exits in most cases)
+ * @param {string[]} [argv=process.argv] - The arguments, as process.argv holds them
+ * @returns {Object} The options, such as { token: 'grc', input: '...', output: 'output.csv' }
  */
-export function parseArgs() {
-  const cmd = setupCommander();
-  cmd.parse(process.argv);
-  return cmd.opts();
+export function parseArgs(argv = process.argv) {
+  return setupCommander().parse(argv).opts();
 }
-
-// Optional: export the program itself for advanced testing / extension
-export { program };

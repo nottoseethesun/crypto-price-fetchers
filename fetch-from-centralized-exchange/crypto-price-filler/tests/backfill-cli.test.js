@@ -1,11 +1,15 @@
 /**
  * Unit tests for backfill.js CLI entry point
  * @module tests/backfill-cli.test
+ *
+ * `fs` and csv-writer are stand-ins, so no file is read or written, and so
+ * is config.js's `loadConfig`, whose settings each test sets.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import fs from "fs";
 import { runBackfill, setupBackfillCommander } from "../backfill.js";
+import { loadConfig } from "../config.js";
 
 // Mock fs module
 vi.mock("fs", async (importOriginal) => {
@@ -22,6 +26,9 @@ vi.mock("fs", async (importOriginal) => {
   };
 });
 
+// The settings, which each test sets
+vi.mock("../config.js", () => ({ loadConfig: vi.fn() }));
+
 // Mock csv-writer
 vi.mock("csv-writer", () => ({
   createObjectCsvWriter: vi.fn(() => ({
@@ -31,6 +38,7 @@ vi.mock("csv-writer", () => ({
 
 const mockExistsSync = vi.mocked(fs.existsSync);
 const mockReadFileSync = vi.mocked(fs.readFileSync);
+const mockLoadConfig = vi.mocked(loadConfig);
 
 // Sample CSV content for testing
 const sampleCsvContent = `"date (UTC)","amount","$usd price","$usd amount","grand total ($usd)"
@@ -38,22 +46,18 @@ const sampleCsvContent = `"date (UTC)","amount","$usd price","$usd amount","gran
 "2024-01-02 12:00:00","20","","","1000"
 "2024-01-03 12:00:00","15","200","3000","4000"`;
 
-const sampleConfig = JSON.stringify({
+const sampleConfig = {
   BACKFILL_HIGHEST: false,
   BACKFILL_LOWEST: false,
-});
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
 
   // Default mocks
   mockExistsSync.mockReturnValue(true);
-  mockReadFileSync.mockImplementation((filePath) => {
-    if (filePath.toString().includes("config.json")) {
-      return sampleConfig;
-    }
-    return sampleCsvContent;
-  });
+  mockReadFileSync.mockReturnValue(sampleCsvContent);
+  mockLoadConfig.mockReturnValue(sampleConfig);
 });
 
 afterEach(() => {
@@ -143,12 +147,7 @@ describe("backfill.js CLI", () => {
     });
 
     it("throws error when CSV is empty", async () => {
-      mockReadFileSync.mockImplementation((filePath) => {
-        if (filePath.toString().includes("config.json")) {
-          return sampleConfig;
-        }
-        return "";
-      });
+      mockReadFileSync.mockReturnValue("");
 
       await expect(
         runBackfill({
@@ -158,13 +157,8 @@ describe("backfill.js CLI", () => {
       ).rejects.toThrow("Input CSV is empty");
     });
 
-    it("uses the defaults in the config.json beside it, whichever folder it runs in", async () => {
-      mockReadFileSync.mockImplementation((filePath) => {
-        if (filePath.toString().includes("config.json")) {
-          return JSON.stringify({ BACKFILL_HIGHEST: true });
-        }
-        return sampleCsvContent;
-      });
+    it("takes its mode from the settings config.js reads when no flag is given", async () => {
+      mockLoadConfig.mockReturnValue({ BACKFILL_HIGHEST: true });
 
       const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
@@ -174,10 +168,7 @@ describe("backfill.js CLI", () => {
       });
 
       expect(stats.emptyRowsFilled).toBe(1);
-      expect(mockReadFileSync).toHaveBeenCalledWith(
-        expect.stringMatching(/crypto-price-filler[\\/]config\.json$/),
-        "utf8",
-      );
+      expect(mockLoadConfig).toHaveBeenCalledTimes(1);
 
       consoleSpy.mockRestore();
     });
@@ -245,25 +236,17 @@ describe("backfill.js CLI", () => {
       consoleSpy.mockRestore();
     });
 
-    it("handles config.json read error gracefully", async () => {
-      mockReadFileSync.mockImplementation((filePath) => {
-        if (filePath.toString().includes("config.json")) {
-          throw new Error("File not found");
-        }
-        return sampleCsvContent;
+    it("stops, saying why, when the settings cannot be read, even with a flag given", async () => {
+      mockLoadConfig.mockImplementation(() => {
+        throw new SyntaxError("Unexpected token } in JSON at position 9");
       });
 
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-
-      // Should still work with explicit backfill flag
-      const stats = await runBackfill({
-        input: "test.csv",
-        backfillHighest: true,
-      });
-
-      expect(stats.emptyRowsFilled).toBe(1);
-
-      consoleSpy.mockRestore();
+      await expect(
+        runBackfill({
+          input: "test.csv",
+          backfillHighest: true,
+        }),
+      ).rejects.toThrow("Unexpected token");
     });
 
     it("detects column names from CSV headers", async () => {
@@ -272,12 +255,7 @@ describe("backfill.js CLI", () => {
 "2024-01-02","20","","","1000"
 "2024-01-03","15","200","3000","4000"`;
 
-      mockReadFileSync.mockImplementation((filePath) => {
-        if (filePath.toString().includes("config.json")) {
-          return sampleConfig;
-        }
-        return customCsv;
-      });
+      mockReadFileSync.mockReturnValue(customCsv);
 
       const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 

@@ -45,11 +45,14 @@
  * Configuration
  * -------------
  *
- * Default backfill mode can be set in config.json:
+ * Default backfill mode can be set in config.json, which config.js lays
+ * over the committed config-example.json:
  *   "BACKFILL_HIGHEST": true   // Enable --backfill-highest by default
  *   "BACKFILL_LOWEST": true    // Enable --backfill-lowest by default
  *
- * CLI flags override config.json settings.
+ * A flag given on the command line turns its mode on whatever config.json
+ * says; a flag not given leaves the setting to decide (`backfillChoice`, in
+ * utils/backfill.js). A config.json that cannot be read stops the run.
  *
  * Examples
  * --------
@@ -82,33 +85,22 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 
-import { fileURLToPath } from "url";
 import { Command } from "commander";
 import { parse as csvParse } from "csv-parse/sync";
 import { createObjectCsvWriter } from "csv-writer";
 
-import { backfillPrices, DEFAULT_COLUMNS } from "./utils/backfill.js";
+import { loadConfig } from "./config.js";
+import {
+  backfillChoice,
+  backfillPrices,
+  DEFAULT_COLUMNS,
+} from "./utils/backfill.js";
 import { logv } from "./utils/log.js";
-
-/** The owner's `config.json`, beside this file, whichever folder the command runs in. */
-const CONFIG_PATH = fileURLToPath(new URL("./config.json", import.meta.url));
-
-/**
- * Loads configuration from config.json.
- * @returns {Object} Configuration object
- */
-function loadConfig() {
-  try {
-    return JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
-  } catch (_e) {
-    return {};
-  }
-}
 
 /**
  * Expands ~ to home directory in file path.
- * @param {string} filePath - File path that may contain ~
- * @returns {string} Expanded file path
+ * @param {string|undefined} filePath - File path that may contain ~, or undefined when none was given
+ * @returns {string|undefined} Expanded file path, or undefined
  */
 function expandPath(filePath) {
   if (filePath?.startsWith("~")) {
@@ -120,18 +112,18 @@ function expandPath(filePath) {
 /**
  * Validates backfill options and returns resolved values.
  * @param {Object} options - CLI options
- * @param {Object} config - Configuration from config.json
+ * @param {Object} config - The settings, as config.js's `loadConfig` reads them
  * @returns {Object} Resolved options with inputFile, outputFile, verbose, useHighest
  * @throws {Error} If validation fails
  */
 function validateAndResolveOptions(options, config) {
   const inputFile = expandPath(options.input);
-  const outputFile = options.output || inputFile;
-  const verbose = options.verbose || process.env.VERBOSE === "1";
-  const backfillHighest =
-    options.backfillHighest ?? config.BACKFILL_HIGHEST ?? false;
-  const backfillLowest =
-    options.backfillLowest ?? config.BACKFILL_LOWEST ?? false;
+  const outputFile = expandPath(options.output) ?? inputFile;
+  const verbose = options.verbose === true || process.env.VERBOSE === "1";
+  const { highest: backfillHighest, lowest: backfillLowest } = backfillChoice(
+    options,
+    config,
+  );
 
   if (!backfillHighest && !backfillLowest) {
     throw new Error(
@@ -184,14 +176,14 @@ function readCsvFile(filePath) {
  */
 function detectColumns(headers) {
   const priceColName =
-    headers.find((h) => h.includes("$usd price")) || DEFAULT_COLUMNS.price;
+    headers.find((h) => h.includes("$usd price")) ?? DEFAULT_COLUMNS.price;
   const amountColName =
-    headers.find((h) => h.toLowerCase().includes("amount")) ||
+    headers.find((h) => h.toLowerCase().includes("amount")) ??
     DEFAULT_COLUMNS.amount;
   const usdAmountColName =
-    headers.find((h) => h.includes("$usd amount")) || DEFAULT_COLUMNS.usdAmount;
+    headers.find((h) => h.includes("$usd amount")) ?? DEFAULT_COLUMNS.usdAmount;
   const grandTotalColName =
-    headers.find((h) => h.includes("grand total")) ||
+    headers.find((h) => h.includes("grand total")) ??
     DEFAULT_COLUMNS.grandTotal;
 
   if (!headers.includes(priceColName)) {
@@ -242,15 +234,13 @@ export function setupBackfillCommander() {
     )
     .option(
       "--backfill-highest",
-      "Fill empty prices with highest bracketing price (conservative tax estimates)",
-      false,
+      "Fill empty prices with highest bracketing price (conservative tax estimates); config.json's BACKFILL_HIGHEST when not given",
     )
     .option(
       "--backfill-lowest",
-      "Fill empty prices with lowest bracketing price (budgeting: avoid over-estimating)",
-      false,
+      "Fill empty prices with lowest bracketing price (budgeting: avoid over-estimating); config.json's BACKFILL_LOWEST when not given",
     )
-    .option("--verbose", "Enable detailed logging during processing", false)
+    .option("--verbose", "Enable detailed logging during processing")
 
     .addHelpText(
       "after",
@@ -295,10 +285,10 @@ export function parseBackfillArgs() {
  * @param {boolean} [options.backfillHighest] - Use highest bracketing price
  * @param {boolean} [options.backfillLowest] - Use lowest bracketing price
  * @param {boolean} [options.verbose] - Enable verbose logging
+ * @param {Object} [config] - The settings; those config.js's `loadConfig` reads when not given
  * @returns {Promise<Object>} Result object with statistics
  */
-export async function runBackfill(options) {
-  const config = loadConfig();
+export async function runBackfill(options, config = loadConfig()) {
   const { inputFile, outputFile, verbose, useHighest } =
     validateAndResolveOptions(options, config);
 

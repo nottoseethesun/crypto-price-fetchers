@@ -313,16 +313,15 @@ functions inside the scripts that the owner runs by hand. crypto-price-filler's
 A bug found gets a test in crypto-price-filler's
 `tests/known-bugs.test.js`, declared with `it.fails`, so it passes while the
 bug is present, and a row in the table below. Its fix makes the test fail;
-the same change declares the test with `it`, moves it to
-`tests/regressions.test.js`, which guards the fixed bugs, and removes the
-row.
+the same change declares the test with `it`, moves it to the tests that
+guard the fixed bugs, `tests/regressions-command-line.test.js` for the
+filler's command lines and `tests/regressions.test.js` for the rest, and
+removes the row.
 
 Google stops a custom function, a function a cell calls, after 30 seconds,
-and the cell shows `#ERROR!`. The first two bugs below are waits longer than that.
+and the cell shows `#ERROR!`. Both bugs below are waits longer than that.
 
 | Bug | Test in `tests/known-bugs.test.js` |
 | --- | --- |
 | `dexToolsGetTokenPrice` and `dexToolsGetTokenFDV`, in `crypto-price-fetchers.gs`, wait up to `DEXTOOLS_CONFIG.LOCK_WAIT_MS`, 120 seconds, for the script lock, so a cell that waits more than 30 seconds shows `#ERROR!`, never the busy message the script returns when the wait ends. | dexToolsGetTokenPrice waits for the script lock no longer than Google lets a custom function run |
 | `getCryptoPrice`, in the exchange script, tries the script lock 3 times for 2 seconds each, waiting 5, 10 and 20 seconds after each failed try (`LOCK_RETRY_BACKOFF`): 41 seconds in all. | getCryptoPrice waits for the script lock, in all, no longer than Google lets a custom function run |
-| crypto-price-filler's `--mode` check throws a plain Error, so a value it does not know, such as `bogus`, crashes the run with a stack trace, where commander would refuse the value and name the option. | refuses a --mode it does not know as commander refuses a wrong value, naming --mode, with no stack trace |
-| crypto-price-filler's `--backfill-highest` and `--backfill-lowest` default to false, so the `??` that should fall back to `BACKFILL_HIGHEST` and `BACKFILL_LOWEST` in config.json never does, in `index.js` and in `backfill.js`. | takes BACKFILL_HIGHEST from config.json when neither backfill flag is given |

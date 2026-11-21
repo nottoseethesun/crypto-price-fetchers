@@ -27,13 +27,13 @@ export function shouldShowProgressBar(verbose) {
  */
 export function createProgressBar(total, options = {}) {
   const bar = new cliProgress.SingleBar({
-    format:
-      options.format ||
-      "Fetching prices |{bar}| {percentage}% | {value}/{total} rows | ETA: {eta_formatted}",
     barCompleteChar: "\u2588",
     barIncompleteChar: "\u2591",
     hideCursor: true,
     ...options,
+    format:
+      options.format ??
+      "Fetching prices |{bar}| {percentage}% | {value}/{total} rows | ETA: {eta_formatted}",
   });
 
   let current = 0;
