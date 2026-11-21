@@ -1,11 +1,20 @@
 # crypto-price-fetchers — Engineering Reference
 
 The files the programs read and write, the gates every change passes, the
-tests, and CI. For how the parts fit, see
-[`docs/architecture.md`](architecture.md); for every npm command, see
+tests, and CI. The programs are this repo's parts: the Sheets scripts and
+their Node versions, which price tokens in USD; crypto-price-filler, the
+Node tool that fills a CSV's price columns; the build step, which sets the
+saved api keys in the Sheets scripts for pasting into Apps Script; the key
+store, which keeps the api keys encrypted; the versions tool, which sets
+a project's dependencies from GitHub to a branch or a release; and the
+Summ CSV writer, which writes the CSV files the owner imports into Summ,
+the crypto tax calculator he keeps his books in.
+For how the parts fit, see [`docs/architecture.md`](architecture.md); for
+every npm command, see
 [`docs/npm-project-commands.md`](npm-project-commands.md).
 
-The repo follows LP Ranger's coding standards: its `CLAUDE.md` and
+The repo follows the coding standards of LP Ranger, the owner's bot that
+manages his 9mm V3 liquidity positions: its `CLAUDE.md` and
 `docs/claude/`, in
 [nottoseethesun/lp-ranger](https://github.com/nottoseethesun/lp-ranger).
 
@@ -31,7 +40,11 @@ The repo follows LP Ranger's coding standards: its `CLAUDE.md` and
 ## Quick Start
 
 A working copy needs Node 22 or later, the packages of the repo and of
-crypto-price-filler, and the api keys. From the repo's top folder:
+crypto-price-filler, and the api keys. `npm run api-keys` runs the key
+store's manager, `npm run check` the gate below, and
+`npm run build apps-script` the build step, which gives the Sheets scripts
+with the saved keys set in them, for pasting into Apps Script. From the
+repo's top folder:
 
 ```bash
 npm ci
@@ -92,8 +105,9 @@ since no import says where it comes from. And `no-unused-vars` passes a
 script's top-level functions, since a cell or another file calls them, out
 of ESLint's sight. The security lint reads the Sheets scripts too.
 
-The husky pre-commit hook (`.husky/pre-commit`) runs `npm run lint`, so an
-unformatted or failing file stops the commit; `npm run format` or
+husky, a package that runs scripts at git's hooks, runs `npm run lint`
+before each commit (`.husky/pre-commit`), so an unformatted or failing
+file stops the commit; `npm run format` or
 `npm run lint:fix` fixes formatting. No rule is ever switched off in a file,
 no file is left out of the lint, and a file over 500 lines is split, not
 excused.
@@ -103,7 +117,8 @@ excused.
 ## Tests
 
 Two test suites run in `npm run check`: the top folder's, on Node's own
-test runner, and crypto-price-filler's, on vitest. Neither asks a service
+test runner, and crypto-price-filler's, on vitest, a test runner its tests
+were written for. Neither asks a service
 outside the computer, and neither reads the owner's key file or password.
 
 **The top folder's tests** (`test/`, Node's test runner) cover the runner,
@@ -118,7 +133,11 @@ clipboard, the install and the questions. The versions tool's tests run
 it on projects in temp folders, with a stand-in npm that writes the
 lockfile an install would (`test/helpers/github-project-deps-stand-ins.js`);
 git itself lists their package.json files, and npm's dry-run pack shows
-what the package ships for the bin. The Summ CSV writer's tests change one
+what the package ships for the bin. The shared helpers' tests ask npm's
+dry-run pack whether `lib/` ships, and import `messageOf` by the
+package's own name, `crypto-price-fetchers/lib/message-of`, which Node
+resolves through the package's `exports`, as it does in a project that
+installs this repo. The Summ CSV writer's tests change one
 value of a row that passes every rule, so each test reads one rule's
 problem (`test/helpers/summ-csv-rows.js`), read a copy of the owner's
 template (`test/fixtures/summ-template.csv`), and write their files in
@@ -128,7 +147,8 @@ folders of their own (`test/helpers/temp-folders.js`), removed when a test
 file ends; `test/fixtures/lp-ranger-api-keys.json`, written by LP Ranger's
 own code, checks that the store opens LP Ranger's files. A test that starts
 a program gives it an environment without `API_KEYS_PASSWORD`, and a key
-file of its own in `API_KEYS_FILE_PATH`. `unlock-api-keys.sh` is tested in
+file of its own in `API_KEYS_FILE_PATH`. `unlock-api-keys.sh`, the script
+that keeps the password for a terminal, is tested in
 bash, and in zsh where zsh is installed. `npm run test:coverage` fails below
 80% of lines covered.
 

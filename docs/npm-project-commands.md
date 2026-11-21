@@ -1,7 +1,10 @@
 # crypto-price-fetchers — `npm` Project Commands
 
-Every command defined in `package.json`, and in crypto-price-filler's, what
-it does, and what to type.
+Every npm command of crypto-price-fetchers, the owner's repo of code his
+projects share: those its top `package.json` defines, which run from the
+repo's top folder, and those of crypto-price-filler, its Node tool that
+fills a CSV's price columns, which has a package of its own; with what
+each does and what to type.
 
 Companion to [`docs/engineering.md`](engineering.md), which covers how the
 gates work. This file covers how to drive them.
@@ -26,7 +29,10 @@ gates work. This file covers how to drive them.
 
 Run with `npm run <name>`; `test` also works without `run`. Flags go after
 a `--` separator, which tells npm the rest belongs to the script; a word
-with no dashes, such as `apps-script`, needs none:
+with no dashes, such as `apps-script`, needs none. These three commands
+replace the saved DexTools key ([Api Keys](#api-keys)), run the tests
+whose names hold `unlockApiKeys` ([Test](#test)), and give the Sheets
+scripts with their keys ([Build](#build)):
 
 ```sh
 npm run api-keys -- set dextools
@@ -38,15 +44,17 @@ npm run build apps-script
 
 ## Api Keys
 
-The api keys the programs send are kept encrypted in `api-keys.json`. One
-command manages them.
+The api keys the programs send are kept encrypted in `api-keys.json` by
+this repo's key store, `api-key-store/`. One command runs its key
+manager.
 
 | Command | Flags | Description | Example |
 | ------- | ----- | ----------- | ------- |
 | `api-keys` | `set <service>`, `check-password`, `--help` | The key manager. Lists each key the top `config.json` names, saved or not, never showing a key's characters, and asks for each one not saved: the key, then the password. Each key is saved, encrypted, once its service takes it. `set <service>` replaces one key. `check-password` says, by its exit code, whether the password in `API_KEYS_PASSWORD` opens every key saved; `unlock-api-keys.sh` runs it. | `npm run api-keys` · `npm run api-keys -- set coingecko` |
 
-`source ./unlock-api-keys.sh`, which is no npm command, keeps the password
-for a terminal: see [the key store's README](../api-key-store/README.md).
+`source ./unlock-api-keys.sh`, a script in the repo's top folder and no npm
+command, keeps the password for a terminal: see
+[the key store's README](../api-key-store/README.md).
 
 ---
 
@@ -64,7 +72,8 @@ gives that copy.
 
 ## Summ CSV Files
 
-Every CSV file the owner imports into Summ is written by one utility,
+Every CSV file the owner imports into Summ, the crypto tax calculator he
+keeps his books in, is written by one utility, this repo's `summ-csv/`,
 which checks every row first and writes nothing while any row breaks a
 rule ([its README](../summ-csv/README.md) lists the rules).
 
@@ -83,7 +92,7 @@ and `format` and `lint:fix` make the fixes the tools can make.
 | ------- | ----- | ----------- | ------- |
 | `format` | — | Prettier's write pass over every JavaScript, Sheets script, JSON and YAML file. | `npm run format` |
 | `knip:files` | — | The dead-code check: fails on any file nothing reaches. `lint` runs it. | `npm run knip:files` |
-| `lint` | — | The linters: ESLint, markdownlint, Prettier in check mode, actionlint, and knip's unused files. The husky pre-commit hook runs it. | `npm run lint` |
+| `lint` | — | The linters: ESLint, markdownlint, Prettier in check mode, actionlint, and knip's unused files. husky, the package that runs scripts at git's hooks, runs it before each commit. | `npm run lint` |
 | `lint:fix` | — | ESLint and markdownlint with their fixes, then `format`. | `npm run lint:fix` |
 
 ---
@@ -137,10 +146,13 @@ run in `fetch-from-centralized-exchange/crypto-price-filler/`, after
 
 ## See Also
 
-This repo's bin, `github-project-deps`, is no command of this repo: the
-projects that install this repo run it, as
+This repo's bin, `github-project-deps`, the versions tool, is no command
+of this repo: the projects that install this repo (pulsechain-analytics,
+pulsechain-validator-analytics and x1-validator-analytics) run it, as
 `npm run github-project-deps -- main` or `-- release`. Its other bin,
 `summ-csv`, is the command above, for a project that installs this repo.
+The gates are those of LP Ranger, the owner's bot that manages his 9mm V3
+liquidity positions, whose merge protocol the last link below gives.
 
 - [Which version they install](architecture.md#which-version-they-install)
   — what that bin does.

@@ -10,6 +10,7 @@
     "./dex-prices/moralis": "./dex-prices/moralis.js",
     "./dex-prices/web-request": "./dex-prices/web-request.js",
     "./eslint-rules/no-secret-logging": "./eslint-rules/no-secret-logging.js",
+    "./lib/message-of": "./lib/message-of.js",
     "./summ-csv": "./summ-csv/index.js"
   },
   "bin": {

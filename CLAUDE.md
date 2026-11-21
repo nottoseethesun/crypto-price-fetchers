@@ -2,7 +2,8 @@
 
 ## Conventions
 
-Follow LP Ranger's coding standards: its `CLAUDE.md` and everything under
+Follow the coding standards of LP Ranger, the owner's bot that manages his
+9mm V3 liquidity positions: its `CLAUDE.md` and everything under
 `docs/claude/`, in [nottoseethesun/lp-ranger](https://github.com/nottoseethesun/lp-ranger)
 or the local clone at `~/code/lp-ranger/github-repo/lp-ranger/`. Read them, and
 never change anything in LP Ranger.
@@ -24,9 +25,12 @@ Each `.gs` has a Node version beside it, of the same name ending in `.js`:
 A Node version runs its `.gs` unchanged, through the runner in
 `apps-script-runner/`, and never copies the script's logic, since LP
 Ranger's rules forbid a second copy. A fix belongs in the `.gs`, where it
-fixes both. crypto-price-filler keeps no price source of its own for
-MEXC, CoinGecko or CoinPaprika: it asks the exchange script's, through its
-Node version's `openCentralizedExchangeSources` (`sources/exchange.js`).
+fixes both. crypto-price-filler, the Node tool in
+`fetch-from-centralized-exchange/crypto-price-filler/` that fills a CSV's
+price columns, keeps no price source of its own for MEXC, a centralized
+exchange, or CoinGecko or CoinPaprika, two services that gather the
+exchanges' prices: it asks the exchange script's, through its Node
+version's `openCentralizedExchangeSources` (`sources/exchange.js`).
 
 Apps Script's `UrlFetchApp.fetch` returns the response, where Node's
 `fetch` returns a promise that a script's code cannot wait for on its own
@@ -34,15 +38,18 @@ thread. So the runner loads a script, one file or several in Apps Script's
 order, in a worker thread, with Node versions of the Apps Script services.
 It does each web request on the caller's thread, with the caller's fetch,
 while the worker blocks; the file headers in `apps-script-runner/` explain
-how. pulsechain-analytics installs this repo from GitHub for the runner
+how. pulsechain-analytics, the owner's tools for questions about
+PulseChain, installs this repo from GitHub for the runner
 (`crypto-price-fetchers/apps-script-runner`), which runs
 pulsechain-analytics' own Sheets script. A change to the runner reaches it
 once its lockfile is made again, below.
 
 ## The projects that install this repo
 
-pulsechain-analytics, pulsechain-validator-analytics and
-x1-validator-analytics install this repo from GitHub as
+pulsechain-analytics, pulsechain-validator-analytics (the owner's
+PulseChain validators' withdrawal addresses and payments) and
+x1-validator-analytics (his X1 validator's rewards) install this repo from
+GitHub as
 `github:nottoseethesun/crypto-price-fetchers#main`, which follows main, or
 `#semver:*`, which follows the latest release, the highest version tag;
 their lockfiles keep the commit installed. The bin `github-project-deps`
@@ -69,6 +76,7 @@ module.
 
 ## Summ csv files
 
+Summ is the crypto tax calculator the owner keeps his books in.
 **Every csv file for Summ is written by `summ-csv/`**, through
 `npm run summ-csv`, the bin `summ-csv`, or `writeSummCsv` from
 `crypto-price-fetchers/summ-csv`: never by a script written for the
@@ -87,22 +95,24 @@ reply, a log line, an error message, a test's output, or a listing. The key
 manager says only whether each key is saved.
 
 No api key is committed. The keys the programs send (CoinGecko's,
-CoinPaprika's, DexTools', Moralis' and x1.ninja's, as the top
+CoinPaprika's and Moralis', for past prices; DexTools' and x1.ninja's, the
+services `crypto-price-fetchers.gs` asks for current prices; as the top
 `config.json` lists them under `apiKeys`) are kept in `api-keys.json` at
 the repo's top, which git ignores,
 encrypted with one password the owner types: LP Ranger's design, built as a
 module any project can use, `api-key-store/` (its README shows how).
 `npm run api-keys` runs the key manager, `manage-api-keys.js`. A program
 opens its keys with the password in `API_KEYS_PASSWORD`, which
-`source ./unlock-api-keys.sh` keeps for a terminal, or else asks for it, and
-keeps the keys only in memory. pulsechain-analytics and
+`source ./unlock-api-keys.sh`, a script at the repo's top, keeps for a
+terminal, or else asks for it, and keeps the keys only in memory.
+pulsechain-analytics, pulsechain-validator-analytics and
 x1-validator-analytics install the module from GitHub and keep a copy of
 `unlock-api-keys.sh`, which their tests hold to this one.
 
 A test names a key file of its own, never the owner's, and passes no
 `API_KEYS_PASSWORD` it did not set: crypto-price-filler's
-`vitest.config.js` names a key file that does not exist and empties the
-password.
+`vitest.config.js`, the settings of vitest, the test runner its tests run
+on, names a key file that does not exist and empties the password.
 
 The Node versions hand the keys they open to their scripts as config
 values: `CONFIG.COINGECKO_API_KEY` and `CONFIG.COINPAPRIKA_API_KEY` in the
@@ -127,9 +137,10 @@ covers the files, the gates, the tests and CI, and
 `docs/` does. A change keeps them true.
 
 Every doc passes the owner's documentation audit: it tells no story of an
-old bug, leads every topic and sub-topic with the context it needs,
-explains with facts rather than adjectives, and leaves out no step in the
-logic of an explanation.
+old bug, leads every topic and sub-topic with the context it needs, says
+which codebase a tool comes from and what it is for before it names the
+tool (an `npm run` command, a bin, a script), explains with facts rather
+than adjectives, and leaves out no step in the logic of an explanation.
 
 ## Gates and CI
 
@@ -138,7 +149,8 @@ Ranger's rules, markdownlint, Prettier, actionlint, knip's unused files),
 the tests with at least 80% of lines covered, crypto-price-filler's tests
 with the same floor, and the security audits (npm audit, the security lint
 in `eslint-security.config.js`, secretlint). It must pass before a commit
-and a push; the husky pre-commit hook runs `npm run lint`. The repo has no
+and a push; husky, the package that runs scripts at git's hooks, runs
+`npm run lint` before each commit. The repo has no
 `prepare`, `install` or `postinstall` script, since npm runs a git
 dependency's `prepare` in every project that installs it: `prelint`
 installs the hooks.
@@ -161,7 +173,8 @@ The runner, the Node versions, the build step, the price clients, the key
 store, the lint rule, the versions tool and the shared helpers in `lib/`
 are tested from the repo's top folder, on Node's own test runner. Code
 that more than one part uses lives once, in `lib/`, which ships with the
-package. The tests ask no
+package; `messageOf` is exported as `crypto-price-fetchers/lib/message-of`,
+for the projects that install this repo. The tests ask no
 outside service: the scripts' requests go to a stand-in fetch or a stand-in
 server on the computer (`test/helpers/stand-in-web.js`). The key store's
 tests save keys in temp folders of their own

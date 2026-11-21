@@ -301,6 +301,10 @@ describe("the command line", () => {
     assert.equal(run.exitCode, 0);
     assert.match(run.stdout, /Usage: summ-csv \[options\]/);
     assert.match(run.stdout, /The rows file holds a JSON array/);
+    assert.match(
+      run.stdout,
+      /Exit codes: 0 when the file was written; 1 when it was not\./,
+    );
   });
 });
 
