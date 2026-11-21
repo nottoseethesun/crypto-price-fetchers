@@ -62,7 +62,7 @@ liquidity positions.
 | The security lint's rule | `eslint-rules/no-secret-logging.js` | Refuses printing a name that may hold a secret. |
 | The versions tool | `github-project-deps.js`, `github-project-deps/` | The bin `github-project-deps`, which sets a project's dependencies from GitHub to their projects' main branch or latest release. |
 | The Summ CSV writer | `summ-csv.js`, `summ-csv/` | Writes the CSV files the owner imports into Summ, once every row has passed its rules: `npm run summ-csv`, the bin `summ-csv`, and `writeSummCsv` for a program. |
-| The shared helpers | `lib/` | Code more than one part uses: `messageOf`, which gives the message of something thrown, for the runner, the key store, the build step, the versions tool and the Summ CSV writer's command line. The package exports it as `crypto-price-fetchers/lib/message-of`, for the projects that install this repo. |
+| The shared helpers | `lib/` | Code more than one part uses: `messageOf`, which gives the message of something thrown, for the runner, the key store, the build step, the versions tool and the Summ CSV writer's command line. The package exports it as `crypto-price-fetchers/lib/message-of`, for the projects that install this repo. And the checks of a command line's help, which every repo's tests make on each of its command lines: `crypto-price-fetchers/lib/command-line-help`. |
 
 ---
 

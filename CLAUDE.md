@@ -193,7 +193,11 @@ exit codes. An npm target that runs one passes the flag through, as
 `npm run <target> -- --help`. Each is declared with commander, the package
 that parses command lines, so the options its help lists come from the
 declaration the program parses; the examples and exit codes go in the
-help's closing text (`addHelpText("after", …)`).
+help's closing text (`addHelpText("after", …)`). The checks of a help
+are in `lib/command-line-help.js`, exported as
+`crypto-price-fetchers/lib/command-line-help`:
+`test/command-line-help.test.js` runs them on every command line here,
+and the repos that install this one run them in their own tests.
 `docs/npm-project-commands.md` lists every npm target, including those
 that run other tools, such as `lint` and `check`, with its flags and an
 example. LP Ranger's rules do not yet ask for the examples; this repo does.
@@ -240,7 +244,9 @@ built from stand-in sources written in its test, compiled with the real
 esbuild. Code
 that more than one part uses lives once, in `lib/`, which ships with the
 package; `messageOf` is exported as `crypto-price-fetchers/lib/message-of`,
-for the projects that install this repo. The tests ask no
+and the checks of a command line's help as
+`crypto-price-fetchers/lib/command-line-help`, for the projects that
+install this repo. The tests ask no
 outside service: the scripts' requests go to a stand-in fetch or a stand-in
 server on the computer (`test/helpers/stand-in-web.js`). The key store's
 tests save keys in temp folders of their own
