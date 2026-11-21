@@ -13,12 +13,14 @@
  *
  * The Sheets scripts run unchanged in the test's thread, through
  * `tests/helpers/sheets-script.js`, with a stand-in for the Apps Script
- * service each test is about: the script lock.
+ * service each test is about: the script lock, or MEXC, an exchange,
+ * answering as `test/helpers/stand-in-mexc.js` says it does.
  */
 
 import { describe, it, expect } from "vitest";
 import path from "path";
 import { loadSheetsScript } from "./helpers/sheets-script.js";
+import { mexcCandleOpen } from "../../../test/helpers/stand-in-mexc.js";
 
 /** How long Google lets a custom function run before it stops it. */
 const CUSTOM_FUNCTION_LIMIT_MS = 30000;
@@ -83,6 +85,39 @@ describe("waits inside a custom function", () => {
       const waited = [...waits, ...sleeps].reduce((sum, ms) => sum + ms, 0);
       expect(waits.length).toBeGreaterThan(0);
       expect(waited).toBeLessThanOrEqual(CUSTOM_FUNCTION_LIMIT_MS);
+    },
+  );
+});
+
+describe("the candle asked of MEXC", () => {
+  it.fails(
+    "getCryptoPrice prices the minute that holds a time on a whole minute, and in its fallback the hour that holds a time on a whole hour",
+    () => {
+      const minuteAsked = Date.UTC(2025, 5, 15, 12, 30, 0);
+      const hourAsked = Date.UTC(2025, 5, 15, 12, 0, 0);
+      // Each candle's high is 1.5 when it holds the time asked, else 9.9;
+      // the minute of 12:00 had no trade, so its hour answers
+      const answer = (url) => {
+        if (url.includes("/exchangeInfo"))
+          return {
+            symbols: [
+              { symbol: "XTMUSDT", baseAsset: "XTM", quoteAsset: "USDT" },
+            ],
+          };
+        if (!url.includes("/klines")) return null;
+        const open = mexcCandleOpen(url);
+        const isMinute = url.includes("interval=1m");
+        if (open === null || (isMinute && open === hourAsked)) return [];
+        const holds = open === (isMinute ? minuteAsked : hourAsked);
+        return [[open, "1.00", holds ? "1.50" : "9.90", "0.80", "1.10", "10"]];
+      };
+      const script = loadSheetsScript(EXCHANGE_SCRIPT, answer);
+      expect(
+        script.getCryptoPrice("xtm", "2025-06-15 12:30:00", "UTC", "high"),
+      ).toBe(1.5);
+      expect(
+        script.getCryptoPrice("xtm", "2025-06-15 12:00:00", "UTC", "high"),
+      ).toBe(1.5);
     },
   );
 });

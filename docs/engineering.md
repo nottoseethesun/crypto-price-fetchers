@@ -259,7 +259,10 @@ that this section, or `CLAUDE.md`, names every one.
 
 Its helpers (`test/helpers/`), besides those the paragraphs above name:
 `captured-output.js`, a stream stand-in that keeps what is written to it,
-for the tests of the command lines.
+for the tests of the command lines; and `stand-in-mexc.js`, which gives
+the open time of the candle MEXC, an exchange, answers a request for
+candles with, the first whose period opens in the window asked, so the
+stand-ins of both suites answer as MEXC does.
 
 **crypto-price-filler's** (`tests/`):
 
@@ -350,7 +353,7 @@ answered at once.
 | crypto-price-filler's `tests/sheets-sources.test.js`, `tests/regressions.test.js`, `tests/xtm-coingecko-id.test.js` | In the test's own thread (`tests/helpers/sheets-script.js`). `UrlFetchApp.fetch` answers at once from a function the test gives, so nothing waits. | What each price source gives, the cases the regression tests cover, and that no file of the exchange script holds a CoinGecko api key. |
 | crypto-price-filler's `tests/regressions.test.js`, `tests/xtm-coingecko-id.test.js`, through the tool | Through the exchange script's Node version, in the worker thread, as the tool runs it (`tests/helpers/stand-in-fetch.js`). | The same cases, reached through the tool's provider chain. |
 | `test/load-apps-script.test.js`, `test/apps-script-services.test.js` | Small scripts in `test/fixtures/`, in the test's own thread, with requests answered at once. | That a script's files load into one scope, in order, and that each Node service acts as Apps Script's does. |
-| `test/crypto-price-fetchers-menu.test.js`; crypto-price-filler's `tests/regressions.test.js` and `tests/known-bugs.test.js` | In the test's own thread, with a spreadsheet held in memory (`test/helpers/stand-in-spreadsheet.js`) or a stand-in lock in place of Apps Script's. | What each menu item writes, in which order, and what it reports; and the waits of the price functions that the known bugs are about. |
+| `test/crypto-price-fetchers-menu.test.js`; crypto-price-filler's `tests/regressions.test.js` and `tests/known-bugs.test.js` | In the test's own thread, with a spreadsheet held in memory (`test/helpers/stand-in-spreadsheet.js`), a stand-in lock in place of Apps Script's, or a stand-in MEXC (`test/helpers/stand-in-mexc.js`). | What each menu item writes, in which order, and what it reports; and what the price functions do in the known bugs. |
 
 The Node tests run Node's versions of the services, one call at a time,
 against stand-ins for the price services. So three things lie outside
