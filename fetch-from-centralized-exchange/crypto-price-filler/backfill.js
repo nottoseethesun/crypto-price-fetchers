@@ -264,7 +264,12 @@ Examples:
 
   Verbose mode:
     $ node backfill.js --input=output.csv --backfill-highest --verbose
-    `,
+
+Exit codes:
+  0  the output file was written
+  1  it was not: an option was wrong or missing, or the input could not be
+     read or filled
+`,
     )
 
     .helpOption("-h, --help", "display help for command");

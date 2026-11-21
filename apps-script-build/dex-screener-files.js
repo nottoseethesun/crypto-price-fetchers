@@ -246,7 +246,14 @@ const AUDIT_HELP_AFTER = `
 npm audit checks only the packages installed from npm, and the build step's
 DEX Screener functions are not one, so this downloads each of their files
 at the commit the build uses and checks its SHA-256 against the one written
-in apps-script-build/dex-screener-files.js.
+in apps-script-build/dex-screener-files.js. A download with no answer
+within ${DOWNLOAD_LIMIT_MS / 1000} seconds is stopped and counted as failed.
+
+Examples:
+  Check DEX Screener's files on their own, before a build:
+    $ npm run audit:dex-screener
+  Check them with npm audit's check of the packages, as CI does:
+    $ npm run audit:deps
 
 Exit codes: 0 when every file matches; 1 when a file cannot be downloaded
 or its SHA-256 differs, or the arguments are wrong.`;

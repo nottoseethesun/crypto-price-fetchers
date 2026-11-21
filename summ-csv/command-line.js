@@ -44,6 +44,12 @@ An amount is decimal text, such as "12.5", or {"raw": "12500000",
 while any stands. A file already at --out is written over only with
 --replace. summ-csv/README.md gives every rule.
 
+Examples:
+  Write a wallet's rows as a csv file for Summ's custom import:
+    $ npm run summ-csv -- --rows rows.json --template ~/summ-template.csv --out summ.csv
+  Write it again over the file the last run wrote, after fixing a row:
+    $ npm run summ-csv -- --rows rows.json --template ~/summ-template.csv --out summ.csv --replace
+
 Exit codes: 0 when the file was written; 1 when it was not.
 `;
 

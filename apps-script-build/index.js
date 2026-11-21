@@ -139,10 +139,31 @@ once you press Enter, or, with no clipboard tool installed and none
 installed when offered, to ${BUILD_FOLDER}/${BUILT_FILE_NAME}, which only
 you can read.
 
+Examples:
+  Build the one file to paste into a spreadsheet; at the question, Enter
+  includes DEX Screener's functions and n leaves them out:
+    $ npm run build apps-script
+  Keep the key file's password for this terminal first, so the build does
+  not ask for it:
+    $ source ./unlock-api-keys.sh
+    $ npm run build apps-script
+
 Exit codes: 0 once the file is on the clipboard or written; 1 when DEX
 Screener's functions cannot be downloaded, checked or compiled, the keys
 cannot be opened, a service refuses its key, the parts do not make one
 Apps Script project, or the arguments are wrong.`;
+
+/** What the help of the build's own command says after its commands. */
+const BUILD_HELP_AFTER = `
+Examples:
+  Build the Sheets scripts as one file for a spreadsheet's Apps Script
+  project:
+    $ npm run build apps-script
+  Show what the apps-script command does, its question and its exit codes:
+    $ npm run build -- apps-script --help
+
+Exit codes: 0 when the command named succeeds, or for --help; 1 when no
+command is named, the command is not one of these, or it fails.`;
 
 /**
  * Asks a question at the terminal and gives the line typed.
@@ -506,6 +527,7 @@ export async function runBuild(argv, project, deps = {}) {
   const program = new Command()
     .name("build")
     .description("Builds the repo's Sheets scripts for Apps Script.")
+    .addHelpText("after", BUILD_HELP_AFTER)
     .exitOverride()
     .configureOutput({
       writeOut: (text) => io.stdout.write(text),

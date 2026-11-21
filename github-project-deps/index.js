@@ -79,7 +79,19 @@ Modes:
 Either way, each folder's ${LOCKFILE} is made again, so the newest commit
 of main, or the newest release, is installed. The project needs none of
 this: its lockfile already names a commit of each such dependency, which
-npm ci installs.`;
+npm ci installs.
+
+Examples:
+  In a project that installs crypto-price-fetchers, move it to the newest
+  commit of its main branch, after a change there:
+    $ npm run github-project-deps -- main
+  Move every such dependency to its project's latest release instead:
+    $ npm run github-project-deps -- release
+
+Exit codes: 0 when each lockfile was made again, or no package.json here
+installs a dependency from GitHub; 1 when npm install failed, which puts
+every package.json and lockfile back as it was, or the mode is not main or
+release.`;
 
 /**
  * The spec a dependency installed from GitHub has in a mode: its project,

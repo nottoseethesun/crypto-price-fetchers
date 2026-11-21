@@ -129,6 +129,34 @@ Api keys:
   which source ./unlock-api-keys.sh keeps for a terminal, or else asks for
   the password on stderr.`;
 
+/** The examples of the top command's help: one of each common use. */
+const EXAMPLES_HELP = `
+Examples:
+  USDC's price on Ethereum, from the pools DexTools picks:
+    $ node crypto-price-fetchers.js price ether 0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48
+  Wrapped XNT's price on X1, in its pool with USDC.X, which x1 needs:
+    $ node crypto-price-fetchers.js price x1 So11111111111111111111111111111111111111112 --pool CAJeVEoSm1QQZccnCqYu9cnNF7TTD2fcUA3E5HQoxRvR
+  A token's fully diluted value on PulseChain:
+    $ node crypto-price-fetchers.js fdv pulse 0xF84b84dAAce6Ac00DbBAed26CA32Ff3570Aaf66C`;
+
+/** The examples of each command's own help, by its name. */
+const COMMAND_EXAMPLES_HELP = Object.freeze({
+  price: `
+Examples:
+  USDC's price on Ethereum, from the pools DexTools picks:
+    $ node crypto-price-fetchers.js price ether 0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48
+  HEX's price on Ethereum, in one of its pools:
+    $ node crypto-price-fetchers.js price ether 0x2b591e99afe9f32eaa6214f7b7629768c40eeb39 --pool 0x69d91b94f0aaf8e8a2586909fa77a5c2c89818d5
+  Wrapped XNT's price on X1, in its pool with USDC.X, which x1 needs:
+    $ node crypto-price-fetchers.js price x1 So11111111111111111111111111111111111111112 --pool CAJeVEoSm1QQZccnCqYu9cnNF7TTD2fcUA3E5HQoxRvR`,
+  fdv: `
+Examples:
+  A token's fully diluted value on PulseChain:
+    $ node crypto-price-fetchers.js fdv pulse 0xF84b84dAAce6Ac00DbBAed26CA32Ff3570Aaf66C
+  The same, with the script's log on stderr, to see what DexTools answered:
+    $ node crypto-price-fetchers.js --verbose fdv pulse 0xF84b84dAAce6Ac00DbBAed26CA32Ff3570Aaf66C`,
+});
+
 /**
  * Checks that an argument is not empty.
  *
@@ -166,7 +194,8 @@ function describeCommandLine(program, runCall) {
       "A token's price or fully diluted value (FDV) in USD, from DexTools, or from x1.ninja for X1, " +
         "worked out by crypto-price-fetchers.gs run under Node.",
     )
-    .addHelpText("after", KEY_HELP);
+    .addHelpText("after", KEY_HELP)
+    .addHelpText("after", EXAMPLES_HELP);
   const commands = [
     [
       "price",
@@ -192,6 +221,7 @@ function describeCommandLine(program, runCall) {
       )
       .argument("<token>", "the token's address", notEmpty)
       .option("-p, --pool <address>", poolHelp, notEmpty)
+      .addHelpText("after", COMMAND_EXAMPLES_HELP[commandName])
       .action((chain, token, options, command) =>
         runCall(functionName, [chain, token, poolCells(options.pool)], command),
       );

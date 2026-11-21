@@ -160,7 +160,12 @@ Examples:
 
   Show help:
     $ node index.js --help
-    `,
+
+Exit codes:
+  0  the output file was written; a row no service priced is left empty
+  1  it was not: an option was wrong or missing, the input has no date
+     column, the api keys could not be opened, or a step failed
+`,
     )
 
     // Make --help more visible
