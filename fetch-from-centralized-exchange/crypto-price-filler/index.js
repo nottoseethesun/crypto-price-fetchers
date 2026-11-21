@@ -27,7 +27,7 @@
  * Installation
  * ------------
  *
- * 1. Ensure Node.js v22 or later is installed
+ * 1. Ensure Node.js v24 or later is installed
  * 2. Install dependencies, here and in the repo's top folder, which holds the runner
  *    that runs the Sheets script's price sources:
  *    npm install
@@ -287,7 +287,7 @@
  * TroubleShooting
  * ---------------
  *
- * - Ensure Node.js v22 or later is installed
+ * - Ensure Node.js v24 or later is installed
  * - Ensure internet connectivity for API access
  * - Check that input CSV matches expected format exactly
  * - Use --verbose flag for detailed logs, the Sheets script's lines among them

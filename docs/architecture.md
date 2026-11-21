@@ -412,7 +412,7 @@ development packages.
 
 ## Technology Choices
 
-- **Node 22 or later**, ES modules, Node's own test runner for the runner,
+- **Node 24 or later**, ES modules, Node's own test runner for the runner,
   the Node versions and the key store; vitest, a test runner for
   JavaScript, for crypto-price-filler, whose tests are written for it.
 - **commander**, the package that parses a command line and writes its
