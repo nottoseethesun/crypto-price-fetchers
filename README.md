@@ -148,12 +148,14 @@ npm run build apps-script
    DEX Screener's Google Sheets functions, such as
    `DEX_SCREENER_PAIR_PROP`. DEX Screener, a service that lists the pairs
    of decentralized exchanges with their prices, wrote them, and this repo
-   holds none of their code. The build runs the audit that
-   `npm run audit:dex-screener` runs, which downloads the code from DEX
-   Screener's repo at the commit the question names and checks each file
-   against its SHA-256, says the result, and compiles the checked files
-   into the file. The step is optional: Enter, or y, includes them, and n
-   leaves them out. If the build fails, run it again and answer n.
+   holds none of their code. Before it uses that code, the build checks
+   that each file is the one this repo pinned: it downloads the files from
+   DEX Screener's repo at the commit the question names, compares each
+   file's SHA-256, a fingerprint of its contents, with the one written in
+   this repo, and says the result; `npm run audit:dex-screener` runs the
+   same check on its own. Then it compiles the checked files into the
+   file. The step is optional: Enter, or y, includes them, and n leaves
+   them out. If the build fails, run it again and answer n.
 2. **The password.** The build opens the saved keys as the tools do, with
    the password `unlock-api-keys.sh` keeps, or else one it asks for.
 3. **The clipboard.** The build puts the file on the clipboard and says how

@@ -141,15 +141,16 @@ more) are DEX Screener's code, from its repo `dexscreener/google-sheets`,
 which carries no license: none of it is ever committed here. At every
 build, `npm run build apps-script` asks whether to include them, Enter
 meaning yes, and says the step is optional and that a failed build should
-be run again with n. On a yes, it runs the audit that
-`npm run audit:dex-screener` runs, which downloads their files at the
-commit `apps-script-build/dex-screener-files.js` names and checks each
-against the SHA-256 written there; then it compiles only the files the
-audit gave, with esbuild and this repo's development packages zod and
-lodash, and wraps them in a function of their own in the built file, so
-their `onOpen` never replaces the menu's. `npm run audit:deps` runs
-`npm run audit:dex-screener` after npm audit, which does not cover that
-code.
+be run again with n. On a yes, it checks that their files are the ones
+this repo pinned: it downloads each, at the commit
+`apps-script-build/dex-screener-files.js` names, within 30 seconds, and
+compares it with the SHA-256 written there, the check
+`npm run audit:dex-screener` also runs on its own. Then it compiles only
+the files the check gave, with esbuild and this repo's development
+packages zod and lodash, and wraps them in a function of their own in the
+built file, so their `onOpen` never replaces the menu's.
+`npm run audit:deps` runs `npm run audit:dex-screener` after npm audit,
+which does not cover that code.
 
 ## Docs
 

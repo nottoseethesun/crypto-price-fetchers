@@ -20,7 +20,10 @@
  *
  * How:
  *
- * - Each file is downloaded from raw.githubusercontent.com at the commit.
+ * - Each file is downloaded from raw.githubusercontent.com at the commit,
+ *   within `DOWNLOAD_LIMIT_MS`, 30 seconds: a download that has no answer
+ *   by then is stopped and named, so a stalled connection never holds the
+ *   build until Node's fetch gives up, 300 seconds later.
  * - The audit, `auditDexScreenerFiles`, downloads every file written here
  *   and refuses each one that cannot be downloaded or whose SHA-256
  *   differs, naming each, one to a line. `npm run audit:dex-screener` runs
@@ -37,6 +40,9 @@
 import { createHash } from "node:crypto";
 import { Command, CommanderError } from "commander";
 import { messageOf } from "../lib/message-of.js";
+
+/** How long one download may take, in milliseconds, before it is stopped. */
+export const DOWNLOAD_LIMIT_MS = 30_000;
 
 /**
  * One custom function DEX Screener's code offers.
@@ -136,15 +142,31 @@ export function urlOf(version, file) {
 }
 
 /**
- * Downloads one of the version's files and checks its SHA-256.
+ * Why a download failed, in words: the time limit when it stopped the
+ * download, the error's own message otherwise.
+ *
+ * @param {Error} error - What the download threw
+ * @param {number} limitMs - The download's time limit, in milliseconds
+ * @returns {string} The reason
+ */
+function downloadFailure(error, limitMs) {
+  return error.name === "TimeoutError"
+    ? `no answer within ${limitMs / 1000} seconds`
+    : error.message;
+}
+
+/**
+ * Downloads one of the version's files, within a time limit, and checks
+ * its SHA-256.
  *
  * @param {DexScreenerVersion} version - The version
  * @param {string} file - The file's path in the repo
- * @param {function(string): Promise<Response>} fetch - Does the download
+ * @param {function(string, RequestInit): Promise<Response>} fetch - Does the download
+ * @param {number} limitMs - How long the download may take, in milliseconds
  * @returns {Promise<string>} The file's text
- * @throws {Error} When the file is not written in the version, cannot be downloaded, or its checksum differs
+ * @throws {Error} When the file is not written in the version, cannot be downloaded within the limit, or its checksum differs
  */
-async function downloadChecked(version, file, fetch) {
+async function downloadChecked(version, file, fetch, limitMs) {
   const checksum = version.files[file];
   if (checksum === undefined) {
     throw new Error(
@@ -154,13 +176,15 @@ async function downloadChecked(version, file, fetch) {
   const url = urlOf(version, file);
   let text;
   try {
-    const response = await fetch(url);
+    const signal = AbortSignal.timeout(limitMs);
+    const response = await fetch(url, { signal });
     if (!response.ok) throw new Error(`status ${response.status}`);
     text = await response.text();
   } catch (error) {
-    throw new Error(`Could not download ${url}: ${error.message}`, {
-      cause: error,
-    });
+    throw new Error(
+      `Could not download ${url}: ${downloadFailure(error, limitMs)}`,
+      { cause: error },
+    );
   }
   if (sha256(text) !== checksum) {
     throw new Error(
@@ -186,18 +210,20 @@ export function auditPassed(count, version) {
  * SHA-256. `npm run audit:dex-screener` and the build both run it.
  *
  * @param {Object} [options] - How
- * @param {function(string): Promise<Response>} [options.fetch=globalThis.fetch] - Does the downloads
+ * @param {function(string, RequestInit): Promise<Response>} [options.fetch=globalThis.fetch] - Does the downloads
  * @param {DexScreenerVersion} [options.version=DEX_SCREENER] - The version
+ * @param {number} [options.limitMs=DOWNLOAD_LIMIT_MS] - How long each download may take, in milliseconds
  * @returns {Promise<Object<string, string>>} Each file's text, by its path in the repo
- * @throws {Error} When a file cannot be downloaded or its checksum differs; the message names each such file, one to a line, after a line that names the commit
+ * @throws {Error} When a file cannot be downloaded within the limit or its checksum differs; the message names each such file, one to a line, after a line that names the commit
  */
 export async function auditDexScreenerFiles({
   fetch = globalThis.fetch,
   version = DEX_SCREENER,
+  limitMs = DOWNLOAD_LIMIT_MS,
 } = {}) {
   const files = Object.keys(version.files);
   const outcomes = await Promise.allSettled(
-    files.map((file) => downloadChecked(version, file, fetch)),
+    files.map((file) => downloadChecked(version, file, fetch, limitMs)),
   );
   const failures = outcomes
     .filter((outcome) => outcome.status === "rejected")

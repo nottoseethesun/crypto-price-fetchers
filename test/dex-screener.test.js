@@ -26,6 +26,7 @@ import {
 } from "../apps-script-build/dex-screener.js";
 import {
   DEX_SCREENER,
+  DOWNLOAD_LIMIT_MS,
   auditDexScreenerFiles,
   runDexScreenerAudit,
   sha256,
@@ -323,6 +324,38 @@ describe("the audit of DEX Screener's files", () => {
     );
     assert.ok(
       lines.some((line) => /src\/lib\/index\.ts: status 404/.test(line)),
+    );
+  });
+
+  it("stops each download that has no answer within the time limit, 30 seconds unless set, and names its file", async () => {
+    assert.equal(DOWNLOAD_LIMIT_MS, 30_000);
+    // A stalled connection: open, so it keeps the process running, as a
+    // socket does, and never answering until the limit's signal stops it.
+    const stalled = (url, init) =>
+      new Promise((resolve, reject) => {
+        const openSocket = setInterval(() => {}, 1000);
+        init.signal.addEventListener(
+          "abort",
+          () => {
+            clearInterval(openSocket);
+            reject(init.signal.reason);
+          },
+          { once: true },
+        );
+      });
+    await assert.rejects(
+      auditDexScreenerFiles({ fetch: stalled, version: VERSION, limitMs: 20 }),
+      (error) => {
+        const lines = error.message.split("\n");
+        assert.equal(lines.length, 1 + Object.keys(VERSION.files).length);
+        for (const line of lines.slice(1)) {
+          assert.match(
+            line,
+            /^Could not download https:\/\/raw\.githubusercontent\.com\/\S+\.ts: no answer within 0\.02 seconds$/,
+          );
+        }
+        return true;
+      },
     );
   });
 });

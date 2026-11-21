@@ -101,11 +101,13 @@ changed during the run, as when the tab is sorted, is left alone and
 reported. Clean up errors does this for the cells that show `#ERROR!` or
 a price script's busy message, which the menu reads from the scripts' own
 constants (`DEXTOOLS_BUSY_MESSAGE`, `EXCHANGE_BUSY_MESSAGE`); Refresh for
-every cell that asks for a current value, which the scripts' caches
-answer for up to 5 minutes (DexTools and x1.ninja) or 30 seconds (DEX
-Screener); and Refresh & freeze historical prices for the past prices of
-one tab, whose numbers it keeps in place of their formulas block by
-block, within the run's time. Help shows the page the build step
+every cell that asks for a current value; and Refresh & freeze historical
+prices for the past prices of one tab, whose numbers it keeps in place of
+their formulas block by block, within the run's time. A current value
+that Refresh runs again may come from a script's cache: the scripts keep
+a DexTools or x1.ninja price or FDV above 0 for 5 minutes, and a DEX
+Screener answer for 30 seconds, and ask again for a 0, an error or a busy
+message. Help shows the page the build step
 makes from the help sections of the scripts' headers. No Node version
 loads the menu, since it gives no price.
 

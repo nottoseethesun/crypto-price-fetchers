@@ -19,9 +19,9 @@
  * `dexToolsGetTokenPrice(chain, tokenAddress, [pool])` gives a token's
  * current price in USD. `dexToolsGetTokenFDV(chain, tokenAddress, [pool])`
  * gives its fully diluted value (FDV): its price times its total supply.
- * Both ask DexTools, or x1.ninja for X1. The script keeps each price above
- * 0 for 5 minutes, so a cell that runs again within that time gives the
- * price it gave before.
+ * Both ask DexTools, or x1.ninja for X1. The script keeps each number
+ * above 0, a price or an FDV, for 5 minutes, so a cell that runs again
+ * within that time gives the number it gave before.
  *
  * Each function gives one of these:
  *

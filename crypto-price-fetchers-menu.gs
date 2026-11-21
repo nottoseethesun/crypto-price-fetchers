@@ -25,11 +25,12 @@
  *   because it reads such a cell clears once that cell has run again.
  * - Refresh: runs again every cell, in every tab, that calls
  *   `dexToolsGetTokenPrice`, `dexToolsGetTokenFDV` or a `DEX_SCREENER_`
- *   function. The scripts keep each answer for a time and give it again
- *   when asked within it: a DexTools or x1.ninja price above 0 for 5
- *   minutes, and a DEX Screener answer for 30 seconds. So a cell shows a
- *   value at most that old. Cells that call `getCryptoPrice`, a price at a
- *   past time, are left as they are.
+ *   function. The scripts keep some answers for a time and give them
+ *   again when asked within it: a DexTools or x1.ninja price or FDV above
+ *   0 for 5 minutes, and a DEX Screener answer for 30 seconds; a 0, an
+ *   error or a busy message is asked for again. So a cell shows a value
+ *   at most that old. Cells that call `getCryptoPrice`, a price at a past
+ *   time, are left as they are.
  * - Refresh & freeze historical prices (this tab): on the tab you are on,
  *   runs every cell that calls `getCryptoPrice` again, then replaces each
  *   formula that gave a number with that number. A cell that gave a
