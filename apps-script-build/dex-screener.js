@@ -25,7 +25,9 @@
  *   TypeScript imports are, and is handed each from the audited files in
  *   memory, so nothing of DEX Screener's is written to disk and nothing
  *   the audit did not check is compiled. The two packages the code
- *   imports, zod and lodash, come from this repo's development packages.
+ *   imports, zod and lodash, come from this repo's dependencies: the built
+ *   file holds their code, so `package.json` lists them where the gate's
+ *   npm audit, which skips development packages, checks them.
  * - The bundle runs inside a function of its own, so none of its names
  *   reaches the rest of the file. Its `global`, where DEX Screener's code
  *   puts each function it offers, is an object of that function's own,

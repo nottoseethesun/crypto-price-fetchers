@@ -14,6 +14,11 @@
  *
  * no-secrets passes the strings that hold `PUBLIC_ADDRESSES`: addresses
  * on X1, written in base58, which look random to it but are public.
+ *
+ * It passes over `build/`, as the main lint does: the build step writes
+ * the file to paste there when there is no clipboard, and that file holds
+ * the api keys and the compiled code of DEX Screener, zod and lodash,
+ * which are not this repo's.
  */
 
 import noSecrets from "eslint-plugin-no-secrets";
@@ -31,7 +36,7 @@ const PUBLIC_ADDRESSES = [
 ];
 
 export default [
-  { ignores: ["**/node_modules/**", "**/coverage/**"] },
+  { ignores: ["**/node_modules/**", "**/coverage/**", "build/**"] },
   {
     files: ["**/*.js", "**/*.gs"],
     plugins: {

@@ -188,26 +188,26 @@ file that holds them all, with the keys written in, for one paste.
   function that lays the keys over its config: `crypto-price-fetchers.gs`,
   then the exchange script's three files, its in-editor tests included;
   then DEX Screener's functions, when the owner asks for them.
-- **DEX Screener's functions.** DEX Screener, a service that lists the
-  pairs of decentralized exchanges with their prices, published Google
-  Sheets functions of its own, such as `DEX_SCREENER_PAIR_PROP`, in a repo
-  that carries no license, so this repo holds none of their code. Every
-  build asks whether to include them; Enter includes them. The build then
-  runs the audit that `npm run audit:dex-screener` runs
-  (`dex-screener-files.js`): it downloads their files from
-  raw.githubusercontent.com at the commit written there, checks each
-  file's SHA-256 against the one written beside it, and says its line. It
-  compiles only the files the audit gave with esbuild, the program that
-  compiles TypeScript and JavaScript into one file, as DEX Screener's own
-  build does, with this repo's development packages zod, a library that
-  checks data against a schema, and lodash, a library of helper functions,
-  which DEX Screener's code imports (`dex-screener.js`). Their code runs inside a function of its own in the
-  file, so its names, its own `onOpen` among them, stay inside it, and a
-  top-level function of each custom function's name hands a cell's call
-  on. A failed download, a file that differs, or a failed compile stops
-  the build with the advice to run it again and answer n. npm audit,
-  npm's check of the installed packages against known vulnerabilities,
-  does not cover that code, so `npm run audit:dex-screener`
+- **DEX Screener's functions.** DEX Screener, a service that lists the pairs
+  of decentralized exchanges with their prices, published Google Sheets
+  functions of its own, such as `DEX_SCREENER_PAIR_PROP`, in a repo that
+  carries no license, so this repo holds none of their code. Every build
+  asks whether to include them; Enter includes them. The build then runs the
+  audit that `npm run audit:dex-screener` runs (`dex-screener-files.js`): it
+  downloads their files from raw.githubusercontent.com at the commit written
+  there, checks each file's SHA-256 against the one written beside it, and
+  says its line. It compiles only the files the audit gave with esbuild, the
+  program that compiles TypeScript and JavaScript into one file, as DEX
+  Screener's own build does, with zod, a library that checks data against a
+  schema, and lodash, a library of helper functions, which DEX Screener's
+  code imports and this repo lists as dependencies, since the file holds
+  their code (`dex-screener.js`). Their code runs inside a function of its
+  own in the file, so its names, its own `onOpen` among them, stay inside
+  it, and a top-level function of each custom function's name hands a cell's
+  call on. A failed download, a file that differs, or a failed compile stops
+  the build with the advice to run it again and answer n. npm audit, npm's
+  check of the installed packages against known vulnerabilities, does not
+  cover that code, so `npm run audit:dex-screener`
   (`audit-dex-screener.js`), which `npm run audit:deps` runs after npm
   audit, runs the same audit on its own.
 - **The values.** The build opens the keys as the programs do
@@ -418,9 +418,10 @@ development packages.
 - **commander**, the package that parses a command line and writes its
   help, for every command line.
 - **esbuild**, a development package, for the build step's compile of DEX
-  Screener's TypeScript, as DEX Screener's own build compiles it; zod and
-  lodash, the two packages that code imports, are development packages
-  too, and only the built file holds them.
+  Screener's TypeScript, as DEX Screener's own build compiles it. zod and
+  lodash, the two packages that code imports, are dependencies: the built
+  file holds their code, and the gate's npm audit checks dependencies
+  only.
 - **Node's `crypto`**, its built-in module of ciphers and hashes, for the
   key store: no package between the password
   and the cipher.

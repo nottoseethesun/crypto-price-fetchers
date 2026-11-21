@@ -28,6 +28,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { pathToFileURL } from "url";
+import { ESLint } from "eslint";
 import { getCryptoPrice } from "../sources/price.js";
 import { closeExchangeSources, exchangeSources } from "../sources/exchange.js";
 import { canonicalTimeZone, parseInputToUtcMs } from "../utils/date.js";
@@ -578,5 +579,17 @@ describe("the command line, run from another folder", () => {
   it("index.js prices a row when run from a folder other than its own", () => {
     const { price } = runCommandLineForOneRow([], os.tmpdir());
     expect(Number(price)).toBeGreaterThan(0);
+  });
+});
+
+describe("the gate's checks of the file the build step writes", () => {
+  it("the security lint passes over build/, where the build step writes the file to paste when there is no clipboard, as the lint, the format check and the secret scan do", async () => {
+    const top = path.resolve(__dirname, "../../..");
+    const eslint = new ESLint({
+      cwd: top,
+      overrideConfigFile: path.join(top, "eslint-security.config.js"),
+    });
+    const built = path.join(top, "build/apps-script/crypto-price-fetchers.gs");
+    expect(await eslint.isPathIgnored(built)).toBe(true);
   });
 });
