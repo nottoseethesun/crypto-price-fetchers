@@ -52,7 +52,9 @@
   "author": "Christopher M. Balz with Grok and Claude",
   "license": "Apache-2.0",
   "dependencies": {
-    "commander": "^12.1.0"
+    "commander": "^12.1.0",
+    "lodash": "^4.18.1",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -67,11 +69,9 @@
     "globals": "^17.14.0",
     "husky": "^9.1.7",
     "knip": "^5.88.1",
-    "lodash": "^4.18.1",
     "markdownlint-cli2": "^0.23.3",
     "prettier": "^3.10.1",
-    "secretlint": "^11.7.1",
-    "zod": "^3.25.76"
+    "secretlint": "^11.7.1"
   },
   "engines": {
     "node": ">=22"

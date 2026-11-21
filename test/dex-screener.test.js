@@ -108,6 +108,49 @@ function versionOf(sources) {
 const VERSION = versionOf(SOURCES);
 
 /**
+ * The two packages DEX Screener's code imports, at the commit
+ * `DEX_SCREENER` names, which the build compiles into the file.
+ */
+const SHIPPED_PACKAGES = Object.freeze(["zod", "lodash"]);
+
+/**
+ * Stand-in sources that fetch an answer, check it with zod and read a field
+ * of it with lodash, through the calls DEX Screener's code makes:
+ * `z.object`, `z.string`, `z.number`, `z.array` and `.optional()`;
+ * `safeParse`, with its `success`, `data` and `error`; and lodash's
+ * `result` on a dotted path.
+ */
+const CHECKING_SOURCES = Object.freeze({
+  "src/index.ts": [
+    "import { pairProp } from './pairs';",
+    "",
+    "declare let global: any;",
+    "global.DEX_SCREENER_PAIR_PROP = (chainId: string, pairAddress: string, prop: string): unknown =>",
+    "  pairProp(chainId, pairAddress, prop);",
+    "global.DEX_SCREENER_REFRESH_INTERVAL = (seconds: number = 30): number => seconds * 1000;",
+  ].join("\n"),
+  "src/pairs.ts": [
+    "import result from 'lodash/result';",
+    "import { z } from 'zod';",
+    "",
+    "declare const UrlFetchApp: any;",
+    "",
+    "const pairSchema = z.object({",
+    "  priceUsd: z.string().optional(),",
+    "  liquidity: z.object({ usd: z.number().optional(), base: z.number() }),",
+    "});",
+    "const answerSchema = z.object({ pairs: z.array(pairSchema) });",
+    "",
+    "export const pairProp = (chainId: string, pairAddress: string, prop: string): unknown => {",
+    "  const url = `https://api.example.com/pairs/${chainId}/${pairAddress}`;",
+    "  const checked = answerSchema.safeParse(JSON.parse(UrlFetchApp.fetch(url).getContentText()));",
+    "  if (!checked.success) return `problems: ${checked.error.issues.length}`;",
+    "  return result(checked.data.pairs[0], prop);",
+    "};",
+  ].join("\n"),
+});
+
+/**
  * A fetch that serves sources at the version's commit, as
  * raw.githubusercontent.com does, and 404 for anything else.
  *
@@ -141,9 +184,14 @@ function partFrom(fetch, version = VERSION, say = undefined) {
  *
  * @param {Array<{name: string, source: string}>} parts - The parts
  * @param {string[]} required - The functions the file must hold
+ * @param {function(Object): Object} [fetchSync] - Answers the file's web requests, as the runner's services take it; none by default
  * @returns {Object} The loaded file's context
  */
-function loadJoined(parts, required) {
+function loadJoined(
+  parts,
+  required,
+  fetchSync = () => ({ failure: "no web" }),
+) {
   const text = combinedScript({
     preamble: "/** test */",
     parts,
@@ -152,7 +200,7 @@ function loadJoined(parts, required) {
   });
   return loadAppsScript(
     [{ source: text, filename: "joined.gs" }],
-    createAppsScriptServices({ fetchSync: () => ({ failure: "no web" }) }),
+    createAppsScriptServices({ fetchSync }),
   );
 }
 
@@ -267,6 +315,59 @@ describe("dexScreenerPart", () => {
       partFrom(serving(broken), versionOf(broken)),
       /Could not compile DEX Screener's code[\s\S]*answer n to leave them out/,
     );
+  });
+
+  it("compiles code that checks an answer with zod and reads it with lodash, as DEX Screener's does, so the file's functions give each field, or the count of problems in an answer the check refuses", async () => {
+    const answers = {
+      full: {
+        pairs: [
+          {
+            priceUsd: "0.0021",
+            liquidity: { usd: 51234.5, base: 10, quote: 3 },
+            marketCap: 9,
+          },
+        ],
+      },
+      bare: { pairs: [{ liquidity: { base: 10 } }] },
+      wrong: { pairs: [{ priceUsd: 0.0021, liquidity: { base: "10" } }] },
+      none: { pairs: null },
+    };
+    const fetchSync = ({ url }) => ({
+      status: 200,
+      headers: {},
+      text: JSON.stringify(answers[url.slice(url.lastIndexOf("/") + 1)]),
+    });
+    const part = await partFrom(
+      serving(CHECKING_SOURCES),
+      versionOf(CHECKING_SOURCES),
+    );
+    const context = loadJoined(
+      [{ name: "dex.gs", source: part.text }],
+      part.required,
+      fetchSync,
+    );
+    const field = (pair, prop) =>
+      context.DEX_SCREENER_PAIR_PROP("pulsechain", pair, prop);
+    assert.equal(field("full", "priceUsd"), "0.0021");
+    assert.equal(field("full", "liquidity.usd"), 51234.5);
+    assert.equal(field("full", "liquidity.quote"), undefined);
+    assert.equal(field("full", "marketCap"), undefined);
+    assert.equal(field("bare", "priceUsd"), undefined);
+    assert.equal(field("bare", "liquidity.base"), 10);
+    assert.equal(field("wrong", "priceUsd"), "problems: 2");
+    assert.equal(field("none", "priceUsd"), "problems: 1");
+  });
+});
+
+describe("the packages DEX Screener's code imports", () => {
+  it("are dependencies, never development packages, since the built file holds their code and the gate's npm audit skips development packages", () => {
+    const manifest = JSON.parse(
+      fs.readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+    );
+    for (const name of SHIPPED_PACKAGES) {
+      assert.ok(Object.hasOwn(manifest.dependencies, name), name);
+      assert.ok(!Object.hasOwn(manifest.devDependencies, name), name);
+    }
   });
 });
 

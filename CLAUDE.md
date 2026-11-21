@@ -157,14 +157,15 @@ this repo pinned: it downloads each, at the commit
 compares it with the SHA-256 written there, the check
 `npm run audit:dex-screener` also runs on its own. Then it compiles only
 the files the check gave, with esbuild, the program that compiles
-TypeScript and JavaScript into one file, and this repo's development
-packages zod, a library that checks data against a schema, and lodash, a
-library of helper functions, which DEX Screener's code imports, and wraps
-them in a function of their own in the
-built file, so their `onOpen` never replaces the menu's.
+TypeScript and JavaScript into one file, and zod, a library that checks
+data against a schema, and lodash, a library of helper functions, which
+DEX Screener's code imports, and wraps them in a function of their own in
+the built file, so their `onOpen` never replaces the menu's.
 `npm run audit:deps` runs `npm run audit:dex-screener` after npm audit,
 npm's check of the installed packages against known vulnerabilities, which
-does not cover that code.
+does not cover that code. zod and lodash ship in the built file, so
+`package.json` lists them as dependencies, which the gate's npm audit
+checks, never as development packages, which it skips.
 
 ## Docs
 

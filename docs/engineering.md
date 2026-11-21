@@ -35,6 +35,8 @@ manages his 9mm V3 liquidity positions: its `CLAUDE.md` and
     - [The Node Tests](#the-node-tests)
     - [The Apps Script Tests](#the-apps-script-tests)
 - [Security Audits](#security-audits)
+- [The Build Step](#the-build-step)
+  - [Packages That Ship in the Built File](#packages-that-ship-in-the-built-file)
 - [Dead Code Detection](#dead-code-detection)
 - [CI and Branch Protection](#ci-and-branch-protection)
 - [Known Bugs](#known-bugs)
@@ -345,6 +347,27 @@ things are this repo's own:
   password is named in the code as `UNLOCK_VARIABLE`.
 - no-secrets passes the public X1 addresses the code names, listed in the
   config as `PUBLIC_ADDRESSES`, which are base58 and look random to it.
+
+---
+
+## The Build Step
+
+`npm run build apps-script`, the build step, joins the Sheets scripts into
+`crypto-price-fetchers.gs`, the one file the owner pastes into a
+spreadsheet's Apps Script project; [The Build Step](architecture.md#the-build-step)
+in `docs/architecture.md` says how it works. When the owner asks, it also
+compiles DEX Screener's Google Sheets functions into that file.
+
+### Packages That Ship in the Built File
+
+DEX Screener's code imports zod, a library that checks data against a
+schema, and lodash, a library of helper functions. esbuild compiles both,
+from this repo's `node_modules`, into the pasted file, where they run in
+the spreadsheet with DEX Screener's functions. So `package.json` lists them
+as dependencies, not development packages, and the gate's npm audit, which
+skips development packages (`--omit=dev`), checks them.
+`test/dex-screener.test.js` holds them there, and compiles a stand-in that
+checks an answer with them as DEX Screener's code does.
 
 ---
 
