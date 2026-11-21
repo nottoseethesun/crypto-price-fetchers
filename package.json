@@ -42,7 +42,8 @@
     "test": "node --test \"test/*.test.js\"",
     "test:coverage": "node --test --experimental-test-coverage --test-coverage-lines=80 \"test/*.test.js\"",
     "test:filler": "npm run test:strict --prefix fetch-from-centralized-exchange/crypto-price-filler",
-    "audit:deps": "npm audit --audit-level=high --omit=dev && npm audit --audit-level=high --omit=dev --prefix fetch-from-centralized-exchange/crypto-price-filler",
+    "audit:deps": "npm audit --audit-level=high --omit=dev && npm audit --audit-level=high --omit=dev --prefix fetch-from-centralized-exchange/crypto-price-filler && npm run audit:dex-screener",
+    "audit:dex-screener": "node audit-dex-screener.js",
     "audit:security": "eslint -c eslint-security.config.js . --max-warnings 0",
     "audit:secrets": "secretlint \"**/*\"",
     "check": "npm run lint && npm run test:coverage && npm run test:filler && npm run audit:deps && npm run audit:security && npm run audit:secrets"
@@ -55,6 +56,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@secretlint/secretlint-rule-preset-recommend": "^11.7.1",
+    "esbuild": "^0.28.2",
     "eslint": "^10.15.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-n": "^17.24.0",
@@ -64,9 +66,11 @@
     "globals": "^17.14.0",
     "husky": "^9.1.7",
     "knip": "^5.88.1",
+    "lodash": "^4.18.1",
     "markdownlint-cli2": "^0.23.3",
     "prettier": "^3.10.1",
-    "secretlint": "^11.7.1"
+    "secretlint": "^11.7.1",
+    "zod": "^3.25.76"
   },
   "engines": {
     "node": ">=22"

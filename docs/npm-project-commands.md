@@ -32,7 +32,7 @@ a `--` separator, which tells npm the rest belongs to the script; a word
 with no dashes, such as `apps-script`, needs none. These three commands
 replace the saved DexTools key ([Api Keys](#api-keys)), run the tests
 whose names hold `unlockApiKeys` ([Test](#test)), and give the Sheets
-scripts with their keys ([Build](#build)):
+scripts as one file, with their keys ([Build](#build)):
 
 ```sh
 npm run api-keys -- set dextools
@@ -60,13 +60,14 @@ command, keeps the password for a terminal: see
 
 ## Build
 
-The Sheets scripts run in Apps Script, which cannot read the key file, so
-the keys go into the copy of a script that is pasted there. One command
-gives that copy.
+A spreadsheet runs the Sheets scripts from its Apps Script project, which
+cannot read the key file and runs every script file in one global scope,
+so the scripts are pasted as one file, with the keys written in. One
+command gives that file.
 
 | Command | Flags | Description | Example |
 | ------- | ----- | ----------- | ------- |
-| `build` | `apps-script [script]`, `--help` | `apps-script` opens the saved keys, as the programs do, and gives each Sheets script that sends keys with them, and the values of the config.json its Node version reads, set at the end of its first file. It puts each file on the clipboard in turn, saying where to paste it, waits for Enter between files, and clears the clipboard after the last. With no clipboard tool installed, it offers to install one (`sudo apt install xclip`, or `wl-clipboard` on Wayland); declined, it warns that the keys go to disk in the clear, then writes the files to `build/apps-script/`, readable by the owner alone. `[script]` names one script: `crypto-price-fetchers` or `getCryptoPriceFromCentralizedExchange`. | `npm run build apps-script` · `npm run build apps-script crypto-price-fetchers` |
+| `build` | `apps-script`, `--help` | `apps-script` first asks whether to include DEX Screener's Google Sheets functions (Enter or y includes them, n leaves them out), naming the commit of DEX Screener's repo they come from, and saying that the step is optional and that a build that fails should be run again with n. On a yes, it runs the audit `audit:dex-screener` runs, which downloads those files and checks each one's SHA-256, prints its line, and compiles the files it checked. Then it opens the saved keys, as the programs do, and joins the menu, every Sheets script and DEX Screener's functions into one file, with the keys, the values of the config.json each Node version reads, and the Help page set at its end. It puts the file on the clipboard, says how to paste it, waits for Enter, and clears the clipboard. With no clipboard tool installed, it offers to install one (`sudo apt install xclip`, or `wl-clipboard` on Wayland); declined, it warns that the keys go to disk in the clear, then writes the file to `build/apps-script/crypto-price-fetchers.gs`, readable by the owner alone. It takes no other argument. | `npm run build apps-script` |
 
 ---
 
@@ -104,12 +105,13 @@ them, after the lint, and must pass before a commit and a push.
 
 | Command | Flags | Description | Example |
 | ------- | ----- | ----------- | ------- |
-| `audit:deps` | — | `npm audit` at the `high` threshold over the packages that ship (`--omit=dev`), the repo's and crypto-price-filler's. | `npm run audit:deps` |
+| `audit:deps` | — | `npm audit` at the `high` threshold over the packages that ship (`--omit=dev`), the repo's and crypto-price-filler's, then `audit:dex-screener`. | `npm run audit:deps` |
+| `audit:dex-screener` | — | Downloads each file of DEX Screener's Google Sheets functions at the commit the build step uses, and fails when one cannot be downloaded or its SHA-256 differs from the one the build checks; npm audit does not cover that code. `audit:deps` runs it. | `npm run audit:dex-screener` |
 | `audit:secrets` | — | secretlint across the repo. | `npm run audit:secrets` |
 | `audit:security` | — | The security lint, `eslint-security.config.js`: eslint-plugin-security, eslint-plugin-no-secrets and `no-secret-logging`. | `npm run audit:security` |
-| `check` | — | The full gate: `lint`, `test:coverage`, `test:filler` and the three audits, in that order, stopping at the first that fails. | `npm run check` |
+| `check` | — | The full gate: `lint`, `test:coverage`, `test:filler`, `audit:deps` (with `audit:dex-screener`), `audit:security` and `audit:secrets`, in that order, stopping at the first that fails. | `npm run check` |
 | `format:check` | — | Prettier in check mode; fails rather than rewriting. | `npm run format:check` |
-| `test` | any `node --test` flag | The tests of the runner, the Node versions, the build step, the price clients, the key store, the lint rule, the versions tool and the Summ CSV writer, on Node's test runner. | `npm test -- --test-name-pattern="openAppsScript"` |
+| `test` | any `node --test` flag | The tests of the runner, the Node versions, the build step, the menu, the price clients, the key store, the lint rule, the versions tool and the Summ CSV writer, on Node's test runner. | `npm test -- --test-name-pattern="openAppsScript"` |
 | `test:coverage` | — | The same tests with coverage, failing below 80% of lines covered. | `npm run test:coverage` |
 | `test:filler` | — | crypto-price-filler's `test:strict`, from the top folder. | `npm run test:filler` |
 

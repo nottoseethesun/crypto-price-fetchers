@@ -10,15 +10,13 @@
  * here.
  *
  * The Sheets scripts run unchanged in the test's thread, through
- * `tests/helpers/sheets-script.js`, with stand-ins for the Apps Script
- * services each test is about: the script lock, and the spreadsheet of
- * `test/helpers/stand-in-spreadsheet.js` at the repo's top.
+ * `tests/helpers/sheets-script.js`, with a stand-in for the Apps Script
+ * service each test is about: the script lock.
  */
 
 import { describe, it, expect } from "vitest";
 import path from "path";
 import { loadSheetsScript } from "./helpers/sheets-script.js";
-import { standInSpreadsheet } from "../../../test/helpers/stand-in-spreadsheet.js";
 
 /** How long Google lets a custom function run before it stops it. */
 const CUSTOM_FUNCTION_LIMIT_MS = 30000;
@@ -83,33 +81,6 @@ describe("waits inside a custom function", () => {
       const waited = [...waits, ...sleeps].reduce((sum, ms) => sum + ms, 0);
       expect(waits.length).toBeGreaterThan(0);
       expect(waited).toBeLessThanOrEqual(CUSTOM_FUNCTION_LIMIT_MS);
-    },
-  );
-});
-
-describe("the DexTools script's menu", () => {
-  it.fails(
-    "Refresh runs again the cells that call dexToolsGetTokenPrice",
-    () => {
-      const sheet = standInSpreadsheet({
-        tabs: {
-          Prices: [
-            ["Token", "Price"],
-            [
-              "PLS",
-              '=dexToolsGetTokenPrice("pulse", "0xA1077a294dDE1B09bB078844df40758a5D0f9a27")',
-            ],
-          ],
-        },
-      });
-      const script = loadSheetsScript(DEXTOOLS_SCRIPT, () => null, {
-        services: {
-          SpreadsheetApp: sheet.SpreadsheetApp,
-          HtmlService: sheet.HtmlService,
-        },
-      });
-      script.refreshDexTools();
-      expect(sheet.runsOf("Prices!B2")).toBe(1);
     },
   );
 });

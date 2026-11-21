@@ -34,7 +34,7 @@ current price, and its fully diluted value. It asks DexTools, a service
 that prices tokens from the pools of decentralized exchanges, so it covers
 tokens on the chains DexTools lists, such as PulseChain, Ethereum and
 Solana. For X1, which DexTools does not list, it asks x1.ninja, a service
-that does the same for X1, instead. The file's header says how to use it.
+that does the same for X1, instead.
 
 `fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.gs`,
 with its price sources in `getCryptoPriceFromCentralizedExchange-sources.gs`
@@ -43,6 +43,18 @@ closing price at a past time, as recent as a minute ago. It asks MEXC, a
 centralized exchange, then CoinGecko, then CoinPaprika, two services that
 gather the exchanges' prices, so it covers the tokens they price. Within
 Apps Script's limits, it handles about 100 calls at a time.
+
+`crypto-price-fetchers-menu.gs` adds the Crypto Price Fetchers menu to the
+spreadsheet. Its items run the price cells again, clear cells stuck on
+`#ERROR!`, replace past prices' formulas with their numbers, and show Help:
+how to use each function, made from the help section of each script's
+header.
+
+The build step puts these scripts in one file, with the saved api keys set
+in it, for one paste into a spreadsheet (see
+[Install in Google Sheets](#3-install-in-google-sheets)). It can add DEX
+Screener's own Google Sheets functions, such as `DEX_SCREENER_PAIR_PROP`,
+downloaded from DEX Screener's repo; this repo holds none of their code.
 
 crypto-price-filler, `fetch-from-centralized-exchange/crypto-price-filler/index.js`,
 does that job on a computer, for a CSV file of any length: it fills in the
@@ -58,9 +70,11 @@ are the Node versions of the two Sheets scripts.
 
 ## Install
 
-Every step after the first is optional. The tools run without api keys,
-with what each service gives without one (the table in step 2 says what),
-and a Sheets script needs the build step only to carry keys.
+Step 1 installs Node and the packages, which every tool needs. Step 2
+saves the api keys, each of them optional: with none saved, a tool asks
+each service without a key, and gets what the table in step 2 says. Step 3
+puts the Sheets scripts into a spreadsheet, as the one file the build step
+gives.
 
 ### 1. Node and the packages
 
@@ -116,37 +130,70 @@ only in memory, for one run.
 The store itself is `api-key-store/`, a module any Node project can use:
 see [its README](./api-key-store/README.md).
 
-### 3. The Sheets scripts, with their keys
+### 3. Install in Google Sheets
 
-A Sheets script runs in Google's Apps Script, which cannot read the key
-file, so the keys go into the script you paste. This repo's build step,
-`build.js` with `apps-script-build/`, writes them in, so no key is typed
-into a script by hand:
+A spreadsheet runs its scripts from its Apps Script project, the code
+Google keeps with the spreadsheet. Apps Script cannot read the key file,
+and runs every script file of a project in one global scope, so the Sheets
+scripts are pasted as one file, which this repo's build step, `build.js`
+with `apps-script-build/`, makes with the saved keys set at its end. From
+the repo's top folder:
 
 ```bash
 npm run build apps-script
 ```
 
-It opens the keys as the tools do, then puts each script file on the
-clipboard in turn, the keys and the values of the `config.json` its Node
-version reads set at the end of the script's first file. For each one it
-says where to paste it: in the spreadsheet, Extensions > Apps Script, the
-script file of that name. It waits for Enter between files, and clears the
-clipboard after the last. `npm run build apps-script crypto-price-fetchers`
-gives one script only.
+1. **DEX Screener's functions.** The build first asks whether to include
+   DEX Screener's Google Sheets functions, such as
+   `DEX_SCREENER_PAIR_PROP`. DEX Screener, a service that lists the pairs
+   of decentralized exchanges with their prices, wrote them, and this repo
+   holds none of their code. The build runs the audit that
+   `npm run audit:dex-screener` runs, which downloads the code from DEX
+   Screener's repo at the commit the question names and checks each file
+   against its SHA-256, says the result, and compiles the checked files
+   into the file. The step is optional: Enter, or y, includes them, and n
+   leaves them out. If the build fails, run it again and answer n.
+2. **The password.** The build opens the saved keys as the tools do, with
+   the password `unlock-api-keys.sh` keeps, or else one it asks for.
+3. **The clipboard.** The build puts the file on the clipboard and says how
+   to paste it.
+4. **Paste.** In the spreadsheet, open Extensions > Apps Script. Open the
+   script file `crypto-price-fetchers`, or make it (Files, +, Script, named
+   `crypto-price-fetchers`), select all of its text, paste over it, and
+   save.
+5. **Delete the files it replaces,** where the project has them from an
+   earlier install: `getCryptoPriceFromCentralizedExchange`,
+   `getCryptoPriceFromCentralizedExchange-sources`,
+   `getCryptoPriceFromCentralizedExchange-tests`, and, when DEX Screener's
+   functions went in, DEX Screener's own file. Each declares names the
+   pasted file declares too: a project that declares a name twice with
+   `const` stops with an error at every run, and of two functions with one
+   name, the one that runs last replaces the other. Apps Script calls the
+   one function named `onOpen` when the spreadsheet opens, so another
+   script in the project that defines `onOpen` hides one of the two menus.
+6. **Clear the clipboard.** Back in the terminal, press Enter.
+7. **Reload the spreadsheet.** The Crypto Price Fetchers menu appears, and
+   its Help item says how to use each function. The first item you choose
+   asks you to approve what the script may do.
+
+Built without DEX Screener's functions, DEX Screener's own file can stay
+in the project, above `crypto-price-fetchers` in the Files list (its menu
+in the list has Move file up). Apps Script runs the files in that order,
+and DEX Screener's file sets an `onOpen` of its own as it runs, which
+would replace the Crypto Price Fetchers menu if it ran last.
 
 The clipboard is reached through the desktop's own tool: xclip or wl-copy
 on Linux, pbcopy on macOS, clip on Windows. When none is installed, the
 build offers to install one with `sudo apt install`, where it can, and runs
 the install on a yes; sudo asks for your computer's password at its own
 prompt. Declined, the build says first that your api keys will be written
-to disk in the clear, then writes each file to `build/apps-script/`, which
-git ignores, readable by you alone, and prints only their paths. Delete
-them once they are pasted.
+to disk in the clear, then writes the file to
+`build/apps-script/crypto-price-fetchers.gs`, which git ignores, readable
+by you alone, and prints only its path. Delete it once it is pasted.
 
 A copy with keys in it is for pasting into Apps Script only: never commit
 or share it. A clipboard manager that keeps a history of what was copied
-keeps the scripts too.
+keeps the script too.
 
 ## Node versions of the Sheets scripts
 
@@ -165,7 +212,7 @@ What differs from the sheet:
 - The api keys come from the repo's encrypted key file (see
   [The api keys](#2-the-api-keys)), not from the script. Each Node version
   sets them in the script's config as it opens the script, as the build
-  step sets them in the copy it gives for the sheet.
+  step sets them in the file it gives for the sheet.
 - The cache lasts while the script is open: for the command line, one run.
 - The sheet's menu is not there.
 
@@ -261,14 +308,19 @@ a row.
 
 ## Usage in Google Sheets
 
-Each Sheets script is pasted into a sheet's Apps Script project, best as
-the build step gives it (see
-[The Sheets scripts, with their keys](#3-the-sheets-scripts-with-their-keys)).
-Its own documentation says how to call it from a cell:
+Once the one file the build step gives is pasted into a spreadsheet (see
+[Install in Google Sheets](#3-install-in-google-sheets)), Crypto Price
+Fetchers > Help, in the spreadsheet's menu bar, says how to call each
+function from a cell. The page is made from the help section of each
+script's header, so the headers say the same:
 
-- `crypto-price-fetchers.gs`: the header of that file.
-- The exchange script and crypto-price-filler:
-  [`fetch-from-centralized-exchange/README.md`](fetch-from-centralized-exchange/README.md).
+- `crypto-price-fetchers.gs`: `dexToolsGetTokenPrice` and
+  `dexToolsGetTokenFDV`.
+- `fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.gs`:
+  `getCryptoPrice`; its folder's
+  [README](fetch-from-centralized-exchange/README.md) covers it and
+  crypto-price-filler.
+- `crypto-price-fetchers-menu.gs`: the menu's items.
 
 ## Test
 

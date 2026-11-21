@@ -1,305 +1,219 @@
 /**
- * DexTools Price & FDV Fetcher (with X1 blockchain support via x1.ninja) – Rate Limit Friendly & Fully Documented (January 2026)
+ * crypto-price-fetchers.gs – a token's current price and fully diluted value
+ * (FDV) in USD, from DexTools, or from x1.ninja for X1
  *
- * PURPOSE:
- *   Provides reliable access to DexTools API v2 for token prices and Fully Diluted Values (FDV)
- *   from Google Sheets / Apps Script, with strong protection against rate limiting.
+ * PURPOSE
+ *   Two custom functions for Google Sheets, `dexToolsGetTokenPrice` and
+ *   `dexToolsGetTokenFDV`. They ask DexTools, a service that prices tokens
+ *   from the pools of decentralized exchanges, through its public api v2.
+ *   For X1, a chain DexTools does not list, they ask x1.ninja, a service
+ *   that does the same for X1 (see X1 ROUTING below). The build step of the
+ *   crypto-price-fetchers repo, `npm run build apps-script`, puts this file
+ *   in the one file to paste into a spreadsheet's Apps Script project, with
+ *   the api keys set at that file's end; the repo's README says how to
+ *   install it.
  *
- * KEY FEATURES:
- *   - Supports exact pool address for price queries (DexTools specialty)
- *   - Caching via CacheService to minimize repeated API calls
- *   - Global rate limiting using LockService + PropertiesService
- *   - Detailed debug logging (extra verbose mode in tests)
- *   - Returns 0 when data is unavailable (untracked token, no pools, API error)
- *     → This allows math formulas in Sheets to continue working (0 is neutral)
- *     → User can manually override 0 in the sheet if needed
- *   - Graceful handling of lock timeouts: returns visible string in cells
- *   - Custom Sheets menu "DexTools Price/FDV" with "Refresh" option to clear cache and flush sheet
- *     (must be manually installed - see instructions below)
- *   - X1 blockchain support: prices and FDVs on X1 are routed through the
- *     same `dexToolsGetTokenPrice` and `dexToolsGetTokenFDV` functions
- *     (DexTools doesn't list X1 yet — see "X1 BLOCKCHAIN ROUTING –
- *     DESIGN NOTE" below for the rationale)
- *   - Never caches zeros or failures → forces fresh retry on next call after transient issues
+ * <!-- HELP START -->
+ * ## Current prices: dexToolsGetTokenPrice and dexToolsGetTokenFDV
  *
- * IMPORTANT – SUBSCRIPTION PLAN CONFIGURATION
+ * `dexToolsGetTokenPrice(chain, tokenAddress, [pool])` gives a token's
+ * current price in USD. `dexToolsGetTokenFDV(chain, tokenAddress, [pool])`
+ * gives its fully diluted value (FDV): its price times its total supply.
+ * Both ask DexTools, or x1.ninja for X1. The script keeps each number for 5
+ * minutes, so a cell that runs again within that time gives the number it
+ * gave before.
  *
- * The DexTools public API v2 requires the plan segment in the URL:
- * https://public-api.dextools.io/{plan}/v2/...
+ * Each function gives one of these:
  *
- * Valid values for SUBSCRIPTION_PLAN (must match your actual API key tier exactly):
- *   - "free"       → Free/limited tier (~40–60 req/min, monthly cap)
- *   - "standard"   → Standard plan (most common paid tier)
- *   - "advanced"   → Advanced plan
- *   - "pro"        → Pro / Premium plan
+ * - a number, in USD;
+ * - 0, when the service has no data for the token or pool, or answered
+ *   with an error; a 0 keeps the sums of the sheet working, and you can
+ *   type a number over it;
+ * - `⌛ Rate limit / busy – retry soon`, when other cells kept the script
+ *   busy for longer than it waits;
+ * - `⚠️ API error – check logs`, when the request failed in a way the
+ *   script does not handle.
  *
- * Using the WRONG value usually results in:
- *   - 401/403 Unauthorized
- *   - 404 Not Found
- *   - or HTTP 200 with empty data object {}
+ * ### Chains
  *
- * How to find your correct plan name:
- * 1. Log in to https://developer.dextools.io/
- * 2. Go to your API product / dashboard
- * 3. Check base URL examples, subscription details or billing section
- * 4. Look for the segment used (e.g. /standard/v2/, /pro/v2/)
+ * The first argument names the chain as DexTools names it, in lowercase:
  *
- * USAGE
+ * - Ethereum: `ether`, not `ethereum`
+ * - BNB Smart Chain: `bsc`
+ * - Polygon: `polygon`
+ * - PulseChain: `pulse`
+ * - Solana: `solana`
+ * - X1: `x1`, which goes to x1.ninja and needs a pool (example E)
  *
- * 1. Finding the correct chain identifier (blockchain slug):
- *    - DexTools uses short, lowercase slugs (e.g., "ether" for Ethereum mainnet, not "ethereum")
- *    - Official interactive API documentation shows examples:  
- *      https://developer.dextools.io/products/http-api/65a5092590427172cd54ada7/spec
- *    - For the complete, up-to-date list of supported chains and their exact identifiers:  
- *      Call the API endpoint (requires your key):  
- *      GET https://public-api.dextools.io/{your-plan}/v2/blockchain  
- *      This returns a JSON array of all supported chains with their slugs/IDs.
- *    - Common examples:  
- *      - Ethereum mainnet: "ether"  
- *      - Binance Smart Chain: "bsc"  
- *      - Polygon: "polygon"  
- *      - PulseChain: "pulse"
- *      - Solana: "solana"
- *      - X1 blockchain (routed to x1.ninja, not DexTools): "x1"
+ * DexTools' documentation lists the rest:
+ * [developer.dextools.io](https://developer.dextools.io/products/http-api/65a5092590427172cd54ada7/spec).
  *
- * 2. Example calls (use these in your Google Sheets formulas):
+ * ### The pool argument
  *
- *    A. Basic token price (token address, no pool specified):  
- *       =dexToolsGetTokenPrice("ether", "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48")
- *       → Returns USDC price on Ethereum (~1.00 USD)
+ * The third argument names one pool, written as the pool's address and a
+ * 0 in double braces: `{{"<pool-address>", 0}}`. Sheets hands a function
+ * one value as that value and several values as an array, and the script
+ * reads the pool from an array, so the 0 is needed. With a pool, the price
+ * is that pool's; without one, it is from the pools DexTools picks.
+ * DexTools' FDV belongs to the token, so `dexToolsGetTokenFDV` sends
+ * DexTools no pool. x1.ninja answers only for a pool, so on X1 both
+ * functions need one.
  *
- *    B. FDV of a token:  
- *       =dexToolsGetTokenFDV("pulse", "0xF84b84dAAce6Ac00DbBAed26CA32Ff3570Aaf66C")
- *       → Returns FDV in USD for the Pulse token
+ * ### Examples
  *
- *    C. Price from a specific liquidity pool (most precise):  
- *       =dexToolsGetTokenPrice("ether", "0x2b591e99afe9f32eaa6214f7b7629768c40eeb39",
- *          {{"0x69d91b94f0aaf8e8a2586909fa77a5c2c89818d5", 0}})
- *       → Returns HEX price from the specified >$1M LP on Ethereum
- *       → Note: The extra "0" is required in Sheets to force array passing
+ * A. A token's price: USDC on Ethereum, about 1.00.
  *
- *    D. Using a different chain (e.g., Binance Smart Chain):
- *       =dexToolsGetTokenPrice("bsc", "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c")
- *       → Returns WBNB price on BSC
+ * ```
+ * =dexToolsGetTokenPrice("ether", "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48")
+ * ```
  *
- *    E. X1 blockchain (routed to x1.ninja API – pool address required):
- *       =dexToolsGetTokenPrice("x1", "So11111111111111111111111111111111111111112",
- *          {{"CAJeVEoSm1QQZccnCqYu9cnNF7TTD2fcUA3E5HQoxRvR", 0}})
- *       → Returns the wXNT/USDC.X pool's current USD price on X1.
- *       → For X1, the pool address is REQUIRED (third argument,
- *         example-C style with the trailing `0` for Sheets array
- *         passing). x1.ninja's free tier does not provide token→pool
- *         resolution — you supply a known pool/pair address from XDEX.
- *       → Uses x1.ninja's /v1/pools/{poolAddress} endpoint (free tier).
- *       → Configure X1_CONFIG.API_KEY at the top of this file. See the
- *         "X1 BLOCKCHAIN ROUTING – DESIGN NOTE" section below for how
- *         to obtain a free-tier key.
+ * B. A token's FDV, on PulseChain.
  *
- *    F. X1 blockchain – FDV (same call shape as E):
- *       =dexToolsGetTokenFDV("x1", "<x1-token-mint>",
- *          {{"<x1-pool-address>", 0}})
- *       → Returns the pool's `fdv` field. Caveat: x1.ninja reports
- *         `fdv: 0` for pools whose base token is the chain-native
- *         token (Wrapped XNT, mint So11…112) — FDV doesn't map
- *         cleanly to a chain-native token. For non-native tokens
- *         the FDV is populated.
- *       → Uses the same /v1/pools/{poolAddress} endpoint as price.
+ * ```
+ * =dexToolsGetTokenFDV("pulse", "0xF84b84dAAce6Ac00DbBAed26CA32Ff3570Aaf66C")
+ * ```
  *
- * X1 BLOCKCHAIN ROUTING – DESIGN NOTE
+ * C. HEX's price on Ethereum, in one of its pools.
  *
- * Why are X1 calls routed through functions named `dexToolsGetTokenPrice`
- * and `dexToolsGetTokenFDV`?
+ * ```
+ * =dexToolsGetTokenPrice("ether", "0x2b591e99afe9f32eaa6214f7b7629768c40eeb39", {{"0x69d91b94f0aaf8e8a2586909fa77a5c2c89818d5", 0}})
+ * ```
  *
- *   - DexTools (as of January 2026) does not list X1 among its supported
- *     chains. Without this routing, X1 price/FDV would require separate
- *     functions and a separate config block on the spreadsheet side.
- *   - X1 was folded into the existing functions so spreadsheet formulas
- *     stay uniform across chains: only the chain slug changes
- *     ("ether", "pulse", "x1", …). Two functions, one mental model.
- *   - If DexTools later adds X1 native support, the X1 branches inside
- *     these functions can be deleted in one step with no spreadsheet
- *     impact.
+ * D. WBNB's price on BNB Smart Chain.
  *
- * How to get an x1.ninja API key:
- *   1. Visit https://x1.ninja/developers
- *   2. Sign up with a wallet (free tier: 500K req/mo, 60 req/min).
- *   3. Copy the resulting `x1_…` token.
- *   4. Paste it into X1_CONFIG.API_KEY near the top of this file.
+ * ```
+ * =dexToolsGetTokenPrice("bsc", "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c")
+ * ```
  *
- * Endpoint used (price AND FDV):
- *   GET /v1/pools/{poolAddress}   (free tier)
- *   Returns `{ pool: { address, baseToken, quoteToken, priceUsd, fdv,
- *   marketCap, liquidity, … }, … }`. `dexToolsGetTokenPrice` extracts
- *   `pool.priceUsd`; `dexToolsGetTokenFDV` extracts `pool.fdv`. Same
- *   endpoint, same auth, same cache-key family — only the field name
- *   differs.
+ * E. Wrapped XNT's price on X1, in its pool with USDC.X. The pool is
+ * needed: x1.ninja's free tier finds no pool from a token, so the pool
+ * comes from XDEX, X1's exchange.
  *
- *   The caller supplies the pool address via the public function's
- *   third argument (`poolAddresses`, example-C style). x1.ninja's free
- *   tier does not include token→pool resolution (`/v1/search` would
- *   provide it but is paid Starter tier), so the pool address must be
- *   known to the caller.
+ * ```
+ * =dexToolsGetTokenPrice("x1", "So11111111111111111111111111111111111111112", {{"CAJeVEoSm1QQZccnCqYu9cnNF7TTD2fcUA3E5HQoxRvR", 0}})
+ * ```
  *
- *   Caveat: x1.ninja reports `fdv: 0` for pools whose base token is
- *   the chain-native (Wrapped XNT, mint So11…112). FDV is well-defined
- *   for non-native tokens.
+ * F. A token's FDV on X1, in the same form as E. x1.ninja gives 0 as the
+ * FDV of a pool whose base token is Wrapped XNT, X1's own coin.
+ *
+ * ```
+ * =dexToolsGetTokenFDV("x1", "<x1-token-mint>", {{"<x1-pool-address>", 0}})
+ * ```
+ *
+ * ### When a cell shows 0 or a message
+ *
+ * - 0: check that the chain is named as DexTools names it, and that the
+ *   address is the token's, not a wallet's. DexTools has no data for some
+ *   tokens with little trading, and 0 is then its answer.
+ * - `⌛ Rate limit / busy – retry soon`: choose Refresh in the Crypto Price
+ *   Fetchers menu, which runs the cell again.
+ * - `#ERROR!`: choose Clean up errors in the Crypto Price Fetchers menu.
+ * - To see what the services answered, open Extensions > Apps Script,
+ *   choose `testDexToolsVerbose` in the list of functions at the top, and
+ *   click Run: the log shows each request and its answer.
+ * <!-- HELP END -->
+ *
+ * API KEYS AND SETTINGS
+ *   DEXTOOLS_CONFIG.API_KEY, DexTools' key, and X1_CONFIG.API_KEY,
+ *   x1.ninja's, hold placeholders as committed, which the services refuse.
+ *   The build step sets both at the end of the file it gives, from the keys
+ *   saved in the repo (`npm run api-keys`), with any other field of the two
+ *   objects that the repo's top config.json sets. The build sets its values
+ *   after this file's top-level code has run, so a field that code reads
+ *   keeps the value written here: SUBSCRIPTION_PLAN, API_HOST and
+ *   API_VERSION, which make the urls, and MIN_SECONDS_BETWEEN_CALLS. To
+ *   change one of those, change it here and build again.
+ *
+ * SUBSCRIPTION PLAN
+ *   DexTools' url names the plan of the key:
+ *   https://public-api.dextools.io/{plan}/v2/... SUBSCRIPTION_PLAN must
+ *   be the key's plan: "free", "standard", "advanced" or "pro". With
+ *   another plan, DexTools answers 401 or 403, 404, or 200 with an empty
+ *   data object. The plan shows in DexTools' developer portal,
+ *   https://developer.dextools.io/, in the key's product and billing pages
+ *   and in the base url of its examples, such as /standard/v2/.
+ *
+ * X1 ROUTING
+ *   DexTools does not list X1 (January 2026), so the two functions send an
+ *   X1 request to x1.ninja instead, and a formula on X1 differs from one on
+ *   another chain only in the chain's name and the pool. Should DexTools
+ *   list X1, the X1 branches of the two functions can go, and no formula
+ *   changes.
+ *
+ *   Both functions ask x1.ninja's free tier for GET /v1/pools/{poolAddress},
+ *   whose answer is `{ pool: { address, baseToken, quoteToken, priceUsd,
+ *   fdv, marketCap, liquidity, … }, … }`: the price is `pool.priceUsd` and
+ *   the FDV `pool.fdv`. The free tier has no way to find a pool from a
+ *   token (/v1/search, which has, is on the paid Starter tier), so the
+ *   formula names the pool. An x1.ninja key comes from
+ *   https://x1.ninja/developers, by signing up with a wallet; the free tier
+ *   allows 500,000 requests a month and 60 a minute.
+ *
+ * RATE LIMITING
+ *   Sheets runs the custom function of each cell as a separate call, many
+ *   at the same time. Each call that asks a service takes the script lock
+ *   (LockService), waits until MIN_SECONDS_BETWEEN_CALLS have passed since
+ *   the last request, whose time the script properties keep, sends its
+ *   request, records the time, and gives the lock back. A call that gets
+ *   no lock within LOCK_WAIT_MS gives the busy message. LOCK_WAIT_MS, 120
+ *   seconds, is longer than the 30 seconds Google gives a custom function,
+ *   so a cell that waits that long shows #ERROR! instead: a known bug, in
+ *   the repo's CLAUDE.md. Only a number above 0 is cached, so a failed
+ *   request is sent again the next time its cell runs.
+ *
+ * TESTING
+ *   The repo's tests run this file unchanged under Node. In the Apps Script
+ *   editor, choose testDexToolsFunctions in the list of functions and click
+ *   Run: it asks for 7 prices and FDVs, the last two on X1 through
+ *   x1.ninja, and logs PASS for each that gives a number above 0, and a
+ *   summary. testDexToolsVerbose runs the same tests and logs each step.
+ *   A test that gives 0, with "empty data keys" in the verbose log, asked
+ *   for a token or pool DexTools has no data for.
+ *
+ * NODE
+ *   crypto-price-fetchers.js, beside this file in the repo, runs it
+ *   unchanged under Node, for Node programs and the command line.
  *
  * PROJECT & LICENSE INFORMATION
- *
- * This script is named crypto-price-fetcher.gs and is part of the open-source
- * crypto-price-fetchers GitHub repository:
- * https://github.com/nottoseethesun/crypto-price-fetchers
- *
- * Use at your own risk. This script interacts with external APIs and handles
- * financial data. The author provides no warranty, expressed or implied.
- *
- * Full license details (Apache 2.0 License) are available here:
- * https://github.com/nottoseethesun/crypto-price-fetchers/blob/main/LICENSE
- *
- * TEST
- *
- * To verify the script is working correctly, run the built-in test functions from the Apps Script editor:
- *
- * 1. Standard test (clean summary output):
- *    - In the Apps Script editor, select the function: testDexToolsFunctions
- *    - Click Run (no parameters needed)
- *    - View results in the Executions log or View → Logs
- *    - Expected: All 7 tests PASS with real values for supported tokens
- *      (tests 6 and 7 query x1.ninja for X1 wXNT price and X1 XENCAT
- *      FDV respectively, and depend on X1_CONFIG.API_KEY being set)
- *
- * 2. Verbose test (maximum debug detail – recommended for troubleshooting):
- *    - Select the function: testDexToolsVerbose
- *    - Click Run
- *    - Or, select testDexToolsFunctions, then pass true as parameter (if dialog allows)
- *    - Expected: Detailed logs for every step (timestamps, lock attempts, raw API responses,
- *      data keys, cache info)
- *
- * Run tests periodically, especially after changes to CONFIG, tokens, or during heavy sheet usage.
- * If any test fails with 0 (and verbose mode shows empty data keys), it indicates DexTools has
- * no indexed data for that token/pool.
- *
- * TROUBLESHOOTING TIPS
- *
- * 1. Cells stuck with "⌛ Rate limit / busy – retry soon" or "⚠️ API error – check logs"
- *    - This means the script couldn't get the lock within 60 seconds (another call is running or previously hung)
- *    - The script automatically retries on the next sheet recalculation (no need to immediately refresh the page)
- *    - Triggers for automatic retry:
- *      - Any edit in the sheet (even a small change elsewhere)
- *      - Background recalculation (Sheets retries periodically)
- *      - Opening/reloading the sheet
- *    - If it persists >1–2 minutes: Hard refresh the page (Windows: Ctrl + Shift + R; Mac: Cmd + Shift + R)
- *    - Or, use menu → "DexTools Price/FDV → Refresh" (clears cache + forces recalc) if menu is working
- *
- * 2. Persistent "Exceeded maximum execution time" in SUM or dependent cells
- *    - Caused by too many parallel custom function calls + temporary delays (locks/sleeps) during recalc
- *    - The error can "stick" in some cells even after the issue is resolved because Sheets' internal computation
- *      queue gets corrupted
- *    - Automatic retry happens on next recalc (edit, open, background), but sometimes it doesn't clear the stuck state
- *    - Immediate fix that works reliably (your current method):
- *      1. Temporarily break the formula in the stuck cell (e.g., change `U18` to `U18a`)
- *      2. Wait a few seconds for Sheets to process the error
- *      3. Fix it back (remove the "a")
- *      → This forces Sheets to treat it as a new formula and re-queue it correctly
- *    - For large sheets (e.g. 100+ DexTools cells), do this in small batches (10–20 cells at a time) to
- *      avoid overwhelming the queue
- *    - Long-term solution (recommended when you have time):
- *      Replace many individual custom function calls with one ARRAYFORMULA at the top of the column.
- *      Example:
- *      =ARRAYFORMULA(
- *        IF(U4:U123<>"",
- *          dexToolsGetTokenPrice("ether", U4:U123),
- *          ""
- *        )
- *      )
- *      → This runs far fewer parallel instances → dramatically reduces timeouts
- *      → Easier to maintain and scales better for 120+ tokens
- *    - Prevention:
- *      - Use the "Refresh" menu or hard refresh proactively after adding new tokens
- *      - Avoid massive simultaneous edits that trigger full recalc
- *      - Mac users: Use Cmd + Shift + R for hard refresh (Windows: Ctrl + Shift + R)
- *
- * 3. Cells show 0 for tokens that should have data
- *    - Run testDexToolsVerbose() → check logs for "empty data keys"
- *    - If empty: DexTools has no indexed data for that token/pool → normal, return 0
- *    - Hard refresh or edit sheet → retries automatically
- *
- * 4. General tips
- *    - Mac users: Use Cmd (not Ctrl) for shortcuts (e.g. Cmd + Shift + R for hard refresh)
- *    - Monitor Executions log for warnings/errors
- *    - If issues persist: Run resetDexToolsLock() to force timestamp update
- *
- * OPTIONAL: Add Custom Refresh Menu
- *
- * The script includes code to create a custom menu "DexTools Price/FDV" with a "Refresh" item, but if the
- * menu is not appearing automatically, use an installable "On open" trigger for reliability (simple triggers can
- * be flaky with conflicts or permissions).
- *
- * Step-by-step to add an installable trigger:
- * 1. In the Apps Script editor, go to the left sidebar and click the clock icon (Triggers).
- * 2. At the bottom right, click the blue "+ Add Trigger" button.
- * 3. In the "Choose which function to run" dropdown, select: onOpenDexTools
- * 4. Leave "Choose which deployment should run" as "Head" (default).
- * 5. For "Select event source", choose: From spreadsheet
- * 6. For "Select event type", choose: On open
- * 7. (Optional) Set "Failure notification settings" to "Notify me immediately" so you get email alerts if
- *    the trigger ever fails.
- * 8. Click "Save" at the bottom.
- * 9. If prompted, review and grant the requested permissions (this is normal for installable triggers).
- * 10. Close and reopen your spreadsheet tab (or refresh the page).
- *
- * The menu should now appear consistently every time the sheet opens.
- * If it still does not appear, check the Triggers list for errors, ensure the function name is exactly
- * "onOpenDexTools", and verify no other scripts are conflicting.
- *
- * Rate Limiting Strategy:
- *   - LockService.getScriptLock() → mutual exclusion (only one execution makes API call at a time)
- *   - PropertiesService → persists last call timestamp across all script executions
- *   - Utilities.sleep() → enforces minimum delay between real calls
- *   - On lock timeout (60s): returns user-friendly string visible in sheet cells
- *
- * Google Apps Script Specifics:
- *   - Custom functions run in **parallel** for each cell → many concurrent calls possible
- *   - No built-in mutex → LockService is essential
- *   - Recursive sleep / naive timestamp checks → dangerous (quota violations, stack overflow)
- *   - Current pattern: lock → check time → sleep if needed → call → update time → release
- *
- * Dependencies:
- *   - UrlFetchApp, LockService, PropertiesService, CacheService (all built-in)
+ *   Part of https://github.com/nottoseethesun/crypto-price-fetchers, under
+ *   the Apache 2.0 License:
+ *   https://github.com/nottoseethesun/crypto-price-fetchers/blob/main/LICENSE
+ *   Use at your own risk. This script asks outside services for financial
+ *   data, and the author gives no warranty, expressed or implied.
  */
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   CONFIGURATION – EDIT ONLY THESE VALUES
+   CONFIGURATION – the build step sets the keys (see API KEYS AND SETTINGS)
    ───────────────────────────────────────────────────────────────────────────── */
 
 /**
- * @typedef {Object} Config
- * @property {string} API_KEY                  Your DexTools API key
- * @property {string} SUBSCRIPTION_PLAN        Exact plan name: "free"|"standard"|"advanced"|"pro"
- * @property {number} MIN_SECONDS_BETWEEN_CALLS Minimum seconds between real API calls
- * @property {string} API_HOST                 Base host (rarely changes)
- * @property {string} API_VERSION              Current API version
- * @property {number} CACHE_SECONDS            How long to cache successful results
- * @property {number} LOCK_WAIT_MS             Max milliseconds to wait for lock acquisition
+ * @typedef {Object} DexToolsConfig
+ * @property {string} API_KEY                   DexTools' key; the build step sets it
+ * @property {string} SUBSCRIPTION_PLAN         The key's plan: "free"|"standard"|"advanced"|"pro"
+ * @property {number} MIN_SECONDS_BETWEEN_CALLS Least seconds between two requests to a service
+ * @property {string} API_HOST                  DexTools' api host
+ * @property {string} API_VERSION               DexTools' api version
+ * @property {number} CACHE_SECONDS             How long a number above 0 is kept
+ * @property {number} LOCK_WAIT_MS              Longest wait for the script lock, in milliseconds
  */
-const CONFIG = {
-  API_KEY: "paste_your_dextools_api_key_here", // Remember, there's a free tier if needed
-  SUBSCRIPTION_PLAN: "standard", // ← MUST match your key's actual plan tier; free should work too
-  MIN_SECONDS_BETWEEN_CALLS: 0.7, // Safe for Standard+; 1.5–3 for free tier; 1.0+ if also calling x1.ninja free (60 req/min)
+const DEXTOOLS_CONFIG = {
+  API_KEY: "set_by_the_build_step", // DexTools has a free tier
+  SUBSCRIPTION_PLAN: "standard", // Must be the key's plan
+  MIN_SECONDS_BETWEEN_CALLS: 0.7, // 0.7 for standard and above; 1.5–3 for free; 1.0 or more when x1.ninja's free tier (60 requests a minute) is asked too
   API_HOST: "https://public-api.dextools.io",
   API_VERSION: "v2",
-  CACHE_SECONDS: 300, // 5 minutes default – only successful results cached
-  LOCK_WAIT_MS: 120000, // 60 seconds for lock wait (increased for stability)
+  CACHE_SECONDS: 300, // 5 minutes
+  LOCK_WAIT_MS: 120000, // 120 seconds: longer than Google's 30 seconds for a custom function (a known bug)
 };
 
 /**
  * @typedef {Object} X1Config
- * @property {string} API_KEY      Your x1.ninja API key (bearer token like `x1_...`)
- * @property {string} API_HOST     Base host for x1.ninja
- * @property {string} API_VERSION  Current API version
+ * @property {string} API_KEY      x1.ninja's key, a bearer token starting with `x1_`; the build step sets it
+ * @property {string} API_HOST     x1.ninja's api host
+ * @property {string} API_VERSION  x1.ninja's api version
  */
 const X1_CONFIG = {
-  API_KEY: "paste_your_x1_ninja_api_key_here", // Free tier — get yours at https://x1.ninja/developers
+  API_KEY: "set_by_the_build_step", // x1.ninja's free tier: https://x1.ninja/developers
   API_HOST: "https://api.x1.ninja",
   API_VERSION: "v1",
 };
@@ -308,8 +222,9 @@ const X1_CONFIG = {
    COMPUTED CONSTANTS & SERVICES
    ───────────────────────────────────────────────────────────────────────────── */
 
-const MILLISECONDS_BETWEEN_CALLS = CONFIG.MIN_SECONDS_BETWEEN_CALLS * 1000;
-const BASE_URL = `${CONFIG.API_HOST}/${CONFIG.SUBSCRIPTION_PLAN}/${CONFIG.API_VERSION}`;
+const MILLISECONDS_BETWEEN_CALLS =
+  DEXTOOLS_CONFIG.MIN_SECONDS_BETWEEN_CALLS * 1000;
+const BASE_URL = `${DEXTOOLS_CONFIG.API_HOST}/${DEXTOOLS_CONFIG.SUBSCRIPTION_PLAN}/${DEXTOOLS_CONFIG.API_VERSION}`;
 const X1_BASE_URL = `${X1_CONFIG.API_HOST}/${X1_CONFIG.API_VERSION}`;
 
 const props = PropertiesService.getScriptProperties();
@@ -325,8 +240,8 @@ const CACHE = CacheService.getScriptCache();
  * Routes by `blockchain`:
  *   - `"x1"`  → x1.ninja `/v1/pools/{poolAddress}` — returns the pool's
  *               current `priceUsd`. The pool address must be supplied
- *               via the third argument (`poolAddresses`), example-C
- *               style. The free tier does not include token→pool
+ *               via the third argument (`poolAddresses`), as in
+ *               example C. The free tier does not include token→pool
  *               resolution.
  *   - other   → DexTools (token endpoint, or pool endpoint when poolAddresses given)
  *
@@ -335,10 +250,9 @@ const CACHE = CacheService.getScriptCache();
  * function so end-user spreadsheet formulas stay uniform across chains
  * — only the chain slug changes. If DexTools later adds X1 natively,
  * the X1 branch here can be deleted in one step with no spreadsheet
- * impact. See the "X1 BLOCKCHAIN ROUTING – DESIGN NOTE" section in
- * this file's header doc for the full rationale.
+ * impact. X1 ROUTING, in this file's header, says why.
  *
- * For X1, the call pattern is example-C style: pass the token mint as
+ * For X1, the call pattern is as in example C: pass the token mint as
  * `tokenAddress` (for documentation/cache-key clarity) and the pool
  * address as the third argument: `[[poolAddress, 0]]`. The fetcher
  * uses the pool address to query `/v1/pools/{poolAddress}`.
@@ -347,14 +261,14 @@ const CACHE = CacheService.getScriptCache();
  * @param {string} tokenAddress - Token contract address (or pool address for X1)
  * @param {Array<Array<string>>} [poolAddresses=[]] - Optional [[poolAddress, unused]]
  *                                 Use when you want price from specific pool
- * @param {number} [cacheSeconds=CONFIG.CACHE_SECONDS] - Override cache duration
+ * @param {number} [cacheSeconds=DEXTOOLS_CONFIG.CACHE_SECONDS] - Override cache duration
  * @return {number|string} Price in USD, or 0 (for math) / friendly string on timeout
  */
 function dexToolsGetTokenPrice(
   blockchain,
   tokenAddress,
   poolAddresses = [],
-  cacheSeconds = CONFIG.CACHE_SECONDS,
+  cacheSeconds = DEXTOOLS_CONFIG.CACHE_SECONDS,
 ) {
   const isX1 = String(blockchain || "").toLowerCase() === "x1";
   const pool = Array.isArray(poolAddresses) && poolAddresses[0]?.[0];
@@ -385,7 +299,7 @@ function dexToolsGetTokenPrice(
  * Routes by `blockchain`:
  *   - `"x1"`  → x1.ninja `/v1/pools/{poolAddress}` — returns the
  *               pool's `fdv`. The pool address must be supplied via
- *               the third argument (`poolAddresses`), example-C style.
+ *               the third argument (`poolAddresses`), as in example C.
  *               x1.ninja reports `fdv: 0` for pools whose base token
  *               is the chain-native (Wrapped XNT).
  *   - other   → DexTools `/token/.../info` (FDV is per-token, not per-pool)
@@ -393,8 +307,7 @@ function dexToolsGetTokenPrice(
  * Design note: DexTools (as of January 2026) does not list X1 among its
  * supported chains. The X1 branch is folded into this function so
  * spreadsheet formulas stay uniform across chains — only the chain
- * slug changes. See the "X1 BLOCKCHAIN ROUTING – DESIGN NOTE" section
- * in this file's header doc for the full rationale.
+ * slug changes. X1 ROUTING, in this file's header, says why.
  *
  * @param {string} blockchain - Chain identifier (e.g. "pulse", "ether", "x1")
  * @param {string} tokenAddress - Token contract address (or pool address for X1)
@@ -402,14 +315,14 @@ function dexToolsGetTokenPrice(
  *                                 Required for X1 (x1.ninja keys on
  *                                 pool address). Ignored by the
  *                                 DexTools path (FDV is per-token).
- * @param {number} [cacheSeconds=CONFIG.CACHE_SECONDS] - Override cache duration
+ * @param {number} [cacheSeconds=DEXTOOLS_CONFIG.CACHE_SECONDS] - Override cache duration
  * @return {number|string} FDV in USD, or 0 (for math) / friendly string on timeout
  */
 function dexToolsGetTokenFDV(
   blockchain,
   tokenAddress,
   poolAddresses = [],
-  cacheSeconds = CONFIG.CACHE_SECONDS,
+  cacheSeconds = DEXTOOLS_CONFIG.CACHE_SECONDS,
 ) {
   const isX1 = String(blockchain || "").toLowerCase() === "x1";
   const pool = Array.isArray(poolAddresses) && poolAddresses[0]?.[0];
@@ -458,12 +371,12 @@ function dexToolsGetTokenFDV(
 function withRateLimitProtection(callback) {
   const lock = LockService.getScriptLock();
 
-  const acquired = lock.tryLock(CONFIG.LOCK_WAIT_MS);
+  const acquired = lock.tryLock(DEXTOOLS_CONFIG.LOCK_WAIT_MS);
 
   if (!acquired) {
     console.warn(
       "Rate limit lock timeout after " +
-        CONFIG.LOCK_WAIT_MS / 1000 +
+        DEXTOOLS_CONFIG.LOCK_WAIT_MS / 1000 +
         "s – another execution is holding it",
     );
     return "⌛ Rate limit / busy – retry soon"; // Visible in cell
@@ -580,7 +493,7 @@ function getOptions() {
   return {
     method: "GET",
     headers: {
-      "X-API-Key": CONFIG.API_KEY,
+      "X-API-Key": DEXTOOLS_CONFIG.API_KEY,
       Accept: "application/json",
     },
     muteHttpExceptions: true,
@@ -594,7 +507,7 @@ function getOptions() {
  * Returns the pool's current `priceUsd` field.
  *
  * Pool-spec required: pass the pool address via the public function's
- * third argument (the `poolAddresses` slot, example-C style). x1.ninja
+ * third argument (the `poolAddresses` slot, as in example C). x1.ninja
  * does not let free-tier callers resolve token-mint → pool, so the
  * caller must know which pool to query.
  *
@@ -687,36 +600,6 @@ function getX1Options() {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   SHEET MENU – "DexTools Price/FDV" with "Refresh" option
-   ───────────────────────────────────────────────────────────────────────────── */
-
-/**
- * Creates the custom menu when the spreadsheet opens.
- * Menu title: "DexTools Price/FDV"
- * Item: "Refresh" → calls refreshDexTools()
- */
-function onOpenDexTools() {
-  SpreadsheetApp.getUi()
-    .createMenu("DexTools Price/FDV")
-    .addItem("Refresh", "refreshDexTools")
-    .addToUi();
-}
-
-/**
- * Refresh function called from the menu.
- * Forces immediate recalculation of all formulas in the sheet.
- * This helps clear stuck "#ERROR!" or "Exceeded maximum execution time" states.
- * Note: Does NOT clear cache (cache expires naturally in 5 min).
- * To fully clear cache, hard-refresh the page or wait for expiration.
- */
-function refreshDexTools() {
-  SpreadsheetApp.flush();
-  console.log(
-    "Sheet formulas forcibly re-evaluated. Stuck cells should update.",
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────────────────────
    TESTING & DEBUGGING – WITH VERBOSE MODE
    ───────────────────────────────────────────────────────────────────────────── */
 
@@ -731,7 +614,7 @@ function refreshDexTools() {
 function testDexToolsFunctions(verbose = false) {
   console.log("=== DexTools Full Test Started ===");
   console.log(
-    `Plan: ${CONFIG.SUBSCRIPTION_PLAN} | Delay: ${CONFIG.MIN_SECONDS_BETWEEN_CALLS}s | Cache: ${CONFIG.CACHE_SECONDS}s | Verbose mode: ${verbose}`,
+    `Plan: ${DEXTOOLS_CONFIG.SUBSCRIPTION_PLAN} | Delay: ${DEXTOOLS_CONFIG.MIN_SECONDS_BETWEEN_CALLS}s | Cache: ${DEXTOOLS_CONFIG.CACHE_SECONDS}s | Verbose mode: ${verbose}`,
   );
 
   const testCases = [

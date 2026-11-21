@@ -12,8 +12,9 @@
  * How it stands in for Sheets:
  *
  * - A cell holds a formula, a value and what it displays. A cell written
- *   as a string that starts with `=` holds that formula; any other value
- *   is a plain value.
+ *   as a string that starts with `=` holds that formula, which has not run
+ *   yet; an object `{ formula, value, display }` holds a formula that has
+ *   run, as a sheet opened with it does; any other value is a plain value.
  * - A formula written with `setFormula` waits for the next
  *   `SpreadsheetApp.flush()`, as Sheets' recalculation does; a formula
  *   ending in `!`, which Sheets cannot read, shows `#ERROR!` at once. At
@@ -29,9 +30,10 @@
 
 /**
  * One cell, as a test describes it: a formula, as a string starting with
- * `=`, or a plain value.
+ * `=`; a formula that has run, with its value and what it displays; or a
+ * plain value.
  *
- * @typedef {string|number|boolean} CellText
+ * @typedef {string|number|boolean|{formula: string, value: *, display: string}} CellText
  */
 
 /**
@@ -55,6 +57,14 @@ function columnLetters(column) {
  * @returns {{formula: string, value: *, display: string, loadingLeft: number}} The cell
  */
 function cellOf(text) {
+  if (text !== null && typeof text === "object") {
+    return {
+      formula: text.formula,
+      value: text.value ?? text.display,
+      display: text.display ?? String(text.value),
+      loadingLeft: 0,
+    };
+  }
   if (typeof text === "string" && text.startsWith("=")) {
     return { formula: text, value: "", display: "", loadingLeft: 0 };
   }

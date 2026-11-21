@@ -1,10 +1,11 @@
 /**
- * Tests that guard fixed bugs in the Node tool and its Sheets script.
+ * Tests that guard fixed bugs in the Node tool, its Sheets script, and the
+ * menu the build step puts in the one file it gives for a spreadsheet.
  * @module tests/regressions.test
  *
  * Each block states what a fixed bug got wrong, as the behavior the tools
  * now have, and checks it everywhere the bug was: the Node tool's functions,
- * its command line, and the Sheets script. A bug found later gets its test
+ * its command line, the Sheets script, and the menu. A bug found later gets its test
  * in `known-bugs.test.js`, declared with `it.fails` while the bug is there;
  * its fix declares the test with `it` and moves it here (see the repo's
  * CLAUDE.md).
@@ -16,7 +17,9 @@
  * command line, run in a child process, against a preloaded fetch; and the
  * Sheets script, run unchanged in the test's thread, against a stand-in
  * `UrlFetchApp`. The Node tool's functions run on the committed settings,
- * whatever a `config.json` on this computer holds.
+ * whatever a `config.json` on this computer holds. The menu runs with the
+ * DexTools script beside it, as in the built file, against the spreadsheet
+ * of `test/helpers/stand-in-spreadsheet.js` at the repo's top.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -30,6 +33,7 @@ import { closeExchangeSources, exchangeSources } from "../sources/exchange.js";
 import { canonicalTimeZone, parseInputToUtcMs } from "../utils/date.js";
 import { answerWith, asked as askedByTool } from "./helpers/stand-in-fetch.js";
 import { loadSheetsScript, reply } from "./helpers/sheets-script.js";
+import { standInSpreadsheet } from "../../../test/helpers/stand-in-spreadsheet.js";
 
 // The Sheets script, opened by its Node version with the stand-in fetch
 vi.mock(
@@ -55,6 +59,11 @@ const FILLER_DIR = path.resolve(__dirname, "..");
 const SHEETS_SCRIPT_PATH = [
   "../../getCryptoPriceFromCentralizedExchange.gs",
   "../../getCryptoPriceFromCentralizedExchange-sources.gs",
+].map((file) => path.resolve(__dirname, file));
+/** The menu and the DexTools script, as the build joins them, from the repo's top. */
+const MENU_AND_DEXTOOLS_SCRIPTS = [
+  "../../../crypto-price-fetchers-menu.gs",
+  "../../../crypto-price-fetchers.gs",
 ].map((file) => path.resolve(__dirname, file));
 const PRELOAD_URL = pathToFileURL(
   path.resolve(__dirname, "helpers/stand-in-fetch-preload.js"),
@@ -526,6 +535,29 @@ describe("fixed bugs", () => {
         script.getPriceFromCoinGecko("tezos", ROW_UTC_MS + 7200000, "high"),
       ).toBe(3.1);
       expect(asked).toHaveLength(2);
+    });
+  });
+  describe("the menu's Refresh", () => {
+    it("Refresh runs again the cells that call dexToolsGetTokenPrice", () => {
+      const sheet = standInSpreadsheet({
+        tabs: {
+          Prices: [
+            ["Token", "Price"],
+            [
+              "PLS",
+              '=dexToolsGetTokenPrice("pulse", "0xA1077a294dDE1B09bB078844df40758a5D0f9a27")',
+            ],
+          ],
+        },
+      });
+      const script = loadSheetsScript(MENU_AND_DEXTOOLS_SCRIPTS, () => null, {
+        services: {
+          SpreadsheetApp: sheet.SpreadsheetApp,
+          HtmlService: sheet.HtmlService,
+        },
+      });
+      script.refreshCurrentPrices();
+      expect(sheet.runsOf("Prices!B2")).toBe(1);
     });
   });
 });

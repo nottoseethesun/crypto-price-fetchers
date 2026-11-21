@@ -3,8 +3,9 @@
 The files the programs read and write, the gates every change passes, the
 tests, and CI. The programs are this repo's parts: the Sheets scripts and
 their Node versions, which price tokens in USD; crypto-price-filler, the
-Node tool that fills a CSV's price columns; the build step, which sets the
-saved api keys in the Sheets scripts for pasting into Apps Script; the key
+Node tool that fills a CSV's price columns; the build step, which joins
+the Sheets scripts into one file, with the saved api keys set in it, for
+one paste into Apps Script; the key
 store, which keeps the api keys encrypted; the versions tool, which sets
 a project's dependencies from GitHub to a branch or a release; and the
 Summ CSV writer, which writes the CSV files the owner imports into Summ,
@@ -43,15 +44,15 @@ A working copy needs Node 22 or later, the packages of the repo and of
 crypto-price-filler, and the api keys. `npm run api-keys` runs the key
 store's manager, `npm run check` the gate below, and
 `npm run build apps-script` the build step, which gives the Sheets scripts
-with the saved keys set in them, for pasting into Apps Script. From the
-repo's top folder:
+as one file, with the saved keys set in it, for one paste into Apps Script.
+From the repo's top folder:
 
 ```bash
 npm ci
 npm ci --prefix fetch-from-centralized-exchange/crypto-price-filler
 npm run api-keys            # save the api keys, once
 npm run check               # the gate
-npm run build apps-script   # the Sheets scripts with their keys, for Apps Script
+npm run build apps-script   # the Sheets scripts as one file, for Apps Script
 ```
 
 ---
@@ -69,7 +70,7 @@ the ones that hold no key and none of the owner's own settings.
 | `summ-csv/settings.json` | yes | The Summ CSV writer's facts of each chain, by Summ's name for it (its own coin, the forms of its hashes and addresses), and the fiat currencies a reference price may be in. |
 | `crypto-price-filler/config-example.json` | yes | The filler's settings. |
 | `crypto-price-filler/config.json` | no | The owner's settings, laid over `config-example.json`. |
-| `build/apps-script/` | no | The Sheets scripts as `npm run build apps-script` writes them when the owner declines a clipboard tool: they hold the api keys in the clear, readable by the owner alone. |
+| `build/apps-script/` | no | `crypto-price-fetchers.gs`, the one file `npm run build apps-script` writes when the owner declines a clipboard tool: it holds the api keys in the clear, readable by the owner alone. ESLint, Prettier and secretlint pass over the folder. |
 | `coverage/` | no | A test run's coverage report. |
 
 ---
@@ -78,8 +79,8 @@ the ones that hold no key and none of the owner's own settings.
 
 `npm run check` runs every gate, in order, and stops at the first that
 fails: the lint, the tests with coverage, crypto-price-filler's tests with
-coverage, then the three security audits. It must pass before every commit
-and push, and CI runs it on Node 22 and Node 24.
+coverage, then the security audits. It must pass before every commit and
+push, and CI runs it on Node 22 and Node 24.
 
 ---
 
@@ -93,7 +94,7 @@ follows, its formatting, the workflows, and files nothing uses.
 | ---- | ------------- | ------------------------- |
 | ESLint | `eslint.config.js` | LP Ranger's rules, with no warning allowed: cyclomatic complexity ≤ 17, ≤ 500 lines of code a file (blank lines and comments not counted), lines ≤ 80 characters but strings, urls and comments, `===`, no unused name, no `var`, `const` where nothing is reassigned, no `Math.random`, no comment that tells Prettier to skip code, and every import resolved. It reads the Sheets scripts too, as the paragraph below the table says. |
 | markdownlint | `.markdownlint-cli2.jsonc` | LP Ranger's settings, over every Markdown file. |
-| Prettier | `.prettierrc`, `.prettierignore` | Its formatting, in check mode, over every JavaScript, Sheets script, JSON and YAML file. |
+| Prettier | `.prettierrc`, `.prettierignore` | Its formatting, in check mode, over every JavaScript, Sheets script, JSON and YAML file the repo keeps. |
 | actionlint | — | The GitHub workflows. |
 | knip | `knip.json` | No file nothing reaches. See [Dead Code Detection](#dead-code-detection). |
 
@@ -109,8 +110,11 @@ husky, a package that runs scripts at git's hooks, runs `npm run lint`
 before each commit (`.husky/pre-commit`), so an unformatted or failing
 file stops the commit; `npm run format` or
 `npm run lint:fix` fixes formatting. No rule is ever switched off in a file,
-no file is left out of the lint, and a file over 500 lines is split, not
-excused.
+no file git keeps is left out of the lint, and a file over 500 lines is
+split, not excused. The one folder the lint passes over is `build/`, which
+git ignores: the build step writes its file there when there is no
+clipboard, and that file holds DEX Screener's compiled code and the api
+keys.
 
 ---
 
@@ -122,14 +126,21 @@ were written for. Neither asks a service
 outside the computer, and neither reads the owner's key file or password.
 
 **The top folder's tests** (`test/`, Node's test runner) cover the runner,
-the Node versions, the build step, the price clients (`dex-prices/`), the
-key store, `no-secret-logging`, the versions tool
+the Node versions, the build step, the menu, the price clients
+(`dex-prices/`), the key store, `no-secret-logging`, the versions tool
 (`github-project-deps/`), the Summ CSV writer (`summ-csv/`) and the shared
 helpers (`lib/`). The scripts' and the clients' requests
 go to a stand-in fetch or a stand-in server on the computer
 (`test/helpers/stand-in-web.js`; `test/helpers/gecko-terminal-stand-in.js`
 answers as GeckoTerminal does). The build step's tests stand in for the
-clipboard, the install and the questions. The versions tool's tests run
+clipboard, the install, the questions and DEX Screener's part.
+`test/dex-screener.test.js` builds that part from stand-in TypeScript
+sources, written in the test with their checksums, served by a stand-in
+fetch, and compiled with the real esbuild; `test/built-script.test.js`
+checks the joining of parts on short scripts. The menu's tests run
+`crypto-price-fetchers-menu.gs` unchanged against a spreadsheet held in
+memory (`test/helpers/stand-in-spreadsheet.js`), which records each
+formula written. The versions tool's tests run
 it on projects in temp folders, with a stand-in npm that writes the
 lockfile an install would (`test/helpers/github-project-deps-stand-ins.js`);
 git itself lists their package.json files, and npm's dry-run pack shows
@@ -162,8 +173,9 @@ holds the stand-ins:
 
 - `sheets-script.js` runs a Sheets script, one file or several, in the
   test's thread with the runner's services; its `UrlFetchApp` answers from
-  a function the test gives, with any status, and the script's config is
-  set as its Node version sets it.
+  a function the test gives, with any status, the script's config is set
+  as its Node version sets it, and more stand-in services, such as the top
+  folder's spreadsheet, can be handed in.
 - `stand-in-fetch.js` is a stand-in fetch for the tool's own sources: the
   exchange sources, whose Sheets script then runs for real in the runner's
   worker, and the pool sources, whose shared clients then ask it.
@@ -176,11 +188,13 @@ again rather than written again.
 
 ### How the Sheets Scripts (`.gs`) Are Tested
 
-The repo has two Sheets scripts. A Sheets script is Google Apps Script:
-JavaScript that runs on Google's servers, inside a spreadsheet, where a
-cell calls one of its functions. `crypto-price-fetchers.gs` is one file.
-The exchange script is three: `getCryptoPriceFromCentralizedExchange.gs`,
-its price sources in `-sources.gs`, and its tests in `-tests.gs`.
+A Sheets script is Google Apps Script: JavaScript that runs on Google's
+servers, inside a spreadsheet, where a cell calls one of its functions.
+The repo has two that give prices, and the menu. `crypto-price-fetchers.gs`
+is one file. The exchange script is three:
+`getCryptoPriceFromCentralizedExchange.gs`, its price sources in
+`-sources.gs`, and its tests in `-tests.gs`. The menu,
+`crypto-price-fetchers-menu.gs`, gives no price and has no Node version.
 
 Two separate sets of tests check the scripts:
 
@@ -235,6 +249,7 @@ answered at once.
 | crypto-price-filler's `tests/sheets-sources.test.js`, `tests/regressions.test.js`, `tests/xtm-coingecko-id.test.js` | In the test's own thread (`tests/helpers/sheets-script.js`). `UrlFetchApp.fetch` answers at once from a function the test gives, so nothing waits. | What each price source gives, the cases the regression tests cover, and that no file of the exchange script holds a CoinGecko api key. |
 | crypto-price-filler's `tests/regressions.test.js`, `tests/xtm-coingecko-id.test.js`, through the tool | Through the exchange script's Node version, in the worker thread, as the tool runs it (`tests/helpers/stand-in-fetch.js`). | The same cases, reached through the tool's provider chain. |
 | `test/load-apps-script.test.js`, `test/apps-script-services.test.js` | Small scripts in `test/fixtures/`, in the test's own thread, with requests answered at once. | That a script's files load into one scope, in order, and that each Node service acts as Apps Script's does. |
+| `test/crypto-price-fetchers-menu.test.js`; crypto-price-filler's `tests/regressions.test.js` and `tests/known-bugs.test.js` | In the test's own thread, with a spreadsheet held in memory (`test/helpers/stand-in-spreadsheet.js`) or a stand-in lock in place of Apps Script's. | What each menu item writes, in which order, and what it reports; and the waits of the price functions that the known bugs are about. |
 
 The Node tests run Node's versions of the services, one call at a time,
 against stand-ins for the price services. So three things lie outside
@@ -271,9 +286,9 @@ log. No automated run calls them.
   runs it with the lock attempts, the raw responses and the cache's state
   logged too.
 - **The exchange script's** are in its third file,
-  `getCryptoPriceFromCentralizedExchange-tests.gs`. The owner pastes it
-  into the same Apps Script project as the other two files; the sheet
-  needs it for nothing else. `test` runs the file's two tests:
+  `getCryptoPriceFromCentralizedExchange-tests.gs`, which the build step
+  puts in the one file with the rest; the sheet needs it for nothing else.
+  `test` runs the file's two tests:
   - `testGetCryptoPrice` prices several coins at past dates through
     `getCryptoPrice`, and checks that each price falls in its expected
     range. A coin the script does not know must give a message, not a
@@ -290,12 +305,14 @@ log. No automated run calls them.
 
 ## Security Audits
 
-Three audits look for security problems: in the packages the repo
-installs, in the code, and in the text of every file.
+Four audits look for security problems: in the packages the repo
+installs, in the code DEX Screener publishes that the build step can put
+in its file, in the repo's code, and in the text of every file.
 
 | Command | What it runs | What it catches |
 | ------- | ------------ | --------------- |
-| `npm run audit:deps` | `npm audit --audit-level=high --omit=dev`, for the repo and crypto-price-filler | Known vulnerabilities, of high severity or worse, in the packages that ship. |
+| `npm run audit:deps` | `npm audit --audit-level=high --omit=dev`, for the repo and crypto-price-filler, then `npm run audit:dex-screener` | Known vulnerabilities, of high severity or worse, in the packages that ship; then what the next row says. |
+| `npm run audit:dex-screener` | `audit-dex-screener.js`: downloads each file of DEX Screener's Google Sheets functions at the commit `apps-script-build/dex-screener-files.js` names | A file that cannot be downloaded, or whose SHA-256 differs from the one written there. npm audit covers only packages installed from npm, and this code is not one. The build step runs the same audit before it compiles those files. |
 | `npm run audit:security` | ESLint with `eslint-security.config.js` | Code open to attack (eslint-plugin-security), strings that look like keys (eslint-plugin-no-secrets), and printing a name that may hold a secret (`no-secret-logging`). |
 | `npm run audit:secrets` | secretlint, with `.secretlintrc.json` and `.secretlintignore` | Keys and credentials in any file. |
 
@@ -335,7 +352,7 @@ request to `main`, and by hand:
 | Workflow | Job | Runs |
 | -------- | --- | ---- |
 | `ci.yml` | Check (Node 22), Check (Node 24) | `npm run check`, after installing the repo's packages and crypto-price-filler's. |
-| `security-audit.yml` | Dependency Audit, Security Lint, Secret Scan | Each audit as a job of its own. |
+| `security-audit.yml` | Dependency Audit, Security Lint, Secret Scan | Each audit as a job of its own; Dependency Audit runs `npm run audit:deps`, so the check of DEX Screener's files with it. |
 
 `main` is protected: a change reaches it only by a pull request whose five
 checks, those five jobs, have passed. Force pushes and deletion are
@@ -352,4 +369,5 @@ bug is gone, so the record cannot go stale. crypto-price-filler's
 `tests/known-bugs.test.js` declares each with `it.fails`: the test passes
 while the bug is present. The fix makes it fail. The same change declares
 it with `it` and moves it to `tests/regressions.test.js`, where it keeps
-the fixed behavior from coming back. None is known today.
+the fixed behavior from coming back. The repo's `CLAUDE.md` lists the bugs
+known today, each with its test.
