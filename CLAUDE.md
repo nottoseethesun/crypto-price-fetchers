@@ -211,9 +211,18 @@ functions inside the scripts that the owner runs by hand. crypto-price-filler's
 
 ## Known bugs
 
-None is known. A bug found gets a test in crypto-price-filler's
+A bug found gets a test in crypto-price-filler's
 `tests/known-bugs.test.js`, declared with `it.fails`, so it passes while the
-bug is present, and a row in a table here. Its fix makes the test fail; the
-same change declares the test with `it`, moves it to
+bug is present, and a row in the table below. Its fix makes the test fail;
+the same change declares the test with `it`, moves it to
 `tests/regressions.test.js`, which guards the fixed bugs, and removes the
 row.
+
+Google stops a custom function, a function a cell calls, after 30 seconds,
+and the cell shows `#ERROR!`. Two of the bugs are waits longer than that.
+
+| Bug | Test in `tests/known-bugs.test.js` |
+| --- | --- |
+| `dexToolsGetTokenPrice` and `dexToolsGetTokenFDV`, in `crypto-price-fetchers.gs`, wait up to `CONFIG.LOCK_WAIT_MS`, 120 seconds, for the script lock, so a cell that waits more than 30 seconds shows `#ERROR!`, never the busy message the script returns when the wait ends. | dexToolsGetTokenPrice waits for the script lock no longer than Google lets a custom function run |
+| `getCryptoPrice`, in the exchange script, tries the script lock 3 times for 2 seconds each, waiting 5, 10 and 20 seconds after each failed try (`LOCK_RETRY_BACKOFF`): 41 seconds in all. | getCryptoPrice waits for the script lock, in all, no longer than Google lets a custom function run |
+| Refresh, the one item of the DexTools Price/FDV menu that `crypto-price-fetchers.gs` adds, calls only `SpreadsheetApp.flush()`, which runs no custom function again, so no cell changes. | Refresh runs again the cells that call dexToolsGetTokenPrice |

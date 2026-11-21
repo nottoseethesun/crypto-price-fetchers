@@ -13,7 +13,9 @@
  *
  * Two services are stand-ins here: `UrlFetchApp.fetch` answers each url
  * from the test's `answer` function, and sleeps return at once unless the
- * test passes its own. `answer` gets the url and the whole request, its
+ * test passes its own. A test may hand more stand-ins, such as the
+ * spreadsheet of `test/helpers/stand-in-spreadsheet.js` at the repo's top,
+ * which replace the runner's services of the same name. `answer` gets the url and the whole request, its
  * headers included, and returns a json body, which goes with status 200,
  * null, which reads as a 404, `reply(status, body)` for any other status,
  * or `rawReply(status, text)` for a body that is no json. The script's log
@@ -77,6 +79,7 @@ export function replyOf(answered) {
  * @param {Object} [options] - What else the script starts with
  * @param {Object<string, Object>} [options.config={}] - Fields to set in its config objects, as its Node version sets them, such as `{ CONFIG: { COINGECKO_API_KEY: '...' } }`
  * @param {function(number): void} [options.sleep] - Takes each wait the script makes; returns at once when absent
+ * @param {Object<string, Object>} [options.services={}] - More services, by name, such as `{ SpreadsheetApp }`, laid over the runner's
  * @returns {Object} The context holding the script's top-level functions
  */
 export function loadSheetsScript(scriptPath, answer, options = {}) {
@@ -91,7 +94,10 @@ export function loadSheetsScript(scriptPath, answer, options = {}) {
     source: fs.readFileSync(filename, "utf8"),
     filename,
   }));
-  const context = loadAppsScript(files, services);
+  const context = loadAppsScript(files, {
+    ...services,
+    ...options.services,
+  });
   applyConfig(context, options.config ?? {});
   return context;
 }
