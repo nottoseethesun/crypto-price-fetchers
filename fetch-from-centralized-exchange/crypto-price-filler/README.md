@@ -35,7 +35,7 @@ The order of the sources, and what each gives, is in the file header of
 ### Current Roster of Utilities
 
 - `index.js` - Main CLI tool for fetching prices and filling CSV files
-- `backfill.js` - Standalone utility to backfill empty prices in existing CSV files
+- `backfill.js` - Standalone utility to backfill the Error prices in existing CSV files
 
 ## Prerequisites
 
@@ -115,8 +115,10 @@ A row whose price no service gave gets `Error` in the output's
 already written, without asking any
 service again: each takes the price of the nearest priced row before or
 after it, the higher of the two with `--backfill-highest`, the lower with
-`--backfill-lowest`. The file header in `./backfill.js` lists all its
-options.
+`--backfill-lowest`. The rows that hold no data, a "Total" row, a row
+with no date and the rows after the last date, have a blank price, which
+backfill leaves as it is, so they stay out of the grand total. The file
+header in `./backfill.js` lists all its options.
 
 ```bash
 # Backfill with highest bracketing price (conservative tax estimates)
@@ -198,7 +200,7 @@ alias swtlog="aha --black -y 'body { font-size: 14px; }' < test.log > test.html 
 
 ## Contributing
 
-Fork the repo on GitHub, the website that hosts it. Contributions are welcome, and each is subject to the license in the LICENSE file here.
+Fork the repo on GitHub, the website that hosts it. Contributions are welcome, and each is subject to the license in the repo's [LICENSE](../../LICENSE) file, two folders up.
 
 To be accepted for pull request:
 

@@ -95,7 +95,7 @@ function runIndex(args, standIns) {
 /** A CSV of three rows, the second with no price, for backfill to fill. */
 const CSV_WITH_A_GAP = `"date (UTC)","amount","$usd price","$usd amount","grand total ($usd)"
 "2024-01-01 12:00:00","10","100","1000","1000"
-"2024-01-02 12:00:00","20","","","1000"
+"2024-01-02 12:00:00","20","Error","","1000"
 "2024-01-03 12:00:00","15","200","3000","4000"
 `;
 
@@ -204,5 +204,20 @@ describe("backfill.js's command line", () => {
       vi.restoreAllMocks();
       fs.rmSync(folder, { recursive: true, force: true });
     }
+  });
+});
+
+describe("the check that the command line loads", () => {
+  it("validate-parse fails when node exits with code 1, as it does when index.js cannot load", () => {
+    const scripts = JSON.parse(
+      fs.readFileSync(path.resolve(__dirname, "../package.json"), "utf8"),
+    ).scripts;
+    const command = scripts["validate-parse"].replace(
+      "node index.js --help",
+      'node -e "process.exit(1)"',
+    );
+    expect(command).not.toBe(scripts["validate-parse"]);
+    const run = spawnSync("sh", ["-c", command], { encoding: "utf8" });
+    expect(run.status).not.toBe(0);
   });
 });

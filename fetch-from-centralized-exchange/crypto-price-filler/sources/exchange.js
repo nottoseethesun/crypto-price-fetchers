@@ -15,8 +15,9 @@
  * runner, opened by its Node version (`openCentralizedExchangeSources` in
  * `../../getCryptoPriceFromCentralizedExchange.js`). It is opened once, at
  * the first price asked, with the CoinGecko and CoinPaprika keys the run
- * opened (`../../../api-key-store/`), which the script reads as its Script
- * Properties. With verbose on, each line the script logs is printed.
+ * opened (`../../../api-key-store/`), which the Node version hands the
+ * script as `CONFIG.COINGECKO_API_KEY` and `CONFIG.COINPAPRIKA_API_KEY`.
+ * With verbose on, each line the script logs is printed.
  *
  * Fit: `price.js` asks these after the pool sources. The script's header
  * says how each source prices a time; a fix to a source goes in the

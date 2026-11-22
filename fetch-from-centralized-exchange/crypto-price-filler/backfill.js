@@ -3,8 +3,10 @@
  * Backfill Batch Job
  * ==================
  *
- * A standalone CLI tool to backfill empty/error prices in a previously-generated
- * output CSV file. This is useful when you have an existing output.csv from index.js
+ * A standalone CLI tool to backfill the prices index.js could not find, marked
+ * "Error", in a previously-generated output CSV file. A blank price marks a
+ * row that holds no data, such as a "Total" row, which it leaves as it is.
+ * This is useful when you have an existing output.csv from index.js
  * that was created without backfill options, and you want to apply backfill without
  * re-fetching prices.
  *
@@ -37,8 +39,8 @@
  *
  *   --input <path>       Required. Path to input CSV file (typically a previous output.csv)
  *   --output <path>      Output CSV path. Default: overwrites input file
- *   --backfill-highest   Fill empty prices with highest bracketing price (tax estimates)
- *   --backfill-lowest    Fill empty prices with lowest bracketing price (budgeting)
+ *   --backfill-highest   Fill each "Error" price with the highest bracketing price (tax estimates)
+ *   --backfill-lowest    Fill each "Error" price with the lowest bracketing price (budgeting)
  *   --verbose            Enable detailed logging
  *   --help               Show usage information
  *
@@ -222,7 +224,7 @@ export function setupBackfillCommander() {
   program
     .name("backfill")
     .description(
-      "Backfill empty/error prices in a CSV file using bracketing prices",
+      'Backfill the prices the filler could not find, marked "Error", in a CSV file it wrote, using bracketing prices',
     )
     .version("1.0.0", "-v, --version", "output the version number")
 
@@ -236,11 +238,11 @@ export function setupBackfillCommander() {
     )
     .option(
       "--backfill-highest",
-      "Fill empty prices with highest bracketing price (conservative tax estimates); config.json's BACKFILL_HIGHEST when not given",
+      "Fill each Error price with the highest bracketing price (conservative tax estimates); config.json's BACKFILL_HIGHEST when not given",
     )
     .option(
       "--backfill-lowest",
-      "Fill empty prices with lowest bracketing price (budgeting: avoid over-estimating); config.json's BACKFILL_LOWEST when not given",
+      "Fill each Error price with the lowest bracketing price (budgeting: avoid over-estimating); config.json's BACKFILL_LOWEST when not given",
     )
     .option("--verbose", "Enable detailed logging during processing")
 

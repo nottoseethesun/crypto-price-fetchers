@@ -14,6 +14,7 @@ import { loadSheetsScript } from "./helpers/sheets-script.js";
 import {
   MENU_AND_DEXTOOLS_SCRIPTS,
   SHEETS_SCRIPT_PATH,
+  answerCoinGeckoForPastDay,
 } from "./helpers/regression-runs.js";
 import { mexcKlines } from "../../../test/helpers/stand-in-mexc.js";
 
@@ -101,5 +102,94 @@ describe("a cell's own cache seconds", () => {
     expect(script.dexToolsGetTokenPrice("ether", token, [], 600)).toBe(1.23);
     expect(asked).toHaveLength(3);
     expect(kept).toEqual([120, 120, 600]);
+  });
+});
+
+describe("the current-price script's cache", () => {
+  const tokenA = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
+  const tokenB = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
+  const pool = "0x3416cF6C708Da44DB2624D63ea0AAef7113527C6";
+
+  /**
+   * Loads the current-price script against a stand-in DexTools that gives
+   * each token an FDV and a price of its own, recording each url asked.
+   *
+   * @returns {{script: Object, asked: string[]}} The script and the urls asked
+   */
+  function scriptWithTwoTokens() {
+    const asked = [];
+    const values = {
+      [tokenA.toLowerCase()]: { fdv: 111, price: 1.11 },
+      [tokenB.toLowerCase()]: { fdv: 222, price: 2.22 },
+    };
+    const script = loadSheetsScript(MENU_AND_DEXTOOLS_SCRIPTS, (url) => {
+      asked.push(url);
+      const contract = url.match(/\/token\/[^/]+\/(0x[0-9a-fA-F]{40})\//);
+      if (contract === null) return null;
+      return { statusCode: 200, data: values[contract[1].toLowerCase()] };
+    });
+    return { script, asked };
+  }
+
+  it("dexToolsGetTokenFDV gives each token its own FDV when two cells name the same pool", () => {
+    const { script } = scriptWithTwoTokens();
+    expect(script.dexToolsGetTokenFDV("pulse", tokenA, [[pool, 0]])).toBe(111);
+    expect(script.dexToolsGetTokenFDV("pulse", tokenB, [[pool, 0]])).toBe(222);
+  });
+
+  it("dexToolsGetTokenPrice asks again for a cell whose cache seconds differ from the cell that kept the answer", () => {
+    const { script, asked } = scriptWithTwoTokens();
+    expect(script.dexToolsGetTokenPrice("ether", tokenA, [], 21600)).toBe(1.11);
+    expect(script.dexToolsGetTokenPrice("ether", tokenA, [], 60)).toBe(1.11);
+    expect(asked).toHaveLength(2);
+    expect(script.dexToolsGetTokenPrice("ether", tokenA, [], 60)).toBe(1.11);
+    expect(asked).toHaveLength(2);
+  });
+});
+
+describe("the exchange script before MEXC lists a pair", () => {
+  it("getCryptoPrice asks CoinGecko for a time before MEXC listed the pair, rather than pricing it from MEXC's later candles", () => {
+    const listed = Date.UTC(2025, 8, 1);
+    const script = loadSheetsScript(SHEETS_SCRIPT_PATH, (url) => {
+      if (url.includes("/exchangeInfo"))
+        return {
+          symbols: [
+            { symbol: "XTMUSDT", baseAsset: "XTM", quoteAsset: "USDT" },
+          ],
+        };
+      if (url.includes("/klines"))
+        return mexcKlines(url, (open) =>
+          open >= listed ? ["0.10", "0.30", "0.10", "0.20", "10"] : null,
+        );
+      return answerCoinGeckoForPastDay(url);
+    });
+    expect(
+      script.getCryptoPrice("xtm", "2025-06-15 12:30:00", "UTC", "close"),
+    ).toBe(1.23);
+  });
+
+  it("getPriceFromMEXC still prices a time after the listing from the larger window in which something traded", () => {
+    const listed = Date.UTC(2025, 8, 1);
+    const script = loadSheetsScript(SHEETS_SCRIPT_PATH, (url) => {
+      if (url.includes("/exchangeInfo"))
+        return {
+          symbols: [
+            { symbol: "XTMUSDT", baseAsset: "XTM", quoteAsset: "USDT" },
+          ],
+        };
+      if (url.includes("/klines")) {
+        const interval = new URL(url).searchParams.get("interval");
+        return mexcKlines(url, (open) => {
+          if (open < listed) return null;
+          return interval === "60m"
+            ? ["0.20", "0.20", "0.20", "0.20", "0"]
+            : ["0.10", "0.30", "0.10", "0.20", "10"];
+        });
+      }
+      return null;
+    });
+    expect(
+      script.getPriceFromMEXC("xtm", Date.UTC(2025, 9, 15, 12, 30), "close"),
+    ).toBeCloseTo(0.2, 10);
   });
 });

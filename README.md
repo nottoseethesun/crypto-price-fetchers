@@ -455,7 +455,9 @@ nothing.
 a past time, from MEXC, then CoinGecko, then CoinPaprika. Each source
 prices a period that holds the time. MEXC's is the minute, for a time in
 about the last 30 days, else the hour; when nothing traded in it, the
-script widens it a step at a time, up to the year. CoinGecko's is the 24
+script widens it a step at a time, up to the year. When MEXC keeps no
+candle of that hour, as for a time before it listed the coin, CoinGecko
+answers. CoinGecko's is the 24
 hours from 12 hours before the time to 12 after, and CoinPaprika's the
 day, in UTC.
 
@@ -634,9 +636,12 @@ node index.js --token=grc --input=mining.csv --backfill-highest
 
 `backfill.js`, in crypto-price-filler's folder, fills the prices
 crypto-price-filler could not give, in a file it wrote, asking no
-service: each row with `Error` or no price takes the price of the nearest
-priced row before or after it, the higher of the two with
-`--backfill-highest` and the lower with `--backfill-lowest`.
+service: each row with `Error` takes the price of the nearest priced row
+before or after it, the higher of the two with `--backfill-highest` and
+the lower with `--backfill-lowest`. The rows that hold no data, a "Total"
+row, a row with no date and the rows after the last date, have a blank
+price, which backfill leaves as it is, so they stay out of the grand
+total.
 
 `output.csv` filled in place with the higher price, a figure that does
 not understate a value for taxes:

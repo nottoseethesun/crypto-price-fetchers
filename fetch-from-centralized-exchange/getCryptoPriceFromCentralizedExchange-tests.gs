@@ -30,7 +30,7 @@ function test() {
   console.log("══════════════════════════════════════════════════════════════");
   console.log("MASTER TEST SUITE - " + new Date().toISOString());
   console.log(
-    "Script version: v2.15.0 (in three files: the function, its sources, and these tests)",
+    "getCryptoPrice, in three files: the function, its sources, and these tests",
   );
   console.log(
     "══════════════════════════════════════════════════════════════\n",

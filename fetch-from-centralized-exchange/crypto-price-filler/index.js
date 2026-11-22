@@ -18,7 +18,7 @@
  * - Caching, rate-limit retry, BTC-pair adjustment at the row's time
  * - Verbose logging for debugging
  * - Handles invalid/future dates gracefully
- * - Backfill options for empty prices (tax estimation)
+ * - Backfill options for the prices no service gave, marked Error (tax estimation)
  *
  * @version 1.0.0
  * @author Christopher M. Balz with Grok and Claude.ai
@@ -156,11 +156,11 @@
  *                        last 24 hours, as LP Ranger picks. Default: 10.
  *
  *   BACKFILL_HIGHEST     Set to true to enable --backfill-highest by default. Default: false.
- *                        Fills empty/error prices with the highest of the two bracketing prices.
+ *                        Fills each Error price with the highest of the two bracketing prices.
  *                        Use for conservative tax estimates (higher taxable income).
  *
  *   BACKFILL_LOWEST      Set to true to enable --backfill-lowest by default. Default: false.
- *                        Fills empty/error prices with the lowest of the two bracketing prices.
+ *                        Fills each Error price with the lowest of the two bracketing prices.
  *                        Use for budgeting to avoid over-estimating income.
  *
  *   Note: CLI flags (--backfill-highest, --backfill-lowest) override config.json settings.
@@ -196,19 +196,22 @@
  *                           clocks, and a fixed offset can't follow daylight saving.
  *   --list-valid-timezones {flag}  Print every name --tz takes, one per line, and exit.
  *   --verbose     {flag}    Enable detailed [VERBOSE] logging. Also: VERBOSE=1 env var
- *   --backfill-highest {flag}  Fill empty/error prices with highest bracketing price.
+ *   --backfill-highest {flag}  Fill each Error price with the highest bracketing price.
  *                           Use for conservative tax estimates (higher taxable income).
- *   --backfill-lowest  {flag}  Fill empty/error prices with lowest bracketing price.
+ *   --backfill-lowest  {flag}  Fill each Error price with the lowest bracketing price.
  *                           Use for budgeting to avoid over-estimating income.
  *   --help        {flag}    Show usage information
  *
  * Backfill Options:
  *   When price data is unavailable for certain rows (API errors, unsupported dates),
- *   the output will contain empty or 'Error' values. The backfill options allow you
+ *   the output will contain 'Error' values. The backfill options allow you
  *   to fill these gaps using neighboring prices for tax estimation purposes.
+ *   The rows that hold no data (a "Total" row, a row with no date, the rows
+ *   after the last date) get a blank price, which backfill leaves as it is,
+ *   so they stay out of the grand total.
  *
  *   How it works:
- *   - Finds contiguous blocks of empty/error prices
+ *   - Finds contiguous blocks of Error prices
  *   - Looks at the valid prices immediately before and after the block
  *   - Fills with the higher (--backfill-highest) or lower (--backfill-lowest) of the two
  *   - If only one bracketing price exists (start/end of file), uses that price
@@ -248,10 +251,10 @@
  *   # Every time zone --tz takes
  *   node index.js --list-valid-timezones
  *
- *   # Backfill empty prices with highest bracketing price (conservative tax estimates)
+ *   # Backfill the Error prices with the highest bracketing price (conservative tax estimates)
  *   node index.js --token=grc --input=mining.csv --output=filled.csv --backfill-highest
  *
- *   # Backfill empty prices with lowest bracketing price (budgeting)
+ *   # Backfill the Error prices with the lowest bracketing price (budgeting)
  *   node index.js --token=grc --input=mining.csv --output=filled.csv --backfill-lowest
  *
  *   # Show help
@@ -277,7 +280,7 @@
  *   - Fetches real prices from configured sources (Moralis → GeckoTerminal for a token
  *     that trades in pools, then MEXC → CoinGecko → CoinPaprika)
  *   - Fills $usd price, $usd amount, and grand total columns
- *   - Future/invalid dates left blank
+ *   - A future or unreadable date gets 'Error', as a row no source priced does
  *   - If no price available → writes 'Error'
  *   - Verbose logs show every fetch attempt, parse step, price result
  *

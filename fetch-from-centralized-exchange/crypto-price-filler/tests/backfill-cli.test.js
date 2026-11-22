@@ -43,7 +43,7 @@ const mockLoadConfig = vi.mocked(loadConfig);
 // Sample CSV content for testing
 const sampleCsvContent = `"date (UTC)","amount","$usd price","$usd amount","grand total ($usd)"
 "2024-01-01 12:00:00","10","100","1000","1000"
-"2024-01-02 12:00:00","20","","","1000"
+"2024-01-02 12:00:00","20","Error","","1000"
 "2024-01-03 12:00:00","15","200","3000","4000"`;
 
 const sampleConfig = {
@@ -70,7 +70,9 @@ describe("backfill.js CLI", () => {
       const program = setupBackfillCommander();
 
       expect(program.name()).toBe("backfill");
-      expect(program.description()).toContain("Backfill empty/error prices");
+      expect(program.description()).toContain(
+        'Backfill the prices the filler could not find, marked "Error"',
+      );
     });
 
     it("has input option as required", () => {
@@ -252,7 +254,7 @@ describe("backfill.js CLI", () => {
     it("detects column names from CSV headers", async () => {
       const customCsv = `"date","qty","$usd price","$usd amount","grand total ($usd)"
 "2024-01-01","10","100","1000","1000"
-"2024-01-02","20","","","1000"
+"2024-01-02","20","Error","","1000"
 "2024-01-03","15","200","3000","4000"`;
 
       mockReadFileSync.mockReturnValue(customCsv);

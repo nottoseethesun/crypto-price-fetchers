@@ -174,14 +174,16 @@ describe("MEXC (getPriceFromMEXC)", () => {
     ]);
   });
 
-  it("gives null when MEXC keeps no candle of any window that holds the time, having asked for each", () => {
+  it("gives null when MEXC keeps no candle of the minute or the hour that holds the time, asking no larger window", () => {
     const { script, asked } = scriptAnswering(
       mexcAnswering(XTM_USDT, () => null),
     );
     expect(script.getPriceFromMEXC("XTM", TIME_MS, "high")).toBeNull();
     expect(
-      asked.filter((request) => request.url.includes("/klines")),
-    ).toHaveLength(8);
+      asked
+        .filter((request) => request.url.includes("/klines"))
+        .map((request) => new URL(request.url).searchParams.get("interval")),
+    ).toEqual(["1m", "60m"]);
   });
 
   it("asks again after each wait in RETRY_DELAYS_MS while MEXC answers 429, and gives up after the last", () => {

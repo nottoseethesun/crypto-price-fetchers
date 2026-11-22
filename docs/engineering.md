@@ -288,7 +288,7 @@ MEXC does.
 | File | What it covers |
 | ---- | -------------- |
 | `backfill-cli.test.js` | `backfill.js`'s command and run, with stand-ins for `fs`, csv-writer and `loadConfig`. |
-| `backfill.test.js` | `utils/backfill.js`: the bracketing prices of a run of empty rows, the fill, the totals, and `backfillChoice`. |
+| `backfill.test.js` | `utils/backfill.js`: the bracketing prices of a run of rows marked `Error`, the fill, the totals, a blank price left as it is, and `backfillChoice`. |
 | `cache.test.js` | `utils/cache.js`, the cache held in memory, with each entry's expiry. |
 | `coingecko-api-key.test.js` | `index.js` opening the saved CoinGecko key before it prices anything. |
 | `exchange.test.js` | `sources/exchange.js`: the exchange script's price sources, opened once per run with the run's keys and closed at its end. |
@@ -299,10 +299,10 @@ MEXC does.
 | `moralis-source.test.js` | `sources/moralis.js`: a token that trades in pools, priced by Moralis at the block its chain had at a row's time. |
 | `price.test.js` | `sources/price.js`: the order the sources are asked in, and the cache. |
 | `progress.test.js` | `utils/progress.js`, the progress bar. |
-| `regressions.test.js` | The fixed bugs of the tool, its Sheets script and the menu. |
-| `regressions-command-line.test.js` | The fixed bugs of the two command lines: their checks of a value, the settings they fall back to, a settings file or token list they cannot take refused as one error, and what `index.js` logs. |
+| `regressions.test.js` | The fixed bugs of the tool, its Sheets script and the menu, and backfill leaving the rows that hold no data, such as a Total row, out of the fill and the grand total. |
+| `regressions-command-line.test.js` | The fixed bugs of the two command lines: their checks of a value, the settings they fall back to, a settings file or token list they cannot take refused as one error, what `index.js` logs, and `validate-parse` failing when node does not exit with code 0. |
 | `regressions-lib.test.js` | The fixed bugs of the repo's shared helpers in `lib/`: a schema compiled once, the words for an empty text and an empty list, and the search for command lines. |
-| `regressions-sheets.test.js` | Fixed bugs whose tests run a Sheets script in the test's thread: the exchange script's pairs quoted in `CONFIG.QUOTE_CURRENCY`, and a cell's own cache seconds outside 1 to 21600 refused with a message before any request, an empty cell taking the config's. |
+| `regressions-sheets.test.js` | Fixed bugs whose tests run a Sheets script in the test's thread: the exchange script's pairs quoted in `CONFIG.QUOTE_CURRENCY`; a cell's own cache seconds outside 1 to 21600 refused with a message before any request, an empty cell taking the config's; each token's own FDV when two cells name one pool, and an answer kept for one cell's seconds never given to a cell with others; and a time before MEXC listed a pair priced by CoinGecko, while a time after it still climbs MEXC's windows. |
 | `settings-files.test.js` | `config.js` and `supported-tokens.js`: the committed settings and token list held to their schemas, the owner's `config.json` laid over the committed settings, and files with a key no schema names or a value of the wrong kind refused, listing every problem. |
 | `sheets-sources.test.js` | The exchange script's sources, MEXC, CoinGecko and CoinPaprika, which the sheet and the tool both price with. |
 | `token-validation.test.js` | A token with no sources refused, naming the tokens the tool supports. |
