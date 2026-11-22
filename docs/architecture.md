@@ -511,11 +511,13 @@ example repeats them, and the code stays as it is for now: the Node
 versions' scripts hold theirs, and `test/config-schemas.test.js` holds
 each example to its schemas and to the values written in its script.
 crypto-price-filler is the one tool that reads its example, as its
-committed settings. The top `config-example.json` holds what the
-committed top `config.json` holds. `configExampleProblems`
+committed settings. A `config.json` git keeps holds the repo's defaults,
+so its example holds the same settings: the top `config-example.json`
+holds what the top `config.json` holds. `configExampleProblems`
 (`lib/repo-checks.js`), which every repo of the owner runs in its tests,
 finds a `config.json`, kept by git or named in the top `.gitignore`, with
-no example beside it.
+no example beside it, and an example that holds other settings than the
+committed `config.json` beside it.
 
 A command line that takes its options' defaults from a settings file makes
 each option's parser from the kind its schema gives the setting. Commander

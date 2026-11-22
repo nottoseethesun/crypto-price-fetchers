@@ -230,11 +230,12 @@ which holds the file's settings with their default values: those written
 in the code, where the code holds them, which stay there for now. No
 program reads an example but crypto-price-filler, which takes its
 committed settings from its own. `configExampleProblems`
-(`lib/repo-checks.js`) finds a `config.json` with no example beside it, in
-`test/repo-checks.test.js`, which also holds the top
-`config-example.json` to the committed `config.json`, and
-`test/config-schemas.test.js` holds each Node version's example to its
-schemas and to the values written in its script. The schemas here: the
+(`lib/repo-checks.js`), in `test/repo-checks.test.js`, finds a
+`config.json` with no example beside it, and an example that holds other
+settings than the committed `config.json` beside it, whose settings are
+the repo's defaults; `test/config-schemas.test.js` holds each Node
+version's example to its schemas and to the values written in its
+script. The schemas here: the
 key store's of a project's `apiKeys`
 (`api-key-store/project-keys.js`), which reads only that key, every other
 key of the file being the project's; crypto-price-filler's of its settings
