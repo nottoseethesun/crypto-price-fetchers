@@ -24,6 +24,8 @@
  * - `createAppsScriptServices`, `loadAppsScript`, `applyConfig` and
  *   `callScriptFunction` run a script in the calling thread, which is how
  *   tests run one with stand-in services.
+ * - `configSchemaProblems` holds a Node version's schemas of its script's
+ *   config objects to the script, for a test (`config-schema-check.js`).
  *
  * Fit: the Node versions in this repo import this file; pulsechain-analytics
  * installs this repo and imports it as `crypto-price-fetchers/apps-script-runner`.
@@ -33,6 +35,7 @@ export { InvalidArgumentError, Option } from "commander";
 export { createAppsScriptServices } from "./apps-script-services.js";
 export { isEntryPoint, runScriptCommandLine } from "./command-line.js";
 export { readConfigFile } from "./config-file.js";
+export { configSchemaProblems } from "./config-schema-check.js";
 export {
   applyConfig,
   callScriptFunction,

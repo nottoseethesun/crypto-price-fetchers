@@ -187,8 +187,10 @@ Node version gives its script's config objects (`CONFIG_SCHEMAS`): each
 names every field the script reads each time it is called, of its kind of
 value, and refuses an api key, which the key store sets, and a field the
 script reads as it loads, which a value laid after the load does not
-reach; `test/config-schemas.test.js` holds each schema to its script. The
-runner holds every config it lays, a test's own among them, to a schema
+reach. The runner's `configSchemaProblems`
+(`apps-script-runner/config-schema-check.js`) holds each schema to its
+script, in `test/config-schemas.test.js` and in pulsechain-analytics'
+tests of its own Node version. The runner holds every config it lays, a test's own among them, to a schema
 built from the script's objects as well
 (`apps-script-runner/load-apps-script.js`): each field the object has, of
 the JavaScript type of the value the script gives it. A schema names only

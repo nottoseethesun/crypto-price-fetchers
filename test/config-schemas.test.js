@@ -4,144 +4,124 @@
  * against before the script opens and before the build sets the values.
  * @module test/config-schemas.test
  *
- * The runner and the build lay config values over the script's objects
- * after the script's top-level code has run, so a field that code reads
- * keeps the value written in the script. Each script is loaded here as the
- * build joins it, with each of its config objects watched as it loads,
- * and each schema is held to what the watch saw: it names every field the
- * script did not read as it loaded, the api keys aside, which the key
- * store sets, and no other field; and the script's own values hold to it.
+ * The runner's check (`apps-script-runner/config-schema-check.js`) is
+ * tested on a fixture script, then run on each Node version's schemas, its
+ * script loaded as the build joins it. A config.json is then checked
+ * against the schemas as the runner and the build check it.
  */
 
 import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { fileURLToPath } from "node:url";
 import { APPS_SCRIPTS } from "../apps-script-build/index.js";
-import { createAppsScriptServices } from "../apps-script-runner/apps-script-services.js";
 import { readConfigFile } from "../apps-script-runner/config-file.js";
-import { loadAppsScript } from "../apps-script-runner/load-apps-script.js";
-import {
-  compileSettingsSchema,
-  settingsProblems,
-} from "../lib/settings-schema.js";
+import { configSchemaProblems } from "../apps-script-runner/config-schema-check.js";
+import { KINDS } from "../lib/settings-schema.js";
 import { makeTempFolder, removeTempFolders } from "./helpers/temp-folders.js";
 
-/**
- * The text of a script's files, with each config object named wrapped,
- * where the script declares it, in a call to `watchConfigObject`, a global
- * the test gives the script.
- *
- * @param {string[]} paths - The script's files, in the build's order
- * @param {string[]} names - The config objects to watch
- * @returns {Array<{source: string, filename: string}>} The files, for `loadAppsScript`
- */
-function watchedFiles(paths, names) {
-  const files = paths.map((file) => ({
-    source: fs.readFileSync(file, "utf8"),
-    filename: file,
-  }));
-  for (const name of names) {
-    const start = `\nconst ${name} = {`;
-    const holders = files.filter((file) => file.source.includes(start));
-    assert.equal(holders.length, 1, `one file declares ${name}`);
-    const [file] = holders;
-    const at = file.source.indexOf(start);
-    assert.equal(
-      at,
-      file.source.lastIndexOf(start),
-      `${name} is declared once`,
-    );
-    const end = file.source.indexOf("\n};", at);
-    assert.notEqual(end, -1, `${name} ends on a line "};"`);
-    file.source = [
-      file.source.slice(0, at),
-      `\nconst ${name} = watchConfigObject("${name}", {`,
-      file.source.slice(at + start.length, end),
-      "\n});",
-      file.source.slice(end + "\n};".length),
-    ].join("");
-  }
-  return files;
-}
+/** The fixture script the check's own tests run on. */
+const CHECK_SCRIPT = new URL(
+  "./fixtures/config-schema-check.gs",
+  import.meta.url,
+);
 
-/**
- * Loads a script as the build joins it, and records each field of its
- * config objects that the script reads as it loads.
- *
- * @param {Object} spec - The Node version's build spec (`APPS_SCRIPTS`)
- * @param {string[]} names - The config objects to watch
- * @returns {{objects: Object<string, Object>, readAsItLoads: Object<string, Set<string>>}} Each object, and the fields read of it as the script loaded
- */
-function loadWatching(spec, names) {
-  const objects = {};
-  const readAsItLoads = Object.fromEntries(
-    names.map((name) => [name, new Set()]),
-  );
-  let loading = true;
-  const services = createAppsScriptServices({
-    fetchSync: () => ({ failure: "the test asks no service" }),
-  });
-  loadAppsScript(
-    watchedFiles(
-      spec.files.map((file) => file.path),
-      names,
-    ),
-    {
-      ...services,
-      watchConfigObject(name, object) {
-        objects[name] = object;
-        return new Proxy(object, {
-          get(target, field, receiver) {
-            if (loading && typeof field === "string")
-              readAsItLoads[name].add(field);
-            return Reflect.get(target, field, receiver);
-          },
-        });
-      },
+describe("configSchemaProblems, on a script whose object has a field read as it loads, one read when called, and a key", () => {
+  /** The fixture's object's schema, naming only what a config may set. */
+  const FITTING = {
+    SETTINGS: {
+      type: "object",
+      additionalProperties: false,
+      properties: { WAIT_MS: KINDS.wholeAtLeast0 },
+      description: "fields of SETTINGS",
     },
-  );
-  loading = false;
-  return { objects, readAsItLoads };
-}
+  };
+
+  /** The fixture's key, as a Node version's keyConfig would set it. */
+  const KEY_FIELDS = { SETTINGS: { API_KEY: "k" } };
+
+  it("finds no problem in a schema that names each field read when called, and no other", () => {
+    assert.deepEqual(
+      configSchemaProblems({
+        files: [CHECK_SCRIPT],
+        configSchemas: FITTING,
+        keyFields: KEY_FIELDS,
+      }),
+      [],
+    );
+  });
+
+  it("names a field read as the script loads, an api key, a field the object lacks, and a field read when called that no schema names", () => {
+    assert.deepEqual(
+      configSchemaProblems({
+        files: [CHECK_SCRIPT],
+        configSchemas: {
+          SETTINGS: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              HOST: KINDS.url,
+              API_KEY: { type: "string", description: "text" },
+              RETRIES: KINDS.wholeAbove0,
+            },
+          },
+        },
+        keyFields: KEY_FIELDS,
+      }),
+      [
+        "SETTINGS.HOST is read as the script loads, so a value laid after the load does not reach it, and its schema names it",
+        "SETTINGS.API_KEY holds an api key, which the key store sets, and its schema names it",
+        "SETTINGS.RETRIES is named in its schema, and the script's SETTINGS has no such field",
+        "SETTINGS.WAIT_MS is not read as the script loads, so a config may set it, and no schema names it",
+      ],
+    );
+  });
+
+  it("names a value the script gives that its schema refuses", () => {
+    assert.deepEqual(
+      configSchemaProblems({
+        files: [CHECK_SCRIPT],
+        configSchemas: {
+          SETTINGS: {
+            type: "object",
+            additionalProperties: false,
+            properties: { WAIT_MS: KINDS.text },
+          },
+        },
+        keyFields: KEY_FIELDS,
+      }),
+      [
+        "the script's SETTINGS → WAIT_MS must be text that is not empty; it is 100",
+      ],
+    );
+  });
+
+  it("names an object the script does not declare as the check looks for it", () => {
+    assert.deepEqual(
+      configSchemaProblems({
+        files: [fileURLToPath(CHECK_SCRIPT)],
+        configSchemas: { ...FITTING, OTHER: { type: "object" } },
+        keyFields: KEY_FIELDS,
+      }),
+      [
+        'OTHER is not declared once as "const OTHER = {", down to a line "};", as the check needs',
+      ],
+    );
+  });
+});
 
 for (const spec of APPS_SCRIPTS) {
-  describe(`${spec.name}'s schemas of its config objects`, () => {
-    const keyFields = spec.keyConfig(
-      Object.fromEntries(spec.services.map((service) => [service, "key"])),
+  it(`${spec.name}'s schemas fit its config objects, each field the script reads when called named, and the script's own values taken`, () => {
+    assert.deepEqual(
+      configSchemaProblems({
+        files: spec.files.map((file) => file.path),
+        configSchemas: spec.configSchemas,
+        keyFields: spec.keyConfig(
+          Object.fromEntries(spec.services.map((service) => [service, "key"])),
+        ),
+      }),
+      [],
     );
-    const names = [
-      ...new Set([
-        ...Object.keys(keyFields),
-        ...Object.keys(spec.configSchemas),
-      ]),
-    ];
-    const { objects, readAsItLoads } = loadWatching(spec, names);
-
-    for (const name of names) {
-      it(`names each field of ${name} that the script reads only when called, the api keys aside`, () => {
-        const keys = new Set(Object.keys(keyFields[name] ?? {}));
-        const settable = Object.keys(objects[name]).filter(
-          (field) => !keys.has(field) && !readAsItLoads[name].has(field),
-        );
-        const named = Object.keys(spec.configSchemas[name]?.properties ?? {});
-        assert.deepEqual(named.toSorted(), settable.toSorted());
-      });
-    }
-
-    for (const [name, schema] of Object.entries(spec.configSchemas)) {
-      it(`takes the values the script gives ${name}`, () => {
-        const values = Object.fromEntries(
-          Object.keys(schema.properties).map((field) => [
-            field,
-            objects[name][field],
-          ]),
-        );
-        assert.deepEqual(
-          settingsProblems(name, compileSettingsSchema(schema), values),
-          [],
-        );
-      });
-    }
   });
 }
 
