@@ -7,9 +7,9 @@
  * makes the test pass, so `it.fails` fails it: the same change declares the
  * test with `it` and moves it to `regressions-command-line.test.js` for the
  * filler's command lines, to `regressions-lib.test.js` for the repo's
- * shared helpers in `lib/`, to `regressions-sheets.test.js` for the Sheets
- * scripts' config objects and a cell's cache seconds, or to
- * `regressions.test.js` for the rest, and removes the bug's row from the
+ * shared helpers in `lib/`, to `regressions-sheets.test.js` for a bug of a
+ * Sheets script alone, its test run on the script in the test's thread, or
+ * to `regressions.test.js` for the rest, and removes the bug's row from the
  * table in the repo's CLAUDE.md, which lists each test here.
  *
  * The Sheets scripts run unchanged in the test's thread, through

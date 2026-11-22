@@ -301,7 +301,7 @@ MEXC does.
 | `regressions.test.js` | The fixed bugs of the tool, its Sheets script and the menu. |
 | `regressions-command-line.test.js` | The fixed bugs of the two command lines: their checks of a value, the settings they fall back to, a settings file or token list they cannot take refused as one error, and what `index.js` logs. |
 | `regressions-lib.test.js` | The fixed bugs of the repo's shared helpers in `lib/`: a schema compiled once, the words for an empty text and an empty list, and the search for command lines. |
-| `regressions-sheets.test.js` | The fixed bugs of the Sheets scripts' config objects and of a cell's cache seconds: the exchange script's pairs quoted in `CONFIG.QUOTE_CURRENCY`, and a cell's own cache seconds outside 1 to 21600 refused with a message before any request, an empty cell taking the config's. |
+| `regressions-sheets.test.js` | The fixed bugs of a Sheets script alone, each run on the script in the test's thread: the exchange script's pairs quoted in `CONFIG.QUOTE_CURRENCY`, and a cell's own cache seconds outside 1 to 21600 refused with a message before any request, an empty cell taking the config's. The Sheets scripts' bugs fixed before this file was made stay in `regressions.test.js`. |
 | `settings-files.test.js` | `config.js` and `supported-tokens.js`: the committed settings and token list held to their schemas, the owner's `config.json` laid over the committed settings, and files with a key no schema names or a value of the wrong kind refused, listing every problem. |
 | `sheets-sources.test.js` | The exchange script's sources, MEXC, CoinGecko and CoinPaprika, which the sheet and the tool both price with. |
 | `token-validation.test.js` | A token with no sources refused, naming the tokens the tool supports. |
@@ -525,7 +525,9 @@ while the bug is present. The fix makes it fail. The same change declares
 it with `it` and moves it to the regression tests, where it keeps the
 fixed behavior from coming back: `tests/regressions-command-line.test.js`
 for the filler's two command lines, `tests/regressions-lib.test.js` for the
-shared helpers in `lib/`, `tests/regressions-sheets.test.js` for the
-Sheets scripts' config objects and a cell's cache seconds, and
-`tests/regressions.test.js` for the rest. The repo's `CLAUDE.md` lists the bugs
+shared helpers in `lib/`, `tests/regressions-sheets.test.js` for a bug
+of a Sheets script alone, its test run on the script in the test's
+thread, and `tests/regressions.test.js` for the rest, which also keeps
+the Sheets scripts' bugs fixed before `regressions-sheets.test.js` was
+made. The repo's `CLAUDE.md` lists the bugs
 known today, each with its test.

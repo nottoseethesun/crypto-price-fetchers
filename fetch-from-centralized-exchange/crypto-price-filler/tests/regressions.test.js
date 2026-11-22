@@ -7,8 +7,8 @@
  * now have, and checks it everywhere the bug was: the Node tool's functions,
  * its command line, the Sheets script, and the menu. A bug found later gets its test
  * in `known-bugs.test.js`, declared with `it.fails` while the bug is there;
- * its fix declares the test with `it` and moves it here (see the repo's
- * CLAUDE.md).
+ * its fix declares the test with `it` and moves it here, or to the
+ * regression file for its kind of bug (see the repo's CLAUDE.md).
  *
  * The tests drive the real code, with the price services standing in at the
  * http layer (see `tests/helpers/`). The Node tool prices with the Sheets

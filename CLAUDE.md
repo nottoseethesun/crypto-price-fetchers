@@ -416,9 +416,11 @@ bug is present, and a row in the table below. Its fix makes the test fail;
 the same change declares the test with `it`, moves it to the tests that
 guard the fixed bugs, `tests/regressions-command-line.test.js` for the
 filler's command lines, `tests/regressions-lib.test.js` for the shared
-helpers in `lib/`, `tests/regressions-sheets.test.js` for the Sheets
-scripts' config objects and a cell's cache seconds, and
-`tests/regressions.test.js` for the rest, and removes the row.
+helpers in `lib/`, `tests/regressions-sheets.test.js` for a bug of a
+Sheets script alone, its test run on the script in the test's thread,
+and `tests/regressions.test.js` for the rest, which also keeps the
+Sheets scripts' bugs fixed before `regressions-sheets.test.js` was made,
+and removes the row.
 
 Google stops a custom function, a function a cell calls, after 30 seconds,
 and the cell shows `#ERROR!`. Both bugs below are waits longer than that.
