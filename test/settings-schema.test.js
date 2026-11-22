@@ -18,6 +18,9 @@ import {
   settingsProblems,
 } from "../lib/settings-schema.js";
 
+/** HEX's contract on PulseChain, in EIP-55's form. */
+const EIP55_ADDRESS = "0x2b591e99afE9f32eAA6214f7B7629768c40Eeb39";
+
 /** HEX's contract on PulseChain in lower case, not EIP-55's form, for the schema to refuse. */
 const LOWER_CASE_ADDRESS = "0x2b591e99afe9f32eaa6214f7b7629768c40eeb39";
 
@@ -150,6 +153,34 @@ describe("settingsProblems", () => {
     assert.deepEqual(
       settingsProblems("config.json", validate, { span: { days: 0 } }),
       ["config.json → span.days must be a whole number above 0; it is 0"],
+    );
+  });
+
+  it("names a key its object's propertyNames refuses as the key, in the words of the key's schema", () => {
+    const validate = compileSettingsSchema({
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        wallets: {
+          type: "object",
+          propertyNames: {
+            type: "string",
+            format: "eip55-address",
+            description: "an EIP-55 address",
+          },
+          additionalProperties: KINDS.text,
+          description: "the wallets' names, by address",
+        },
+      },
+    });
+    assert.deepEqual(
+      settingsProblems("config.json", validate, {
+        wallets: { "0xzz": "Mine", [EIP55_ADDRESS]: 3 },
+      }),
+      [
+        'config.json → wallets has the key "0xzz", which must be an EIP-55 address',
+        `config.json → wallets.${EIP55_ADDRESS} must be text; it is 3`,
+      ],
     );
   });
 
