@@ -1,12 +1,13 @@
-# crypto-price-fetchers — `npm` Project Commands
+# crypto-price-fetchers — Project Commands
 
 Every command of crypto-price-fetchers, the owner's repo of code his
-projects share, that npm, Node's package manager, runs from a
-`package.json`: those its top `package.json` defines, which run from the
-repo's top folder, and those of crypto-price-filler, its tool that fills a
-CSV's price columns on Node, the program that runs JavaScript outside a
-browser, which has a package of its own; with what each does and what to
-type.
+projects share, with what each does and what to type. Most run through
+npm, the package manager of Node, the program that runs JavaScript outside
+a browser, from a `package.json`: those its top `package.json` defines,
+which run from the repo's top folder, and those of crypto-price-filler,
+its tool that fills a CSV's price columns, which has a package of its own.
+The rest run with `node`, or `source`, at a terminal
+([Commands Run Without npm](#commands-run-without-npm)).
 
 Each command runs on both major versions of Node the repo supports: the
 newest LTS (long-term support) version, today 26, and the version two
@@ -27,6 +28,7 @@ gates work. This file covers how to drive them.
 - [Test](#test)
 - [Commands That Are Usually Not Run Alone](#commands-that-are-usually-not-run-alone)
 - [crypto-price-filler's Commands](#crypto-price-fillers-commands)
+- [Commands Run Without npm](#commands-run-without-npm)
 - [See Also](#see-also)
 
 ---
@@ -62,9 +64,9 @@ manager.
 | ------- | ----- | ----------- | ------- |
 | `api-keys` | `set <service>`, `check-password`, `--help` | The key manager. Lists each key the top `config.json` names, saved or not, never showing a key's characters, and asks for each one not saved: the key, then the password. Each key is saved, encrypted, once its service takes it. `set <service>` replaces one key. `check-password` says, by its exit code, whether the password in `API_KEYS_PASSWORD` opens every key saved; `unlock-api-keys.sh`, the script that keeps the password for a terminal, runs it. | `npm run api-keys` · `npm run api-keys -- set coingecko` |
 
-`source ./unlock-api-keys.sh`, a script in the repo's top folder and no npm
-command, keeps the password for a terminal: see
-[the key store's README](../api-key-store/README.md).
+`source ./unlock-api-keys.sh`, a script in the repo's top folder, keeps the
+password for a terminal ([Commands Run Without npm](#commands-run-without-npm));
+[the key store's README](../api-key-store/README.md) explains the store.
 
 ---
 
@@ -155,6 +157,24 @@ run in `fetch-from-centralized-exchange/crypto-price-filler/`, after
 | `test:strict` | — | `validate-parse`, then the tests with coverage, failing below 80% of lines covered. What `npm run check` runs. | `npm run test:strict` |
 | `test:watch` | — | vitest in watch mode, with coverage. | `npm run test:watch` |
 | `validate-parse` | — | Loads `index.js` with `--help`, so a broken import fails before the tests run. | `npm run validate-parse` |
+
+---
+
+## Commands Run Without npm
+
+These command lines run with `node`, or, for the password script,
+`source`, at a terminal: the Node version of each Sheets script, which
+prints the number the script gives a cell, crypto-price-filler's backfill,
+and the script that keeps the key store's password for a terminal. Each
+Node command line answers `--help` with its options, examples and exit
+codes; [the README's Usage](../README.md#usage) shows each at work.
+
+| Command | Flags | Description | Example |
+| ------- | ----- | ----------- | ------- |
+| `node crypto-price-fetchers.js` | `price <chain> <token>`, `fdv <chain> <token>`, `--pool <address>` (after `price` or `fdv`), `--config <file>`, `--verbose`, `--help` | The Node version of `crypto-price-fetchers.gs`: a token's price, or fully diluted value (FDV), in USD now, from DexTools, or from x1.ninja for X1, which needs `--pool`. In the repo's top folder. | `node crypto-price-fetchers.js price ether 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48` |
+| `node getCryptoPriceFromCentralizedExchange.js` | `<token> <date>`, `--tz <abbreviation>`, `--mode <mode>`, `--config <file>`, `--verbose`, `--help` | The Node version of the exchange script: a coin's USD price at a past time, from MEXC, then CoinGecko, then CoinPaprika. In `fetch-from-centralized-exchange/`; from another folder, give the file's path. | `node getCryptoPriceFromCentralizedExchange.js btc "2026-01-15 14:30:00"` |
+| `node backfill.js` | `--input <path>`, `--output <path>`, `--backfill-highest`, `--backfill-lowest`, `--verbose`, `--version`, `--help` | crypto-price-filler's backfill: fills each row the filler left without a price, in a CSV it wrote, with the price of the nearest priced row before or after it, the higher of the two or the lower, asking no service. In `fetch-from-centralized-exchange/crypto-price-filler/`; from another folder, give the file's path. `--input` and `--output` are read from the folder it runs in. | `node backfill.js --input=output.csv --backfill-highest` |
+| `source ./unlock-api-keys.sh` | — | Asks for the key store's password, showing nothing typed, checks that it opens every key saved, and keeps it in `API_KEYS_PASSWORD` for the terminal, so the programs open their keys without asking. Runs in bash or zsh. | `source ./unlock-api-keys.sh` |
 
 ---
 

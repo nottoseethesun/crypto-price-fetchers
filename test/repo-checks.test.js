@@ -7,7 +7,7 @@
  * and then on this repo: its EVM addresses written in EIP-55's form, but
  * those its tests write otherwise on purpose (this file's own among them,
  * the forms it tests the check with), its npm targets named in
- * `docs/npm-project-commands.md`, its test files and helpers named in
+ * `docs/project-commands.md`, its test files and helpers named in
  * `docs/engineering.md` or `CLAUDE.md`, and its docs' links and paths
  * pointing at what it keeps.
  */
@@ -127,11 +127,11 @@ describe("the checks, on a repo made for the test", () => {
         scripts: { lint: "x", test: "x", "test:coverage": "x" },
       }),
       "tool/package.json": JSON.stringify({ scripts: { start: "x" } }),
-      "docs/npm-project-commands.md":
+      "docs/project-commands.md":
         "| `lint` | … |\nRun `npm run test:coverage -- --watch` to …\nnpm start\n",
     });
     assert.deepEqual(
-      npmTargetsMissingFromDocs(top, "docs/npm-project-commands.md"),
+      npmTargetsMissingFromDocs(top, "docs/project-commands.md"),
       [
         { packageFile: "package.json", target: "test" },
         { packageFile: "tool/package.json", target: "start" },
@@ -252,9 +252,9 @@ describe("this repo", () => {
     );
   });
 
-  it("names every npm target in docs/npm-project-commands.md", () => {
+  it("names every npm target in docs/project-commands.md", () => {
     assert.deepEqual(
-      npmTargetsMissingFromDocs(REPO_TOP, "docs/npm-project-commands.md"),
+      npmTargetsMissingFromDocs(REPO_TOP, "docs/project-commands.md"),
       [],
     );
   });
