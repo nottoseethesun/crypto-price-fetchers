@@ -85,7 +85,7 @@ that holds it, or else the candle's high, low or close, from MEXC, a
 centralized exchange, first, then CoinGecko, then CoinPaprika, two
 services that gather the exchanges' prices. When nothing traded in that
 minute, MEXC's price comes from the first larger period around it, up to
-a year, in which something did; when MEXC keeps no candle of the hour
+a year, in which something did; when MEXC keeps no candle of the day
 that holds the time, as for a time before it listed the coin, the next
 source answers. Apps Script runs the calls of many cells at
 the same time. The script's lock makes those calls take turns at the
@@ -268,8 +268,8 @@ price, for as many rows as the file holds, asking its sources in turn
    price asked and closed at the end of the run.
 
 As it starts, it opens the CoinGecko, CoinPaprika and Moralis keys from the
-key store, each one saved. `backfill.js` fills the empty prices of a file
-already written.
+key store, each one saved. `backfill.js` fills the prices marked `Error`
+in a file already written.
 
 Its settings are `config-example.json`, committed, with its own
 `config.json`, which git ignores, laid over them, and its tokens are those

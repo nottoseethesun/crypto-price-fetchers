@@ -27,7 +27,7 @@ import path from "path";
 import { pathToFileURL } from "url";
 import { runBackfill, setupBackfillCommander } from "../backfill.js";
 import { setupCommander } from "../commander.js";
-import { backfillChoice } from "../utils/backfill.js";
+import { backfillChoice, backfillPrices } from "../utils/backfill.js";
 
 /** crypto-price-filler's folder, and the two preloads a run of index.js takes. */
 const FILLER_DIR = path.resolve(__dirname, "..");
@@ -219,5 +219,67 @@ describe("the check that the command line loads", () => {
     expect(command).not.toBe(scripts["validate-parse"]);
     const run = spawnSync("sh", ["-c", command], { encoding: "utf8" });
     expect(run.status).not.toBe(0);
+  });
+});
+
+describe("backfill and the rows that hold no data", () => {
+  it("backfillPrices leaves out of the backfill and the grand total the rows the filler leaves blank on purpose, such as a Total row", () => {
+    const row = (date, amount, price) => ({
+      date,
+      amount,
+      "$usd price": price,
+      "$usd amount": "",
+      "grand total ($usd)": "",
+    });
+    const rows = [
+      row("2025-06-01", "10", "2"),
+      row("2025-06-02", "10", "Error"),
+      row("2025-06-03", "10", "3"),
+      row("Total", "30", ""),
+    ];
+    backfillPrices(rows, {
+      priceColName: "$usd price",
+      amountColName: "amount",
+      usdAmountColName: "$usd amount",
+      grandTotalColName: "grand total ($usd)",
+      useHighest: true,
+    });
+    expect(rows[1]["$usd price"]).toBe(3);
+    expect(rows[3]["$usd price"]).toBe("");
+    expect(rows[3]["grand total ($usd)"]).toBe((80).toFixed(6));
+  });
+});
+
+describe("backfill beside a row that holds no data", () => {
+  it("backfillPrices brackets a block of Error prices with the nearest priced rows, past a blank row beside it", () => {
+    const row = (date, price) => ({
+      date,
+      amount: "1",
+      "$usd price": price,
+      "$usd amount": "",
+      "grand total ($usd)": "",
+    });
+    const options = {
+      priceColName: "$usd price",
+      amountColName: "amount",
+      usdAmountColName: "$usd amount",
+      grandTotalColName: "grand total ($usd)",
+    };
+    const highest = [
+      row("2025-06-01", "30"),
+      row("", ""),
+      row("2025-06-02", "Error"),
+      row("2025-06-03", "20"),
+    ];
+    backfillPrices(highest, { ...options, useHighest: true });
+    expect(highest[2]["$usd price"]).toBe(30);
+    const lowest = [
+      row("2025-06-01", "10"),
+      row("", ""),
+      row("2025-06-02", "Error"),
+      row("2025-06-03", "20"),
+    ];
+    backfillPrices(lowest, { ...options, useHighest: false });
+    expect(lowest[2]["$usd price"]).toBe(10);
   });
 });

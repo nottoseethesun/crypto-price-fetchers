@@ -20,7 +20,7 @@
  *
  * @version 1.0.0
  * @author Christopher M. Balz with Claude.ai
- * @license See the file, `../LICENSE`
+ * @license See the file, `../../LICENSE`
  *
  * Quick Start
  * -----------

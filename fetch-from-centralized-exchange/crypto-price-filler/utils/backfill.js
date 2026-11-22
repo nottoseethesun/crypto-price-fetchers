@@ -42,22 +42,27 @@ export function isPriceEmpty(price) {
 }
 
 /**
- * Finds the bracketing prices around an empty block.
+ * Finds the bracketing prices around a block of Error prices: the price of
+ * the nearest priced row before the block and after it, stepping past any
+ * row with no price, such as a blank row that holds no data or another
+ * Error.
  * @param {Array<Object>} rows - Array of row objects
- * @param {number} blockStart - Start index of empty block
- * @param {number} blockEnd - End index of empty block (exclusive)
+ * @param {number} blockStart - Start index of the block
+ * @param {number} blockEnd - End index of the block (exclusive)
  * @param {string} priceColName - Name of the price column
  * @returns {Object} Object with leftPrice and rightPrice (or null if not found)
  */
 export function findBracketingPrices(rows, blockStart, blockEnd, priceColName) {
-  let leftPrice =
-    blockStart > 0 ? parseFloat(rows[blockStart - 1][priceColName]) : null;
-  let rightPrice =
-    blockEnd < rows.length ? parseFloat(rows[blockEnd][priceColName]) : null;
-
-  if (isNaN(leftPrice)) leftPrice = null;
-  if (isNaN(rightPrice)) rightPrice = null;
-
+  const priceAt = (index) => {
+    const price = parseFloat(rows[index][priceColName]);
+    return Number.isFinite(price) ? price : null;
+  };
+  let leftPrice = null;
+  for (let i = blockStart - 1; i >= 0 && leftPrice === null; i--)
+    leftPrice = priceAt(i);
+  let rightPrice = null;
+  for (let i = blockEnd; i < rows.length && rightPrice === null; i++)
+    rightPrice = priceAt(i);
   return { leftPrice, rightPrice };
 }
 

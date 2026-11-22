@@ -456,8 +456,8 @@ a past time, from MEXC, then CoinGecko, then CoinPaprika. Each source
 prices a period that holds the time. MEXC's is the minute, for a time in
 about the last 30 days, else the hour; when nothing traded in it, the
 script widens it a step at a time, up to the year. When MEXC keeps no
-candle of that hour, as for a time before it listed the coin, CoinGecko
-answers. CoinGecko's is the 24
+candle of the day that holds the time, as for a time before it listed the
+coin, CoinGecko answers. CoinGecko's is the 24
 hours from 12 hours before the time to 12 after, and CoinPaprika's the
 day, in UTC.
 
