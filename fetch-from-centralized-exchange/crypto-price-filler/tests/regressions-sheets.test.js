@@ -19,9 +19,11 @@ import {
   reply,
 } from "./helpers/sheets-script.js";
 import {
+  DAY_MS,
   MENU_AND_DEXTOOLS_SCRIPTS,
   SHEETS_SCRIPT_PATH,
   answerCoinGeckoForPastDay,
+  cellTime,
 } from "./helpers/regression-runs.js";
 import { mexcKlines } from "../../../test/helpers/stand-in-mexc.js";
 
@@ -255,16 +257,6 @@ describe("the exchange script in the hour MEXC lists a pair", () => {
 const TRADED = ["1.00", "1.50", "0.80", "1.20", "10"];
 
 /**
- * A time as a cell writes it, in UTC.
- *
- * @param {number} utcMs - The time, in ms since 1970 UTC
- * @returns {string} The time, as `YYYY-MM-DD HH:MM:SS`
- */
-function cellTime(utcMs) {
-  return new Date(utcMs).toISOString().slice(0, 19).replace("T", " ");
-}
-
-/**
  * Loads the exchange script with a stand-in MEXC that lists XTMUSDT and
  * answers its klines with `klines`, and CoinGecko's answer for a past day.
  *
@@ -313,9 +305,6 @@ describe("MEXC's minute candles", () => {
     expect(script.getCryptoPrice("xtm", time, "UTC", "close")).toBe(1.2);
   });
 });
-
-/** A day, in ms. */
-const DAY_MS = 86400000;
 
 /**
  * Whether a klines url asks for a day's candle, and for which day.
