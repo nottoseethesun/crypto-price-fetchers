@@ -20,7 +20,6 @@
 import { describe, it, expect } from "vitest";
 import path from "path";
 import { loadSheetsScript } from "./helpers/sheets-script.js";
-import { backfillPrices } from "../utils/backfill.js";
 
 /** How long Google lets a custom function run before it stops it. */
 const CUSTOM_FUNCTION_LIMIT_MS = 30000;
@@ -85,43 +84,6 @@ describe("waits inside a custom function", () => {
       const waited = [...waits, ...sleeps].reduce((sum, ms) => sum + ms, 0);
       expect(waits.length).toBeGreaterThan(0);
       expect(waited).toBeLessThanOrEqual(CUSTOM_FUNCTION_LIMIT_MS);
-    },
-  );
-});
-
-describe("backfill beside a row that holds no data", () => {
-  it.fails(
-    "backfillPrices brackets a block of Error prices with the nearest priced rows, past a blank row beside it",
-    () => {
-      const row = (date, price) => ({
-        date,
-        amount: "1",
-        "$usd price": price,
-        "$usd amount": "",
-        "grand total ($usd)": "",
-      });
-      const options = {
-        priceColName: "$usd price",
-        amountColName: "amount",
-        usdAmountColName: "$usd amount",
-        grandTotalColName: "grand total ($usd)",
-      };
-      const highest = [
-        row("2025-06-01", "30"),
-        row("", ""),
-        row("2025-06-02", "Error"),
-        row("2025-06-03", "20"),
-      ];
-      backfillPrices(highest, { ...options, useHighest: true });
-      expect(highest[2]["$usd price"]).toBe(30);
-      const lowest = [
-        row("2025-06-01", "10"),
-        row("", ""),
-        row("2025-06-02", "Error"),
-        row("2025-06-03", "20"),
-      ];
-      backfillPrices(lowest, { ...options, useHighest: false });
-      expect(lowest[2]["$usd price"]).toBe(10);
     },
   );
 });

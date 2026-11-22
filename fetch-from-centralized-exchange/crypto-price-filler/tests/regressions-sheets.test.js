@@ -170,6 +170,7 @@ describe("the exchange script before MEXC lists a pair", () => {
 
   it("getPriceFromMEXC still prices a time after the listing from the larger window in which something traded", () => {
     const listed = Date.UTC(2025, 8, 1);
+    const intervals = [];
     const script = loadSheetsScript(SHEETS_SCRIPT_PATH, (url) => {
       if (url.includes("/exchangeInfo"))
         return {
@@ -179,17 +180,19 @@ describe("the exchange script before MEXC lists a pair", () => {
         };
       if (url.includes("/klines")) {
         const interval = new URL(url).searchParams.get("interval");
+        intervals.push(interval);
         return mexcKlines(url, (open) => {
-          if (open < listed) return null;
+          if (open < listed || interval === "1m") return null;
           return interval === "60m"
             ? ["0.20", "0.20", "0.20", "0.20", "0"]
-            : ["0.10", "0.30", "0.10", "0.20", "10"];
+            : ["0.10", "0.50", "0.10", "0.30", "10"];
         });
       }
       return null;
     });
     expect(
       script.getPriceFromMEXC("xtm", Date.UTC(2025, 9, 15, 12, 30), "close"),
-    ).toBeCloseTo(0.2, 10);
+    ).toBeCloseTo(0.3, 10);
+    expect(intervals).toEqual(["1m", "60m", "60m", "4h"]);
   });
 });

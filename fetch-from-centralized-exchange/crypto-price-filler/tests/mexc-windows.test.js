@@ -2,7 +2,9 @@
  * Tests of the windows the Sheets script asks MEXC, an exchange, for: the
  * minute that holds a time, or for an older time its hour, and, when
  * nothing traded in it, the next window up that holds the time, to the
- * year.
+ * year; and, when MEXC keeps no candle of the hour, the day, which tells a
+ * time older than the hour candles MEXC keeps from one before it listed
+ * the pair.
  * @module tests/mexc-windows.test
  *
  * The script, getCryptoPriceFromCentralizedExchange.gs with its
@@ -254,5 +256,36 @@ describe("MEXC's window for a time older than the minute candles it keeps", () =
       10,
     );
     expect(windowOf(klines[klines.length - 1]).limit).toBe("2");
+  });
+});
+
+describe("MEXC's windows when it keeps no candle of the hour that holds a time", () => {
+  it("climbs from the day, when MEXC keeps the day's candle", () => {
+    const { script, klines } = scriptWithMexc((symbol, open, end, interval) =>
+      interval === "1d" ? TRADED : null,
+    );
+    expect(script.getPriceFromMEXC("XTM", TIME_MS, "close")).toBeCloseTo(
+      1.1,
+      10,
+    );
+    expect(klines.map((query) => query.get("interval"))).toEqual([
+      "1m",
+      "60m",
+      "60m",
+      "4h",
+      "1d",
+    ]);
+  });
+
+  it("gives no price when MEXC keeps no candle of the day either, as before it listed the pair", () => {
+    const { script, klines } = scriptWithMexc(() => null);
+    expect(script.getPriceFromMEXC("XTM", TIME_MS, "close")).toBeNull();
+    expect(klines.map((query) => query.get("interval"))).toEqual([
+      "1m",
+      "60m",
+      "60m",
+      "4h",
+      "1d",
+    ]);
   });
 });

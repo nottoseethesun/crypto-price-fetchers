@@ -5,9 +5,9 @@
  *
  * What: `getPriceFromGeckoTerminal` gives the high, low or close, in USD,
  * of the candle that holds the row's time: the minute's candle, or the
- * hour's when nothing traded in that minute, as the MEXC source reads its
- * candles. GeckoTerminal's public api serves the last 180 days only, so an
- * older time gets null, and the provider chain asks CoinGecko.
+ * hour's when nothing traded in that minute. GeckoTerminal's public api
+ * serves the last 180 days only, so an older time gets null, and the
+ * provider chain asks CoinGecko.
  *
  * How: the pool is the one LP Ranger would read the token's price from:
  * of the first `GECKOTERMINAL_TOP_POOLS_CONSIDERED` pools GeckoTerminal

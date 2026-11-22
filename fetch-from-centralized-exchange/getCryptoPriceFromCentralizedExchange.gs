@@ -105,7 +105,7 @@
  *   month and year, in UTC, that hold the time, and the first in which
  *   something traded gives the average of its high and low, whatever the
  *   mode. When nothing traded in that year, or MEXC keeps no candle of the
- *   hour that holds the time, as for a time before it listed the coin,
+ *   day that holds the time, as for a time before it listed the coin,
  *   the next source answers.
  * - CoinGecko, a service that gathers the exchanges' prices, asked next:
  *   24 hours of hourly prices, from 12 hours before the time to 12 hours
@@ -146,10 +146,11 @@
  *     the 60-minute candle of the hour containing the timestamp. MEXC
  *     gives a candle for every period it keeps: one in which nothing
  *     traded has volume 0, and open, high, low and close all at the last
- *     trade's price. When it gives no candle of the hour, as for a time
- *     before it listed the pair, MEXC gives no price, since a larger window
- *     would hold only candles of other hours, which may all come from after
- *     the time. When the candle's volume is above 0, the script gives
+ *     trade's price. When it gives no candle of the day that holds the
+ *     time, as for a time before it listed the pair, MEXC gives no price,
+ *     since a larger window would hold only candles of other days, which
+ *     may all come from after the time. When the candle's volume is above
+ *     0, the script gives
  *     the mode's price from it. When it is 0, the script asks for the
  *     candles of the next window up, in MEXC_WINDOWS (-sources.gs): the
  *     hour, 2 hours, 4 hours, day, week, month and year containing the
