@@ -135,12 +135,13 @@
  *   while the script keeps "no data" (above).
  * - `No data available for future dates`: the time is after now.
  * - `Rate limit busy - retry later`: other cells kept the script busy, or
- *   no source gave a price and a request got no answer: the sources
- *   refused it as too many until the call used the 25 seconds the script
- *   allows a cell, within the 30 Google gives one, or it got no response,
- *   as on a timeout or when Apps Script's daily quota of requests is
- *   spent; choose Clean up errors in the Crypto Price Fetchers menu, which
- *   runs the cell again.
+ *   no source gave a price and a request got no answer: refused as too
+ *   many on its last try, or when the call had no more of the 25 seconds
+ *   the script allows a cell, within the 30 Google gives one, to wait;
+ *   answered with a server error; or given no response, as on a timeout
+ *   or when Apps Script's daily quota of requests is spent; choose Clean
+ *   up errors in the Crypto Price Fetchers menu, which runs the cell
+ *   again.
  * - `Unknown time zone`, or `Invalid` with a part of the date: check
  *   `tz` or `dateStr`.
  * - `#ERROR!`: choose Clean up errors in the Crypto Price Fetchers menu.
@@ -209,10 +210,11 @@
  * the call's budget, CALL_BUDGET_MS, below; a request that gets no
  * response at all, as on a timeout, a refused connection or Apps Script's
  * own quota of requests, is a failed one, as a refusal is, and the next
- * provider answers. Such a request, a refusal the call cannot wait out and
- * a request it has no time to send are cut short (CALL, below): when no
- * provider then gives a price, the cell shows the busy message, and no
- * provider's silence is kept as no data.
+ * provider answers. Such a request, an answer with a server error, a
+ * refusal the call cannot wait out and a request it has no time to send
+ * are cut short (CALL, below): when no provider then gives a price, the
+ * cell shows the busy message, and no provider's silence is kept as no
+ * data.
  *
  *   1. MEXC       - Primary. Real OHLCV candles (1-minute for about the
  *                   last 30 days, else 1-hour; up to the year when
@@ -408,8 +410,9 @@ const CALL_BUDGET_MS = 25000;
  * The time a call of getCryptoPrice has used, for its budget
  * (CALL_BUDGET_MS): when it began, or null outside a call; the waits it
  * asked for; and how many of its requests were cut short: refused as one
- * too many past the last try or the time left to wait, given no response,
- * or not sent for want of time. A request cut short says nothing of
+ * too many past the last try or the time left to wait, answered with a
+ * server error or a request timeout, given no response, or not sent for
+ * want of time. A request cut short says nothing of
  * whether its source has a price, so no source keeps the lack of an answer
  * from one, and a call with one, which no source priced, shows the busy
  * message rather than no data. Outside a call the count only grows.
@@ -454,8 +457,8 @@ function waitInCall(milliseconds) {
 /**
  * What a cell shows when the call got no script lock in its tries, or no
  * source gave a price and a request was cut short: refused as one too many
- * past what the call could wait out, given no response, or not sent for
- * want of time. The menu's Clean up errors runs again each cell that shows
+ * past what the call could wait out, answered with a server error, given
+ * no response, or not sent for want of time. The menu's Clean up errors runs again each cell that shows
  * it.
  *
  * @type {string}
