@@ -110,8 +110,9 @@ name `--tz` takes.
 
 ### backfill.js: Filling Empty Prices
 
-A row whose price no service gave is left empty in the output. `backfill.js`
-fills such rows in an output CSV file already written, without asking any
+A row whose price no service gave gets `Error` in the output's
+`$usd price` column. `backfill.js` fills such rows in an output CSV file
+already written, without asking any
 service again: each takes the price of the nearest priced row before or
 after it, the higher of the two with `--backfill-highest`, the lower with
 `--backfill-lowest`. The file header in `./backfill.js` lists all its
