@@ -197,6 +197,20 @@ describe("settingsProblems", () => {
   });
 });
 
+describe("the kinds of a time limit", () => {
+  it("take a whole number up to the longest limit Node's timers keep, in seconds or in milliseconds, and refuse any other", () => {
+    for (const [timeLimit, longest] of [
+      [KINDS.timeLimitSeconds, 2147483],
+      [KINDS.timeLimitMs, 2147483647],
+    ]) {
+      const check = compileSettingsSchema(timeLimit);
+      for (const value of [1, 30, longest]) assert.equal(check(value), true);
+      for (const value of [0, 2.01, longest + 1, "30", null])
+        assert.equal(check(value), false, `${value}`);
+    }
+  });
+});
+
 describe("kindParser", () => {
   it("reads and checks a typed value with its kind, refusing it in the kind's words", () => {
     const count = kindParser(KINDS.wholeAbove0, asWholeNumber);

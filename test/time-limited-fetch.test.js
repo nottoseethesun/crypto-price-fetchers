@@ -98,8 +98,8 @@ describe("fetchWithinTimeLimit", () => {
     assert.equal(await response.text(), "");
   });
 
-  it("refuses a limit that is not a number of milliseconds above 0", async () => {
-    for (const timeoutMs of [0, -1, "30", undefined, Number.NaN]) {
+  it("refuses a limit that is not a whole number of milliseconds from 1 to 2147483647", async () => {
+    for (const timeoutMs of [0, -1, "30", undefined, Number.NaN, 2.5]) {
       await assert.rejects(
         fetchWithinTimeLimit("https://node.test/", {}, { timeoutMs }),
         RangeError,

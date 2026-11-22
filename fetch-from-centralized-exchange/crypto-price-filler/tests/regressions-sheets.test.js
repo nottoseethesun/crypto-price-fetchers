@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { loadSheetsScript } from "./helpers/sheets-script.js";
+import { loadSheetsScript, reply } from "./helpers/sheets-script.js";
 import {
   MENU_AND_DEXTOOLS_SCRIPTS,
   SHEETS_SCRIPT_PATH,
@@ -241,5 +241,61 @@ describe("the exchange script in the hour MEXC lists a pair", () => {
       return answerCoinGeckoForPastDay(url);
     });
     expect(script.getCryptoPrice("xtm", time, "UTC", "close")).toBe(1.23);
+  });
+});
+
+/** A MEXC candle in which something traded: open, high, low, close, volume. */
+const TRADED = ["1.00", "1.50", "0.80", "1.20", "10"];
+
+/**
+ * A time as a cell writes it, in UTC.
+ *
+ * @param {number} utcMs - The time, in ms since 1970 UTC
+ * @returns {string} The time, as `YYYY-MM-DD HH:MM:SS`
+ */
+function cellTime(utcMs) {
+  return new Date(utcMs).toISOString().slice(0, 19).replace("T", " ");
+}
+
+/**
+ * Loads the exchange script with a stand-in MEXC that lists XTMUSDT and
+ * answers its klines with `klines`, and CoinGecko's answer for a past day.
+ *
+ * @param {function(string): *} klines - Answers a klines url
+ * @returns {Object} The script's global scope
+ */
+function exchangeScriptWith(klines) {
+  return loadSheetsScript(SHEETS_SCRIPT_PATH, (url) => {
+    if (url.includes("/exchangeInfo"))
+      return {
+        symbols: [{ symbol: "XTMUSDT", baseAsset: "XTM", quoteAsset: "USDT" }],
+      };
+    if (url.includes("/klines")) return klines(url);
+    return answerCoinGeckoForPastDay(url);
+  });
+}
+
+describe("MEXC's minute candles", () => {
+  it("getCryptoPrice prices a recent time from MEXC's hour when the request for its minute fails, rather than taking the failure for a minute before the pair's first trade", () => {
+    const script = exchangeScriptWith((url) => {
+      const asked = new URL(url).searchParams;
+      if (asked.get("interval") === "1m" && asked.get("limit") === "1")
+        return reply(503, null);
+      return mexcKlines(url, () => TRADED);
+    });
+    const time = cellTime(Date.now() - 2 * 86400000);
+    expect(script.getCryptoPrice("xtm", time, "UTC", "close")).toBe(1.2);
+  });
+
+  it("getCryptoPrice prices a time in the hour MEXC's minute candles begin in from MEXC's hour, rather than taking the minutes MEXC let go for minutes before the pair's first trade", () => {
+    const hour = Math.floor((Date.now() - 30 * 86400000) / 3600000) * 3600000;
+    const keptFrom = hour + 30 * 60000;
+    const script = exchangeScriptWith((url) =>
+      mexcKlines(url, (open, end, interval) =>
+        interval === "1m" && open < keptFrom ? null : TRADED,
+      ),
+    );
+    const time = cellTime(hour + 10 * 60000);
+    expect(script.getCryptoPrice("xtm", time, "UTC", "close")).toBe(1.2);
   });
 });

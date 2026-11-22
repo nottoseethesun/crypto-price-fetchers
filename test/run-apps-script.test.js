@@ -294,10 +294,12 @@ describe("openAppsScript, refusing to open", () => {
       openAppsScript(RUNNER_CHECK, { config: ["not", "an", "object"] }),
       /config must be an object/,
     );
-    await assert.rejects(
-      openAppsScript(RUNNER_CHECK, { requestTimeoutMs: 0 }),
-      /requestTimeoutMs must be/,
-    );
+    for (const requestTimeoutMs of [0, 2.5, 2147483648]) {
+      await assert.rejects(
+        openAppsScript(RUNNER_CHECK, { requestTimeoutMs }),
+        /requestTimeoutMs must be a whole number of milliseconds from 1 to 2147483647/,
+      );
+    }
     await assert.rejects(
       openAppsScript(RUNNER_CHECK, { scriptProperties: { API_KEY: 42 } }),
       /scriptProperties must be an object of strings/,
