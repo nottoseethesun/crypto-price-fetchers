@@ -30,6 +30,19 @@
 
 import { readSettingsFile } from "../lib/settings-file.js";
 import { KINDS } from "../lib/settings-schema.js";
+import { MAX_CACHE_SECONDS } from "./apps-script-services.js";
+
+/**
+ * The kind of value of a config field a script hands Apps Script's cache
+ * as the seconds to keep a value: a whole number from 1 to 21600, the
+ * longest Apps Script's cache keeps one, for a Node version's schemas.
+ */
+export const CACHE_SECONDS_KIND = Object.freeze({
+  type: "integer",
+  minimum: 1,
+  maximum: MAX_CACHE_SECONDS,
+  description: `a whole number of seconds from 1 to ${MAX_CACHE_SECONDS}`,
+});
 
 /**
  * The JSON Schema of a config file: each of the script's config objects

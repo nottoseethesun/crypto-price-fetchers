@@ -59,6 +59,7 @@
 
 import { fileURLToPath } from "node:url";
 import {
+  CACHE_SECONDS_KIND,
   InvalidArgumentError,
   Option,
   isEntryPoint,
@@ -110,7 +111,11 @@ export const CONFIG_SCHEMAS = Object.freeze({
     additionalProperties: false,
     properties: {
       EXCHANGE_BASE_URL: KINDS.url,
-      QUOTE_CURRENCY: KINDS.text,
+      QUOTE_CURRENCY: {
+        enum: ["USDT", "USDC"],
+        description:
+          "USDT or USDC, a USD stablecoin MEXC quotes pairs in, as CoinGecko and CoinPaprika answer in USD",
+      },
       TIMEZONE_OFFSETS: {
         type: "object",
         required: ["UTC"],
@@ -134,8 +139,8 @@ export const CONFIG_SCHEMAS = Object.freeze({
         additionalProperties: false,
         required: ["DAILY_PRICE", "NEGATIVE_CACHE"],
         properties: {
-          DAILY_PRICE: KINDS.wholeAbove0,
-          NEGATIVE_CACHE: KINDS.wholeAbove0,
+          DAILY_PRICE: CACHE_SECONDS_KIND,
+          NEGATIVE_CACHE: CACHE_SECONDS_KIND,
         },
         description: "the seconds a price, and a price not found, are kept",
       },

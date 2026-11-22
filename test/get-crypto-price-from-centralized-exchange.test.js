@@ -1,6 +1,6 @@
 /**
  * Tests for fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.js,
- * the Node version of getCryptoPriceFromCentralizedExchange.gs (item 15).
+ * the Node version of getCryptoPriceFromCentralizedExchange.gs.
  * @module test/get-crypto-price-from-centralized-exchange.test
  *
  * The real `.gs` runs under the real runner. Its requests go to a stand-in

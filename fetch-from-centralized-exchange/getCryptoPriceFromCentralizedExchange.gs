@@ -80,9 +80,9 @@
  * =getCryptoPrice("xtm", A1, "UTC", "close")
  * ```
  *
- * A price for a time is kept for 24 hours, and "no data" for 5 minutes,
- * so a cell that runs again within that time gives the answer it gave
- * before. A past price does not change, so Refresh & freeze historical
+ * A price for a time is kept for 6 hours, the longest Apps Script's cache
+ * keeps a value, and "no data" for 5 minutes, so a cell that runs again
+ * within that time gives the answer it gave before. A past price does not change, so Refresh & freeze historical
  * prices, in the Crypto Price Fetchers menu, can replace these formulas
  * with their numbers.
  *
@@ -150,8 +150,9 @@
  *     join their two hour candles and the year its twelve month candles.
  *     The first window whose volume is above 0 gives the average of its
  *     high and low, whatever the mode. A coin MEXC trades only against BTC
- *     is priced in USD with BTC/USDT's candle of the same window, read the
- *     same way.
+ *     is priced in USD with the candle of BTC against the quote currency
+ *     (QUOTE_CURRENCY, below, USDT as written) of the same window, read
+ *     the same way.
  *
  *   CoinGecko market_chart/range: Fetches hourly data points over a
  *     24-hour window centered on the requested time (12 hours before to
@@ -211,13 +212,18 @@
  * All tuning is in the CONFIG object at the top of this file:
  *
  *   EXCHANGE_BASE_URL    - MEXC REST API base ("https://api.mexc.com/api/v3")
- *   QUOTE_CURRENCY       - Quote side of the pair ("USDT")
+ *   QUOTE_CURRENCY       - Quote side of the token's MEXC pair, and of the
+ *                          BTC pair a BTC-quoted price goes through:
+ *                          "USDT" or "USDC", a USD stablecoin, since
+ *                          CoinGecko and CoinPaprika answer in USD
+ *                          ("USDT")
  *
  *   TIMEZONE_OFFSETS     - Map of abbreviation to UTC offset in hours
  *                          (see Time zones, in the help section above)
  *
  *   CACHE_EXPIRY_SECONDS
- *     DAILY_PRICE        - TTL for successful price lookups (86400 = 24h)
+ *     DAILY_PRICE        - TTL for successful price lookups (21600 = 6h,
+ *                          the longest Apps Script's cache keeps a value)
  *     NEGATIVE_CACHE     - TTL for "no data" results (300 = 5min)
  *
  *   COINGECKO_BASE       - CoinGecko API v3 base URL
@@ -296,7 +302,7 @@ const CONFIG = {
     PDT: -7,
   },
   CACHE_EXPIRY_SECONDS: {
-    DAILY_PRICE: 86400, // 24 hours
+    DAILY_PRICE: 21600, // 6 hours, the longest Apps Script's cache keeps a value
     NEGATIVE_CACHE: 300, // 5 min for failures
   },
 

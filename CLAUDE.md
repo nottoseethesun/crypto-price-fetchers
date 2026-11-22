@@ -164,7 +164,8 @@ package of the ajv-validator project that checks JSON against a schema, on
 the 2020-12 draft of JSON Schema, strict. An object of settings refuses a
 key its schema does not name. An object keyed by names the owner chooses
 takes any such key, held to a form where the code needs one: the filler's
-tokens by symbol, in lower case, and summ-csv's chains by name. A value of
+tokens by symbol, in lower case, summ-csv's chains by name, and the
+exchange script's time zones by abbreviation, with no lower-case letter. A value of
 the wrong kind is refused, never corrected, and every problem in a file is
 listed at once, one line each.
 `lib/settings-schema.js` holds the shared part: `compileSettingsSchema`,
