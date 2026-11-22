@@ -229,8 +229,9 @@ checks, never as development packages, which it skips.
 `docs/architecture.md` says how the parts fit, `docs/engineering.md`
 covers the files, the gates, the tests and CI (the gates, run by GitHub
 Actions at each push), and
-`docs/npm-project-commands.md` lists every npm command, as LP Ranger's
-`docs/` does. A change keeps them true.
+`docs/project-commands.md` lists every command, those npm runs and those
+run with `node` or `source`, as LP Ranger's `docs/` does. A change keeps
+them true.
 
 Every doc passes the owner's documentation audit: it tells no story of an
 old bug, leads every topic and sub-topic with the context it needs,
@@ -271,9 +272,10 @@ are in `lib/command-line-help.js`, exported as
 `crypto-price-fetchers/lib/command-line-help`:
 `test/command-line-help.test.js` runs them on every command line here,
 and the repos that install this one run them in their own tests.
-`docs/npm-project-commands.md` lists every npm target, including those
-that run other tools, such as `lint` and `check`, with its flags and an
-example. LP Ranger's rules do not yet ask for the examples; this repo does.
+`docs/project-commands.md` lists every npm target, including those
+that run other tools, such as `lint` and `check`, and every command line
+run with `node`, each with its flags and an example. LP Ranger's rules do
+not yet ask for the examples; this repo does.
 
 ## Gates and CI
 
@@ -330,7 +332,7 @@ that install this repo run the bin in their lint.
 The repo supports two major versions of Node: the newest LTS (long-term
 support) version, today 26, and the version two majors before it, today 24.
 The build step, every tool, every test and every npm command, each a target a
-`package.json` names (`docs/npm-project-commands.md` lists them), run on both.
+`package.json` names (`docs/project-commands.md` lists them), run on both.
 `engines` in `package.json` names only the oldest supported major as a
 minimum, `>=24`, raised to a minor version, such as `>=24.15`, only when the
 code needs what that version added; no file pins or requires one exact version
@@ -352,7 +354,7 @@ command line's help (`test/command-line-help.test.js`), and the repo's
 tracked files (`test/repo-checks.test.js`) are tested from the repo's top
 folder, on Node's own test runner. The tracked files are held to the
 checks of `lib/repo-checks.js`: every EVM address in EIP-55's form, every
-npm target named in `docs/npm-project-commands.md`, every test file and
+npm target named in `docs/project-commands.md`, every test file and
 helper named in `docs/engineering.md` or here, and every link and path in
 a doc pointing at a file, folder or heading the repo keeps. The menu runs against a spreadsheet held in memory
 (`test/helpers/stand-in-spreadsheet.js`), and DEX Screener's part is

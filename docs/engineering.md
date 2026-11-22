@@ -14,8 +14,9 @@ the versions tool sets a project's dependencies from GitHub to a branch or
 a release; and the Summ CSV writer writes the CSV files the owner imports
 into Summ, the crypto tax calculator he keeps his books in.
 For how the parts fit, see [`docs/architecture.md`](architecture.md); for
-every command the repo's `package.json` gives npm, Node's package manager,
-to run, see [`docs/npm-project-commands.md`](npm-project-commands.md).
+every command, those the repo's `package.json` gives npm, Node's package
+manager, to run and those run with `node` or `source`, see
+[`docs/project-commands.md`](project-commands.md).
 
 The repo follows the coding standards of LP Ranger, the owner's bot that
 manages his 9mm V3 liquidity positions: its `CLAUDE.md` and

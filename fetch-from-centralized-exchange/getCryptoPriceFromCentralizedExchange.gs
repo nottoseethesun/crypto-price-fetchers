@@ -80,9 +80,9 @@
  * =getCryptoPrice("xtm", A1, "UTC", "close")
  * ```
  *
- * A price for a time is kept for up to 6 hours, the longest Apps Script's
- * cache keeps a value, and "no data" for up to 5 minutes, as the script is
- * written (the CACHE_EXPIRY_SECONDS setting), so a cell that runs again
+ * As the script is written (the CACHE_EXPIRY_SECONDS setting), a price for
+ * a time is kept for up to 6 hours, the longest Apps Script's cache keeps
+ * a value, and "no data" for up to 5 minutes, so a cell that runs again
  * within that time gives the answer it gave before. A past
  * price does not change, so Refresh & freeze historical prices, in the
  * Crypto Price Fetchers menu, can replace these formulas with their
@@ -123,7 +123,7 @@
  *
  * - `No data available from any source`: no source had a price for that
  *   coin at that time; `No data available (cached)` repeats that answer
- *   for up to 5 minutes.
+ *   while the script keeps "no data" (above).
  * - `No data available for future dates`: the time is after now.
  * - `Rate limit busy - retry later`: other cells kept the script busy;
  *   choose Clean up errors in the Crypto Price Fetchers menu, which runs

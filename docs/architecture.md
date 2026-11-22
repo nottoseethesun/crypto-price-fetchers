@@ -17,9 +17,9 @@ Two companion references sit alongside this one:
 - [`docs/engineering.md`](engineering.md): the files on disk, the gates,
   the tests and CI, the checks GitHub, the website that hosts the repo,
   runs at each push.
-- [`docs/npm-project-commands.md`](npm-project-commands.md): every command
-  the repo's `package.json` gives npm, Node's package manager, to run, and
-  its flags.
+- [`docs/project-commands.md`](project-commands.md): every command,
+  those the repo's `package.json` gives npm, Node's package manager, to run
+  and those run with `node` or `source`, with its flags.
 
 ---
 
@@ -114,9 +114,10 @@ every cell that asks for a current value; and Refresh & freeze historical
 prices for the past prices of one tab, whose numbers it keeps in place of
 their formulas block by block, within the run's time. A current value
 that Refresh runs again may come from a script's cache: the scripts keep
-a DexTools or x1.ninja price or FDV above 0 for 5 minutes, and a DEX
-Screener answer for 30 seconds, and ask again for a 0, an error or a busy
-message. Help shows the page the build step
+a DexTools or x1.ninja price or FDV above 0 for 5 minutes, as the script
+is written (`DEXTOOLS_CONFIG.CACHE_SECONDS`), or for the seconds the
+cell's fourth argument gives, and a DEX Screener answer for 30 seconds,
+and ask again for a 0, an error or a busy message. Help shows the page the build step
 makes from the help sections of the scripts' headers. No Node version
 loads the menu, since it gives no price.
 
