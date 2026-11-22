@@ -14,18 +14,12 @@
  *
  * The Sheets scripts run unchanged in the test's thread, through
  * `tests/helpers/sheets-script.js`, with a stand-in for the Apps Script
- * service each test is about: the script lock, or the web, through a
- * stand-in MEXC.
+ * service each test is about: the script lock.
  */
 
 import { describe, it, expect } from "vitest";
 import path from "path";
-import { loadSheetsScript, reply } from "./helpers/sheets-script.js";
-import {
-  SHEETS_SCRIPT_PATH,
-  answerCoinGeckoForPastDay,
-} from "./helpers/regression-runs.js";
-import { mexcKlines } from "../../../test/helpers/stand-in-mexc.js";
+import { loadSheetsScript } from "./helpers/sheets-script.js";
 
 /** How long Google lets a custom function run before it stops it. */
 const CUSTOM_FUNCTION_LIMIT_MS = 30000;
@@ -90,111 +84,6 @@ describe("waits inside a custom function", () => {
       const waited = [...waits, ...sleeps].reduce((sum, ms) => sum + ms, 0);
       expect(waits.length).toBeGreaterThan(0);
       expect(waited).toBeLessThanOrEqual(CUSTOM_FUNCTION_LIMIT_MS);
-    },
-  );
-});
-
-/** A MEXC candle in which something traded: open, high, low, close, volume. */
-const TRADED = ["1.00", "1.50", "0.80", "1.20", "10"];
-
-/** A day, in ms. */
-const DAY_MS = 86400000;
-
-/**
- * A time as a cell writes it, in UTC.
- *
- * @param {number} utcMs - The time, in ms since 1970 UTC
- * @returns {string} The time, as `YYYY-MM-DD HH:MM:SS`
- */
-function cellTime(utcMs) {
-  return new Date(utcMs).toISOString().slice(0, 19).replace("T", " ");
-}
-
-/**
- * Loads the exchange script with a stand-in MEXC that lists XTMUSDT and
- * answers its klines with `klines`, and CoinGecko's answer for a past day.
- *
- * @param {function(string): *} klines - Answers a klines url
- * @returns {Object} The script's global scope
- */
-function exchangeScriptWith(klines) {
-  return loadSheetsScript(SHEETS_SCRIPT_PATH, (url) => {
-    if (url.includes("/exchangeInfo"))
-      return {
-        symbols: [{ symbol: "XTMUSDT", baseAsset: "XTM", quoteAsset: "USDT" }],
-      };
-    if (url.includes("/klines")) return klines(url);
-    return answerCoinGeckoForPastDay(url);
-  });
-}
-
-/**
- * Whether a klines url asks for a day's candle, and for which day.
- *
- * @param {string} url - The url
- * @param {number} dayStart - The day's first ms
- * @returns {boolean} Whether it asks for that day
- */
-function asksForDay(url, dayStart) {
-  const asked = new URL(url).searchParams;
-  return (
-    asked.get("interval") === "1d" &&
-    Number(asked.get("startTime")) === dayStart
-  );
-}
-
-describe("MEXC's requests that fail", () => {
-  it.fails(
-    "getCryptoPrice prices a time whose minute MEXC let go from MEXC's hour when the request for the day before fails, rather than taking the failure for no candle of it",
-    () => {
-      const hour = Math.floor((Date.now() - 30 * DAY_MS) / 3600000) * 3600000;
-      const keptFrom = hour + 30 * 60000;
-      const dayBefore = Math.floor(hour / DAY_MS) * DAY_MS - DAY_MS;
-      const script = exchangeScriptWith((url) =>
-        asksForDay(url, dayBefore)
-          ? reply(503, null)
-          : mexcKlines(url, (open, end, interval) =>
-              interval === "1m" && open < keptFrom ? null : TRADED,
-            ),
-      );
-      const time = cellTime(hour + 10 * 60000);
-      expect(script.getCryptoPrice("xtm", time, "UTC", "close")).toBe(1.2);
-    },
-  );
-
-  it.fails(
-    "getCryptoPrice goes up from the 2 hours when MEXC keeps no candle of the hour and the request for the day before fails, rather than taking the failure for no candle of it",
-    () => {
-      const time = Date.now() - 60 * DAY_MS;
-      const dayBefore = Math.floor(time / DAY_MS) * DAY_MS - DAY_MS;
-      const script = exchangeScriptWith((url) =>
-        asksForDay(url, dayBefore)
-          ? reply(503, null)
-          : mexcKlines(url, (open, end, interval) =>
-              ["1m", "60m", "4h"].includes(interval) ? null : TRADED,
-            ),
-      );
-      expect(script.getCryptoPrice("xtm", cellTime(time), "UTC", "close")).toBe(
-        1.15,
-      );
-    },
-  );
-
-  it.fails(
-    "getCryptoPrice goes on up to the week when the request for the day fails, rather than taking the failure for no candle of the day",
-    () => {
-      const time = Date.now() - 60 * DAY_MS;
-      const day = Math.floor(time / DAY_MS) * DAY_MS;
-      const script = exchangeScriptWith((url) =>
-        asksForDay(url, day)
-          ? reply(503, null)
-          : mexcKlines(url, (open, end, interval) =>
-              ["1m", "60m", "4h"].includes(interval) ? null : TRADED,
-            ),
-      );
-      expect(script.getCryptoPrice("xtm", cellTime(time), "UTC", "close")).toBe(
-        1.15,
-      );
     },
   );
 });

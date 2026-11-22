@@ -111,7 +111,9 @@
  *   candle of the hour, the script asks for the day before: with none, as
  *   on the day MEXC listed the coin or before, the next source answers;
  *   with one, the script goes up from the 2 hours. When nothing traded in
- *   the year, the next source answers.
+ *   the year, the next source answers. A request MEXC fails is never taken
+ *   for a period with no candle: the script goes on to the next period, or,
+ *   when the request for the day before fails, up from the 2 hours.
  * - CoinGecko, a service that gathers the exchanges' prices, asked next:
  *   24 hours of hourly prices, from 12 hours before the time to 12 hours
  *   after; for `"close"` only, the day's price at 00:00 UTC.
@@ -170,7 +172,13 @@
  *     timestamp. MEXC serves no 2-hour or yearly candle, so the 2 hours
  *     join their two hour candles and the year its twelve month candles.
  *     The first window whose volume is above 0 gives the average of its
- *     high and low, whatever the mode. A coin for which MEXC lists no pair
+ *     high and low, whatever the mode. A request MEXC fails shows nothing
+ *     of the candles it keeps, so the script never takes it for a window
+ *     with no candle: a failed check of the hour's minute candles or of the
+ *     day before, while it checks the minute, leaves it to ask for the
+ *     hour; a failed request for the hour leaves the day before to decide,
+ *     a failed request for the day before leaves it to go up from the 2
+ *     hours, and a failed request for a larger window, to go on up. A coin for which MEXC lists no pair
  *     against the quote currency (QUOTE_CURRENCY, below, USDT as written),
  *     but one against BTC, is priced from its BTC pair, then in USD with
  *     the candle of BTC against the quote currency of the same window,

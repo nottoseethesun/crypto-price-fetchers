@@ -206,8 +206,7 @@ function findMEXCTradingPair(token, symbols) {
  * pair, and MEXC gives no price. With a candle of the day before, the pair
  * traded before the time, so the minute is one MEXC let go, as at the
  * start of the days it keeps minute candles, and the script asks for the
- * hour; so it does when the request for the minute fails, which shows
- * nothing of the pair's trades.
+ * hour.
  * When MEXC keeps no candle of the hour that holds the time, the script
  * asks for the day before: with no candle
  * of it, as on the day MEXC listed the pair or before, MEXC gives no
@@ -215,11 +214,18 @@ function findMEXCTradingPair(token, symbols) {
  * time; with one, the hour is older than the hour candles MEXC keeps, and
  * the script goes up from the 2 hours, as for an hour in which nothing
  * traded.
+ * A request MEXC fails shows nothing of the candles it keeps, so the
+ * script never takes it for a window with no candle: a failed request for
+ * the minute, or for the hour's minute candles or the day before while it
+ * checks the minute, leaves it to ask for the hour; a failed request for
+ * the hour leaves the day before to decide, and a failed request for the
+ * day before, to go up from the 2 hours; a failed request for a larger
+ * window leaves it to go on up.
  *
  * @param {string} symbol - The MEXC pair, such as XTMUSDT
  * @param {number} utcMs - The time, in ms since 1970 UTC
  * @param {string} target - The price to give: "average", "high", "low" or "close"
- * @return {?{window: Object, averaged: boolean, price: number}} The price, its window, and whether it is the average of the window's high and low; or null when the time comes before the pair's first trade, as a minute MEXC answers with no candle, in an hour of minute candles, on a day with no candle of the day before, shows, or MEXC keeps no candle of the hour that holds the time nor of the day before, or of the day that holds it, or nothing traded in the year that holds it
+ * @return {?{window: Object, averaged: boolean, price: number}} The price, its window, and whether it is the average of the window's high and low; or null when the time comes before the pair's first trade, as a minute MEXC answers with no candle, in an hour of minute candles, on a day with no candle of the day before, shows, or MEXC answers with no candle of the hour that holds the time, or a failed request for it, and no candle of the day before, or with no candle of the day that holds it, or nothing traded in the year that holds it
  */
 function mexcPairPrice(symbol, utcMs, target) {
   let level = 0;
@@ -228,8 +234,8 @@ function mexcPairPrice(symbol, utcMs, target) {
   if (candle === null) {
     if (
       minutes !== null &&
-      mexcKeptMinutesOfHour(symbol, utcMs) &&
-      !mexcKeptDayBefore(symbol, utcMs)
+      mexcKeptMinutesOfHour(symbol, utcMs) === true &&
+      mexcKeptDayBefore(symbol, utcMs) === false
     ) {
       Logger.log(
         `MEXC: no candle of ${symbol} for the minute that holds the time, though it keeps others of its hour, and none of the day before, so the time comes before the pair's first trade, and MEXC gives no price for it`,
@@ -247,19 +253,27 @@ function mexcPairPrice(symbol, utcMs, target) {
       price: priceOf(candle, target),
     };
   }
-  if (candle === null && !mexcKeptDayBefore(symbol, utcMs)) {
-    Logger.log(
-      `MEXC: no candle of ${symbol} for the hour that holds the time, nor for the day before, so MEXC gives no price for it`,
-    );
-    return null;
+  if (candle === null) {
+    const dayBefore = mexcKeptDayBefore(symbol, utcMs);
+    if (dayBefore === false) {
+      Logger.log(
+        `MEXC: no candle of ${symbol} for the hour that holds the time, nor for the day before, so MEXC gives no price for it`,
+      );
+      return null;
+    }
+    if (dayBefore === null)
+      Logger.log(
+        `MEXC: the request for the day before failed, so the script goes up from the 2 hours`,
+      );
   }
   for (level += 1; level < MEXC_WINDOWS.length; level++) {
     const window = MEXC_WINDOWS[level];
-    candle = fetchWindowCandle(symbol, window, utcMs);
+    const candles = fetchWindowCandles(symbol, window, utcMs);
+    candle = joinedCandle(candles);
     if (candle !== null && candle.volume > 0) {
       return { window, averaged: true, price: priceOf(candle, "average") };
     }
-    if (candle === null && window.name === "day") {
+    if (candles !== null && candles.length === 0 && window.name === "day") {
       Logger.log(
         `MEXC: no candle of ${symbol} for the day that holds the time, so MEXC gives no price for it`,
       );
@@ -286,13 +300,13 @@ const MEXC_MINUTES_KEPT_MS = 31 * MEXC_DAY_MS;
  *
  * @param {string} symbol - The MEXC pair
  * @param {number} utcMs - The time, in ms since 1970 UTC
- * @return {boolean} Whether MEXC gives a minute candle of the hour
+ * @return {?boolean} Whether MEXC gives a minute candle of the hour, or null when the request fails
  */
 function mexcKeptMinutesOfHour(symbol, utcMs) {
   if (Date.now() - utcMs > MEXC_MINUTES_KEPT_MS) return false;
   const { start, end } = MEXC_WINDOWS[1].bounds(utcMs);
   const candles = fetchKlines(symbol, "1m", start, end, 60);
-  return candles !== null && candles.length > 0;
+  return candles === null ? null : candles.length > 0;
 }
 
 /**
@@ -301,13 +315,13 @@ function mexcKeptMinutesOfHour(symbol, utcMs) {
  *
  * @param {string} symbol - The MEXC pair
  * @param {number} utcMs - The time, in ms since 1970 UTC
- * @return {boolean} Whether MEXC gives a candle of the day before
+ * @return {?boolean} Whether MEXC gives a candle of the day before, or null when the request fails
  */
 function mexcKeptDayBefore(symbol, utcMs) {
   const day = MEXC_WINDOWS.find((window) => window.name === "day");
   const { start, end } = day.bounds(utcMs - MEXC_DAY_MS);
   const candles = fetchKlines(symbol, day.interval, start, end, day.candles);
-  return candles !== null && candles.length > 0;
+  return candles === null ? null : candles.length > 0;
 }
 
 /** A candle's price for a target: the average of its high and low, or its high, its low or its close */
