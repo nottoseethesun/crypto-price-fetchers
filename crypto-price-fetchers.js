@@ -20,7 +20,9 @@
  *   time it sends a request.
  * - The command line, `node crypto-price-fetchers.js price <chain> <token>`
  *   or `fdv <chain> <token>`, with `--pool <address>` for a pool, prints the
- *   number (`--help` gives the rest). Before it asks for a price, it opens
+ *   number (`--help` gives the rest). A run on x1 with no `--pool` is
+ *   refused before anything is asked, since x1.ninja answers only for a
+ *   pool (`checkPoolForX1`). Before it asks for a price, it opens
  *   the key the call sends, from the project's encrypted key file: x1.ninja's
  *   for x1, DexTools' for any other chain (`api-key-store/`). It opens it
  *   with the password in `API_KEYS_PASSWORD`, which `unlock-api-keys.sh`
@@ -260,10 +262,28 @@ function describeCommandLine(program, runCall) {
       .option("-p, --pool <address>", poolHelp, notEmpty)
       .addHelpText("after", RESULT_HELP)
       .addHelpText("after", COMMAND_EXAMPLES_HELP[commandName])
+      .hook("preAction", (command) => checkPoolForX1(command))
       .action((chain, token, options, command) =>
         runCall(functionName, [chain, token, poolCells(options.pool)], command),
       );
   }
+}
+
+/**
+ * Refuses a run on x1 with no `--pool`, before anything is asked: x1.ninja
+ * answers only for a pool, so the script would ask it for the token's mint
+ * as one, and give its 0. The chain is x1 in any letter case, as the
+ * script reads it.
+ *
+ * @param {import('commander').Command} command - The command about to run
+ * @throws {import('commander').CommanderError} With exit code 1, on x1 with no pool
+ */
+function checkPoolForX1(command) {
+  const [chain] = command.processedArgs;
+  if (chain.toLowerCase() === "x1" && command.opts().pool === undefined)
+    command.error(
+      "error: option '-p, --pool <address>' is needed for x1, since x1.ninja answers only for a pool",
+    );
 }
 
 /**

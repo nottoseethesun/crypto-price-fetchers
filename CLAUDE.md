@@ -422,7 +422,7 @@ A bug found gets a test in crypto-price-filler's
 bug is present, and a row in the table below. Its fix makes the test fail;
 the same change declares the test with `it`, moves it to the tests that
 guard the fixed bugs, `tests/regressions-command-line.test.js` for the
-filler's command lines, `tests/regressions-lib.test.js` for the shared
+repo's command lines, `tests/regressions-lib.test.js` for the shared
 helpers in `lib/`, `tests/regressions-sheets.test.js` for a test that
 runs a Sheets script in the test's thread, and `tests/regressions.test.js`
 for any other, and removes the row. `tests/regressions.test.js` also

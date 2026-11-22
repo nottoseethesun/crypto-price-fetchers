@@ -514,14 +514,15 @@ describe("getCryptoPriceFromCentralizedExchange.js, the command line", () => {
     );
   });
 
-  it("prints the script's message for a time zone it does not know, never reading it as UTC", async () => {
+  it("names --tz with the script's message for a time zone it does not know, never reading it as UTC, and asks nothing", async () => {
     const result = await run(["xtm", ROW_TIME, "--tz", "CTS"]);
     assert.equal(result.exitCode, 1);
     assert.equal(result.stdout, "");
     assert.match(
       result.stderr,
-      /^Unknown time zone "CTS": use one of UTC, GMT, /,
+      /^error: option '-z, --tz <abbreviation>' argument 'CTS' is invalid\. Unknown time zone "CTS": use one of UTC, GMT, /,
     );
+    assert.deepEqual(result.fetch.requests, []);
   });
 
   it("refuses a mode other than average, high, low or close", async () => {

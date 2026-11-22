@@ -138,7 +138,8 @@
  *   no source gave a price and a request got no answer: refused as too
  *   many on its last try, or when the call had no more of the 25 seconds
  *   the script allows a cell, within the 30 Google gives one, to wait;
- *   answered with a server error; or given no response, as on a timeout
+ *   answered with a server error or a request timeout (408); or given no
+ *   response, as on a timeout
  *   or when Apps Script's daily quota of requests is spent; choose Clean
  *   up errors in the Crypto Price Fetchers menu, which runs the cell
  *   again.
@@ -210,9 +211,9 @@
  * the call's budget, CALL_BUDGET_MS, below; a request that gets no
  * response at all, as on a timeout, a refused connection or Apps Script's
  * own quota of requests, is a failed one, as a refusal is, and the next
- * provider answers. Such a request, an answer with a server error, a
- * refusal the call cannot wait out and a request it has no time to send
- * are cut short (CALL, below): when no provider then gives a price, the
+ * provider answers. Such a request, an answer with a server error (5xx)
+ * or a request timeout (408), a refusal the call cannot wait out and a
+ * request it has no time to send are cut short (CALL, below): when no provider then gives a price, the
  * cell shows the busy message, and no provider's silence is kept as no
  * data.
  *
@@ -304,7 +305,11 @@
  *
  *   Rate-limit tuning:
  *     LOCK_WAIT_MS         - Lock acquisition timeout (2000ms)
- *     GENERAL_DELAY_MS     - Delay between API calls (200ms prod, 0ms test)
+ *     GENERAL_DELAY_MS     - The wait once the lock is taken, before a lookup
+ *                            (200ms). A call that passes 0 as getCryptoPrice's
+ *                            fifth argument, as the in-sheet tests do, takes
+ *                            no lock at all, so config.json may set only a
+ *                            whole number above 0
  *     MAX_LOCK_RETRIES     - Retry attempts on lock failure (3)
  *     LOCK_RETRY_BACKOFF   - Exponential backoff array [5000, 10000, 20000]:
  *                            the waits after each failed try but the last
@@ -411,8 +416,8 @@ const CALL_BUDGET_MS = 25000;
  * (CALL_BUDGET_MS): when it began, or null outside a call; the waits it
  * asked for; and how many of its requests were cut short: refused as one
  * too many past the last try or the time left to wait, answered with a
- * server error or a request timeout, given no response, or not sent for
- * want of time. A request cut short says nothing of
+ * server error (5xx) or a request timeout (408), given no response, or not
+ * sent for want of time. A request cut short says nothing of
  * whether its source has a price, so no source keeps the lack of an answer
  * from one, and a call with one, which no source priced, shows the busy
  * message rather than no data. Outside a call the count only grows.
@@ -457,8 +462,8 @@ function waitInCall(milliseconds) {
 /**
  * What a cell shows when the call got no script lock in its tries, or no
  * source gave a price and a request was cut short: refused as one too many
- * past what the call could wait out, answered with a server error, given
- * no response, or not sent for want of time. The menu's Clean up errors runs again each cell that shows
+ * past what the call could wait out, answered with a server error or a
+ * request timeout, given no response, or not sent for want of time. The menu's Clean up errors runs again each cell that shows
  * it.
  *
  * @type {string}
@@ -571,9 +576,7 @@ function cryptoPriceInCall(token, dateStr, tz, mode, apiDelayMs) {
   if (typeof safeDateStr !== "string") return safeDateStr.error;
 
   const offsetHours = getTimezoneOffsetHours(tz);
-  if (offsetHours === null) {
-    return `Unknown time zone "${tz}": use one of ${Object.keys(CONFIG.TIMEZONE_OFFSETS).join(", ")}`;
-  }
+  if (offsetHours === null) return unknownTimeZoneMessage(tz);
 
   const utcMs = parseInputToUtcMs(safeDateStr, offsetHours);
   if (typeof utcMs === "string") return utcMs;
@@ -731,6 +734,18 @@ function cacheAndReturn(cacheKey, price) {
 /** ============================================================================
  *                            HELPER FUNCTIONS
  * ========================================================================== */
+
+/**
+ * What a cell shows for a time zone the script does not know: the zones
+ * it knows. The Node version's command line names a mistyped `--tz` with
+ * it before it asks anything.
+ *
+ * @param {string} tz - The zone given
+ * @return {string} The message
+ */
+function unknownTimeZoneMessage(tz) {
+  return `Unknown time zone "${tz}": use one of ${Object.keys(CONFIG.TIMEZONE_OFFSETS).join(", ")}`;
+}
 
 /** The UTC offset in hours of a time zone abbreviation; UTC when none is given; null when the abbreviation is unknown */
 function getTimezoneOffsetHours(tz) {

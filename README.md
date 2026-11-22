@@ -498,8 +498,8 @@ A cell shows a message instead of a price when no source has one for that
 coin at that time, when the time is in the future, when other cells kept
 the script busy, when no source gave a price and a request got no answer
 (refused as too many on its last try or past the 25 seconds the script
-allows a call, answered with a server error, or given no response, as when
-Apps Script's daily quota of requests is spent), or when it cannot read
+allows a call, answered with a server error or a request timeout, or given
+no response, as when Apps Script's daily quota of requests is spent), or when it cannot read
 `tz` or `dateStr`; Help lists each message.
 
 #### The Menu
@@ -562,15 +562,18 @@ node crypto-price-fetchers.js fdv pulse 0xF84b84dAAce6Ac00DbBAed26CA32Ff3570Aaf6
 
 It prints the number, with exit code 0, or the script's message on stderr,
 with exit code 1. A 0 is the script's answer when the service has no data
-for the token or answered with an error, as it gives a cell.
+for the token or answered with an error, as it gives a cell. A run on X1
+with no `--pool` is refused, with exit code 1, before anything is asked.
 
 ### A Past Price at the Terminal: getCryptoPriceFromCentralizedExchange.js
 
 `getCryptoPriceFromCentralizedExchange.js` runs the exchange script under
 Node and prints what `getCryptoPrice` would show in a cell. `--tz` names
 the time zone of the time, UTC unless given, and `--mode` the price:
-`average`, unless given, `high`, `low` or `close`. It sends the CoinGecko
-and CoinPaprika keys when they are saved.
+`average`, unless given, `high`, `low` or `close`. A time zone the script
+does not know, or a time the calendar does not have, is refused, naming
+`--tz` or the date, before a key is opened or anything is asked. It sends
+the CoinGecko and CoinPaprika keys when they are saved.
 
 Bitcoin's average price in the period around 14:30 UTC on 15 January
 2026:

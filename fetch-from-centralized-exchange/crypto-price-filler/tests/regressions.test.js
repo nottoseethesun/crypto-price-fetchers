@@ -1,6 +1,7 @@
 /**
- * Tests that guard fixed bugs in the Node tool, its Sheets script, and the
- * menu the build step puts in the one file it gives for a spreadsheet.
+ * Tests that guard fixed bugs in the Node tool, its Sheets script, the
+ * Summ csv utility, and the menu the build step puts in the one file it
+ * gives for a spreadsheet.
  * @module tests/regressions.test
  *
  * Each block states what a fixed bug got wrong, as the behavior the tools
@@ -40,6 +41,7 @@ import { canonicalTimeZone, parseInputToUtcMs } from "../utils/date.js";
 import { answerWith, asked as askedByTool } from "./helpers/stand-in-fetch.js";
 import { loadSheetsScript } from "./helpers/sheets-script.js";
 import { standInSpreadsheet } from "../../../test/helpers/stand-in-spreadsheet.js";
+import { summCsvText } from "../../../summ-csv/index.js";
 import { mexcCandleOpen } from "../../../test/helpers/stand-in-mexc.js";
 
 // The Sheets script, opened by its Node version with the stand-in fetch
@@ -536,5 +538,34 @@ describe("the runner's Apps Script services", () => {
       null,
       "0xabc",
     ]);
+  });
+});
+
+describe("the Summ csv utility's times", () => {
+  it("refuses a time past 9999-12-31, as a time in milliseconds given for seconds is, rather than write a timestamp Summ cannot read", () => {
+    const header = fs
+      .readFileSync(
+        path.resolve(__dirname, "../../../test/fixtures/summ-template.csv"),
+        "utf8",
+      )
+      .split(/\r?\n/)[0];
+    const row = (timestamp) => ({
+      timestamp,
+      type: "income",
+      baseCurrency: "HEX",
+      baseAmount: "1.5",
+      from: `0x${"11".repeat(20)}`,
+      to: `0x${"22".repeat(20)}`,
+      blockchain: "pulsechain",
+      id: `0x${"ab".repeat(32)}`,
+      contractAddress: `0x${"33".repeat(20)}`,
+    });
+    expect(summCsvText([row(1763800000)], header)).toContain(
+      "2025-11-22 08:26:40",
+    );
+    expect(() => summCsvText([row(1763800000000)], header)).toThrow(
+      /Timestamp/,
+    );
+    expect(() => summCsvText([row(253402300800)], header)).toThrow(/Timestamp/);
   });
 });

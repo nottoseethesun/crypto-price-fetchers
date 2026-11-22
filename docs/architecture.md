@@ -102,9 +102,9 @@ request refused as one too many (status 429), only while the wait fits in
 them, and sends no request once they are used. A request that gets no
 response at all, as on a timeout or when Apps Script's daily quota of
 requests is spent, is a failed one, and the next source answers. Such a
-request, an answer with a server error, a refusal still there after the
-last try or past the time the call could wait, and a request it had no
-time to send are cut short: when no source then gave a price, the cell
+request, an answer with a server error (5xx) or a request timeout (408),
+a refusal still there after the last try or past the time the call could
+wait, and a request it had no time to send are cut short: when no source then gave a price, the cell
 shows the script's busy message, and no source keeps the lack of an
 answer from a request cut short, since it says nothing of whether the
 source has a price.

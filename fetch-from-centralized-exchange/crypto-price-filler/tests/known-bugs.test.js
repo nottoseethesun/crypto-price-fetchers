@@ -6,7 +6,7 @@
  * the bug is there, and `it.fails` turns that failure into a pass. A fix
  * makes the test pass, so `it.fails` fails it: the same change declares the
  * test with `it` and moves it to `regressions-command-line.test.js` for the
- * filler's command lines, to `regressions-lib.test.js` for the repo's
+ * repo's command lines, to `regressions-lib.test.js` for the repo's
  * shared helpers in `lib/`, to `regressions-sheets.test.js` for a test
  * that runs a Sheets script in the test's thread, or to
  * `regressions.test.js` for any other, and removes the bug's row from the

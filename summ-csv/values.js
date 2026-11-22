@@ -34,8 +34,13 @@ const DIGITS = /^\d+$/;
 /** Summ's time: `YYYY-MM-DD HH:MM:SS`. */
 const SUMM_TIME = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
 
-/** The latest moment a JavaScript `Date` holds, in seconds since 1970. */
-const LAST_SECOND = 8_640_000_000_000;
+/**
+ * The last second Summ's `YYYY-MM-DD HH:MM:SS` can write, in seconds since
+ * 1970: 9999-12-31 23:59:59 UTC. A later time has a year of five digits,
+ * which no such text holds, and a time in milliseconds given for seconds,
+ * such as `Date.now()`, is one.
+ */
+const LAST_SECOND = 253402300799;
 
 /** The characters of each alphabet a chain's form may name. */
 const ALPHABETS = Object.freeze({
@@ -188,8 +193,8 @@ export function plainNumberText(number) {
 }
 
 /**
- * Whether a number is a whole count of seconds since 1970 that a `Date`
- * can hold.
+ * Whether a number is a whole count of seconds since 1970 that Summ's
+ * text can write: up to the last second of the year 9999.
  *
  * @param {number} seconds - The number
  * @returns {boolean} Whether it is such a count

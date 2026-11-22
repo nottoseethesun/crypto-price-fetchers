@@ -48,7 +48,7 @@ spreadsheet app, as one file, with their keys ([Build](#build)):
 
 ```sh
 npm run api-keys -- set dextools
-npm test -- --test-name-pattern="unlockApiKeys"
+node --test --test-name-pattern="unlockApiKeys" "test/*.test.js"
 npm run build apps-script
 ```
 
@@ -125,7 +125,7 @@ them, after the lint, and must pass before a commit and a push.
 | `audit:security` | — | The security lint, ESLint with `eslint-security.config.js`: the rules of eslint-plugin-security, against code open to attack, of eslint-plugin-no-secrets, against strings that look like keys, and `no-secret-logging`, this repo's rule against printing a name that may hold a secret. | `npm run audit:security` |
 | `check` | — | The full gate: `lint`, `test:coverage`, `test:filler`, `audit:deps` (with `audit:dex-screener` and `audit:actionlint`), `audit:security` and `audit:secrets`, in that order, stopping at the first that fails. | `npm run check` |
 | `format:check` | — | Prettier in check mode; fails rather than rewriting. | `npm run format:check` |
-| `test` | any `node --test` flag | The tests of the runner, which runs a Sheets script under Node; the Node versions; the build step; the menu the built file adds to a spreadsheet; the price clients of the services that price pools; the key store; the two lint rules; the versions tool; the Summ CSV writer; the actionlint runner; the shared helpers; every command line's help, and its help into a closed pipe; the package's exports; and the repo's tracked files, held to the checks of `lib/repo-checks.js`; on Node's test runner. | `npm test -- --test-name-pattern="openAppsScript"` |
+| `test` | — | The tests of the runner, which runs a Sheets script under Node; the Node versions; the build step; the menu the built file adds to a spreadsheet; the price clients of the services that price pools; the key store; the two lint rules; the versions tool; the Summ CSV writer; the actionlint runner; the shared helpers; every command line's help, and its help into a closed pipe; the package's exports; and the repo's tracked files, held to the checks of `lib/repo-checks.js`; on Node's test runner. Node reads a flag of its test runner only before the file pattern, and npm puts the arguments after `--` after it, so the tests whose names hold some words run as `node --test --test-name-pattern="openAppsScript" "test/*.test.js"`. | `npm test` |
 | `test:coverage` | — | The same tests with coverage, failing below 80% of lines covered. | `npm run test:coverage` |
 | `test:filler` | — | crypto-price-filler's `test:strict`, from the top folder. | `npm run test:filler` |
 
