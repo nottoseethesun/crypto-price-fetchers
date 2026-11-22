@@ -431,7 +431,10 @@ crypto-price-filler/config.json → BACKFILL_LOWEST must be true or false; it is
   (`lib/repo-checks.js`).
 - `KINDS` holds the kinds of value the settings files share, each a schema
   whose `description` is the words a refusal uses, such as "a whole number
-  above 0".
+  above 0". The two kinds of a time limit, in seconds and in milliseconds,
+  take a whole number up to 2147483647 milliseconds, the longest Node's
+  timers keep: a timer set for longer fires after 1 millisecond, and
+  `fetchWithinTimeLimit` refuses a limit past it.
 - `kindParser` makes a command line's option parser from a kind, so a
   value typed and the same value in a settings file meet one rule.
 - `settingsProblems` words Ajv's errors, one line for each value at
