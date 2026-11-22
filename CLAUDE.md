@@ -425,9 +425,13 @@ for any other, and removes the row. `tests/regressions.test.js` also
 holds older tests that run a Sheets script that way.
 
 Google stops a custom function, a function a cell calls, after 30 seconds,
-and the cell shows `#ERROR!`. Both bugs below are waits longer than that.
+and the cell shows `#ERROR!`. The first two bugs below are waits longer
+than that.
 
 | Bug | Test in `tests/known-bugs.test.js` |
 | --- | --- |
 | `dexToolsGetTokenPrice` and `dexToolsGetTokenFDV`, in `crypto-price-fetchers.gs`, wait up to `DEXTOOLS_CONFIG.LOCK_WAIT_MS`, 120 seconds, for the script lock, so a cell that waits more than 30 seconds shows `#ERROR!`, never the busy message the script returns when the wait ends. | dexToolsGetTokenPrice waits for the script lock no longer than Google lets a custom function run |
 | `getCryptoPrice`, in the exchange script, tries the script lock 3 times for 2 seconds each, waiting 5, 10 and 20 seconds after each failed try (`LOCK_RETRY_BACKOFF`): 41 seconds in all. | getCryptoPrice waits for the script lock, in all, no longer than Google lets a custom function run |
+| `mexcPairPrice`, in the exchange script, takes a failed request for a recent time's minute for a minute MEXC keeps no candle of, so with other minutes of the hour kept, it gives no price, and the next source answers. | getCryptoPrice prices a recent time from MEXC's hour when the request for its minute fails, rather than taking the failure for a minute before the pair's first trade |
+| `mexcPairPrice` takes a time's minute that MEXC let go, in the hour MEXC's minute candles begin in, for a minute before the pair's first trade, so it gives no price, and the next source answers. | getCryptoPrice prices a time in the hour MEXC's minute candles begin in from MEXC's hour, rather than taking the minutes MEXC let go for minutes before the pair's first trade |
+| `fetchWithinTimeLimit`, in `lib/time-limited-fetch.js`, takes a limit Node's timers cannot keep: a fraction of a millisecond throws Node's own RangeError, and more than 2147483647 milliseconds ends the request at once. | fetchWithinTimeLimit refuses a limit Node's timers cannot keep, a fraction of a millisecond or more than 2147483647, saying so |
