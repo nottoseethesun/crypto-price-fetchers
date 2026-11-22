@@ -276,7 +276,12 @@ their clients, asked in LP Ranger's order:
   chain had at a time, then the price there. It needs a key, and gives one
   price, with no high or low. It also gives a pool's candles over a span of
   time (`pairCandles`), in USD, of the token the pool lists first, as in
-  HEX / WPLS, which prices HEX; its answer names that token.
+  HEX / WPLS, which prices HEX; its answer names that token. To find a pool
+  whose candles price a token, `tokenPairs` lists the pairs that trade the
+  token, up to 10 pages, each with the token it lists first, and
+  `pairListingFirst` picks the deepest of those that list the token first,
+  leaving out a pair Moralis marks inactive for having traded nothing over
+  the last day.
 - GeckoTerminal (`geckoterminal.js`) gives a pool's candles. The pool is
   the one LP Ranger picks: of the first pools GeckoTerminal ranks for the
   token, the deepest that traded in the last day and holds the token on

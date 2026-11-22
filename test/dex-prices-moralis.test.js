@@ -1,6 +1,7 @@
 /**
  * Tests for `dex-prices/moralis.js`, the Moralis client: the block a chain
- * had at a time, a token's price at a block, and a pool's candles.
+ * had at a time, a token's price at a block, the pairs that trade a token
+ * and the one whose candles price it, and a pool's candles.
  * @module test/dex-prices-moralis.test
  *
  * Moralis is a stand-in fetch (`helpers/stand-in-web.js`), so nothing
@@ -17,7 +18,9 @@ import {
   blockAt,
   moralisSettings,
   pairCandles,
+  pairListingFirst,
   priceAtBlock,
+  tokenPairs,
 } from "../dex-prices/moralis.js";
 import { standInFetch } from "./helpers/stand-in-web.js";
 
@@ -142,6 +145,177 @@ describe("priceAtBlock", () => {
         settings,
       ),
       /Moralis answered 500/,
+    );
+  });
+});
+
+describe("tokenPairs and pairListingFirst", () => {
+  /** HEX, the token whose pairs are listed. */
+  const HEX = "0x2b591e99afE9f32eAA6214f7B7629768c40Eeb39";
+  /** Wrapped PLS, HEX's other token in two of the pairs. */
+  const WPLS = "0xA1077a294dDE1B09bB078844df40758a5D0f9a27";
+  /** Three made-up pairs. */
+  const PAIR_1 = "0x0000000000000000000000000000000000000001";
+  const PAIR_2 = "0x0000000000000000000000000000000000000002";
+  const PAIR_3 = "0x0000000000000000000000000000000000000003";
+
+  /**
+   * A pair as Moralis lists it.
+   *
+   * @param {string} address - The pair's address
+   * @param {string} base - The token it lists first
+   * @param {string} quote - Its other token
+   * @param {number} liquidity - The value it holds, in USD
+   * @param {boolean} [inactive=false] - Whether nothing traded in it over the last day
+   * @returns {Object} The pair
+   */
+  function listed(address, base, quote, liquidity, inactive = false) {
+    const token = (tokenAddress, symbol, type) => ({
+      token_address: tokenAddress,
+      token_name: symbol === "HEX" ? "HEX" : "Wrapped Pulse",
+      token_symbol: symbol,
+      token_decimals: "8",
+      pair_token_type: type,
+      liquidity_usd: String(liquidity / 2),
+    });
+    const symbol = (tokenAddress) => (tokenAddress === HEX ? "HEX" : "WPLS");
+    return {
+      exchange_name: "PulseX v2",
+      pair_label: `${symbol(base)}/${symbol(quote)}`,
+      pair_address: address,
+      liquidity_usd: liquidity,
+      inactive_pair: inactive,
+      base_token: base.toLowerCase(),
+      quote_token: quote.toLowerCase(),
+      pair: [
+        token(base, symbol(base), "token0"),
+        token(quote, symbol(quote), "token1"),
+      ],
+    };
+  }
+
+  it("reads every page, by its cursor, with the key in its header only, and gives each pair's facts", async () => {
+    const { settings, fetch } = standIn(({ url }) =>
+      new URL(url).searchParams.get("cursor") === "page-2"
+        ? { cursor: null, pairs: [listed(PAIR_2, WPLS, HEX, 900)] }
+        : { cursor: "page-2", pairs: [listed(PAIR_1, HEX, WPLS, 5000)] },
+    );
+    const pairs = await tokenPairs(
+      { chain: "0x171", token: HEX },
+      STAND_IN_KEY,
+      settings,
+    );
+    assert.deepEqual(pairs[0], {
+      address: PAIR_1,
+      label: "HEX/WPLS",
+      baseToken: HEX.toLowerCase(),
+      liquidityUsd: 5000,
+      inactive: false,
+      tokens: [
+        { address: HEX.toLowerCase(), name: "HEX", symbol: "HEX" },
+        { address: WPLS.toLowerCase(), name: "Wrapped Pulse", symbol: "WPLS" },
+      ],
+    });
+    assert.equal(pairs[1].baseToken, WPLS.toLowerCase());
+    const first = new URL(fetch.requests[0].url);
+    assert.equal(first.pathname, `/api/v2.2/erc20/${HEX}/pairs`);
+    assert.deepEqual(Object.fromEntries(first.searchParams), {
+      chain: "0x171",
+    });
+    assert.equal(
+      new URL(fetch.requests[1].url).searchParams.get("cursor"),
+      "page-2",
+    );
+    assert.equal(fetch.requests[1].headers["x-api-key"], STAND_IN_KEY);
+    assert.ok(fetch.requests.every(({ url }) => !url.includes(STAND_IN_KEY)));
+  });
+
+  it("leaves out a pair whose address is unreadable, and a token without a readable address", async () => {
+    const { settings } = standIn(() => ({
+      pairs: [
+        { ...listed(PAIR_1, HEX, WPLS, 10), pair_address: "none" },
+        {
+          ...listed(PAIR_2, HEX, WPLS, 20),
+          liquidity_usd: "much",
+          pair: [{ token_address: "none", token_symbol: "X" }],
+        },
+      ],
+    }));
+    const pairs = await tokenPairs(
+      { chain: "0x171", token: HEX },
+      STAND_IN_KEY,
+      settings,
+    );
+    assert.deepEqual(
+      pairs.map(({ address, liquidityUsd, tokens }) => ({
+        address,
+        liquidityUsd,
+        tokens,
+      })),
+      [{ address: PAIR_2, liquidityUsd: 0, tokens: [] }],
+    );
+  });
+
+  it("reads no more than 10 pages, gives none for a 404, and throws on any other error", async () => {
+    let page = 0;
+    const endless = standIn(() => ({
+      cursor: `page-${++page}`,
+      pairs: [listed(PAIR_1, HEX, WPLS, page)],
+    }));
+    const pairs = await tokenPairs(
+      { chain: "0x171", token: HEX },
+      STAND_IN_KEY,
+      endless.settings,
+    );
+    assert.equal(endless.fetch.requests.length, 10);
+    assert.equal(pairs.length, 10);
+    const none = standIn(() => ({ status: 404, text: "{}" }));
+    assert.deepEqual(
+      await tokenPairs(
+        { chain: "0x171", token: HEX },
+        STAND_IN_KEY,
+        none.settings,
+      ),
+      [],
+    );
+    const refused = standIn(() => ({ status: 401, text: "{}" }));
+    await assert.rejects(
+      tokenPairs(
+        { chain: "0x171", token: HEX },
+        STAND_IN_KEY,
+        refused.settings,
+      ),
+      /Moralis answered 401/,
+    );
+  });
+
+  it("picks the deepest active pair that lists the token first, in either case", async () => {
+    const { settings } = standIn(() => ({
+      pairs: [
+        listed(PAIR_1, WPLS, HEX, 90000),
+        listed(PAIR_2, HEX, WPLS, 7000, true),
+        listed(PAIR_3, HEX, WPLS, 3000),
+      ],
+    }));
+    const pairs = await tokenPairs(
+      { chain: "0x171", token: HEX },
+      STAND_IN_KEY,
+      settings,
+    );
+    assert.equal(pairListingFirst(pairs, HEX).address, PAIR_3);
+    assert.equal(pairListingFirst(pairs, HEX.toLowerCase()).address, PAIR_3);
+    assert.equal(pairListingFirst(pairs, WPLS).address, PAIR_1);
+    assert.equal(
+      pairListingFirst([{ ...pairs[2], liquidityUsd: 1 }, pairs[2]], HEX)
+        .liquidityUsd,
+      3000,
+    );
+  });
+
+  it("picks none when no active pair lists the token first", () => {
+    assert.equal(
+      pairListingFirst([], "0x2b591e99afE9f32eAA6214f7B7629768c40Eeb39"),
+      null,
     );
   });
 });
