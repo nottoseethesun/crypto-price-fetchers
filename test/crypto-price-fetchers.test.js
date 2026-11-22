@@ -416,6 +416,25 @@ describe("crypto-price-fetchers.js, the command line", () => {
     assert.match(result.stderr, /Cannot read \S*missing\.json: /);
   });
 
+  it("refuses a config file that sets a field the script reads as it loads, naming it, before it asks anything", async () => {
+    const refused = path.join(folder, "refused.json");
+    fs.writeFileSync(
+      refused,
+      JSON.stringify({ DEXTOOLS_CONFIG: { API_HOST: "https://example.com" } }),
+    );
+    const result = await run(["price", "ether", TOKEN, "--config", refused], {
+      env: { API_KEYS_FILE_PATH: keyFile },
+      ask: askNothing,
+    });
+    assert.equal(result.exitCode, 1);
+    assert.ok(
+      result.stderr.includes(
+        `${refused} → DEXTOOLS_CONFIG.API_HOST is not a setting this tool reads`,
+      ),
+    );
+    assert.deepEqual(result.fetch.requests, []);
+  });
+
   it("runs as a program: node crypto-price-fetchers.js --help", () => {
     const file = fileURLToPath(
       new URL("../crypto-price-fetchers.js", import.meta.url),

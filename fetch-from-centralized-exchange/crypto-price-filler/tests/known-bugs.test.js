@@ -5,11 +5,11 @@
  * Each test checks the behavior the code should have, so it fails while
  * the bug is there, and `it.fails` turns that failure into a pass. A fix
  * makes the test pass, so `it.fails` fails it: the same change declares the
- * test with `it` and moves it to `regressions.test.js`, or to
- * `regressions-command-line.test.js` for the filler's command lines, and
- * removes the
- * bug's row from the table in the repo's CLAUDE.md, which lists each test
- * here.
+ * test with `it` and moves it to `regressions-command-line.test.js` for the
+ * filler's command lines, to `regressions-lib.test.js` for the repo's
+ * shared helpers in `lib/`, or to `regressions.test.js` for the rest, and
+ * removes the bug's row from the table in the repo's CLAUDE.md, which
+ * lists each test here.
  *
  * The Sheets scripts run unchanged in the test's thread, through
  * `tests/helpers/sheets-script.js`, with a stand-in for the Apps Script

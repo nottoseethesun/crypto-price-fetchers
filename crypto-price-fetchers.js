@@ -28,10 +28,15 @@
  *   script sends the placeholder written in it, which the service refuses.
  *   `npm run api-keys` saves the keys.
  * - `config.json` beside this file lists the keys the project's programs
- *   use, for the key manager, and may set other fields of the script's
- *   config objects. A field the script uses as it loads keeps the value
- *   written in the script: `SUBSCRIPTION_PLAN` and `API_HOST`, which build
- *   its DexTools url.
+ *   use, for the key manager, and may set the fields of `DEXTOOLS_CONFIG`
+ *   the script reads each time it is called, which `CONFIG_SCHEMAS` names,
+ *   each with its kind of value: the runner checks the file against it
+ *   before the script opens. A field the script reads as it loads, to
+ *   build its urls (`SUBSCRIPTION_PLAN`, `API_HOST` and `API_VERSION`, and
+ *   `X1_CONFIG`'s two) or its spacing of requests
+ *   (`MIN_SECONDS_BETWEEN_CALLS`), would keep the value written in the
+ *   script, so the schema refuses it, as it refuses an api key, which is
+ *   no setting.
  *
  * What differs from the sheet: it runs on this computer, so there is no
  * 30-second limit per call and no daily cap on requests. The cache and the
@@ -45,6 +50,7 @@
 
 import { fileURLToPath } from "node:url";
 import { unlockProjectKeys } from "./api-key-store/index.js";
+import { KINDS } from "./lib/settings-schema.js";
 import {
   InvalidArgumentError,
   isEntryPoint,
@@ -69,6 +75,23 @@ const PROJECT_TOP = fileURLToPath(new URL(".", import.meta.url));
 
 /** The script's Sheets functions. */
 const FUNCTION_NAMES = ["dexToolsGetTokenPrice", "dexToolsGetTokenFDV"];
+
+/**
+ * The JSON Schema of each config object `config.json` may set, by its name
+ * in the script: the fields the script reads each time it is called, each
+ * of its kind of value, and no other.
+ */
+export const CONFIG_SCHEMAS = Object.freeze({
+  DEXTOOLS_CONFIG: Object.freeze({
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      CACHE_SECONDS: KINDS.wholeAbove0,
+      LOCK_WAIT_MS: KINDS.wholeAtLeast0,
+    },
+    description: "fields of DEXTOOLS_CONFIG",
+  }),
+});
 
 /**
  * The config values that hand the script the keys given.
@@ -99,6 +122,7 @@ export const APPS_SCRIPT_BUILD = Object.freeze({
   services: Object.freeze(["dextools", "x1ninja"]),
   keyConfig,
   defaultConfigFile: DEFAULT_CONFIG_FILE,
+  configSchemas: CONFIG_SCHEMAS,
 });
 
 /**
@@ -117,6 +141,7 @@ export function openCryptoPriceFetchers(options = {}) {
   return openScriptFunctions(SHEETS_SCRIPT, FUNCTION_NAMES, {
     ...rest,
     defaultConfigFile: DEFAULT_CONFIG_FILE,
+    configSchemas: CONFIG_SCHEMAS,
     configOverlay: keyConfig(apiKeys),
   });
 }
@@ -277,6 +302,7 @@ export function runCommandLine(argv, deps = {}) {
       argv,
       scriptPath: SHEETS_SCRIPT,
       defaultConfigFile: DEFAULT_CONFIG_FILE,
+      configSchemas: CONFIG_SCHEMAS,
       describe: describeCommandLine,
       apiKeys: (call) => openCallKey(deps, call),
     },

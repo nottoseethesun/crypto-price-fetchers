@@ -161,12 +161,16 @@ each file is checked against its JSON Schema, a description in JSON of
 the keys the file may hold and the kind of value each takes, before the
 tool takes any setting, as LP Ranger checks its settings: by Ajv, an npm
 package of the ajv-validator project that checks JSON against a schema, on
-the 2020-12 draft of JSON Schema, strict, with every object refusing a key its schema does not
-name. A value of the wrong kind is refused, never corrected, and every
-problem in a file is listed at once, one line each.
+the 2020-12 draft of JSON Schema, strict. An object of settings refuses a
+key its schema does not name. An object keyed by names the owner chooses
+takes any such key, held to a form where the code needs one: the filler's
+tokens by symbol, in lower case, and summ-csv's chains by name. A value of
+the wrong kind is refused, never corrected, and every problem in a file is
+listed at once, one line each.
 `lib/settings-schema.js` holds the shared part: `compileSettingsSchema`,
-which compiles a schema with the formats code checks (an http or https
-url, an EIP-55 address); `KINDS`, the kinds of value, each with the words
+which compiles a schema once, with the formats code checks (an http or
+https url, an EIP-55 address), and gives the same check at every later
+read; `KINDS`, the kinds of value, each with the words
 a refusal uses, such as "a whole number above 0"; `kindParser`, which
 makes a command line's option parser from a kind, so a typed value and
 the same value in a file meet one rule; and `settingsProblems`, which
@@ -174,11 +178,22 @@ words Ajv's errors. `lib/settings-file.js` reads a file with them: a
 missing file gives no settings unless the caller marks it required, and a
 file that cannot be read, is not JSON, or has a problem its schema finds
 stops the run. The schemas here: the key store's of a project's `apiKeys`
-(`api-key-store/project-keys.js`), crypto-price-filler's of its settings
-(`config.js`) and of its token list (`supported-tokens.js`), and the Summ
-csv utility's of its settings (`summ-csv/index.js`); a Node version's
-config file is held to a schema built from the script's own config
-objects (`apps-script-runner/load-apps-script.js`). A schema names only
+(`api-key-store/project-keys.js`), which reads only that key, every other
+key of the file being the project's; crypto-price-filler's of its settings
+(`config.js`) and of its token list (`supported-tokens.js`); and the Summ
+csv utility's of its settings (`summ-csv/index.js`). A Node version's
+config file is held, by the runner and by the build, to the schemas the
+Node version gives its script's config objects (`CONFIG_SCHEMAS`): each
+names every field the script reads each time it is called, of its kind of
+value, and refuses an api key, which the key store sets, and a field the
+script reads as it loads, which a value laid after the load does not
+reach. The runner's `configSchemaProblems`
+(`apps-script-runner/config-schema-check.js`) holds each schema to its
+script, in `test/config-schemas.test.js` and in pulsechain-analytics'
+tests of its own Node version. The runner holds every config it lays, a test's own among them, to a schema
+built from the script's objects as well
+(`apps-script-runner/load-apps-script.js`): each field the object has, of
+the JavaScript type of the value the script gives it. A schema names only
 the keys its file is read for; a key is added to one with the owner's
 go-ahead. The projects that install this repo build their schemas the same
 way, from `crypto-price-fetchers/lib/settings-schema` and
@@ -384,6 +399,10 @@ functions inside the scripts that the owner runs by hand. crypto-price-filler's
 - `stand-in-fetch-preload.js` runs the real command line, `index.js`, in a
   child process against a stand-in MEXC, and a stand-in CoinGecko ping that
   takes the one key in `stand-in-coingecko-key.js`.
+- `stand-in-settings-preload.js` hands the command line, run in a child
+  process, a settings file or a token list of the test's own, from an
+  environment variable, since the tool reads both beside its own files and
+  a test never writes the owner's `config.json`.
 - `regression-runs.js` holds the settings, stand-in answers and runs that
   `tests/regressions.test.js` shares among its tests.
 
@@ -394,7 +413,8 @@ A bug found gets a test in crypto-price-filler's
 bug is present, and a row in the table below. Its fix makes the test fail;
 the same change declares the test with `it`, moves it to the tests that
 guard the fixed bugs, `tests/regressions-command-line.test.js` for the
-filler's command lines and `tests/regressions.test.js` for the rest, and
+filler's command lines, `tests/regressions-lib.test.js` for the shared
+helpers in `lib/`, and `tests/regressions.test.js` for the rest, and
 removes the row.
 
 Google stops a custom function, a function a cell calls, after 30 seconds,

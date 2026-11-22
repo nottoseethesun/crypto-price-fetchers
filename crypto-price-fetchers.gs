@@ -120,12 +120,16 @@
  *   DEXTOOLS_CONFIG.API_KEY, DexTools' key, and X1_CONFIG.API_KEY,
  *   x1.ninja's, hold placeholders as committed, which the services refuse.
  *   The build step sets both at the end of the file it gives, from the keys
- *   saved in the repo (`npm run api-keys`), with any other field of the two
- *   objects that the repo's top config.json sets. The build sets its values
- *   after this file's top-level code has run, so a field that code reads
- *   keeps the value written here: SUBSCRIPTION_PLAN, API_HOST and
- *   API_VERSION, which make the urls, and MIN_SECONDS_BETWEEN_CALLS. To
- *   change one of those, change it here and build again.
+ *   saved in the repo (`npm run api-keys`), with the fields of
+ *   DEXTOOLS_CONFIG that the repo's top config.json sets. The build sets
+ *   its values after this file's top-level code has run, so a field that
+ *   code reads keeps the value written here: SUBSCRIPTION_PLAN, API_HOST
+ *   and API_VERSION, which make the urls, MIN_SECONDS_BETWEEN_CALLS, and
+ *   X1_CONFIG's API_HOST and API_VERSION. config.json may set only the
+ *   other two, CACHE_SECONDS and LOCK_WAIT_MS, as the Node version's
+ *   CONFIG_SCHEMAS says, and the build refuses a file that sets more. To
+ *   change a field the top-level code reads, change it here and build
+ *   again.
  *
  * SUBSCRIPTION PLAN
  *   DexTools' url names the plan of the key:

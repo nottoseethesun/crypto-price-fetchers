@@ -167,9 +167,10 @@ The rules for a row on a blockchain read that chain's facts from
 
 `readSummCsvSettings` checks the file against `SUMM_CSV_SETTINGS_SCHEMA`,
 its JSON Schema, as it reads it, with crypto-price-fetchers'
-`readSettingsFile` (`lib/settings-file.js`): a key the schema does not
+`readSettingsFile` (`lib/settings-file.js`): a setting the schema does not
 name, a form with both a `length` and a `minLength`, or an alphabet the
-utility does not know stops the run, with every problem listed. A program
+utility does not know stops the run, with every problem listed. `chains`
+takes any name of a chain as a key. A program
 can pass settings of its own as `settings`.
 
 ### Adding a chain

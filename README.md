@@ -157,6 +157,12 @@ the repo's top folder:
 npm run build apps-script
 ```
 
+Before its first question, the build reads the config.json each script's
+Node version reads, `config.json` at the repo's top and
+`fetch-from-centralized-exchange/config.json`, and checks it as that Node
+version does: it stops, listing every problem, when a file sets a field
+the script does not take or a value of the wrong kind.
+
 1. **DEX Screener's functions.** The build first asks whether to include
    DEX Screener's Google Sheets functions, such as
    `DEX_SCREENER_PAIR_PROP`. DEX Screener, a service that lists the pairs
@@ -233,6 +239,14 @@ What differs from the sheet:
   step sets them in the file it gives for the sheet.
 - The cache lasts while the script is open: for the command line, one run.
 - The sheet's menu is not there.
+
+Each Node version reads `config.json` beside it when it is there, the
+repo's top one for `crypto-price-fetchers.js`, and sets its values in the
+script's config objects, as the build sets them for the sheet. The file
+may set only the fields its Node version's `CONFIG_SCHEMAS` names: those
+the script reads each time it is called, each of its kind of value. A
+field it does not name, an api key among them, or a value of the wrong
+kind stops the run, with every problem listed.
 
 ### Command line
 

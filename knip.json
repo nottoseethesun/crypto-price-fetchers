@@ -9,6 +9,7 @@
     "fetch-from-centralized-exchange/crypto-price-filler/vitest.config.js",
     "fetch-from-centralized-exchange/crypto-price-filler/tests/**/*.test.js",
     "fetch-from-centralized-exchange/crypto-price-filler/tests/helpers/stand-in-fetch-preload.js",
+    "fetch-from-centralized-exchange/crypto-price-filler/tests/helpers/stand-in-settings-preload.js",
     "test/**/*.test.js"
   ],
   "project": ["**/*.js"]

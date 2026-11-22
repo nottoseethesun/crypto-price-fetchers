@@ -149,7 +149,11 @@ compiled first, so one that does not compile stops the load before any
 runs, then each runs, in order, in one scope (`load-apps-script.js`).
 
 The runner also lays a config over the script's config objects, such as an
-api key the script reads from `CONFIG` (`config-file.js`), sets Script
+api key the script reads from `CONFIG`, once it has checked a config file
+against the Node version's schemas of those objects (`config-file.js`),
+and holds every config it lays to a schema built from the objects
+themselves: each field an object has, of the JavaScript type of the value
+the script gives it (`load-apps-script.js`). It sets Script
 Properties the script reads, and makes a command line of a script's
 functions (`command-line.js`). Tests can run a script in their own thread
 instead, with stand-in services (`loadAppsScript`), as
@@ -218,9 +222,12 @@ file that holds them all, with the keys written in, for one paste.
 - **The values.** The build opens the keys as the programs do
   (`unlockProjectKeys`), and sets, as the file's last statements, the
   values each Node version would set: those of the config.json it reads,
-  with the keys laid over them. Code a script runs as it loads has run by
-  then, so a field it reads there keeps the value written in the script,
-  as under Node. The last value is the page the menu's Help item shows,
+  with the keys laid over them. It reads each config.json before its first
+  question and checks it against the Node version's schemas, so a file
+  they refuse stops the build before it asks anything or opens a key. Code
+  a script runs as it loads has run by the last statements, so a field it
+  reads there keeps the value written in the script, as under Node, and
+  the schemas refuse such a field. The last value is the page the menu's Help item shows,
   made from the help section of each script's header (`help-page.js`).
 - **The checks.** Before it hands the file over, the build checks that the
   parts make one Apps Script project (`built-script.js`). Each part,
@@ -394,9 +401,14 @@ the tool takes any setting, as LP Ranger checks its settings.
 
 Ajv, an npm package of the ajv-validator project that checks JSON against
 a schema, compiles each schema on the 2020-12 draft of JSON Schema, strict, so a keyword or format it does
-not know is refused as the schema compiles. Every object in a schema
-names the keys it takes and refuses any other
-(`additionalProperties: false`). A value of the wrong kind is refused,
+not know is refused as the schema compiles. Each schema is compiled once,
+the first time a file is read against it, and the check is kept for every
+later read: crypto-price-filler reads its token list for every row. An
+object of settings names the keys it takes and refuses any other
+(`additionalProperties: false`). An object keyed by names or addresses the
+owner chooses, such as the filler's tokens by symbol, takes any such key,
+held to a form where the code needs one (`propertyNames`): the filler's
+symbols in lower case. A value of the wrong kind is refused,
 never corrected, and every problem in the file is listed at once, one line
 each:
 
@@ -428,8 +440,8 @@ The settings files of this repo, and the schemas they are held to:
 
 | File | Schema | Read by |
 | --- | --- | --- |
-| `config.json`, its `apiKeys` | `apiKeysSchema` in `api-key-store/project-keys.js`: a list of services the key store knows, each once; the file's other keys are the Node version's | The key store, for any project |
-| A Node version's `config.json` | Built from the script's own config objects (`fieldsSchema`, `apps-script-runner/load-apps-script.js`): each field the script has, of the kind its value has | The runner, before it sets a value |
+| `config.json`, its `apiKeys` | `apiKeysSchema` in `api-key-store/project-keys.js`: a list of services the key store knows, each once; it reads no other key, since every other key of the file is the project's | The key store, for any project |
+| A Node version's `config.json` | `CONFIG_SCHEMAS` in the Node version (`crypto-price-fetchers.js`, `fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.js`), which it passes to the runner and the build as `configSchemas`: for each config object it names, every field the script reads each time it is called, of its kind of value. An api key, which the key store sets, and a field the script reads as it loads, which a value laid after the load does not reach, are refused. The runner's `configSchemaProblems` (`apps-script-runner/config-schema-check.js`) holds each schema to its script: it loads the script with each config object watched, and names a field a schema names that the script reads as it loads, holds a key or lacks, a field read only when called that no schema names, and a value of the script's own that its schema refuses; `test/config-schemas.test.js` runs it on each Node version | The runner, before the script opens (`apps-script-runner/config-file.js`), and the build step, before its first question |
 | `crypto-price-filler/config-example.json`, `crypto-price-filler/config.json` | `SETTINGS_SCHEMA` in `config.js` | crypto-price-filler |
 | `crypto-price-filler/supported-tokens.json` | `SUPPORTED_TOKENS_SCHEMA` in `supported-tokens.js` | crypto-price-filler |
 | `summ-csv/settings.json` | `SUMM_CSV_SETTINGS_SCHEMA` in `summ-csv/index.js` | The Summ CSV writer |

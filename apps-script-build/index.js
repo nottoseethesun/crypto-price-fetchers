@@ -19,7 +19,11 @@
  *   x1.ninja keys, and getCryptoPriceFromCentralizedExchange.gs with its
  *   sources and its in-editor tests, with the CoinGecko and CoinPaprika
  *   keys.
- * - Every build first asks whether to include DEX Screener's functions:
+ * - Each script's config.json is read first and checked against the
+ *   spec's schemas of the script's config objects (`configSchemas`), as
+ *   its Node version checks it, so a file they refuse stops the build
+ *   before it asks anything or opens a key, with every problem listed.
+ * - Every build then asks whether to include DEX Screener's functions:
  *   Enter, or y, includes them, and n leaves them out. The question names
  *   the version, a commit of DEX Screener's repo, and says the step is
  *   optional, and that a build that fails should be run again with n. On
@@ -93,6 +97,7 @@ import { helpPage, helpSection } from "./help-page.js";
  * @property {string[]} services - The services whose keys it sends, as the top config.json names them
  * @property {function(Object<string, ?string>): Object<string, Object>} keyConfig - The config values that hand it the keys given, as its Node version hands them
  * @property {string} defaultConfigFile - The config.json its Node version reads, which may be missing
+ * @property {Object<string, Object>} configSchemas - Each of its config objects' JSON Schema, by name, which that config.json is checked against
  */
 
 /** The Sheets scripts the build joins, after the menu. */
@@ -129,7 +134,10 @@ const REPLACED_FILES = Object.freeze([
 
 /** What the help says after the commands. */
 const HELP_AFTER = `
-It first asks whether to include DEX Screener's Google Sheets functions,
+It first reads the config.json each script's Node version reads and checks
+it as that Node version does, stopping, with every problem listed, when a
+file sets a field the script does not take or a value of the wrong kind.
+It then asks whether to include DEX Screener's Google Sheets functions,
 downloaded from DEX Screener's repo at one commit and compiled; Enter
 includes them. The keys come from the repo's key file (npm run api-keys
 saves them), opened with the password in API_KEYS_PASSWORD (source
@@ -148,10 +156,10 @@ Examples:
     $ source ./unlock-api-keys.sh
     $ npm run build apps-script
 
-Exit codes: 0 once the file is on the clipboard or written; 1 when DEX
-Screener's functions cannot be downloaded, checked or compiled, the keys
-cannot be opened, a service refuses its key, the parts do not make one
-Apps Script project, or the arguments are wrong.`;
+Exit codes: 0 once the file is on the clipboard or written; 1 when a
+config.json is refused, DEX Screener's functions cannot be downloaded,
+checked or compiled, the keys cannot be opened, a service refuses its key,
+the parts do not make one Apps Script project, or the arguments are wrong.`;
 
 /** What the help of the build's own command says after its commands. */
 const BUILD_HELP_AFTER = `
@@ -297,14 +305,21 @@ function preambleOf(run, parts) {
 }
 
 /**
- * Builds the file's text: asks about DEX Screener's functions, fetches
- * them when asked, opens the keys, and joins the parts.
+ * Builds the file's text: reads each script's config.json, asks about DEX
+ * Screener's functions, fetches them when asked, opens the keys, and joins
+ * the parts.
  *
  * @param {Object} run - The run (`runBuild`)
  * @returns {Promise<{text: string, holdsKeys: boolean, withDexScreener: boolean}>} The text, whether it holds a key, and whether DEX Screener's functions are in it
- * @throws {Error} When DEX Screener's functions cannot be had, the keys cannot be opened, a service refuses its key, or the parts do not make one project
+ * @throws {Error} When a config.json breaks its Node version's schemas, DEX Screener's functions cannot be had, the keys cannot be opened, a service refuses its key, or the parts do not make one project
  */
 async function buildText(run) {
+  const configs = run.scripts.map((spec) =>
+    readConfigFile(spec.defaultConfigFile, {
+      required: false,
+      schemas: spec.configSchemas,
+    }),
+  );
   const withDexScreener = await askDexScreener(run);
   const dexScreener = withDexScreener
     ? await run.dexScreener({
@@ -324,16 +339,10 @@ async function buildText(run) {
   });
   let values = {};
   let holdsKeys = false;
-  for (const spec of run.scripts) {
+  for (const [index, spec] of run.scripts.entries()) {
     const keyValues = spec.keyConfig(keys);
     holdsKeys ||= Object.keys(keyValues).length > 0;
-    values = layConfig(
-      values,
-      layConfig(
-        readConfigFile(spec.defaultConfigFile, { required: false }),
-        keyValues,
-      ),
-    );
+    values = layConfig(values, layConfig(configs[index], keyValues));
   }
   const parts = partsOf(run, dexScreener);
   const sections = parts
