@@ -422,20 +422,15 @@ A bug found gets a test in crypto-price-filler's
 bug is present, and a row in the table below. Its fix makes the test fail;
 the same change declares the test with `it`, moves it to the tests that
 guard the fixed bugs, `tests/regressions-command-line.test.js` for the
-filler's command lines, `tests/regressions-lib.test.js` for the shared
+repo's command lines, `tests/regressions-lib.test.js` for the shared
 helpers in `lib/`, `tests/regressions-sheets.test.js` for a test that
 runs a Sheets script in the test's thread, and `tests/regressions.test.js`
 for any other, and removes the row. `tests/regressions.test.js` also
 holds older tests that run a Sheets script that way.
 
 Google stops a custom function, a function a cell calls, after 30 seconds,
-and the cell shows `#ERROR!`. The first bug below is a wait longer than
-that.
+and the cell shows `#ERROR!`. The bug below is a wait longer than that.
 
 | Bug | Test in `tests/known-bugs.test.js` |
 | --- | --- |
 | `dexToolsGetTokenPrice` and `dexToolsGetTokenFDV`, in `crypto-price-fetchers.gs`, wait up to `DEXTOOLS_CONFIG.LOCK_WAIT_MS`, 120 seconds, for the script lock, so a cell that waits more than 30 seconds shows `#ERROR!`, never the busy message the script returns when the wait ends. | dexToolsGetTokenPrice waits for the script lock no longer than Google lets a custom function run |
-| `getCryptoPriceFromCentralizedExchange.js` takes any `--tz` and any date as it parses them: a time zone the script does not know, or a day the calendar does not have, is named only by the script, after the key store's password and the keys' checks, and not as the option it is. | getCryptoPriceFromCentralizedExchange.js names --tz or the date, before it opens a key, for a time zone the script does not know or a day the calendar does not have |
-| `crypto-price-fetchers.js` runs `price x1` or `fdv x1` with no `--pool`, which x1 needs: it asks x1.ninja for the token's mint as a pool and prints its 0, with exit code 0. | crypto-price-fetchers.js refuses a run on x1 with no --pool, naming it, before it asks anything |
-| The exchange script's `CONFIG_SCHEMAS` takes a `GENERAL_DELAY_MS` of 0, with which every call in the sheet takes no lock. | refuses a config.json that sets the exchange script's GENERAL_DELAY_MS to 0, with which a call takes no lock |
-| The Summ csv utility takes any count of seconds a Date holds, so a time in milliseconds given for seconds is written as a timestamp past the year 9999, which Summ cannot read. | refuses a time past 9999-12-31, as a time in milliseconds given for seconds is, rather than write a timestamp Summ cannot read |

@@ -18,7 +18,7 @@
  * first process exits, and the tool is handed no pipe but its stdin, which
  * it would otherwise hold open after the copy.
  *
- * Fit: `index.js` copies each built file with these, and offers the
+ * Fit: `index.js` copies the built file with these, and offers the
  * install when no tool is found.
  */
 

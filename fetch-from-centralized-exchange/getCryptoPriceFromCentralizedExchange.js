@@ -29,7 +29,10 @@
  *   build step sets them in the script it gives for the sheet.
  * - The command line, `node getCryptoPriceFromCentralizedExchange.js <token>
  *   "<date>"`, with `--tz` and `--mode`, prints the price (`--help` gives
- *   the rest). Before it asks for a price, it opens the CoinGecko and
+ *   the rest). It first checks the time zone and the date as the script
+ *   reads them, with the script loaded in this thread, which asks nothing,
+ *   and names a mistake as the option or argument it is in
+ *   (`checkTimeArguments`). Before it asks for a price, it opens the CoinGecko and
  *   CoinPaprika keys saved in the project's encrypted key file and hands
  *   them to the script (`../api-key-store/`): with the password in
  *   `API_KEYS_PASSWORD`, which `unlock-api-keys.sh` keeps for a terminal,
@@ -61,12 +64,17 @@
  * `openCentralizedExchangeSources`.
  */
 
+import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
   CACHE_SECONDS_KIND,
   InvalidArgumentError,
   Option,
+  applyConfig,
+  callScriptFunction,
+  createAppsScriptServices,
   isEntryPoint,
+  loadAppsScript,
   openScriptFunctions,
   readConfigFile,
   runScriptCommandLine,
@@ -181,7 +189,7 @@ export const CONFIG_SCHEMAS = Object.freeze({
       COINPAPRIKA_DAY_PRICE_TEMPLATE: ASKS_COINPAPRIKA_FOR_USD,
       RETRY_DELAYS_MS: WAITS_MS,
       LOCK_WAIT_MS: KINDS.wholeAtLeast0,
-      GENERAL_DELAY_MS: KINDS.wholeAtLeast0,
+      GENERAL_DELAY_MS: KINDS.wholeAbove0,
       MAX_LOCK_RETRIES: KINDS.wholeAbove0,
       LOCK_RETRY_BACKOFF: WAITS_MS,
     },
@@ -383,12 +391,69 @@ function describeCommandLine(program, runCall) {
     )
     .addHelpText("after", KEY_HELP)
     .addHelpText("after", EXAMPLES_HELP)
+    .hook("preAction", (_program, command) => checkTimeArguments(command))
     .action((token, date, options, command) =>
       runCall(
         "getCryptoPrice",
         [token, date, options.tz, options.mode],
         command,
       ),
+    );
+}
+
+/**
+ * The script, loaded in this thread with a config file's values, for the
+ * checks of a call's arguments, which ask nothing: its services refuse a
+ * web request.
+ *
+ * @param {Object<string, Object>} config - The config file's values
+ * @returns {Object} The script's context
+ */
+function scriptForChecks(config) {
+  const context = loadAppsScript(
+    SHEETS_SCRIPT.map((url) => ({
+      source: fs.readFileSync(url, "utf8"),
+      filename: fileURLToPath(url),
+    })),
+    createAppsScriptServices({
+      fetchSync: () => {
+        throw new Error("a check of the arguments sends no request");
+      },
+      sleep: () => {},
+    }),
+  );
+  applyConfig(context, config);
+  return context;
+}
+
+/**
+ * Checks the call's time zone and date as the script reads them, with the
+ * config file's zones, before the keys are opened, so a mistake is named
+ * as the option or argument it is in, as commander names one, before
+ * anything is asked.
+ *
+ * @param {import('commander').Command} command - The command about to run
+ * @throws {import('commander').CommanderError} With exit code 1, when the zone or the date is one the script refuses
+ */
+function checkTimeArguments(command) {
+  const options = command.optsWithGlobals();
+  const [, date] = command.processedArgs;
+  const config = readConfigFile(options.config, {
+    required: command.getOptionValueSourceWithGlobals("config") !== "default",
+    schemas: CONFIG_SCHEMAS,
+  });
+  const script = scriptForChecks(config);
+  const offset = callScriptFunction(script, "getTimezoneOffsetHours", [
+    options.tz,
+  ]);
+  if (offset === null)
+    command.error(
+      `error: option '-z, --tz <abbreviation>' argument '${options.tz}' is invalid. ${callScriptFunction(script, "unknownTimeZoneMessage", [options.tz])}`,
+    );
+  const time = callScriptFunction(script, "parseInputToUtcMs", [date, offset]);
+  if (typeof time === "string")
+    command.error(
+      `error: command-argument value '${date}' is invalid for argument 'date'. ${time}`,
     );
 }
 

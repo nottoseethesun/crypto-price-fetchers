@@ -1,8 +1,10 @@
 /**
- * Tests that guard fixed bugs in crypto-price-filler's two command lines,
- * `index.js` and `backfill.js`: their checks of a value, the settings they
- * fall back to, how a settings file or token list they cannot take ends a
- * run, and what `index.js` logs. The other fixed bugs' tests are in
+ * Tests that guard fixed bugs in the repo's command lines:
+ * crypto-price-filler's two, `index.js` and `backfill.js`, with their
+ * checks of a value, the settings they fall back to, how a settings file
+ * or token list they cannot take ends a run, and what `index.js` logs; and
+ * the Sheets scripts' Node versions', with their checks of a value before
+ * a key is opened, and the exchange script's settings. The other fixed bugs' tests are in
  * `regressions.test.js`, `regressions-lib.test.js` and
  * `regressions-sheets.test.js`; a bug found later gets its test in
  * `known-bugs.test.js`, declared with `it.fails` while the bug is there,
@@ -16,7 +18,8 @@
  * `helpers/stand-in-fetch-preload.js`; its command, and `backfill.js`'s,
  * are also parsed here, in the test's thread, and `backfill.js` backfills
  * a CSV in a temp folder of the test's own, with the settings the test
- * gives it.
+ * gives it. The Node versions' command lines run in the test's thread,
+ * with a stand-in fetch and a key file in a temp folder of the test's own.
  */
 
 import { afterAll, beforeAll, describe, it, expect, vi } from "vitest";
@@ -29,6 +32,12 @@ import { setupCommander } from "../commander.js";
 import { backfillChoice, backfillPrices } from "../utils/backfill.js";
 import { runCommandLine, runIndexIn } from "./helpers/regression-runs.js";
 import { logLines } from "./helpers/log-lines.js";
+import { saveEncryptedKey } from "../../../api-key-store/key-file.js";
+import { runCommandLine as runPriceNowCommandLine } from "../../../crypto-price-fetchers.js";
+import {
+  readCentralizedExchangeConfig,
+  runCommandLine as runPastPriceCommandLine,
+} from "../../getCryptoPriceFromCentralizedExchange.js";
 
 /** crypto-price-filler's folder. */
 const FILLER_DIR = path.resolve(__dirname, "..");
@@ -309,6 +318,106 @@ describe("the filler's test commands and its input", () => {
       expect(run.status).toBe(1);
       expect(run.stderr).toContain(
         "The input CSV has no rows below its header",
+      );
+    } finally {
+      fs.rmSync(folder, { recursive: true, force: true });
+    }
+  });
+});
+
+/**
+ * Collects what a command line writes to a stream.
+ *
+ * @returns {{text: string, write: function(string): void}} The stream
+ */
+function written() {
+  return {
+    text: "",
+    write(text) {
+      this.text += text;
+    },
+  };
+}
+
+describe("the command lines' checks", () => {
+  it("getCryptoPriceFromCentralizedExchange.js names --tz or the date, before it opens a key, for a time zone the script does not know or a day the calendar does not have", async () => {
+    const folder = fs.mkdtempSync(path.join(os.tmpdir(), "past-price-"));
+    const keyFile = path.join(folder, "api-keys.json");
+    await saveEncryptedKey(
+      keyFile,
+      "coingecko",
+      "made-up-key-for-the-test",
+      "test-password",
+    );
+    try {
+      for (const [args, named] of [
+        [
+          ["btc", "2026-01-15 14:30:00", "--tz", "XYZ"],
+          /option '-z, --tz <abbreviation>'/,
+        ],
+        [["btc", "2026-02-30 14:30:00"], /argument 'date'/],
+      ]) {
+        const asked = [];
+        const prompts = [];
+        const stderr = written();
+        const code = await runPastPriceCommandLine(["node", "x", ...args], {
+          env: { API_KEYS_FILE_PATH: keyFile },
+          ask: async (prompt) => {
+            prompts.push(prompt);
+            return "test-password";
+          },
+          fetch: async (url) => {
+            asked.push(String(url));
+            return new Response("{}", { status: 200 });
+          },
+          stdout: written(),
+          stderr,
+        });
+        expect(code).toBe(1);
+        expect(stderr.text).toMatch(named);
+        expect(prompts).toEqual([]);
+        expect(asked).toEqual([]);
+      }
+    } finally {
+      fs.rmSync(folder, { recursive: true, force: true });
+    }
+  });
+
+  it("crypto-price-fetchers.js refuses a run on x1 with no --pool, naming it, before it asks anything", async () => {
+    const asked = [];
+    const stderr = written();
+    const code = await runPriceNowCommandLine(
+      [
+        "node",
+        "x",
+        "price",
+        "x1",
+        "So11111111111111111111111111111111111111112",
+      ],
+      {
+        env: {
+          API_KEYS_FILE_PATH: path.join(os.tmpdir(), "no-such-key-file.json"),
+        },
+        fetch: async (url) => {
+          asked.push(String(url));
+          return new Response('{"error":"not found"}', { status: 404 });
+        },
+        stdout: written(),
+        stderr,
+      },
+    );
+    expect(code).toBe(1);
+    expect(stderr.text).toMatch(/--pool/);
+    expect(asked).toEqual([]);
+  });
+
+  it("refuses a config.json that sets the exchange script's GENERAL_DELAY_MS to 0, with which a call takes no lock", () => {
+    const folder = fs.mkdtempSync(path.join(os.tmpdir(), "past-price-"));
+    const file = path.join(folder, "config.json");
+    fs.writeFileSync(file, JSON.stringify({ CONFIG: { GENERAL_DELAY_MS: 0 } }));
+    try {
+      expect(() => readCentralizedExchangeConfig(file)).toThrow(
+        /GENERAL_DELAY_MS/,
       );
     } finally {
       fs.rmSync(folder, { recursive: true, force: true });

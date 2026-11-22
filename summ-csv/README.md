@@ -63,8 +63,10 @@ owner's rules for his files. A row breaks a rule when:
    owner's files name both sides of every movement.
 4. It fills Quote Currency or Quote Amount. A row carries one token, since
    Contract Address names one: a trade is a `sell` row and a `buy` row.
-5. Its time is neither whole seconds since 1970 nor a real time written as
-   `YYYY-MM-DD HH:MM:SS`.
+5. Its time is neither whole seconds since 1970, up to the last second of
+   the year 9999, nor a real time written as `YYYY-MM-DD HH:MM:SS`. A time
+   in milliseconds given for seconds, such as `Date.now()`, is past that
+   year, and is refused.
 6. An amount is a JavaScript number, which cannot hold every amount
    exactly, or is not a plain decimal above zero, or `{raw, decimals}` with
    `raw` above zero and `decimals` from 0 to 255.

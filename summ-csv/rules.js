@@ -246,7 +246,7 @@ function timestampProblems(row) {
       : typeof time === "string" && isSummTimestamp(time);
   if (valid) return [];
   return [
-    `Timestamp ${shown(time)} is neither whole seconds since 1970 nor a real time as "YYYY-MM-DD HH:MM:SS"`,
+    `Timestamp ${shown(time)} is neither whole seconds since 1970, up to the year 9999, nor a real time as "YYYY-MM-DD HH:MM:SS"`,
   ];
 }
 
