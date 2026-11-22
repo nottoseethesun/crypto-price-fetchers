@@ -14,7 +14,7 @@
  *   script in a worker through the repo's runner: mock its Node version
  *   with `withStandInFetch`,
  *
- *     vi.mock("../../getCryptoPriceFromCentralizedExchange.js", async (importOriginal) => {
+ *     vi.mock("../../../bin/getCryptoPriceFromCentralizedExchange.js", async (importOriginal) => {
  *       const { withStandInFetch } = await import("./helpers/stand-in-fetch.js");
  *       return withStandInFetch(await importOriginal());
  *     });

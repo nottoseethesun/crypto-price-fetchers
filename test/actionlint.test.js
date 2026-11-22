@@ -308,7 +308,7 @@ describe("runActionlint, the command line", () => {
     const output = { stdout: capturedOutput(), stderr: capturedOutput() };
     const ran = [];
     const exitCode = await runActionlint(
-      ["node", "run-actionlint.js", ".github/workflows/ci.yml", "a.yml"],
+      ["node", "bin/run-actionlint.js", ".github/workflows/ci.yml", "a.yml"],
       {
         fetch: serving(SERVED),
         release: RELEASE,
@@ -346,7 +346,7 @@ describe("runActionlint, the command line", () => {
       limitMs: 1000,
     };
     assert.equal(
-      await runActionlint(["node", "run-actionlint.js", "--check"], {
+      await runActionlint(["node", "bin/run-actionlint.js", "--check"], {
         ...options,
         fetch: serving(SERVED),
       }),
@@ -357,7 +357,7 @@ describe("runActionlint, the command line", () => {
       "actionlint 9.9.9's 2 archives, and the program in each, match the SHA-256 crypto-price-fetchers pins.\n",
     );
     assert.equal(
-      await runActionlint(["node", "run-actionlint.js", "--check"], {
+      await runActionlint(["node", "bin/run-actionlint.js", "--check"], {
         ...options,
         fetch: serving({}),
       }),
@@ -373,7 +373,7 @@ describe("runActionlint, the command line", () => {
   it("exits with 1, saying why, when the program cannot be had", async () => {
     const output = { stdout: capturedOutput(), stderr: capturedOutput() };
     const exitCode = await runActionlint(
-      ["node", "run-actionlint.js", "ci.yml"],
+      ["node", "bin/run-actionlint.js", "ci.yml"],
       {
         fetch: serving({}),
         release: RELEASE,

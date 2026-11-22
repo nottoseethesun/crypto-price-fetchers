@@ -58,7 +58,7 @@ function jsonRows() {
 function runWith(args) {
   const stdout = capturedOutput();
   const stderr = capturedOutput();
-  const exitCode = runSummCsv(["node", "summ-csv.js", ...args], {
+  const exitCode = runSummCsv(["node", "bin/summ-csv.js", ...args], {
     stdout,
     stderr,
   });
@@ -359,11 +359,11 @@ describe("the package", () => {
       fs.readFileSync(path.join(REPO_TOP, "package.json"), "utf8"),
     );
 
-    assert.equal(manifest.bin["summ-csv"], "summ-csv.js");
+    assert.equal(manifest.bin["summ-csv"], "bin/summ-csv.js");
     assert.equal(manifest.exports["./summ-csv"], "./summ-csv/index.js");
-    assert.equal(manifest.scripts["summ-csv"], "node summ-csv.js");
+    assert.equal(manifest.scripts["summ-csv"], "node bin/summ-csv.js");
     for (const file of [
-      "summ-csv.js",
+      "bin/summ-csv.js",
       "summ-csv/index.js",
       "summ-csv/columns.js",
       "summ-csv/values.js",
@@ -376,7 +376,7 @@ describe("the package", () => {
   });
 
   it("runs as a program, from its entry point", () => {
-    const help = execFileSync(process.execPath, ["summ-csv.js", "--help"], {
+    const help = execFileSync(process.execPath, ["bin/summ-csv.js", "--help"], {
       cwd: REPO_TOP,
       encoding: "utf8",
     });

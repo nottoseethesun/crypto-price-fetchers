@@ -15,7 +15,7 @@
  * no-secrets passes the strings that hold `PUBLIC_ADDRESSES`: addresses
  * on X1, written in base58, which look random to it but are public.
  *
- * It passes over `build/`, as the main lint does: the build step writes
+ * It passes over `dist/`, as the main lint does: the build step writes
  * the file to paste there when there is no clipboard, and that file holds
  * the api keys and the compiled code of DEX Screener, zod and lodash,
  * which are not this repo's.
@@ -36,7 +36,7 @@ const PUBLIC_ADDRESSES = [
 ];
 
 export default [
-  { ignores: ["**/node_modules/**", "**/coverage/**", "build/**"] },
+  { ignores: ["**/node_modules/**", "**/coverage/**", "dist/**"] },
   {
     files: ["**/*.js", "**/*.gs"],
     plugins: {

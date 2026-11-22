@@ -42,24 +42,21 @@ const FILLER = "fetch-from-centralized-exchange/crypto-price-filler";
  * help is asked for.
  */
 const COMMAND_LINES = Object.freeze([
-  { file: "build.js", command: [] },
-  { file: "build.js", command: ["apps-script"] },
-  { file: "manage-api-keys.js", command: [] },
-  { file: "manage-api-keys.js", command: ["set"] },
-  { file: "manage-api-keys.js", command: ["check-password"] },
-  { file: "summ-csv.js", command: [] },
-  { file: "github-project-deps.js", command: [] },
-  { file: "audit-dex-screener.js", command: [] },
-  { file: "run-actionlint.js", command: [] },
-  { file: "crypto-price-fetchers.js", command: [] },
-  { file: "crypto-price-fetchers.js", command: ["price"] },
-  { file: "crypto-price-fetchers.js", command: ["fdv"] },
-  {
-    file: "fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.js",
-    command: [],
-  },
-  { file: `${FILLER}/index.js`, command: [] },
-  { file: `${FILLER}/backfill.js`, command: [] },
+  { file: "build/tools/build.js", command: [] },
+  { file: "build/tools/build.js", command: ["apps-script"] },
+  { file: "bin/manage-api-keys.js", command: [] },
+  { file: "bin/manage-api-keys.js", command: ["set"] },
+  { file: "bin/manage-api-keys.js", command: ["check-password"] },
+  { file: "bin/summ-csv.js", command: [] },
+  { file: "bin/github-project-deps.js", command: [] },
+  { file: "build/tools/audit-dex-screener.js", command: [] },
+  { file: "bin/run-actionlint.js", command: [] },
+  { file: "bin/crypto-price-fetchers.js", command: [] },
+  { file: "bin/crypto-price-fetchers.js", command: ["price"] },
+  { file: "bin/crypto-price-fetchers.js", command: ["fdv"] },
+  { file: "bin/getCryptoPriceFromCentralizedExchange.js", command: [] },
+  { file: "bin/crypto-price-filler.js", command: [] },
+  { file: "bin/backfill.js", command: [] },
 ]);
 
 /**
@@ -67,14 +64,16 @@ const COMMAND_LINES = Object.freeze([
  * file, by the file node runs.
  */
 const COMMAND_MODULES = Object.freeze({
-  "apps-script-build/index.js": "build.js",
-  "apps-script-build/dex-screener-files.js": "audit-dex-screener.js",
-  "api-key-store/key-manager.js": "manage-api-keys.js",
-  "summ-csv/command-line.js": "summ-csv.js",
-  "github-project-deps/index.js": "github-project-deps.js",
-  "actionlint/index.js": "run-actionlint.js",
-  "apps-script-runner/command-line.js": "crypto-price-fetchers.js",
-  [`${FILLER}/commander.js`]: `${FILLER}/index.js`,
+  "build/tools/apps-script-build/index.js": "build/tools/build.js",
+  "build/tools/apps-script-build/dex-screener-files.js":
+    "build/tools/audit-dex-screener.js",
+  "api-key-store/key-manager.js": "bin/manage-api-keys.js",
+  "summ-csv/command-line.js": "bin/summ-csv.js",
+  "github-project-deps/index.js": "bin/github-project-deps.js",
+  "actionlint/index.js": "bin/run-actionlint.js",
+  "apps-script-runner/command-line.js": "bin/crypto-price-fetchers.js",
+  [`${FILLER}/commander.js`]: "bin/crypto-price-filler.js",
+  [`${FILLER}/backfill.js`]: "bin/backfill.js",
 });
 
 /** A help that meets the rule, for the tests of the checks. */

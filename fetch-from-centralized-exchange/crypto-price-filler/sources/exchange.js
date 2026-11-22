@@ -16,7 +16,7 @@
  *
  * How: the script runs unchanged in a worker thread, through the repo's
  * runner, opened by its Node version (`openCentralizedExchangeSources` in
- * `../../getCryptoPriceFromCentralizedExchange.js`). It is opened once, at
+ * `bin/getCryptoPriceFromCentralizedExchange.js`, at the repo's top). It is opened once, at
  * the first price asked, with the CoinGecko and CoinPaprika keys the run
  * opened (`../../../api-key-store/`), which the Node version hands the
  * script as `CONFIG.COINGECKO_API_KEY` and `CONFIG.COINPAPRIKA_API_KEY`.
@@ -30,7 +30,7 @@
 import {
   openCentralizedExchangeSources,
   readCentralizedExchangeConfig,
-} from "../../getCryptoPriceFromCentralizedExchange.js";
+} from "../../../bin/getCryptoPriceFromCentralizedExchange.js";
 import { getApiKey } from "../../../api-key-store/index.js";
 import { logv } from "../utils/log.js";
 

@@ -14,7 +14,7 @@
  * `raw` as digits. Output goes to the streams a caller gives, so the tests
  * read what a run prints.
  *
- * Fit: `summ-csv.js` at the repo's top runs `runSummCsv`, as
+ * Fit: `bin/summ-csv.js` runs `runSummCsv`, as
  * `npm run summ-csv` and as the bin `summ-csv` of a project that installs
  * this repo.
  */
@@ -27,8 +27,8 @@ import { writeSummCsv } from "./index.js";
 /** The end of the help: the rows file, and what is refused. */
 const HELP_AFTER = `
 The rows file holds a JSON array, one object per row, keyed by column:
-  timestamp                 whole seconds since 1970, or "YYYY-MM-DD HH:MM:SS",
-                            in UTC
+  timestamp                 whole seconds since 1970, up to the year 9999,
+                            or "YYYY-MM-DD HH:MM:SS", in UTC
   type                      one of the types Summ's csv import takes
   baseCurrency, baseAmount  the row's one token, and how much of it
   feeCurrency, feeAmount    the gas, on one row of a transaction only

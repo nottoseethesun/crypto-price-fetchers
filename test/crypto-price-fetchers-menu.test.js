@@ -1,5 +1,5 @@
 /**
- * Tests for crypto-price-fetchers-menu.gs, the Crypto Price Fetchers menu
+ * Tests for src/crypto-price-fetchers-menu.gs, the Crypto Price Fetchers menu
  * that the build step puts first in the one file it gives.
  * @module test/crypto-price-fetchers-menu.test
  *
@@ -23,10 +23,10 @@ import { standInSpreadsheet } from "./helpers/stand-in-spreadsheet.js";
 
 /** The menu's file and the price scripts after it, in the built file's order. */
 const SCRIPT_FILES = [
-  "../crypto-price-fetchers-menu.gs",
-  "../crypto-price-fetchers.gs",
-  "../fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.gs",
-  "../fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange-sources.gs",
+  "../src/crypto-price-fetchers-menu.gs",
+  "../src/crypto-price-fetchers.gs",
+  "../src/getCryptoPriceFromCentralizedExchange.gs",
+  "../src/getCryptoPriceFromCentralizedExchange-sources.gs",
 ].map((file) => ({
   source: fs.readFileSync(new URL(file, import.meta.url), "utf8"),
   filename: file.slice(3),

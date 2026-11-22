@@ -2,7 +2,7 @@
 /**
  * The entry point of the Summ csv utility, `npm run summ-csv`, and the bin
  * `summ-csv` of a project that installs this repo from GitHub.
- * @module summ-csv
+ * @module bin/summ-csv
  *
  * What: writes a csv file for Summ's custom import from a JSON file of
  * rows, once every row has passed the rules; `--help` gives the rest.
@@ -12,8 +12,8 @@
  * instead.
  */
 
-import { runSummCsv } from "./summ-csv/command-line.js";
-import { endQuietlyWhenOutputCloses } from "./lib/closed-output.js";
+import { runSummCsv } from "../summ-csv/command-line.js";
+import { endQuietlyWhenOutputCloses } from "../lib/closed-output.js";
 
 endQuietlyWhenOutputCloses();
 

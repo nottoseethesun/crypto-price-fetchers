@@ -1,6 +1,6 @@
 /**
- * Tests for fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.js,
- * the Node version of getCryptoPriceFromCentralizedExchange.gs.
+ * Tests for bin/getCryptoPriceFromCentralizedExchange.js,
+ * the Node version of src/getCryptoPriceFromCentralizedExchange.gs.
  * @module test/get-crypto-price-from-centralized-exchange.test
  *
  * The real `.gs` runs under the real runner. Its requests go to a stand-in
@@ -26,7 +26,7 @@ import {
   openCentralizedExchangePrices,
   openCentralizedExchangeSources,
   runCommandLine,
-} from "../fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.js";
+} from "../bin/getCryptoPriceFromCentralizedExchange.js";
 import { capturedOutput } from "./helpers/captured-output.js";
 import { mexcKlines } from "./helpers/stand-in-mexc.js";
 import { standInFetch } from "./helpers/stand-in-web.js";
@@ -551,7 +551,7 @@ describe("getCryptoPriceFromCentralizedExchange.js, the command line", () => {
   it("runs as a program: node getCryptoPriceFromCentralizedExchange.js --help", () => {
     const file = fileURLToPath(
       new URL(
-        "../fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.js",
+        "../bin/getCryptoPriceFromCentralizedExchange.js",
         import.meta.url,
       ),
     );

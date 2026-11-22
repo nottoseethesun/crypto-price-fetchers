@@ -1,11 +1,11 @@
 /**
- * Tests for `unlock-api-keys.sh`, the script a terminal sources to keep
+ * Tests for `bin/unlock-api-keys.sh`, the script a terminal sources to keep
  * the password of the project's api keys in `API_KEYS_PASSWORD`.
  * @module test/unlock-api-keys.test
  *
  * Each test sources the real script in bash, with the password typed on
  * its stdin, then has bash say whether `API_KEYS_PASSWORD` holds it. The
- * script checks the password with the real `manage-api-keys.js`, against a
+ * script checks the password with the real `bin/manage-api-keys.js`, against a
  * key file in a temp folder of the test's own, which `API_KEYS_FILE_PATH`
  * names, removed afterwards. The same tests run in zsh where zsh is
  * installed.
@@ -20,7 +20,9 @@ import { saveEncryptedKey } from "../api-key-store/index.js";
 import { makeTempFolder, removeTempFolders } from "./helpers/temp-folders.js";
 
 /** The script. */
-const SCRIPT = fileURLToPath(new URL("../unlock-api-keys.sh", import.meta.url));
+const SCRIPT = fileURLToPath(
+  new URL("../bin/unlock-api-keys.sh", import.meta.url),
+);
 
 /**
  * What a shell runs: source the script, then say whether

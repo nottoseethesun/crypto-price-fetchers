@@ -17,7 +17,7 @@
  *   offers every key a program asks for.
  *
  * Fit: each project's programs call `unlockProjectKeys`; its
- * `manage-api-keys.js` runs the manager (`key-manager.js`), which reads
+ * `bin/manage-api-keys.js` runs the manager (`key-manager.js`), which reads
  * the same `config.json`.
  */
 

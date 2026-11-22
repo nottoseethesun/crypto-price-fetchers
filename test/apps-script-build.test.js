@@ -1,5 +1,5 @@
 /**
- * Tests for apps-script-build/, the build step: `npm run build apps-script`.
+ * Tests for build/tools/apps-script-build/, the build step: `npm run build apps-script`.
  * @module test/apps-script-build.test
  *
  * The build runs in process with stand-ins for what reaches outside it: the
@@ -24,10 +24,10 @@ import {
   APPS_SCRIPTS,
   BUILD_FOLDER,
   runBuild,
-} from "../apps-script-build/index.js";
-import { BUILT_FILE_NAME } from "../apps-script-build/built-script.js";
-import { RETRY_ADVICE } from "../apps-script-build/dex-screener.js";
-import { DEX_SCREENER } from "../apps-script-build/dex-screener-files.js";
+} from "../build/tools/apps-script-build/index.js";
+import { BUILT_FILE_NAME } from "../build/tools/apps-script-build/built-script.js";
+import { RETRY_ADVICE } from "../build/tools/apps-script-build/dex-screener.js";
+import { DEX_SCREENER } from "../build/tools/apps-script-build/dex-screener-files.js";
 import { capturedOutput } from "./helpers/captured-output.js";
 import { standInFetch } from "./helpers/stand-in-web.js";
 import { makeTempFolder, removeTempFolders } from "./helpers/temp-folders.js";
@@ -42,7 +42,7 @@ const KEYS = Object.freeze({
 
 /** The menu, the built file's first part. */
 const MENU_SOURCE = fs.readFileSync(
-  new URL("../crypto-price-fetchers-menu.gs", import.meta.url),
+  new URL("../src/crypto-price-fetchers-menu.gs", import.meta.url),
   "utf8",
 );
 
@@ -121,7 +121,7 @@ async function build(args, options = {}) {
   const stdout = capturedOutput();
   const stderr = capturedOutput();
   const exitCode = await runBuild(
-    ["node", "build.js", ...args],
+    ["node", "build/tools/build.js", ...args],
     { projectTop: top, scripts },
     {
       env: {
@@ -259,9 +259,9 @@ describe("npm run build apps-script, on a desktop with a clipboard tool", () => 
       STAND_IN_DEX_SCREENER.text,
     ]);
     for (const name of [
-      "crypto-price-fetchers-menu.gs",
-      "crypto-price-fetchers.gs",
-      "fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange-tests.gs",
+      "src/crypto-price-fetchers-menu.gs",
+      "src/crypto-price-fetchers.gs",
+      "src/getCryptoPriceFromCentralizedExchange-tests.gs",
     ]) {
       assert.ok(file.includes(`\n// ${name}\n`), name);
     }

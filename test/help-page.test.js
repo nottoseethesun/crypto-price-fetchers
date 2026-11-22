@@ -1,5 +1,5 @@
 /**
- * Tests for apps-script-build/help-page.js, which makes the page the Help
+ * Tests for build/tools/apps-script-build/help-page.js, which makes the page the Help
  * item of the Crypto Price Fetchers menu shows.
  * @module test/help-page.test
  *
@@ -16,7 +16,7 @@ import {
   HELP_START,
   helpPage,
   helpSection,
-} from "../apps-script-build/help-page.js";
+} from "../build/tools/apps-script-build/help-page.js";
 
 /**
  * A script header holding the lines given between the two markers.
@@ -83,12 +83,13 @@ describe("helpSection", () => {
 
   it("reads the help section of each file the build takes one from", () => {
     const files = {
-      "crypto-price-fetchers-menu.gs": "## The Crypto Price Fetchers menu",
-      "crypto-price-fetchers.gs":
+      "src/crypto-price-fetchers-menu.gs": "## The Crypto Price Fetchers menu",
+      "src/crypto-price-fetchers.gs":
         "## Current prices: dexToolsGetTokenPrice and dexToolsGetTokenFDV",
-      "fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.gs":
+      "src/getCryptoPriceFromCentralizedExchange.gs":
         "## Past prices: getCryptoPrice",
-      "apps-script-build/dex-screener-help.md": "## DEX Screener's functions",
+      "build/tools/apps-script-build/dex-screener-help.md":
+        "## DEX Screener's functions",
     };
     for (const [file, heading] of Object.entries(files)) {
       const source = fs.readFileSync(

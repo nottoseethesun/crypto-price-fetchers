@@ -186,7 +186,7 @@
  *   for a token or pool DexTools has no data for.
  *
  * NODE
- *   crypto-price-fetchers.js, beside this file in the repo, runs it
+ *   bin/crypto-price-fetchers.js, in the repo, runs it
  *   unchanged under Node, for Node programs and the command line.
  *
  * PROJECT & LICENSE INFORMATION

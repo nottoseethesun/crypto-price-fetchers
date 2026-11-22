@@ -20,7 +20,7 @@
  * How:
  *
  * - The password is the one in `API_KEYS_PASSWORD` when that is set, as
- *   `unlock-api-keys.sh` sets it for a terminal. Otherwise it is typed, at
+ *   `bin/unlock-api-keys.sh` sets it for a terminal. Otherwise it is typed, at
  *   a prompt that shows nothing of what is typed (`ask-password.js`): once
  *   to open the keys saved, or twice for a file that holds none yet.
  * - A key and a password are never arguments, which shell history and
@@ -55,7 +55,7 @@ import { setApiKey } from "./key-holder.js";
 export const UNLOCK_VARIABLE = "API_KEYS_PASSWORD";
 
 /** The command that keeps the password in a terminal, run in the project's top folder. */
-export const UNLOCK_COMMAND = "source ./unlock-api-keys.sh";
+export const UNLOCK_COMMAND = "source ./bin/unlock-api-keys.sh";
 
 /** The command that saves a key, run in the project's top folder. */
 export const MANAGE_COMMAND = "npm run api-keys";

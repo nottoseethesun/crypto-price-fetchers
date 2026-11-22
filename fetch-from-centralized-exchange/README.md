@@ -28,9 +28,9 @@ inside its apps:
 
 | Tool | Use | Limits |
 | ---- | --- | ------ |
-| **The Sheets script**, `getCryptoPriceFromCentralizedExchange.gs` | A price in a spreadsheet's cell | Google stops a cell's call after 30 seconds, and runs at most 30 calls of one person at once. |
-| **crypto-price-filler**, `crypto-price-filler/index.js` | Every row of a CSV file, in one run | None of Apps Script's. |
-| **The Sheets script's Node version**, `getCryptoPriceFromCentralizedExchange.js` | One price, from the command line or a Node program | None of Apps Script's; a call keeps to the 25 seconds the script allows a cell. |
+| **The Sheets script**, `src/getCryptoPriceFromCentralizedExchange.gs`, at the repo's top | A price in a spreadsheet's cell | Google stops a cell's call after 30 seconds, and runs at most 30 calls of one person at once. |
+| **crypto-price-filler**, `crypto-price-filler/`, started by `bin/crypto-price-filler.js` at the repo's top | Every row of a CSV file, in one run | None of Apps Script's. |
+| **The Sheets script's Node version**, `bin/getCryptoPriceFromCentralizedExchange.js`, at the repo's top | One price, from the command line or a Node program | None of Apps Script's; a call keeps to the 25 seconds the script allows a cell. |
 
 ---
 
@@ -43,14 +43,15 @@ MEXC for the price first, then CoinGecko, then CoinPaprika. It caches
 each answer, and its lock makes the calls of many cells take turns,
 so a sheet stays within each service's rate limit.
 
-The script is in three files, which work as one, since Apps Script runs
-every script file of a project in one global scope:
+The script is in three files, in the repo's `src/`, which work as one,
+since Apps Script runs every script file of a project in one global
+scope:
 
-- [`getCryptoPriceFromCentralizedExchange.gs`](./getCryptoPriceFromCentralizedExchange.gs):
+- [`getCryptoPriceFromCentralizedExchange.gs`](../src/getCryptoPriceFromCentralizedExchange.gs):
   `=getCryptoPrice()`, its settings and the cache.
-- [`getCryptoPriceFromCentralizedExchange-sources.gs`](./getCryptoPriceFromCentralizedExchange-sources.gs):
+- [`getCryptoPriceFromCentralizedExchange-sources.gs`](../src/getCryptoPriceFromCentralizedExchange-sources.gs):
   the price sources.
-- [`getCryptoPriceFromCentralizedExchange-tests.gs`](./getCryptoPriceFromCentralizedExchange-tests.gs):
+- [`getCryptoPriceFromCentralizedExchange-tests.gs`](../src/getCryptoPriceFromCentralizedExchange-tests.gs):
   the tests to run from the Apps Script editor.
 
 The repo's build step, `npm run build apps-script` (npm, Node's package
@@ -65,7 +66,7 @@ a key. The menu's Refresh & freeze historical prices item runs a tab's
 `getCryptoPrice` cells again and keeps each price as a number.
 
 The help section of the header of
-[`getCryptoPriceFromCentralizedExchange.gs`](./getCryptoPriceFromCentralizedExchange.gs),
+[`getCryptoPriceFromCentralizedExchange.gs`](../src/getCryptoPriceFromCentralizedExchange.gs),
 which the spreadsheet shows under Crypto Price Fetchers > Help, says how
 to call the function; the rest of the header covers its settings and
 data sources.
@@ -80,7 +81,8 @@ GeckoTerminal first; for every token, it then asks MEXC, CoinGecko and
 CoinPaprika through the Apps Script's own price sources, run unchanged
 under Node, so the sheet and the tool price alike.
 
-For detailed documentation, see the file header in
+The repo's `bin/crypto-price-filler.js` starts it. For detailed
+documentation, see the file header in
 [`crypto-price-filler/index.js`](./crypto-price-filler/index.js)
 and
 [`crypto-price-filler/README.md`](./crypto-price-filler/README.md).
@@ -90,14 +92,15 @@ the repo's README.
 
 ---
 
-### 3. Node version of the Apps Script (`getCryptoPriceFromCentralizedExchange.js`)
+### 3. Node version of the Apps Script (`bin/getCryptoPriceFromCentralizedExchange.js`)
 
-Runs `getCryptoPriceFromCentralizedExchange.gs` itself, unchanged, under
+The repo's `bin/getCryptoPriceFromCentralizedExchange.js` runs
+`src/getCryptoPriceFromCentralizedExchange.gs` itself, unchanged, under
 Node, so it answers as `=getCryptoPrice()` does, from a Node program or the
-command line:
+command line, run from the repo's top folder:
 
 ```bash
-node getCryptoPriceFromCentralizedExchange.js xtm "2026-01-15 14:30:00" --tz CST --mode low
+node bin/getCryptoPriceFromCentralizedExchange.js xtm "2026-01-15 14:30:00" --tz CST --mode low
 ```
 
 It sends the CoinGecko and CoinPaprika keys saved, encrypted, in the
@@ -105,7 +108,7 @@ repo's key file ([The api keys](../README.md#2-the-api-keys)), asking for
 its password first. The rest is in the
 [repo's README](../README.md#node-versions-of-the-sheets-scripts), and the
 file header in
-[`getCryptoPriceFromCentralizedExchange.js`](./getCryptoPriceFromCentralizedExchange.js)
+[`getCryptoPriceFromCentralizedExchange.js`](../bin/getCryptoPriceFromCentralizedExchange.js)
 says what differs from the sheet.
 
 ---
@@ -123,7 +126,7 @@ at its date and time:
 Each tool keeps its own list of the ids each service knows a token by:
 
 - **The Apps Script:** the `TOKEN_TO_ID` constant in
-  `getCryptoPriceFromCentralizedExchange.gs`
+  `src/getCryptoPriceFromCentralizedExchange.gs`
 - **crypto-price-filler:** `supported-tokens.json`, which also names a
   pool token's contract and chains
 

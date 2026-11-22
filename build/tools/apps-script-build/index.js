@@ -47,12 +47,12 @@
  *   sudo asking for the computer's password at its own prompt. Declined,
  *   or where no install can be offered, the run says first that the api
  *   keys will be written to disk in the clear, then writes the file to
- *   `build/apps-script/` at the repo's top, which git ignores, readable
+ *   `dist/apps-script/` at the repo's top, which git ignores, readable
  *   by its owner alone, and prints its path.
  * - No line printed holds any character of a key: the file's text goes
  *   only to the clipboard or to that file.
  *
- * Fit: `build.js` at the repo's top runs `runBuild`.
+ * Fit: `build/tools/build.js` runs `runBuild`.
  */
 
 import fs from "node:fs";
@@ -61,14 +61,14 @@ import readline from "node:readline";
 import { spawn as nodeSpawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { Command, CommanderError } from "commander";
-import { unlockProjectKeys } from "../api-key-store/index.js";
+import { unlockProjectKeys } from "../../../api-key-store/index.js";
 import {
   layConfig,
   readConfigFile,
-} from "../apps-script-runner/config-file.js";
-import { APPS_SCRIPT_BUILD as DEXTOOLS_SCRIPT } from "../crypto-price-fetchers.js";
-import { APPS_SCRIPT_BUILD as EXCHANGE_SCRIPT } from "../fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.js";
-import { messageOf } from "../lib/message-of.js";
+} from "../../../apps-script-runner/config-file.js";
+import { APPS_SCRIPT_BUILD as DEXTOOLS_SCRIPT } from "../../../bin/crypto-price-fetchers.js";
+import { APPS_SCRIPT_BUILD as EXCHANGE_SCRIPT } from "../../../bin/getCryptoPriceFromCentralizedExchange.js";
+import { messageOf } from "../../../lib/message-of.js";
 import { BUILT_FILE_NAME, combinedScript } from "./built-script.js";
 import {
   copyToClipboard,
@@ -104,12 +104,12 @@ import { helpPage, helpSection } from "./help-page.js";
 export const APPS_SCRIPTS = Object.freeze([DEXTOOLS_SCRIPT, EXCHANGE_SCRIPT]);
 
 /** This repo's top folder, from which each part is named. */
-const REPO_TOP = fileURLToPath(new URL("..", import.meta.url));
+const REPO_TOP = fileURLToPath(new URL("../../..", import.meta.url));
 
 /** The menu, the file's first part. */
 const MENU_FILE = Object.freeze({
   path: fileURLToPath(
-    new URL("../crypto-price-fetchers-menu.gs", import.meta.url),
+    new URL("../../../src/crypto-price-fetchers-menu.gs", import.meta.url),
   ),
   help: true,
 });
@@ -120,7 +120,7 @@ const DEX_SCREENER_HELP = fileURLToPath(
 );
 
 /** Where the file goes when there is no clipboard, from the repo's top. */
-export const BUILD_FOLDER = path.join("build", "apps-script");
+export const BUILD_FOLDER = path.join("dist", "apps-script");
 
 /** The script file in Apps Script that the file is pasted into. */
 const APPS_SCRIPT_FILE = path.basename(BUILT_FILE_NAME, ".gs");
@@ -141,7 +141,7 @@ It then asks whether to include DEX Screener's Google Sheets functions,
 downloaded from DEX Screener's repo at one commit and compiled; Enter
 includes them. The keys come from the repo's key file (npm run api-keys
 saves them), opened with the password in API_KEYS_PASSWORD (source
-./unlock-api-keys.sh keeps it for a terminal), or else one asked for. No
+./bin/unlock-api-keys.sh keeps it for a terminal), or else one asked for. No
 line printed shows a key: the file goes to the clipboard, which is cleared
 once you press Enter, or, with no clipboard tool installed and none
 installed when offered, to ${BUILD_FOLDER}/${BUILT_FILE_NAME}, which only
@@ -153,7 +153,7 @@ Examples:
     $ npm run build apps-script
   Keep the key file's password for this terminal first, so the build does
   not ask for it:
-    $ source ./unlock-api-keys.sh
+    $ source ./bin/unlock-api-keys.sh
     $ npm run build apps-script
 
 Exit codes: 0 once the file is on the clipboard or written; 1 when a
@@ -352,7 +352,7 @@ async function buildText(run) {
     sections.push(
       helpSection(
         fs.readFileSync(DEX_SCREENER_HELP, "utf8"),
-        "apps-script-build/dex-screener-help.md",
+        "build/tools/apps-script-build/dex-screener-help.md",
       ),
     );
   }

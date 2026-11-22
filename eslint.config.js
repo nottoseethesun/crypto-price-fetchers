@@ -18,7 +18,7 @@
  *   `'use strict'` is asked of it: the directive would change how the code
  *   the owner pastes into Apps Script runs.
  *
- * `build/`, where the build step writes the file it gives when there is no
+ * `dist/`, where the build step writes the file it gives when there is no
  * clipboard, is not linted: git ignores it, and the file holds code that is
  * not this repo's.
  *
@@ -100,7 +100,7 @@ const APPS_SCRIPT_GLOBALS = {
 };
 
 export default [
-  { ignores: ["**/node_modules/**", "**/coverage/**", "build/**"] },
+  { ignores: ["**/node_modules/**", "**/coverage/**", "dist/**"] },
   {
     files: ["**/*.js"],
     plugins: { n: nPlugin, local: LOCAL_RULES },

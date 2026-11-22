@@ -39,8 +39,8 @@
 
 import { createHash } from "node:crypto";
 import { Command, CommanderError } from "commander";
-import { messageOf } from "../lib/message-of.js";
-import { fetchWithinTimeLimit } from "../lib/time-limited-fetch.js";
+import { messageOf } from "../../../lib/message-of.js";
+import { fetchWithinTimeLimit } from "../../../lib/time-limited-fetch.js";
 
 /** How long one download may take, in milliseconds, before it is stopped. */
 export const DOWNLOAD_LIMIT_MS = 30_000;
@@ -177,7 +177,7 @@ async function downloadChecked(version, file, fetch, limitMs) {
   }
   if (sha256(text) !== checksum) {
     throw new Error(
-      `${url} is not the file this build knows: its SHA-256 differs from the one in apps-script-build/dex-screener-files.js`,
+      `${url} is not the file this build knows: its SHA-256 differs from the one in build/tools/apps-script-build/dex-screener-files.js`,
     );
   }
   return text;
@@ -235,7 +235,7 @@ const AUDIT_HELP_AFTER = `
 npm audit checks only the packages installed from npm, and the build step's
 DEX Screener functions are not one, so this downloads each of their files
 at the commit the build uses and checks its SHA-256 against the one written
-in apps-script-build/dex-screener-files.js. A download with no answer
+in build/tools/apps-script-build/dex-screener-files.js. A download with no answer
 within ${DOWNLOAD_LIMIT_MS / 1000} seconds is stopped and counted as failed.
 
 Examples:

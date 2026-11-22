@@ -3,7 +3,7 @@
  * service: the one way such a file is made.
  * @module summ-csv/index
  *
- * What: a program, or the command line through `summ-csv.js`, gives the
+ * What: a program, or the command line through `bin/summ-csv.js`, gives the
  * rows of a file as objects, one token per row, and the path of the
  * owner's template, a file whose one line is the header of Summ's custom
  * csv import. `writeSummCsv` checks every row against the rules of

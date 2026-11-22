@@ -10,11 +10,11 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { closeExchangeSources, exchangeSources } from "../sources/exchange.js";
-import { openCentralizedExchangeSources } from "../../getCryptoPriceFromCentralizedExchange.js";
+import { openCentralizedExchangeSources } from "../../../bin/getCryptoPriceFromCentralizedExchange.js";
 import { getApiKey } from "../../../api-key-store/index.js";
 import { logLines } from "./helpers/log-lines.js";
 
-vi.mock("../../getCryptoPriceFromCentralizedExchange.js", () => ({
+vi.mock("../../../bin/getCryptoPriceFromCentralizedExchange.js", () => ({
   openCentralizedExchangeSources: vi.fn(),
 }));
 

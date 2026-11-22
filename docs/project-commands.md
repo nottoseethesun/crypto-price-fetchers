@@ -62,10 +62,10 @@ manager.
 
 | Command | Flags | Description | Example |
 | ------- | ----- | ----------- | ------- |
-| `api-keys` | `set <service>`, `check-password`, `--help` | The key manager. Lists each key the top `config.json` names, saved or not, never showing a key's characters, and asks for each one not saved: the key, then the password. Each key is saved, encrypted, once its service takes it. `set <service>` replaces one key. `check-password` says, by its exit code, whether the password in `API_KEYS_PASSWORD` opens every key saved; `unlock-api-keys.sh`, the script that keeps the password for a terminal, runs it. | `npm run api-keys` · `npm run api-keys -- set coingecko` |
+| `api-keys` | `set <service>`, `check-password`, `--help` | The key manager. Lists each key the top `config.json` names, saved or not, never showing a key's characters, and asks for each one not saved: the key, then the password. Each key is saved, encrypted, once its service takes it. `set <service>` replaces one key. `check-password` says, by its exit code, whether the password in `API_KEYS_PASSWORD` opens every key saved; `bin/unlock-api-keys.sh`, the script that keeps the password for a terminal, runs it. | `npm run api-keys` · `npm run api-keys -- set coingecko` |
 
-`source ./unlock-api-keys.sh`, a script in the repo's top folder, keeps the
-password for a terminal ([Commands Run Without npm](#commands-run-without-npm));
+`source ./bin/unlock-api-keys.sh`, a script in the repo's `bin/` folder,
+keeps the password for a terminal ([Commands Run Without npm](#commands-run-without-npm));
 [the key store's README](../api-key-store/README.md) explains the store.
 
 ---
@@ -156,27 +156,28 @@ run in `fetch-from-centralized-exchange/crypto-price-filler/`, after
 | `test:debug` | — | vitest with `VERBOSE=1`, the verbose reporter, coverage and no cache. | `npm run test:debug` |
 | `test:strict` | — | `validate-parse`, then the tests with coverage, failing below 80% of lines covered. What `npm run check` runs. | `npm run test:strict` |
 | `test:watch` | — | vitest in watch mode, with coverage. | `npm run test:watch` |
-| `validate-parse` | — | Loads `index.js` with `--help`, so a broken import fails before the tests run. | `npm run validate-parse` |
+| `validate-parse` | — | Runs the command line, `bin/crypto-price-filler.js`, with `--help`, so a broken import fails before the tests run. | `npm run validate-parse` |
 
 ---
 
 ## Commands Run Without npm
 
-These command lines run with `node`, or, for the password script,
-`source`, at a terminal: the Node version of each Sheets script, which
-prints the number the script gives a cell, crypto-price-filler's command
-line and its backfill, and the script that keeps the key store's password
-for a terminal. Each
-Node command line answers `--help` with its options, examples and exit
-codes; [the README's Usage](../README.md#usage) shows each at work.
+These command lines, the programs in `bin/`, run with `node`, or, for
+the password script, `source`, at a terminal, from the repo's top folder:
+the Node version of each Sheets script, which prints the number the
+script gives a cell, crypto-price-filler's command line and its
+backfill, and the script that keeps the key store's password for a
+terminal. Each Node command line answers `--help` with its options,
+examples and exit codes; [the README's Run](../README.md#run) shows each
+at work.
 
 | Command | Flags | Description | Example |
 | ------- | ----- | ----------- | ------- |
-| `node crypto-price-fetchers.js` | `price <chain> <token>`, `fdv <chain> <token>`, `--pool <address>` (after `price` or `fdv`), `--config <file>`, `--verbose`, `--help` | The Node version of `crypto-price-fetchers.gs`: a token's price, or fully diluted value (FDV), in USD now, from DexTools, or from x1.ninja for X1, which needs `--pool`. In the repo's top folder. | `node crypto-price-fetchers.js price ether 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48` |
-| `node getCryptoPriceFromCentralizedExchange.js` | `<token> <date>`, `--tz <abbreviation>`, `--mode <mode>`, `--config <file>`, `--verbose`, `--help` | The Node version of the exchange script: a coin's USD price at a past time, from MEXC, then CoinGecko, then CoinPaprika. In `fetch-from-centralized-exchange/`; from another folder, give the file's path. | `node getCryptoPriceFromCentralizedExchange.js btc "2026-01-15 14:30:00"` |
-| `node index.js` | `--token <symbol>`, `--input <path>`, `--output <path>`, `--mode <mode>`, `--tz <zone>`, `--list-valid-timezones`, `--backfill-highest`, `--backfill-lowest`, `--verbose`, `--version`, `--help` | crypto-price-filler's command line: fills the price columns of a CSV file of dated rows with the token's USD price at each row's time, from the pools a token trades in, then MEXC, CoinGecko and CoinPaprika; a row no service priced gets `Error`. In `fetch-from-centralized-exchange/crypto-price-filler/`, as `npm start` runs it. | `node index.js --token=grc --input=mining.csv` |
-| `node backfill.js` | `--input <path>`, `--output <path>`, `--backfill-highest`, `--backfill-lowest`, `--verbose`, `--version`, `--help` | crypto-price-filler's backfill: fills each price the filler marked `Error`, in a CSV it wrote, with the price of the nearest priced row before or after it, the higher of the two or the lower, asking no service. In `fetch-from-centralized-exchange/crypto-price-filler/`; from another folder, give the file's path. `--input` and `--output` are read from the folder it runs in. | `node backfill.js --input=output.csv --backfill-highest` |
-| `source ./unlock-api-keys.sh` | — | Asks for the key store's password, showing nothing typed, checks that it opens every key saved, and keeps it in `API_KEYS_PASSWORD` for the terminal, so the programs open their keys without asking. Runs in bash or zsh. | `source ./unlock-api-keys.sh` |
+| `node bin/crypto-price-fetchers.js` | `price <chain> <token>`, `fdv <chain> <token>`, `--pool <address>` (after `price` or `fdv`), `--config <file>`, `--verbose`, `--help` | The Node version of `src/crypto-price-fetchers.gs`: a token's price, or fully diluted value (FDV), in USD now, from DexTools, or from x1.ninja for X1, which needs `--pool`. | `node bin/crypto-price-fetchers.js price ether 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48` |
+| `node bin/getCryptoPriceFromCentralizedExchange.js` | `<token> <date>`, `--tz <abbreviation>`, `--mode <mode>`, `--config <file>`, `--verbose`, `--help` | The Node version of the exchange script: a coin's USD price at a past time, from MEXC, then CoinGecko, then CoinPaprika. | `node bin/getCryptoPriceFromCentralizedExchange.js btc "2026-01-15 14:30:00"` |
+| `node bin/crypto-price-filler.js` | `--token <symbol>`, `--input <path>`, `--output <path>`, `--mode <mode>`, `--tz <zone>`, `--list-valid-timezones`, `--backfill-highest`, `--backfill-lowest`, `--verbose`, `--version`, `--help` | crypto-price-filler's command line: fills the price columns of a CSV file of dated rows with the token's USD price at each row's time, from the pools a token trades in, then MEXC, CoinGecko and CoinPaprika; a row no service priced gets `Error`. It loads the package in `fetch-from-centralized-exchange/crypto-price-filler/`, whose `npm start` runs it too; `--input` and `--output` are read from the folder it runs in. | `node bin/crypto-price-filler.js --token=grc --input=mining.csv` |
+| `node bin/backfill.js` | `--input <path>`, `--output <path>`, `--backfill-highest`, `--backfill-lowest`, `--verbose`, `--version`, `--help` | crypto-price-filler's backfill: fills each price the filler marked `Error`, in a CSV it wrote, with the price of the nearest priced row before or after it, the higher of the two or the lower, asking no service. `--input` and `--output` are read from the folder it runs in. | `node bin/backfill.js --input=output.csv --backfill-highest` |
+| `source ./bin/unlock-api-keys.sh` | — | Asks for the key store's password, showing nothing typed, checks that it opens every key saved, and keeps it in `API_KEYS_PASSWORD` for the terminal, so the programs open their keys without asking. Runs in bash or zsh. | `source ./bin/unlock-api-keys.sh` |
 
 ---
 

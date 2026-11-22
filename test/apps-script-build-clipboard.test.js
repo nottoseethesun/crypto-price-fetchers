@@ -1,5 +1,5 @@
 /**
- * Tests for apps-script-build/clipboard.js, which finds the desktop's
+ * Tests for build/tools/apps-script-build/clipboard.js, which finds the desktop's
  * clipboard tool for the build step, offers its install, and copies text
  * with it.
  * @module test/apps-script-build-clipboard.test
@@ -17,7 +17,7 @@ import {
   copyToClipboard,
   findClipboardTool,
   installCommand,
-} from "../apps-script-build/clipboard.js";
+} from "../build/tools/apps-script-build/clipboard.js";
 import { makeTempFolder, removeTempFolders } from "./helpers/temp-folders.js";
 
 after(removeTempFolders);

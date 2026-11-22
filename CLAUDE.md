@@ -11,26 +11,44 @@ never change anything in LP Ranger.
 Work in this repo, never in a copy of it. Code written to check something goes
 into the tests, so that later sessions reuse it instead of writing it again.
 
-The Sheets scripts (`.gs`) price crypto tokens in the cells of Google
-Sheets, Google's spreadsheet app, and run there as Apps Script, Google's
-platform for scripts that run inside its apps. They change only here. The
+The Sheets scripts (`.gs`), in `src/`, price crypto tokens in the cells
+of Google Sheets, Google's spreadsheet app, and run there as Apps Script,
+Google's platform for scripts that run inside its apps. They change only
+here. The
 build step, `npm run build apps-script` (below), joins them into one file,
 which the owner pastes into a spreadsheet's Apps Script project, where
 every script file runs in one scope; npm, the package manager of Node, the
 program that runs JavaScript outside a browser, runs the commands
 `package.json` names. The build joins the menu,
-`crypto-price-fetchers-menu.gs`, which runs a spreadsheet's price cells
-again; then `crypto-price-fetchers.gs`, a token's price now; then the
-exchange script, a token's price at a past time, in three files:
-`getCryptoPriceFromCentralizedExchange.gs`, its `-sources.gs` and its
+`src/crypto-price-fetchers-menu.gs`, which runs a spreadsheet's price
+cells again; then `src/crypto-price-fetchers.gs`, a token's price now;
+then the exchange script, a token's price at a past time, in three files:
+`src/getCryptoPriceFromCentralizedExchange.gs`, its `-sources.gs` and its
 `-tests.gs`. A name one file uses from another is declared in a
 `/* global */` comment, and no two files declare one top-level name.
 
+## Where things are
+
+The programs a reader runs from a terminal are in `bin/`: the Node
+versions of the two price scripts, crypto-price-filler's two start files,
+the Summ csv utility, the key manager, the versions tool,
+`run-actionlint` and `unlock-api-keys.sh`. The Sheets scripts, which the
+build joins into one file, are in `src/`. The build's tools are in
+`build/tools/`: `build.js`, the build's modules in `apps-script-build/`,
+and `audit-dex-screener.js`. The file the build writes when there is no
+clipboard goes to `dist/apps-script/`, which git ignores. The code the
+programs share stays in folders of its own (`lib/`, `dex-prices/`,
+`summ-csv/`, `api-key-store/`, `apps-script-runner/`, `actionlint/`,
+`github-project-deps/`), and crypto-price-filler's in its package,
+`fetch-from-centralized-exchange/crypto-price-filler/`, whose start
+files in `bin/` load it. A program's settings file stays where the
+program has always read it.
+
 ## Node versions of the Sheets scripts
 
-Each `.gs` that gives a price has a Node version beside it, which runs it
-on Node, under the same name ending in `.js`: `crypto-price-fetchers.js` and
-`fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.js`.
+Each `.gs` that gives a price has a Node version in `bin/`, which runs it
+on Node, under the same name ending in `.js`: `bin/crypto-price-fetchers.js`
+and `bin/getCryptoPriceFromCentralizedExchange.js`.
 The menu gives none and has none; its tests run it with a stand-in
 spreadsheet.
 A Node version runs its `.gs` unchanged, through the runner in
@@ -66,7 +84,7 @@ GitHub as
 `github:nottoseethesun/crypto-price-fetchers#main`, which follows main, or
 `#semver:*`, which follows the latest release, the highest version tag;
 their lockfiles keep the commit installed. The bin `github-project-deps`
-(`github-project-deps.js`, `github-project-deps/`) switches between the
+(`bin/github-project-deps.js`, `github-project-deps/`) switches between the
 two, as each project's `npm run github-project-deps -- main|release`, and
 makes the lockfiles again, as LP Ranger's rule for a change of dependency
 says: package-lock.json deleted first, then node_modules, then
@@ -120,18 +138,19 @@ manager says only whether each key is saved.
 
 No api key is committed. The keys the programs send (CoinGecko's,
 CoinPaprika's and Moralis', for past prices; DexTools' and x1.ninja's, the
-services `crypto-price-fetchers.gs` asks for current prices; as the top
+services `src/crypto-price-fetchers.gs` asks for current prices; as the top
 `config.json` lists them under `apiKeys`) are kept in `api-keys.json` at
 the repo's top, which git, the version-control program, ignores,
 encrypted with one password the owner types: LP Ranger's design, built as a
 module any project can use, `api-key-store/` (its README shows how).
-`npm run api-keys` runs the key manager, `manage-api-keys.js`. A program
-opens its keys with the password in `API_KEYS_PASSWORD`, which
-`source ./unlock-api-keys.sh`, a script at the repo's top, keeps for a
+`npm run api-keys` runs the key manager, `bin/manage-api-keys.js`. A
+program opens its keys with the password in `API_KEYS_PASSWORD`, which
+`source ./bin/unlock-api-keys.sh`, a script in `bin/`, keeps for a
 terminal, or else asks for it, and keeps the keys only in memory.
 pulsechain-analytics, pulsechain-validator-analytics and
 x1-validator-analytics install the module from GitHub and keep a copy of
-`unlock-api-keys.sh`, which their tests hold to this one.
+`bin/unlock-api-keys.sh` in their own `bin/`, which their tests hold to
+this one.
 
 A test names a key file of its own, never the owner's, and passes no
 `API_KEYS_PASSWORD` it did not set: crypto-price-filler's
@@ -141,14 +160,15 @@ on, names a key file that does not exist and empties the password.
 The Node versions hand the keys they open to their scripts as config values:
 `CONFIG.COINGECKO_API_KEY` and `CONFIG.COINPAPRIKA_API_KEY` in the exchange
 script, `DEXTOOLS_CONFIG.API_KEY` and `X1_CONFIG.API_KEY` in
-`crypto-price-fetchers.gs`, which the committed scripts leave empty or
-holding a placeholder. For Apps Script, `npm run build apps-script`
-(`build.js`, `apps-script-build/`) sets the same values, with those of the
+`src/crypto-price-fetchers.gs`, which the committed scripts leave empty
+or holding a placeholder. For Apps Script, `npm run build apps-script`
+(`build/tools/build.js`, `build/tools/apps-script-build/`) sets the same
+values, with those of the
 config.json each Node version reads and the menu's Help page, as the last
 statements of the one file it gives, from each Node version's
 `APPS_SCRIPT_BUILD` spec. It puts the file on the clipboard, or, when no
 clipboard tool is installed and the owner declines the install it offers,
-writes it to `build/apps-script/`, which git ignores, as do the lint, the
+writes it to `dist/apps-script/`, which git ignores, as do the lint, the
 security lint, the format check and the secret scan (Gates and CI, below),
 readable by the owner alone. It prints no key. crypto-price-filler reads
 `config-example.json`, its committed settings, with its own `config.json`,
@@ -210,7 +230,8 @@ build, `npm run build apps-script` asks whether to include them, Enter
 meaning yes, and says the step is optional and that a failed build should
 be run again with n. On a yes, it checks that their files are the ones
 this repo pinned: it downloads each, at the commit
-`apps-script-build/dex-screener-files.js` names, within 30 seconds, and
+`build/tools/apps-script-build/dex-screener-files.js` names, within 30
+seconds, and
 compares it with the SHA-256 written there, the check
 `npm run audit:dex-screener` also runs on its own. Then it compiles only
 the files the check gave, with esbuild, the program that compiles
@@ -317,7 +338,7 @@ check, as LP Ranger's rules ask. The other three repos run it from here
 (`crypto-price-fetchers/eslint-rules/no-or-default`).
 
 actionlint runs from its author's official release, never from an npm
-package that wraps it: the bin `run-actionlint` (`run-actionlint.js`,
+package that wraps it: the bin `run-actionlint` (`bin/run-actionlint.js`,
 `actionlint/`) downloads the archive for its system, refuses it unless its
 SHA-256 is the one `actionlint/release.js` pins, refuses the program in it
 unless its own SHA-256 is the one pinned beside it, and keeps the program
@@ -401,7 +422,8 @@ functions inside the scripts that the owner runs by hand. crypto-price-filler's
 - `stand-in-fetch.js` is a stand-in fetch for the Node tool's own sources:
   the exchange sources, whose Sheets script then runs for real in its
   worker, and the pool sources, whose shared clients then ask it.
-- `stand-in-fetch-preload.js` runs the real command line, `index.js`, in a
+- `stand-in-fetch-preload.js` runs the real command line,
+  `bin/crypto-price-filler.js`, in a
   child process against a stand-in MEXC, and a stand-in CoinGecko ping that
   takes the one key in `stand-in-coingecko-key.js`.
 - `stand-in-settings-preload.js` hands the command line, run in a child

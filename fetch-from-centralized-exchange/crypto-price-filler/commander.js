@@ -140,19 +140,19 @@ export function setupCommander() {
       `
 Examples:
   Basic usage:
-    $ node index.js --token=grc --input=mining.csv
+    $ node bin/crypto-price-filler.js --token=grc --input=mining.csv
 
   Full options:
-    $ node index.js --token=xtm --input=input.csv --output=prices.csv --mode=high --tz=America/Chicago --verbose
+    $ node bin/crypto-price-filler.js --token=xtm --input=input.csv --output=prices.csv --mode=high --tz=America/Chicago --verbose
 
   Backfill the Error prices (conservative tax estimates - use higher bracketing price):
-    $ node index.js --token=grc --input=mining.csv --backfill-highest
+    $ node bin/crypto-price-filler.js --token=grc --input=mining.csv --backfill-highest
 
   Backfill the Error prices (budgeting - use lower bracketing price):
-    $ node index.js --token=grc --input=mining.csv --backfill-lowest
+    $ node bin/crypto-price-filler.js --token=grc --input=mining.csv --backfill-lowest
 
   Show help:
-    $ node index.js --help
+    $ node bin/crypto-price-filler.js --help
 
 Exit codes:
   0  the output file was written; a row no service priced gets Error in

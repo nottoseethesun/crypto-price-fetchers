@@ -13,9 +13,9 @@ api-keys.json.tmp
 /fetch-from-centralized-exchange/config.json
 /fetch-from-centralized-exchange/crypto-price-filler/config.json
 
-# The Sheets scripts as `npm run build apps-script` writes them when there
-# is no clipboard: they hold the api keys in the clear
-/build/
+# The Sheets file as `npm run build apps-script` writes it when there is
+# no clipboard: it holds the api keys in the clear
+/dist/
 
 # Logs
 logs

@@ -46,7 +46,7 @@ import { mexcCandleOpen } from "../../../test/helpers/stand-in-mexc.js";
 
 // The Sheets script, opened by its Node version with the stand-in fetch
 vi.mock(
-  "../../getCryptoPriceFromCentralizedExchange.js",
+  "../../../bin/getCryptoPriceFromCentralizedExchange.js",
   async (importOriginal) => {
     const { withStandInFetch } = await import("./helpers/stand-in-fetch.js");
     return withStandInFetch(await importOriginal());
@@ -67,6 +67,7 @@ import {
   answerMexcCandle,
   answerPaprikaBeyondCandles,
   COINGECKO_KEY_PATTERN,
+  COMMAND_LINE,
   DATED_PRICE,
   FILLER_DIR,
   gitIgnores,
@@ -327,12 +328,14 @@ describe("fixed bugs", () => {
   describe("no CoinGecko api key is committed", () => {
     it("no file of the Sheets script carries a CoinGecko api key", () => {
       const scriptFiles = fs
-        .readdirSync(path.resolve(__dirname, "../.."))
-        .filter((name) => name.endsWith(".gs"));
+        .readdirSync(path.resolve(__dirname, "../../../src"))
+        .filter((name) =>
+          name.startsWith("getCryptoPriceFromCentralizedExchange"),
+        );
       expect(scriptFiles.length).toBe(3);
       for (const name of scriptFiles) {
         const text = fs.readFileSync(
-          path.resolve(__dirname, "../..", name),
+          path.resolve(__dirname, "../../../src", name),
           "utf8",
         );
         expect(text).not.toMatch(COINGECKO_KEY_PATTERN);
@@ -489,31 +492,30 @@ describe("the token list", () => {
 });
 
 describe("the command line, run from another folder", () => {
-  it("index.js answers --help when run from a folder other than its own", () => {
-    const run = spawnSync(
-      process.execPath,
-      [path.join(FILLER_DIR, "index.js"), "--help"],
-      { cwd: os.tmpdir(), encoding: "utf8" },
-    );
+  it("bin/crypto-price-filler.js answers --help when run from a folder other than its own", () => {
+    const run = spawnSync(process.execPath, [COMMAND_LINE, "--help"], {
+      cwd: os.tmpdir(),
+      encoding: "utf8",
+    });
     expect(run.stderr).toBe("");
     expect(run.status).toBe(0);
     expect(run.stdout).toMatch(/^Usage: /);
   });
 
-  it("index.js prices a row when run from a folder other than its own", () => {
+  it("bin/crypto-price-filler.js prices a row when run from a folder other than its own", () => {
     const { price } = runCommandLineForOneRow([], os.tmpdir());
     expect(Number(price)).toBeGreaterThan(0);
   });
 });
 
 describe("the gate's checks of the file the build step writes", () => {
-  it("the security lint passes over build/, where the build step writes the file to paste when there is no clipboard, as the lint, the format check and the secret scan do", async () => {
+  it("the security lint passes over dist/, where the build step writes the file to paste when there is no clipboard, as the lint, the format check and the secret scan do", async () => {
     const top = path.resolve(__dirname, "../../..");
     const eslint = new ESLint({
       cwd: top,
       overrideConfigFile: path.join(top, "eslint-security.config.js"),
     });
-    const built = path.join(top, "build/apps-script/crypto-price-fetchers.gs");
+    const built = path.join(top, "dist/apps-script/crypto-price-fetchers.gs");
     expect(await eslint.isPathIgnored(built)).toBe(true);
   });
 });

@@ -1,5 +1,5 @@
 /**
- * Tests for apps-script-build/dex-screener.js, which downloads DEX
+ * Tests for build/tools/apps-script-build/dex-screener.js, which downloads DEX
  * Screener's Google Sheets functions at one commit and compiles them for
  * the built file.
  * @module test/dex-screener.test
@@ -18,24 +18,24 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createAppsScriptServices } from "../apps-script-runner/apps-script-services.js";
 import { loadAppsScript } from "../apps-script-runner/load-apps-script.js";
-import { combinedScript } from "../apps-script-build/built-script.js";
+import { combinedScript } from "../build/tools/apps-script-build/built-script.js";
 import {
   HOLDER,
   RETRY_ADVICE,
   dexScreenerPart,
-} from "../apps-script-build/dex-screener.js";
+} from "../build/tools/apps-script-build/dex-screener.js";
 import {
   DEX_SCREENER,
   DOWNLOAD_LIMIT_MS,
   auditDexScreenerFiles,
   runDexScreenerAudit,
   sha256,
-} from "../apps-script-build/dex-screener-files.js";
+} from "../build/tools/apps-script-build/dex-screener-files.js";
 import { capturedOutput } from "./helpers/captured-output.js";
 import { standInFetch } from "./helpers/stand-in-web.js";
 
 /** The audit's command line, with no arguments, shaped as `process.argv`. */
-const AUDIT_ARGV = Object.freeze(["node", "audit-dex-screener.js"]);
+const AUDIT_ARGV = Object.freeze(["node", "build/tools/audit-dex-screener.js"]);
 
 /** This repo's top folder, whose packages hold zod and lodash. */
 const PROJECT_TOP = fileURLToPath(new URL("..", import.meta.url));
@@ -254,12 +254,12 @@ describe("dexScreenerPart", () => {
   it("goes in one file with the menu, whose onOpen stays the one Sheets calls", async () => {
     const part = await partFrom(serving(SOURCES));
     const menu = fs.readFileSync(
-      new URL("../crypto-price-fetchers-menu.gs", import.meta.url),
+      new URL("../src/crypto-price-fetchers-menu.gs", import.meta.url),
       "utf8",
     );
     const context = loadJoined(
       [
-        { name: "crypto-price-fetchers-menu.gs", source: menu },
+        { name: "src/crypto-price-fetchers-menu.gs", source: menu },
         { name: "dex.gs", source: part.text },
       ],
       part.required,
@@ -300,7 +300,7 @@ describe("dexScreenerPart", () => {
   it("stops, saying the step is optional, when a file's SHA-256 differs, or a file imports one whose SHA-256 it does not know", async () => {
     await assert.rejects(
       partFrom(serving({ ...SOURCES, "src/pairs.ts": "export const x = 1;" })),
-      /src\/pairs\.ts is not the file this build knows: its SHA-256 differs from the one in apps-script-build\/dex-screener-files\.js[\s\S]*answer n/,
+      /src\/pairs\.ts is not the file this build knows: its SHA-256 differs from the one in build\/tools\/apps-script-build\/dex-screener-files\.js[\s\S]*answer n/,
     );
     const importing = { ...SOURCES, "src/index.ts": "import './missing';" };
     await assert.rejects(

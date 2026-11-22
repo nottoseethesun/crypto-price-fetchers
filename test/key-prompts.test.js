@@ -147,7 +147,7 @@ describe("unlockApiKeys", () => {
     );
     assert.match(
       failure.message,
-      /In the project's top folder, keep the right one with: source \.\/unlock-api-keys\.sh$/,
+      /In the project's top folder, keep the right one with: source \.\/bin\/unlock-api-keys\.sh$/,
     );
     assert.equal(getApiKey("alpha"), null);
   });

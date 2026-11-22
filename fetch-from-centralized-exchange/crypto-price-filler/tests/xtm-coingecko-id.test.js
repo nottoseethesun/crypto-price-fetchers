@@ -27,7 +27,7 @@ import { loadSheetsScript } from "./helpers/sheets-script.js";
 
 // The Sheets script, opened by its Node version with the stand-in fetch
 vi.mock(
-  "../../getCryptoPriceFromCentralizedExchange.js",
+  "../../../bin/getCryptoPriceFromCentralizedExchange.js",
   async (importOriginal) => {
     const { withStandInFetch } = await import("./helpers/stand-in-fetch.js");
     return withStandInFetch(await importOriginal());
@@ -36,8 +36,8 @@ vi.mock(
 
 /** The Sheets script's files its function needs, in the order Apps Script loads them. */
 const SHEETS_SCRIPT_PATH = [
-  "../../getCryptoPriceFromCentralizedExchange.gs",
-  "../../getCryptoPriceFromCentralizedExchange-sources.gs",
+  "../../../src/getCryptoPriceFromCentralizedExchange.gs",
+  "../../../src/getCryptoPriceFromCentralizedExchange-sources.gs",
 ].map((file) => path.resolve(__dirname, file));
 const ROW_UTC_MS = Date.UTC(2025, 5, 15, 12, 30, 0);
 const MINOTARI_PRICE = 0.0123;
