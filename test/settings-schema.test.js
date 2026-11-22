@@ -209,6 +209,13 @@ describe("the kinds of a time limit", () => {
         assert.equal(check(value), false, `${value}`);
     }
   });
+
+  it("take a wait of 0 too, in milliseconds, up to the longest Node's timers keep", () => {
+    const check = compileSettingsSchema(KINDS.waitMs);
+    for (const value of [0, 222, 2147483647]) assert.equal(check(value), true);
+    for (const value of [-1, 2.5, 2147483648, "222"])
+      assert.equal(check(value), false, `${value}`);
+  });
 });
 
 describe("kindParser", () => {

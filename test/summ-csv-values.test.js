@@ -40,6 +40,11 @@ describe("decimalFromRaw", () => {
     assert.equal(decimalFromRaw("42", 0), "42");
   });
 
+  it("writes nothing but 0 for an amount of 0, and takes decimals up to 255", () => {
+    assert.equal(decimalFromRaw(0n, 8), "0");
+    assert.equal(decimalFromRaw(5n, 255), `0.${"0".repeat(254)}5`);
+  });
+
   it("keeps every digit of an amount no JavaScript number holds", () => {
     assert.equal(
       decimalFromRaw(123456789012345678901234567890n, 18),
