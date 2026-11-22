@@ -216,14 +216,18 @@
  *   EXCHANGE_BASE_URL    - MEXC REST API base ("https://api.mexc.com/api/v3")
  *   QUOTE_CURRENCY       - Quote side of the token's MEXC pair, and of the
  *                          BTC pair a BTC-quoted price goes through:
- *                          "USDT" or "USDC", a USD stablecoin, since
- *                          CoinGecko and CoinPaprika answer in USD
- *                          ("USDT"). DAI and USDS, the stablecoin Sky
- *                          (formerly MakerDAO) upgraded DAI to, are left
- *                          out: MEXC lists no pair quoted in either
- *                          (its pairs on 2026-11-21 were quoted in USDT,
- *                          USDC, USD1, BTC, EUR, ETH, BRL, USDE and USDF),
- *                          so with either set, MEXC would find no pair
+ *                          "USDT" or "USDC" ("USDT"). It is a USD
+ *                          stablecoin, since CoinGecko and CoinPaprika
+ *                          answer in USD, and one of the two MEXC quotes
+ *                          the most pairs in: on 2026-11-21, 1,366 pairs
+ *                          in USDT and 222 in USDC; then 77 in USD1, 20
+ *                          in BTC, 16 in EUR, 7 each in ETH and BRL, 6 in
+ *                          USDE and 4 in USDF. DAI and USDS, the
+ *                          stablecoin Sky (formerly MakerDAO) upgraded DAI
+ *                          to, are left out: MEXC quotes no pair in
+ *                          either, so with either set MEXC would give no
+ *                          price, finding at most a coin's BTC pair and no
+ *                          BTC pair in DAI or USDS to convert it through,
  *                          and CoinGecko or CoinPaprika would give every
  *                          price.
  *

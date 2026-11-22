@@ -182,7 +182,7 @@ describe("a config.json checked against a Node version's schemas", () => {
     assert.throws(read, {
       message: [
         `${file} → CONFIG.EXCHANGE_BASE_URL must be an http or https url; it is "ftp://api.mexc.com/api/v3"`,
-        `${file} → CONFIG.QUOTE_CURRENCY must be USDT or USDC, a USD stablecoin MEXC quotes pairs in, as CoinGecko and CoinPaprika answer in USD; it is "EUR"`,
+        `${file} → CONFIG.QUOTE_CURRENCY must be USDT or USDC, the USD stablecoins MEXC quotes the most pairs in, as CoinGecko and CoinPaprika answer in USD; it is "EUR"`,
         `${file} → CONFIG.TIMEZONE_OFFSETS has the key "est", which must be a time zone's abbreviation, with no lower-case letter`,
         `${file} → CONFIG.TIMEZONE_OFFSETS.IST must be an offset from UTC in hours, from -12 to 14; it is 15`,
         `${file} → CONFIG.TIMEZONE_OFFSETS.UTC must be 0; it is 1`,

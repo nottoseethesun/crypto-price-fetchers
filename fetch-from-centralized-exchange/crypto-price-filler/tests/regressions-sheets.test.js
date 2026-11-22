@@ -1,7 +1,7 @@
 /**
- * Tests that guard the fixed bugs of the Sheets scripts' settings and of
- * the arguments a cell hands their functions, each moved here from
- * `known-bugs.test.js` with its fix.
+ * Tests that guard the fixed bugs of the Sheets scripts' config objects
+ * and of a cell's cache seconds, each moved here from `known-bugs.test.js`
+ * with its fix.
  * @module tests/regressions-sheets.test
  *
  * The Sheets scripts run unchanged in the test's thread, through
@@ -47,18 +47,40 @@ describe("the exchange script's quote currency", () => {
 });
 
 describe("a cell's own cache seconds", () => {
-  it("dexToolsGetTokenPrice refuses cache seconds outside 1 to 21600 with a message, asking DexTools nothing", () => {
+  const token = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
+
+  /**
+   * Loads the current-price script against a stand-in DexTools that
+   * answers every request with a price and an FDV, recording each url.
+   *
+   * @returns {{script: Object, asked: string[]}} The script, and the urls asked
+   */
+  function scriptWithDexTools() {
     const asked = [];
     const script = loadSheetsScript(MENU_AND_DEXTOOLS_SCRIPTS, (url) => {
       asked.push(url);
-      return { statusCode: 200, data: { price: 1.23 } };
+      return { statusCode: 200, data: { price: 1.23, fdv: 5000000 } };
     });
-    const token = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
-    for (const seconds of [0, 21601, 2.5, "five"]) {
-      expect(script.dexToolsGetTokenPrice("ether", token, [], seconds)).toMatch(
-        /1 to 21600/,
-      );
+    return { script, asked };
+  }
+
+  it("dexToolsGetTokenPrice and dexToolsGetTokenFDV refuse cache seconds outside 1 to 21600 with a message, asking DexTools nothing", () => {
+    const { script, asked } = scriptWithDexTools();
+    for (const name of ["dexToolsGetTokenPrice", "dexToolsGetTokenFDV"]) {
+      for (const seconds of [0, 21601, 2.5, "five"]) {
+        expect(script[name]("ether", token, [], seconds)).toMatch(/1 to 21600/);
+      }
     }
+    expect(script.dexToolsGetTokenPrice("ether", token, [], "300")).toBe(
+      'Cache seconds must be a whole number from 1 to 21600, not "300"',
+    );
     expect(asked).toEqual([]);
+  });
+
+  it("takes an empty cell as no cache seconds, so the config's apply", () => {
+    const { script, asked } = scriptWithDexTools();
+    expect(script.dexToolsGetTokenPrice("ether", token, [], "")).toBe(1.23);
+    expect(script.dexToolsGetTokenFDV("pulse", token, [], "")).toBe(5000000);
+    expect(asked).toHaveLength(2);
   });
 });

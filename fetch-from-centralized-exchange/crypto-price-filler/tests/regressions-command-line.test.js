@@ -3,10 +3,11 @@
  * `index.js` and `backfill.js`: their checks of a value, the settings they
  * fall back to, how a settings file or token list they cannot take ends a
  * run, and what `index.js` logs. The other fixed bugs' tests are in
- * `regressions.test.js` and `regressions-lib.test.js`; a bug found later
- * gets its test in `known-bugs.test.js`, declared with `it.fails` while the
- * bug is there, and its fix moves the test to one of the three (see the
- * repo's CLAUDE.md).
+ * `regressions.test.js`, `regressions-lib.test.js` and
+ * `regressions-sheets.test.js`; a bug found later gets its test in
+ * `known-bugs.test.js`, declared with `it.fails` while the bug is there,
+ * and its fix moves the test to one of the four (see the repo's
+ * CLAUDE.md).
  * @module tests/regressions-command-line.test
  *
  * `index.js` runs as its owner runs it, in a child process, given a

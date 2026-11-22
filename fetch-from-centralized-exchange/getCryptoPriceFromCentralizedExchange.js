@@ -135,7 +135,7 @@ export const CONFIG_SCHEMAS = Object.freeze({
       QUOTE_CURRENCY: {
         enum: ["USDT", "USDC"],
         description:
-          "USDT or USDC, a USD stablecoin MEXC quotes pairs in, as CoinGecko and CoinPaprika answer in USD",
+          "USDT or USDC, the USD stablecoins MEXC quotes the most pairs in, as CoinGecko and CoinPaprika answer in USD",
       },
       TIMEZONE_OFFSETS: {
         type: "object",

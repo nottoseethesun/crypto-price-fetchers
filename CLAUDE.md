@@ -417,7 +417,7 @@ the same change declares the test with `it`, moves it to the tests that
 guard the fixed bugs, `tests/regressions-command-line.test.js` for the
 filler's command lines, `tests/regressions-lib.test.js` for the shared
 helpers in `lib/`, `tests/regressions-sheets.test.js` for the Sheets
-scripts' settings and the arguments a cell hands their functions, and
+scripts' config objects and a cell's cache seconds, and
 `tests/regressions.test.js` for the rest, and removes the row.
 
 Google stops a custom function, a function a cell calls, after 30 seconds,
