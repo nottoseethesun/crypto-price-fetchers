@@ -241,7 +241,7 @@ that this section, or `CLAUDE.md`, names every one.
 | `dex-prices-geckoterminal.test.js` | The GeckoTerminal client, part one: its settings, the budget of requests every caller shares, a token's facts and pools, and the pool it reads a price from. |
 | `dex-prices-geckoterminal-candles.test.js` | The GeckoTerminal client, part two: a pool's candles, page by page, and the candle and price of a time. |
 | `dex-prices-dextools.test.js` | The DexTools client: a token's price now, asked at the plan's path with the key in its header only, a 429 waited out, the errors it throws, which never name the key, and its time limit, against a stand-in server that never answers. |
-| `dex-prices-moralis.test.js` | The Moralis client: the block a chain had at a time, a token's price at a block, and a pool's candles, read page by page and given oldest first, with the token Moralis priced. |
+| `dex-prices-moralis.test.js` | The Moralis client: the block a chain had at a time, a token's price at a block, the pairs that trade a token, read page by page up to 10 pages, the pick of the deepest active pair that lists a token first, and a pool's candles, read page by page and given oldest first, with the token Moralis priced. |
 | `dex-prices-web-request.test.js` | `dex-prices/web-request.js`: a request sent again after each wait while the service answers 429, each try with its time limit. |
 | `dex-screener.test.js` | DEX Screener's part of the build: its files downloaded at one commit, checked against their SHA-256, and compiled, from stand-in sources. |
 | `format-date.test.js` | `Utilities.formatDate` under Node. |

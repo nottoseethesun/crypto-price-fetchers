@@ -80,9 +80,11 @@ a copy.
 a blockchain's pools, in LP Ranger's order: Moralis (`moralis.js`) first,
 at the block the chain had at a time, when a key is saved, then
 GeckoTerminal (`geckoterminal.js`), from the candles of the pool LP Ranger
-would pick, within its budget of requests. Moralis also gives a pool's
-candles over a span of time (`pairCandles`), in USD, of the token the pool
-lists first, and DexTools (`dextools.js`) a token's price now. Every
+would pick, within its budget of requests. Moralis also lists the pairs
+that trade a token (`tokenPairs`), picks the deepest that lists a token
+first (`pairListingFirst`), and gives a pool's candles over a span of time
+(`pairCandles`), in USD, of the token the pool lists first; DexTools
+(`dextools.js`) gives a token's price now. Every
 request goes through `web-request.js`, the one loop that sends a request
 again after a 429, and gives each try its time limit, the answer's body
 included, through `lib/time-limited-fetch.js`. crypto-price-filler's pool
