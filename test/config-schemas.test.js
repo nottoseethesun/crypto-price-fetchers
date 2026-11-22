@@ -173,6 +173,8 @@ describe("a config.json checked against a Node version's schemas", () => {
         QUOTE_CURRENCY: "EUR",
         TIMEZONE_OFFSETS: { UTC: 1, est: -5, IST: 15 },
         CACHE_EXPIRY_SECONDS: { DAILY_PRICE: 86400 },
+        COINPAPRIKA_OHLCV_TEMPLATE:
+          "{base}/coins/{id}/ohlcv/historical?start={start}&end={end}&quote=eur",
         RETRY_DELAYS_MS: [5000, -1],
         MAX_LOCK_RETRIES: 0,
       },
@@ -186,6 +188,7 @@ describe("a config.json checked against a Node version's schemas", () => {
         `${file} → CONFIG.TIMEZONE_OFFSETS.UTC must be 0; it is 1`,
         `${file} → CONFIG.CACHE_EXPIRY_SECONDS.NEGATIVE_CACHE is missing`,
         `${file} → CONFIG.CACHE_EXPIRY_SECONDS.DAILY_PRICE must be a whole number of seconds from 1 to 21600; it is 86400`,
+        `${file} → CONFIG.COINPAPRIKA_OHLCV_TEMPLATE must be a url template that asks CoinPaprika for USD, with quote=usd; it is "{base}/coins/{id}/ohlcv/historical?start={start}&end={end}&quote=eur"`,
         `${file} → CONFIG.RETRY_DELAYS_MS[1] must be a whole number of at least 0; it is -1`,
         `${file} → CONFIG.MAX_LOCK_RETRIES must be a whole number above 0; it is 0`,
       ].join("\n"),

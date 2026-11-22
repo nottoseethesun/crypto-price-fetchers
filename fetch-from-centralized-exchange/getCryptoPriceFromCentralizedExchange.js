@@ -90,6 +90,27 @@ export const DEFAULT_CONFIG_FILE = fileURLToPath(
 /** The project's top folder, which holds its key file. */
 const PROJECT_TOP = fileURLToPath(new URL("..", import.meta.url));
 
+/**
+ * A CoinGecko url template that asks for prices in USD, as the script
+ * gives every price in USD.
+ */
+const ASKS_COINGECKO_FOR_USD = Object.freeze({
+  type: "string",
+  pattern: "[?&]vs_currency=usd(&|$)",
+  description:
+    "a url template that asks CoinGecko for USD, with vs_currency=usd",
+});
+
+/**
+ * A CoinPaprika url template that asks for prices in USD, as the script
+ * gives every price in USD.
+ */
+const ASKS_COINPAPRIKA_FOR_USD = Object.freeze({
+  type: "string",
+  pattern: "[?&]quote=usd(&|$)",
+  description: "a url template that asks CoinPaprika for USD, with quote=usd",
+});
+
 /** A list of waits, in milliseconds. */
 const WAITS_MS = Object.freeze({
   type: "array",
@@ -150,9 +171,9 @@ export const CONFIG_SCHEMAS = Object.freeze({
       COINGECKO_API_KEY_HEADER: KINDS.text,
       COINPAPRIKA_API_KEY_HEADER: KINDS.text,
       COINGECKO_HISTORY_TEMPLATE: KINDS.text,
-      COINGECKO_MARKET_CHART_RANGE_TEMPLATE: KINDS.text,
-      COINPAPRIKA_OHLCV_TEMPLATE: KINDS.text,
-      COINPAPRIKA_DAY_PRICE_TEMPLATE: KINDS.text,
+      COINGECKO_MARKET_CHART_RANGE_TEMPLATE: ASKS_COINGECKO_FOR_USD,
+      COINPAPRIKA_OHLCV_TEMPLATE: ASKS_COINPAPRIKA_FOR_USD,
+      COINPAPRIKA_DAY_PRICE_TEMPLATE: ASKS_COINPAPRIKA_FOR_USD,
       RETRY_DELAYS_MS: WAITS_MS,
       LOCK_WAIT_MS: KINDS.wholeAtLeast0,
       GENERAL_DELAY_MS: KINDS.wholeAtLeast0,

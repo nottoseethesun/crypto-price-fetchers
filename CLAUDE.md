@@ -405,7 +405,8 @@ functions inside the scripts that the owner runs by hand. crypto-price-filler's
   environment variable, since the tool reads both beside its own files and
   a test never writes the owner's `config.json`.
 - `regression-runs.js` holds the settings, stand-in answers and runs that
-  `tests/regressions.test.js` shares among its tests.
+  `tests/regressions.test.js` and `tests/regressions-sheets.test.js`
+  share.
 
 ## Known bugs
 
@@ -415,15 +416,14 @@ bug is present, and a row in the table below. Its fix makes the test fail;
 the same change declares the test with `it`, moves it to the tests that
 guard the fixed bugs, `tests/regressions-command-line.test.js` for the
 filler's command lines, `tests/regressions-lib.test.js` for the shared
-helpers in `lib/`, and `tests/regressions.test.js` for the rest, and
-removes the row.
+helpers in `lib/`, `tests/regressions-sheets.test.js` for the Sheets
+scripts' settings and the arguments a cell hands their functions, and
+`tests/regressions.test.js` for the rest, and removes the row.
 
 Google stops a custom function, a function a cell calls, after 30 seconds,
-and the cell shows `#ERROR!`. The first two bugs below are waits longer
-than that.
+and the cell shows `#ERROR!`. Both bugs below are waits longer than that.
 
 | Bug | Test in `tests/known-bugs.test.js` |
 | --- | --- |
 | `dexToolsGetTokenPrice` and `dexToolsGetTokenFDV`, in `crypto-price-fetchers.gs`, wait up to `DEXTOOLS_CONFIG.LOCK_WAIT_MS`, 120 seconds, for the script lock, so a cell that waits more than 30 seconds shows `#ERROR!`, never the busy message the script returns when the wait ends. | dexToolsGetTokenPrice waits for the script lock no longer than Google lets a custom function run |
 | `getCryptoPrice`, in the exchange script, tries the script lock 3 times for 2 seconds each, waiting 5, 10 and 20 seconds after each failed try (`LOCK_RETRY_BACKOFF`): 41 seconds in all. | getCryptoPrice waits for the script lock, in all, no longer than Google lets a custom function run |
-| `dexToolsGetTokenPrice` and `dexToolsGetTokenFDV`, in `crypto-price-fetchers.gs`, hand a cell's own cache seconds, the fourth argument, to Apps Script's cache unchecked, after asking the service: a value outside 1 to 21600 meets the cache's own limits, and 0 throws. | dexToolsGetTokenPrice refuses cache seconds outside 1 to 21600 with a message, asking DexTools nothing |

@@ -7,13 +7,14 @@
  * makes the test pass, so `it.fails` fails it: the same change declares the
  * test with `it` and moves it to `regressions-command-line.test.js` for the
  * filler's command lines, to `regressions-lib.test.js` for the repo's
- * shared helpers in `lib/`, or to `regressions.test.js` for the rest, and
- * removes the bug's row from the table in the repo's CLAUDE.md, which
- * lists each test here.
+ * shared helpers in `lib/`, to `regressions-sheets.test.js` for the Sheets
+ * scripts' settings and the arguments a cell hands their functions, or to
+ * `regressions.test.js` for the rest, and removes the bug's row from the
+ * table in the repo's CLAUDE.md, which lists each test here.
  *
  * The Sheets scripts run unchanged in the test's thread, through
  * `tests/helpers/sheets-script.js`, with a stand-in for the Apps Script
- * service each test is about: the script lock, or DexTools' answers.
+ * service each test is about: the script lock.
  */
 
 import { describe, it, expect } from "vitest";
@@ -83,26 +84,6 @@ describe("waits inside a custom function", () => {
       const waited = [...waits, ...sleeps].reduce((sum, ms) => sum + ms, 0);
       expect(waits.length).toBeGreaterThan(0);
       expect(waited).toBeLessThanOrEqual(CUSTOM_FUNCTION_LIMIT_MS);
-    },
-  );
-});
-
-describe("a cell's own cache seconds", () => {
-  it.fails(
-    "dexToolsGetTokenPrice refuses cache seconds outside 1 to 21600 with a message, asking DexTools nothing",
-    () => {
-      const asked = [];
-      const script = loadSheetsScript(DEXTOOLS_SCRIPT, (url) => {
-        asked.push(url);
-        return { statusCode: 200, data: { price: 1.23 } };
-      });
-      const token = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
-      for (const seconds of [0, 21601, 2.5, "five"]) {
-        expect(
-          script.dexToolsGetTokenPrice("ether", token, [], seconds),
-        ).toMatch(/1 to 21600/);
-      }
-      expect(asked).toEqual([]);
     },
   );
 });
