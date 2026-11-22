@@ -7,8 +7,8 @@
  * now have, and checks it everywhere the bug was: the Node tool's functions,
  * its command line, the Sheets script, and the menu. A bug found later gets its test
  * in `known-bugs.test.js`, declared with `it.fails` while the bug is there;
- * its fix declares the test with `it` and moves it here (see the repo's
- * CLAUDE.md).
+ * its fix declares the test with `it` and moves it here, or to the
+ * regression file for its kind of bug (see the repo's CLAUDE.md).
  *
  * The tests drive the real code, with the price services standing in at the
  * http layer (see `tests/helpers/`). The Node tool prices with the Sheets
@@ -40,10 +40,7 @@ import { canonicalTimeZone, parseInputToUtcMs } from "../utils/date.js";
 import { answerWith, asked as askedByTool } from "./helpers/stand-in-fetch.js";
 import { loadSheetsScript } from "./helpers/sheets-script.js";
 import { standInSpreadsheet } from "../../../test/helpers/stand-in-spreadsheet.js";
-import {
-  mexcCandleOpen,
-  mexcKlines,
-} from "../../../test/helpers/stand-in-mexc.js";
+import { mexcCandleOpen } from "../../../test/helpers/stand-in-mexc.js";
 
 // The Sheets script, opened by its Node version with the stand-in fetch
 vi.mock(
@@ -459,35 +456,6 @@ describe("fixed bugs", () => {
       script.refreshCurrentPrices();
       expect(sheet.runsOf("Prices!B2")).toBe(1);
     });
-  });
-});
-
-describe("the exchange script's quote currency", () => {
-  it("getPriceFromMEXC asks for the pairs quoted in CONFIG.QUOTE_CURRENCY, the token's and BTC's", () => {
-    const symbols = [];
-    const script = loadSheetsScript(
-      SHEETS_SCRIPT_PATH,
-      (url) => {
-        if (url.includes("/exchangeInfo")) {
-          return {
-            symbols: [
-              { baseAsset: "ABC", quoteAsset: "USDT" },
-              { baseAsset: "ABC", quoteAsset: "USDC" },
-              { baseAsset: "XYZ", quoteAsset: "BTC" },
-              { baseAsset: "BTC", quoteAsset: "USDT" },
-              { baseAsset: "BTC", quoteAsset: "USDC" },
-            ],
-          };
-        }
-        symbols.push(new URL(url).searchParams.get("symbol"));
-        return mexcKlines(url, ["1.20", "1.60", "0.60", "1.20", "5"]);
-      },
-      { config: { CONFIG: { QUOTE_CURRENCY: "USDC" } } },
-    );
-    const time = Date.UTC(2025, 5, 15, 12, 30);
-    script.getPriceFromMEXC("abc", time, "close");
-    script.getPriceFromMEXC("xyz", time, "close");
-    expect([...new Set(symbols)]).toEqual(["ABCUSDC", "XYZBTC", "BTCUSDC"]);
   });
 });
 

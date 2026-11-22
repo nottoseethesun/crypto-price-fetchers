@@ -405,7 +405,8 @@ functions inside the scripts that the owner runs by hand. crypto-price-filler's
   environment variable, since the tool reads both beside its own files and
   a test never writes the owner's `config.json`.
 - `regression-runs.js` holds the settings, stand-in answers and runs that
-  `tests/regressions.test.js` shares among its tests.
+  `tests/regressions.test.js` and `tests/regressions-sheets.test.js`
+  share.
 
 ## Known bugs
 
@@ -415,8 +416,9 @@ bug is present, and a row in the table below. Its fix makes the test fail;
 the same change declares the test with `it`, moves it to the tests that
 guard the fixed bugs, `tests/regressions-command-line.test.js` for the
 filler's command lines, `tests/regressions-lib.test.js` for the shared
-helpers in `lib/`, and `tests/regressions.test.js` for the rest, and
-removes the row.
+helpers in `lib/`, `tests/regressions-sheets.test.js` for a test that
+runs a Sheets script in the test's thread, and `tests/regressions.test.js`
+for any other, and removes the row.
 
 Google stops a custom function, a function a cell calls, after 30 seconds,
 and the cell shows `#ERROR!`. Both bugs below are waits longer than that.

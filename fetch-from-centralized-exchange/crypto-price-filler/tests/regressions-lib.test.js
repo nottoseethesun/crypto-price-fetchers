@@ -1,11 +1,11 @@
 /**
  * Tests that guard fixed bugs in the repo's shared helpers, in `lib/`,
  * which crypto-price-filler and the projects that install this repo use.
- * The other fixed bugs' tests are in `regressions.test.js` and
- * `regressions-command-line.test.js`; a bug found later gets its test in
- * `known-bugs.test.js`, declared with `it.fails` while the bug is there,
- * and its fix moves the test to one of the three (see the repo's
- * CLAUDE.md).
+ * The other fixed bugs' tests are in `regressions.test.js`,
+ * `regressions-command-line.test.js` and `regressions-sheets.test.js`; a
+ * bug found later gets its test in `known-bugs.test.js`, declared with
+ * `it.fails` while the bug is there, and its fix moves the test to one of
+ * the four (see the repo's CLAUDE.md).
  * @module tests/regressions-lib.test
  *
  * The helpers run in the test's thread; the files the search for command

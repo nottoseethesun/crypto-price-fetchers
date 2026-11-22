@@ -173,6 +173,8 @@ describe("a config.json checked against a Node version's schemas", () => {
         QUOTE_CURRENCY: "EUR",
         TIMEZONE_OFFSETS: { UTC: 1, est: -5, IST: 15 },
         CACHE_EXPIRY_SECONDS: { DAILY_PRICE: 86400 },
+        COINPAPRIKA_OHLCV_TEMPLATE:
+          "{base}/coins/{id}/ohlcv/historical?start={start}&end={end}&quote=eur",
         RETRY_DELAYS_MS: [5000, -1],
         MAX_LOCK_RETRIES: 0,
       },
@@ -180,12 +182,13 @@ describe("a config.json checked against a Node version's schemas", () => {
     assert.throws(read, {
       message: [
         `${file} → CONFIG.EXCHANGE_BASE_URL must be an http or https url; it is "ftp://api.mexc.com/api/v3"`,
-        `${file} → CONFIG.QUOTE_CURRENCY must be USDT or USDC, a USD stablecoin MEXC quotes pairs in, as CoinGecko and CoinPaprika answer in USD; it is "EUR"`,
+        `${file} → CONFIG.QUOTE_CURRENCY must be USDT or USDC, the USD stablecoins MEXC quotes the most pairs in, as CoinGecko and CoinPaprika answer in USD; it is "EUR"`,
         `${file} → CONFIG.TIMEZONE_OFFSETS has the key "est", which must be a time zone's abbreviation, with no lower-case letter`,
         `${file} → CONFIG.TIMEZONE_OFFSETS.IST must be an offset from UTC in hours, from -12 to 14; it is 15`,
         `${file} → CONFIG.TIMEZONE_OFFSETS.UTC must be 0; it is 1`,
         `${file} → CONFIG.CACHE_EXPIRY_SECONDS.NEGATIVE_CACHE is missing`,
         `${file} → CONFIG.CACHE_EXPIRY_SECONDS.DAILY_PRICE must be a whole number of seconds from 1 to 21600; it is 86400`,
+        `${file} → CONFIG.COINPAPRIKA_OHLCV_TEMPLATE must be a url template that asks CoinPaprika for USD, with quote=usd; it is "{base}/coins/{id}/ohlcv/historical?start={start}&end={end}&quote=eur"`,
         `${file} → CONFIG.RETRY_DELAYS_MS[1] must be a whole number of at least 0; it is -1`,
         `${file} → CONFIG.MAX_LOCK_RETRIES must be a whole number above 0; it is 0`,
       ].join("\n"),

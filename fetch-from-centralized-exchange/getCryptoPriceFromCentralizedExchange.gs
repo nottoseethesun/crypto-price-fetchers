@@ -80,11 +80,12 @@
  * =getCryptoPrice("xtm", A1, "UTC", "close")
  * ```
  *
- * A price for a time is kept for 6 hours, the longest Apps Script's cache
- * keeps a value, and "no data" for 5 minutes, so a cell that runs again
- * within that time gives the answer it gave before. A past price does not change, so Refresh & freeze historical
- * prices, in the Crypto Price Fetchers menu, can replace these formulas
- * with their numbers.
+ * A price for a time is kept for up to 6 hours, the longest Apps Script's
+ * cache keeps a value, and "no data" for up to 5 minutes, so a cell that
+ * runs again within that time gives the answer it gave before. A past
+ * price does not change, so Refresh & freeze historical prices, in the
+ * Crypto Price Fetchers menu, can replace these formulas with their
+ * numbers.
  *
  * ### Average, high, low and close
  *
@@ -149,10 +150,11 @@
  *     timestamp. MEXC serves no 2-hour or yearly candle, so the 2 hours
  *     join their two hour candles and the year its twelve month candles.
  *     The first window whose volume is above 0 gives the average of its
- *     high and low, whatever the mode. A coin MEXC trades only against BTC
- *     is priced in USD with the candle of BTC against the quote currency
- *     (QUOTE_CURRENCY, below, USDT as written) of the same window, read
- *     the same way.
+ *     high and low, whatever the mode. A coin MEXC lists no pair for
+ *     against the quote currency (QUOTE_CURRENCY, below, USDT as written),
+ *     but one against BTC, is priced from its BTC pair, then in USD with
+ *     the candle of BTC against the quote currency of the same window,
+ *     read the same way.
  *
  *   CoinGecko market_chart/range: Fetches hourly data points over a
  *     24-hour window centered on the requested time (12 hours before to
@@ -214,9 +216,20 @@
  *   EXCHANGE_BASE_URL    - MEXC REST API base ("https://api.mexc.com/api/v3")
  *   QUOTE_CURRENCY       - Quote side of the token's MEXC pair, and of the
  *                          BTC pair a BTC-quoted price goes through:
- *                          "USDT" or "USDC", a USD stablecoin, since
- *                          CoinGecko and CoinPaprika answer in USD
- *                          ("USDT")
+ *                          "USDT" or "USDC" ("USDT"). It is a USD
+ *                          stablecoin, since CoinGecko and CoinPaprika
+ *                          answer in USD, and one of the two MEXC quotes
+ *                          the most pairs in: on 2026-11-21, 1,366 pairs
+ *                          in USDT and 222 in USDC; then 77 in USD1, 20
+ *                          in BTC, 16 in EUR, 7 each in ETH and BRL, 6 in
+ *                          USDE and 4 in USDF. DAI and USDS, the
+ *                          stablecoin Sky (formerly MakerDAO) upgraded DAI
+ *                          to, are left out: MEXC quotes no pair in
+ *                          either, so with either set MEXC would give no
+ *                          price, finding at most a coin's BTC pair and no
+ *                          BTC pair in DAI or USDS to convert it through,
+ *                          and CoinGecko or CoinPaprika would give every
+ *                          price.
  *
  *   TIMEZONE_OFFSETS     - Map of abbreviation to UTC offset in hours
  *                          (see Time zones, in the help section above)
@@ -241,7 +254,10 @@
  *                          value ("Authorization")
  *
  *   Endpoint templates (use {base}, {id}, {date}, {from}, {to}, {start},
- *   {end} placeholders):
+ *   {end} placeholders). config.json may change one only so that it still
+ *   asks for USD: vs_currency=usd for CoinGecko's range, quote=usd for
+ *   CoinPaprika's two; CoinGecko's history gives every currency, and the
+ *   script reads its USD price:
  *     COINGECKO_HISTORY_TEMPLATE
  *     COINGECKO_MARKET_CHART_RANGE_TEMPLATE
  *     COINPAPRIKA_OHLCV_TEMPLATE      - the day's candle

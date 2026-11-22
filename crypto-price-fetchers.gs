@@ -18,12 +18,15 @@
  * <!-- HELP START -->
  * ## Current prices: dexToolsGetTokenPrice and dexToolsGetTokenFDV
  *
- * `dexToolsGetTokenPrice(chain, tokenAddress, [pool])` gives a token's
- * current price in USD. `dexToolsGetTokenFDV(chain, tokenAddress, [pool])`
- * gives its fully diluted value (FDV): its price times its total supply.
- * Both ask DexTools, or x1.ninja for X1. The script keeps each number
- * above 0, a price or an FDV, for 5 minutes, so a cell that runs again
- * within that time gives the number it gave before.
+ * `dexToolsGetTokenPrice(chain, tokenAddress, [pool], [seconds])` gives a
+ * token's current price in USD.
+ * `dexToolsGetTokenFDV(chain, tokenAddress, [pool], [seconds])` gives its
+ * fully diluted value (FDV): its price times its total supply. Both ask
+ * DexTools, or x1.ninja for X1. The script keeps each number above 0, a
+ * price or an FDV, for up to 5 minutes, or up to the seconds the fourth
+ * argument gives, a whole number from 1 to 21600, the longest Apps Script's
+ * cache keeps a value, so a cell that runs again within that time gives the
+ * number it gave before.
  *
  * Each function gives one of these:
  *
@@ -34,7 +37,9 @@
  * - `⌛ Rate limit / busy – retry soon`, when other cells kept the script
  *   busy for longer than it waits for them;
  * - `⚠️ API error – check logs`, when the request failed in a way the
- *   script does not handle.
+ *   script does not handle;
+ * - `Cache seconds must be a whole number from 1 to 21600, not …`, when
+ *   the fourth argument is another value; the script then asks nothing.
  *
  * ### Chains
  *
@@ -235,6 +240,42 @@ const X1_CONFIG = {
  */
 const DEXTOOLS_BUSY_MESSAGE = "⌛ Rate limit / busy – retry soon";
 
+/**
+ * The longest Apps Script's cache keeps a value, in seconds.
+ *
+ * @type {number}
+ */
+const DEXTOOLS_MAX_CACHE_SECONDS = 21600;
+
+/**
+ * The seconds a cell keeps its answer: its own fourth argument, a whole
+ * number from 1 to DEXTOOLS_MAX_CACHE_SECONDS, or DEXTOOLS_CONFIG's when it
+ * gives none, as an empty cell gives "". Any other value gets the message
+ * the cell shows instead, before any request is sent.
+ *
+ * @param {*} cacheSeconds - The cell's fourth argument
+ * @return {number|string} The seconds, or the message
+ */
+function cacheSecondsOf(cacheSeconds) {
+  if (
+    cacheSeconds === undefined ||
+    cacheSeconds === null ||
+    cacheSeconds === ""
+  )
+    return DEXTOOLS_CONFIG.CACHE_SECONDS;
+  if (
+    Number.isInteger(cacheSeconds) &&
+    cacheSeconds >= 1 &&
+    cacheSeconds <= DEXTOOLS_MAX_CACHE_SECONDS
+  )
+    return cacheSeconds;
+  const given =
+    typeof cacheSeconds === "string"
+      ? JSON.stringify(cacheSeconds)
+      : cacheSeconds;
+  return `Cache seconds must be a whole number from 1 to ${DEXTOOLS_MAX_CACHE_SECONDS}, not ${given}`;
+}
+
 /* ─────────────────────────────────────────────────────────────────────────────
    COMPUTED CONSTANTS & SERVICES
    ───────────────────────────────────────────────────────────────────────────── */
@@ -304,15 +345,17 @@ function dexToolsAddress(address) {
  * @param {string} tokenAddress - Token contract address (or pool address for X1)
  * @param {Array<Array<string>>} [poolAddresses=[]] - Optional [[poolAddress, unused]]
  *                                 Use when you want price from specific pool
- * @param {number} [cacheSeconds=DEXTOOLS_CONFIG.CACHE_SECONDS] - Override cache duration
+ * @param {number} [cacheSeconds=DEXTOOLS_CONFIG.CACHE_SECONDS] - The seconds to keep the answer, a whole number from 1 to 21600; the config's when absent or empty
  * @return {number|string} Price in USD, or 0 (for math) / friendly string on timeout
  */
 function dexToolsGetTokenPrice(
   blockchain,
   tokenAddress,
   poolAddresses = [],
-  cacheSeconds = DEXTOOLS_CONFIG.CACHE_SECONDS,
+  cacheSeconds,
 ) {
+  const seconds = cacheSecondsOf(cacheSeconds);
+  if (typeof seconds === "string") return seconds;
   const isX1 = String(blockchain ?? "").toLowerCase() === "x1";
   const pool = poolNamed(poolAddresses);
   const address = dexToolsAddress(pool ?? tokenAddress);
@@ -330,7 +373,7 @@ function dexToolsGetTokenPrice(
   );
 
   if (typeof price === "number" && price > 0) {
-    CACHE.put(cacheKey, price.toString(), cacheSeconds);
+    CACHE.put(cacheKey, price.toString(), seconds);
   }
 
   return price;
@@ -358,15 +401,17 @@ function dexToolsGetTokenPrice(
  *                                 Required for X1 (x1.ninja keys on
  *                                 pool address). Ignored by the
  *                                 DexTools path (FDV is per-token).
- * @param {number} [cacheSeconds=DEXTOOLS_CONFIG.CACHE_SECONDS] - Override cache duration
+ * @param {number} [cacheSeconds=DEXTOOLS_CONFIG.CACHE_SECONDS] - The seconds to keep the answer, a whole number from 1 to 21600; the config's when absent or empty
  * @return {number|string} FDV in USD, or 0 (for math) / friendly string on timeout
  */
 function dexToolsGetTokenFDV(
   blockchain,
   tokenAddress,
   poolAddresses = [],
-  cacheSeconds = DEXTOOLS_CONFIG.CACHE_SECONDS,
+  cacheSeconds,
 ) {
+  const seconds = cacheSecondsOf(cacheSeconds);
+  if (typeof seconds === "string") return seconds;
   const isX1 = String(blockchain ?? "").toLowerCase() === "x1";
   const pool = poolNamed(poolAddresses);
   const address = dexToolsAddress(pool ?? tokenAddress);
@@ -395,7 +440,7 @@ function dexToolsGetTokenFDV(
   });
 
   if (typeof fdv === "number" && fdv > 0) {
-    CACHE.put(cacheKey, fdv.toString(), cacheSeconds);
+    CACHE.put(cacheKey, fdv.toString(), seconds);
   }
 
   return fdv;

@@ -217,7 +217,8 @@ holds the stand-ins:
   since the tool reads both beside its own files and a test never writes
   the owner's `config.json`.
 - `regression-runs.js` holds the settings, stand-in answers and runs that
-  `tests/regressions.test.js` shares among its tests: answers as MEXC,
+  `tests/regressions.test.js` and `tests/regressions-sheets.test.js`
+  share: answers as MEXC,
   CoinGecko and CoinPaprika give them, the command line run over one row
   in a child process, and a call run with the computer's time zone set to
   another.
@@ -300,6 +301,7 @@ MEXC does.
 | `regressions.test.js` | The fixed bugs of the tool, its Sheets script and the menu. |
 | `regressions-command-line.test.js` | The fixed bugs of the two command lines: their checks of a value, the settings they fall back to, a settings file or token list they cannot take refused as one error, and what `index.js` logs. |
 | `regressions-lib.test.js` | The fixed bugs of the repo's shared helpers in `lib/`: a schema compiled once, the words for an empty text and an empty list, and the search for command lines. |
+| `regressions-sheets.test.js` | Fixed bugs whose tests run a Sheets script in the test's thread: the exchange script's pairs quoted in `CONFIG.QUOTE_CURRENCY`, and a cell's own cache seconds outside 1 to 21600 refused with a message before any request, an empty cell taking the config's. |
 | `settings-files.test.js` | `config.js` and `supported-tokens.js`: the committed settings and token list held to their schemas, the owner's `config.json` laid over the committed settings, and files with a key no schema names or a value of the wrong kind refused, listing every problem. |
 | `sheets-sources.test.js` | The exchange script's sources, MEXC, CoinGecko and CoinPaprika, which the sheet and the tool both price with. |
 | `token-validation.test.js` | A token with no sources refused, naming the tokens the tool supports. |
@@ -370,7 +372,7 @@ answered at once.
 | ----- | ------------------- | --------------- |
 | `test/crypto-price-fetchers.test.js`, `test/get-crypto-price-from-centralized-exchange.test.js` | Through its Node version, in the worker thread. Each request goes to `standInFetch` (`test/helpers/stand-in-web.js`), which answers as DexTools or x1.ninja, the services that give current prices, or MEXC or CoinGecko, which give past ones, does. | What each Sheets function returns, as its cell would show it, and the Node versions' command lines. |
 | `test/run-apps-script.test.js` | A small script, `test/fixtures/runner-check.gs`, in the worker thread. Its requests go through Node's own `fetch` to a web server on this computer. | The hand-off between the threads: the worker waits, the main thread does the request, and each response reaches the request it answers. |
-| crypto-price-filler's `tests/sheets-sources.test.js`, `tests/mexc-windows.test.js`, `tests/regressions.test.js`, `tests/xtm-coingecko-id.test.js` | In the test's own thread (`tests/helpers/sheets-script.js`). `UrlFetchApp.fetch` answers at once from a function the test gives, so nothing waits. | What each price source gives, the cases the regression tests cover, and that no file of the exchange script holds a CoinGecko api key. |
+| crypto-price-filler's `tests/sheets-sources.test.js`, `tests/mexc-windows.test.js`, `tests/regressions.test.js`, `tests/regressions-sheets.test.js`, `tests/xtm-coingecko-id.test.js` | In the test's own thread (`tests/helpers/sheets-script.js`). `UrlFetchApp.fetch` answers at once from a function the test gives, so nothing waits. | What each price source gives, the cases the regression tests cover, and that no file of the exchange script holds a CoinGecko api key. |
 | crypto-price-filler's `tests/regressions.test.js`, `tests/xtm-coingecko-id.test.js`, through the tool | Through the exchange script's Node version, in the worker thread, as the tool runs it (`tests/helpers/stand-in-fetch.js`). | The same cases, reached through the tool's provider chain. |
 | `test/load-apps-script.test.js`, `test/apps-script-services.test.js` | Small scripts in `test/fixtures/`, in the test's own thread, with requests answered at once. | That a script's files load into one scope, in order, and that each Node service acts as Apps Script's does. |
 | `test/crypto-price-fetchers-menu.test.js`; crypto-price-filler's `tests/regressions.test.js` and `tests/known-bugs.test.js` | In the test's own thread, with a spreadsheet held in memory (`test/helpers/stand-in-spreadsheet.js`) or a stand-in lock in place of Apps Script's. | What each menu item writes, in which order, and what it reports; and the waits of the price functions that the known bugs are about. |
@@ -522,6 +524,8 @@ bug is gone, so the record cannot go stale. crypto-price-filler's
 while the bug is present. The fix makes it fail. The same change declares
 it with `it` and moves it to the regression tests, where it keeps the
 fixed behavior from coming back: `tests/regressions-command-line.test.js`
-for the filler's two command lines, `tests/regressions.test.js` for the
-rest. The repo's `CLAUDE.md` lists the bugs
+for the filler's two command lines, `tests/regressions-lib.test.js` for the
+shared helpers in `lib/`, `tests/regressions-sheets.test.js` for a test
+that runs a Sheets script in the test's thread, and
+`tests/regressions.test.js` for any other. The repo's `CLAUDE.md` lists the bugs
 known today, each with its test.

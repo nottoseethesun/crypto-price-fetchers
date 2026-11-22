@@ -1,6 +1,6 @@
 /**
  * The settings, stand-in answers and runs the regression tests share
- * (`tests/regressions.test.js`).
+ * (`tests/regressions.test.js`, `tests/regressions-sheets.test.js`).
  * @module tests/helpers/regression-runs
  *
  * The answers stand in for the price services at the http layer: MEXC for
