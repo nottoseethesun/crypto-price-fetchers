@@ -80,11 +80,18 @@ a copy.
 a blockchain's pools, in LP Ranger's order: Moralis (`moralis.js`) first,
 at the block the chain had at a time, when a key is saved, then
 GeckoTerminal (`geckoterminal.js`), from the candles of the pool LP Ranger
-would pick, within its budget of requests. Every request goes through
-`web-request.js`, the one loop that sends a request again after a 429.
-crypto-price-filler's pool sources use them, and other repos install them
-as `crypto-price-fetchers/dex-prices/...`. The exchange script keeps a loop
-of its own in its `-sources.gs`, since Apps Script cannot load a Node
+would pick, within its budget of requests. Moralis also gives a pool's
+candles over a span of time (`pairCandles`), in USD, of the token the pool
+lists first, and DexTools (`dextools.js`) a token's price now. Every
+request goes through `web-request.js`, the one loop that sends a request
+again after a 429, and gives each try its time limit, the answer's body
+included, through `lib/time-limited-fetch.js`. crypto-price-filler's pool
+sources use them, and other repos install them as
+`crypto-price-fetchers/dex-prices/...`: the projects that install this
+repo keep no client of their own for a service it has one for, and send
+their other requests, to a chain's endpoint or a beacon node, through
+`crypto-price-fetchers/lib/time-limited-fetch`. The exchange script keeps a
+loop of its own in its `-sources.gs`, since Apps Script cannot load a Node
 module.
 
 ## Summ csv files
@@ -298,9 +305,9 @@ that more than one part uses lives once, in `lib/`, which ships with the
 package, and the projects that install this repo import each by the
 package's name, as `exports` in package.json names it:
 `crypto-price-fetchers/lib/message-of`, `…/lib/command-line-help`,
-`…/lib/closed-output`, `…/lib/calendar-day`, `…/lib/http-url` and
-`…/lib/repo-checks` (`test/package-exports.test.js` loads each by that
-name). The tests ask no
+`…/lib/closed-output`, `…/lib/calendar-day`, `…/lib/http-url`,
+`…/lib/repo-checks` and `…/lib/time-limited-fetch`
+(`test/package-exports.test.js` loads each by that name). The tests ask no
 outside service: the scripts' requests go to a stand-in fetch or a stand-in
 server on the computer (`test/helpers/stand-in-web.js`). The key store's
 tests save keys in temp folders of their own

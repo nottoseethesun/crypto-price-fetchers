@@ -1,6 +1,6 @@
 /**
  * Tests for `dex-prices/moralis.js`, the Moralis client: the block a chain
- * had at a time, and a token's price at a block.
+ * had at a time, a token's price at a block, and a pool's candles.
  * @module test/dex-prices-moralis.test
  *
  * Moralis is a stand-in fetch (`helpers/stand-in-web.js`), so nothing
@@ -16,6 +16,7 @@ import {
   MORALIS_KEY_HEADER,
   blockAt,
   moralisSettings,
+  pairCandles,
   priceAtBlock,
 } from "../dex-prices/moralis.js";
 import { standInFetch } from "./helpers/stand-in-web.js";
@@ -41,6 +42,7 @@ describe("moralisSettings", () => {
   it("completes the settings with Moralis's api", () => {
     const settings = moralisSettings();
     assert.equal(settings.apiUrl, MORALIS_API_URL);
+    assert.equal(settings.name, "Moralis");
     assert.equal(typeof settings.fetch, "function");
     assert.equal(MORALIS_KEY_HEADER, "X-API-Key");
   });
@@ -141,5 +143,126 @@ describe("priceAtBlock", () => {
       ),
       /Moralis answered 500/,
     );
+  });
+});
+
+describe("pairCandles", () => {
+  /** HEX / WPLS, a pool that lists HEX first, and HEX, which its candles price. */
+  const POOL = "0x19BB45a7270177e303DEe6eAA6F5Ad700812bA98";
+  const HEX = "0x2b591e99afE9f32eAA6214f7B7629768c40Eeb39";
+
+  /**
+   * A day's candle as Moralis writes it.
+   *
+   * @param {string} day - The day, YYYY-MM-DD
+   * @param {number} close - Its close
+   * @returns {Object} The candle
+   */
+  function day(day, close) {
+    return {
+      timestamp: `${day}T00:00:00.000Z`,
+      open: close,
+      high: close * 1.1,
+      low: close * 0.9,
+      close,
+      volume: 1000,
+      trades: 12,
+    };
+  }
+
+  /** A query for two years of daily candles. */
+  const QUERY = {
+    chain: "0x171",
+    pair: POOL,
+    timeframe: "1d",
+    fromSeconds: 1732147200,
+    toSeconds: 1795219200,
+  };
+
+  it("reads every page, by its cursor, and gives the candles oldest first, with the token Moralis priced", async () => {
+    // Moralis's pages, newest first, the second named by the first's cursor
+    const { settings, fetch } = standIn(({ url }) =>
+      new URL(url).searchParams.get("cursor") === "page-2"
+        ? {
+            cursor: null,
+            tokenAddress: HEX,
+            result: [day("2026-11-19", 0.0011)],
+          }
+        : {
+            cursor: "page-2",
+            tokenAddress: HEX,
+            result: [day("2026-11-21", 0.0013), day("2026-11-20", 0.0012)],
+          },
+    );
+    const { tokenAddress, candles } = await pairCandles(
+      QUERY,
+      STAND_IN_KEY,
+      settings,
+    );
+    assert.equal(tokenAddress, HEX.toLowerCase());
+    assert.deepEqual(
+      candles.map(({ seconds, close }) => [seconds, close]),
+      [
+        [Date.UTC(2026, 10, 19) / 1000, 0.0011],
+        [Date.UTC(2026, 10, 20) / 1000, 0.0012],
+        [Date.UTC(2026, 10, 21) / 1000, 0.0013],
+      ],
+    );
+    const first = new URL(fetch.requests[0].url);
+    assert.equal(first.pathname, `/api/v2.2/pairs/${POOL}/ohlcv`);
+    assert.deepEqual(Object.fromEntries(first.searchParams), {
+      chain: "0x171",
+      timeframe: "1d",
+      currency: "usd",
+      fromDate: "1732147200",
+      toDate: "1795219200",
+    });
+    assert.equal(fetch.requests.length, 2);
+    assert.equal(fetch.requests[1].headers["x-api-key"], STAND_IN_KEY);
+    assert.ok(fetch.requests.every(({ url }) => !url.includes(STAND_IN_KEY)));
+  });
+
+  it("leaves out a candle with an unreadable field or a close not above 0", async () => {
+    const { settings } = standIn(() => ({
+      tokenAddress: HEX,
+      result: [
+        day("2026-11-21", 0.0013),
+        { ...day("2026-11-20", 0.0012), timestamp: "soon" },
+        day("2026-11-19", 0),
+        { ...day("2026-11-18", 0.001), high: "much" },
+      ],
+    }));
+    const { candles } = await pairCandles(QUERY, STAND_IN_KEY, settings);
+    assert.deepEqual(
+      candles.map(({ close }) => close),
+      [0.0013],
+    );
+  });
+
+  it("gives no candles, and no token, when Moralis answers 404", async () => {
+    const { settings } = standIn(() => ({ status: 404, text: "{}" }));
+    assert.deepEqual(await pairCandles(QUERY, STAND_IN_KEY, settings), {
+      tokenAddress: null,
+      candles: [],
+    });
+  });
+
+  it("throws on any other error, and on more pages than it reads", async () => {
+    const refused = standIn(() => ({ status: 401, text: "{}" }));
+    await assert.rejects(
+      pairCandles(QUERY, STAND_IN_KEY, refused.settings),
+      /Moralis answered 401/,
+    );
+    let page = 0;
+    const endless = standIn(() => ({
+      cursor: `page-${++page}`,
+      tokenAddress: HEX,
+      result: [],
+    }));
+    await assert.rejects(
+      pairCandles(QUERY, STAND_IN_KEY, endless.settings),
+      /Moralis gave more than 50 pages of candles for pool/,
+    );
+    assert.equal(endless.fetch.requests.length, 50);
   });
 });

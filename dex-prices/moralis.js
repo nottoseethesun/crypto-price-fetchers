@@ -7,7 +7,10 @@
  * stood at a block of its chain. `blockAt` gives the block a chain had at
  * a time, and `priceAtBlock` the token's price at that block, so the two
  * together price a token at a time. A block's price is one figure, with no
- * high or low.
+ * high or low. `pairCandles` gives a pool's candles over a span of time,
+ * each with its open, high, low and close in USD, of the token the pool
+ * lists first, as in HEX / WPLS, which prices HEX: Moralis names that
+ * token in its answer, and a caller that charts another token checks it.
  *
  * How: each request carries the key in the `X-API-Key` header, never in
  * the url, so no url a log line or an error message quotes holds it. A
@@ -20,7 +23,8 @@
  *
  * Fit: crypto-price-filler asks Moralis first for a token's price at a
  * time, when the owner has saved a Moralis key (`sources/moralis.js`), and
- * GeckoTerminal (`geckoterminal.js`) for what Moralis does not answer. The
+ * GeckoTerminal (`geckoterminal.js`) for what Moralis does not answer.
+ * pulsechain-analytics' ratio chart asks it for a pool's daily candles. The
  * key comes from the repo's key store (`api-key-store/`), whose check of a
  * Moralis key is in `api-key-store/services.js`.
  */
@@ -41,14 +45,19 @@ export const MORALIS_KEY_HEADER = "X-API-Key";
  */
 
 /**
- * Completes a caller's settings for Moralis: its api's address, and the
- * request settings of `requestSettings`.
+ * Completes a caller's settings for Moralis: its api's address, its name,
+ * for the error of a request that runs out of time, and the request
+ * settings of `requestSettings`.
  *
  * @param {Partial<MoralisSettings>} [settings={}] - The caller's settings
  * @returns {MoralisSettings} The completed settings
  */
 export function moralisSettings(settings = {}) {
-  return { apiUrl: MORALIS_API_URL, ...requestSettings(settings) };
+  return {
+    apiUrl: MORALIS_API_URL,
+    name: "Moralis",
+    ...requestSettings(settings),
+  };
 }
 
 /**
@@ -111,4 +120,85 @@ export async function priceAtBlock({ chain, token, block }, apiKey, settings) {
   );
   const price = Number(body?.usdPrice);
   return Number.isFinite(price) && price > 0 ? price : null;
+}
+
+/**
+ * The most pages `pairCandles` reads, so an answer whose cursor never ends
+ * cannot hold its caller.
+ */
+const MAX_CANDLE_PAGES = 50;
+
+/**
+ * A candle as Moralis gives it, read as numbers.
+ *
+ * @param {*} row - The candle: its timestamp, an ISO time, and its open, high, low, close and volume
+ * @returns {?{seconds: number, open: number, high: number, low: number, close: number, volume: number}} The candle, its time in unix seconds; or null when a field is unreadable or the close is not above 0
+ */
+function candleOf(row) {
+  const seconds = Date.parse(row?.timestamp) / 1000;
+  const candle = {
+    seconds,
+    open: Number(row?.open),
+    high: Number(row?.high),
+    low: Number(row?.low),
+    close: Number(row?.close),
+    volume: Number(row?.volume),
+  };
+  const readable = Object.values(candle).every(Number.isFinite);
+  return readable && candle.close > 0 ? candle : null;
+}
+
+/**
+ * Asks Moralis for a pool's candles over a span of time, page by page, in
+ * USD: those of the token the pool lists first.
+ *
+ * @param {{chain: string, pair: string, timeframe: string, fromSeconds: number, toSeconds: number}} query - Moralis's id for the chain, such as '0x171', the pool's address, the candles' timeframe, such as '1d', and the span's first and last times, in unix seconds
+ * @param {string} apiKey - The Moralis api key
+ * @param {MoralisSettings} settings - How to ask (`moralisSettings`)
+ * @returns {Promise<{tokenAddress: (string|null), candles: Array<{seconds: number, open: number, high: number, low: number, close: number, volume: number}>}>} The token Moralis priced, in lower case, and the candles, oldest first; no candles when Moralis has none
+ * @throws {Error} When Moralis answers with an error, a refused key among them, or gives more than MAX_CANDLE_PAGES pages
+ */
+export async function pairCandles(
+  { chain, pair, timeframe, fromSeconds, toSeconds },
+  apiKey,
+  settings,
+) {
+  const candles = [];
+  let tokenAddress = null;
+  let cursor = null;
+  for (let page = 1; ; page++) {
+    if (page > MAX_CANDLE_PAGES) {
+      throw new Error(
+        `Moralis gave more than ${MAX_CANDLE_PAGES} pages of candles for pool ${pair}`,
+      );
+    }
+    const query = new URLSearchParams({
+      chain,
+      timeframe,
+      currency: "usd",
+      fromDate: String(fromSeconds),
+      toDate: String(toSeconds),
+    });
+    if (cursor !== null) query.set("cursor", cursor);
+    const body = await askMoralis(
+      `${settings.apiUrl}/pairs/${pair}/ohlcv?${query}`,
+      apiKey,
+      settings,
+    );
+    if (body === null) break;
+    if (typeof body.tokenAddress === "string") {
+      tokenAddress = body.tokenAddress.toLowerCase();
+    }
+    for (const row of Array.isArray(body.result) ? body.result : []) {
+      const candle = candleOf(row);
+      if (candle !== null) candles.push(candle);
+    }
+    cursor =
+      typeof body.cursor === "string" && body.cursor !== ""
+        ? body.cursor
+        : null;
+    if (cursor === null) break;
+  }
+  candles.sort((a, b) => a.seconds - b.seconds);
+  return { tokenAddress, candles };
 }

@@ -6,6 +6,7 @@
   "exports": {
     "./api-key-store": "./api-key-store/index.js",
     "./apps-script-runner": "./apps-script-runner/index.js",
+    "./dex-prices/dextools": "./dex-prices/dextools.js",
     "./dex-prices/geckoterminal": "./dex-prices/geckoterminal.js",
     "./dex-prices/moralis": "./dex-prices/moralis.js",
     "./dex-prices/web-request": "./dex-prices/web-request.js",
@@ -17,6 +18,7 @@
     "./lib/http-url": "./lib/http-url.js",
     "./lib/message-of": "./lib/message-of.js",
     "./lib/repo-checks": "./lib/repo-checks.js",
+    "./lib/time-limited-fetch": "./lib/time-limited-fetch.js",
     "./summ-csv": "./summ-csv/index.js"
   },
   "bin": {
