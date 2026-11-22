@@ -154,6 +154,36 @@ readable by the owner alone. It prints no key. crypto-price-filler reads
 `config-example.json`, its committed settings, with its own `config.json`,
 which git ignores, laid over them.
 
+## Settings files
+
+A tool keeps its settings in a JSON file, such as its `config.json`, and
+each file is checked against its JSON Schema, a description in JSON of
+the keys the file may hold and the kind of value each takes, before the
+tool takes any setting, as LP Ranger checks its settings: by Ajv, an npm
+package of the ajv-validator project that checks JSON against a schema, on
+the 2020-12 draft of JSON Schema, strict, with every object refusing a key its schema does not
+name. A value of the wrong kind is refused, never corrected, and every
+problem in a file is listed at once, one line each.
+`lib/settings-schema.js` holds the shared part: `compileSettingsSchema`,
+which compiles a schema with the formats code checks (an http or https
+url, an EIP-55 address); `KINDS`, the kinds of value, each with the words
+a refusal uses, such as "a whole number above 0"; `kindParser`, which
+makes a command line's option parser from a kind, so a typed value and
+the same value in a file meet one rule; and `settingsProblems`, which
+words Ajv's errors. `lib/settings-file.js` reads a file with them: a
+missing file gives no settings unless the caller marks it required, and a
+file that cannot be read, is not JSON, or has a problem its schema finds
+stops the run. The schemas here: the key store's of a project's `apiKeys`
+(`api-key-store/project-keys.js`), crypto-price-filler's of its settings
+(`config.js`) and of its token list (`supported-tokens.js`), and the Summ
+csv utility's of its settings (`summ-csv/index.js`); a Node version's
+config file is held to a schema built from the script's own config
+objects (`apps-script-runner/load-apps-script.js`). A schema names only
+the keys its file is read for; a key is added to one with the owner's
+go-ahead. The projects that install this repo build their schemas the same
+way, from `crypto-price-fetchers/lib/settings-schema` and
+`…/lib/settings-file`.
+
 ## DEX Screener's functions
 
 DEX Screener, a service that lists the pairs of decentralized exchanges
@@ -212,7 +242,14 @@ such as `head`, ends with its exit code and no stack trace. A value a
 command line takes is checked as commander parses it, with
 `InvalidArgumentError`, so a mistake names its option before anything
 runs; `lib/calendar-day.js` checks a day and `lib/http-url.js` an http or
-https url, for every repo. The checks of a help, every option its
+https url, for every repo. A command line that takes its options' defaults
+from a settings file, such as a project's `config.json`, checks the file
+against its schema (Settings files, above), makes each option's parser
+from the kind its schema gives the setting, and refuses, with
+`checkConflicts` (`lib/option-conflicts.js`), a typed option that
+conflicts with one the file sets, which commander's own check of
+conflicts passes over. The
+checks of a help, every option its
 examples use listed in it among them, and of a help into a closed pipe,
 are in `lib/command-line-help.js`, exported as
 `crypto-price-fetchers/lib/command-line-help`:
@@ -310,7 +347,8 @@ package, and the projects that install this repo import each by the
 package's name, as `exports` in package.json names it:
 `crypto-price-fetchers/lib/message-of`, `…/lib/command-line-help`,
 `…/lib/closed-output`, `…/lib/calendar-day`, `…/lib/http-url`,
-`…/lib/repo-checks` and `…/lib/time-limited-fetch`
+`…/lib/repo-checks`, `…/lib/time-limited-fetch`, `…/lib/settings-file`,
+`…/lib/settings-schema` and `…/lib/option-conflicts`
 (`test/package-exports.test.js` loads each by that name). The tests ask no
 outside service: the scripts' requests go to a stand-in fetch or a stand-in
 server on the computer (`test/helpers/stand-in-web.js`). The key store's

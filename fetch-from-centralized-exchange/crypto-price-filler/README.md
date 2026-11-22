@@ -63,7 +63,12 @@ settings go in `config.json` beside it, which git, the version-control
 program, ignores: each setting there
 takes the place of the same one in `config-example.json`, so it needs only
 those that differ. The file header in `./index.js` describes every setting.
-The exchange sources run on the Sheets script's own settings, its `CONFIG`.
+Both files, and `supported-tokens.json`, are checked against their JSON
+Schemas (`SETTINGS_SCHEMA` in `config.js`, `SUPPORTED_TOKENS_SCHEMA` in
+`supported-tokens.js`) before the tool takes them: a setting the tool does
+not read, such as a misspelled one, or a value of the wrong kind stops the
+run, with every problem listed. The exchange sources run on the Sheets
+script's own settings, its `CONFIG`.
 
 The api keys are no settings: the CoinGecko, CoinPaprika and Moralis keys
 are kept in `api-keys.json` at the repo's top, encrypted with a password you

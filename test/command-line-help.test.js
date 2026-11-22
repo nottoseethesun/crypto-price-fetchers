@@ -15,8 +15,9 @@
  * rule as well. A third checks that the checks find what a help lacks.
  */
 
-import { describe, it } from "node:test";
+import { after, describe, it } from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -26,6 +27,9 @@ import {
   helpOf,
   helpProblems,
 } from "../lib/command-line-help.js";
+import { makeTempFolder, removeTempFolders } from "./helpers/temp-folders.js";
+
+after(removeTempFolders);
 
 /** The repo's top folder. */
 const REPO_TOP = fileURLToPath(new URL("..", import.meta.url));
@@ -70,7 +74,6 @@ const COMMAND_MODULES = Object.freeze({
   "github-project-deps/index.js": "github-project-deps.js",
   "actionlint/index.js": "run-actionlint.js",
   "apps-script-runner/command-line.js": "crypto-price-fetchers.js",
-  "apps-script-runner/index.js": "crypto-price-fetchers.js",
   [`${FILLER}/commander.js`]: `${FILLER}/index.js`,
 });
 
@@ -233,10 +236,38 @@ describe("the checks of a help", () => {
     assert.equal(shared.helpProblems, helpProblems);
   });
 
-  it("find the files that import commander, and only those", () => {
+  it("find the files that import from commander what declares a command, and only those", () => {
     const users = filesUsingCommander(REPO_TOP);
-    assert.ok(users.includes("apps-script-runner/index.js"));
+    assert.ok(users.includes("apps-script-runner/command-line.js"));
     assert.ok(users.includes("api-key-store/key-manager.js"));
     assert.ok(!users.includes("lib/command-line-help.js"));
+    assert.ok(!users.includes("lib/settings-schema.js"));
+    assert.ok(!users.includes("apps-script-runner/index.js"));
+  });
+
+  it("count an import over several lines, the whole package and a re-export, but not InvalidArgumentError or Option alone", () => {
+    const top = makeTempFolder("commander-users");
+    const files = {
+      "one-line.js": 'import { Command } from "commander";\n',
+      "several-lines.js":
+        'import {\n  InvalidArgumentError,\n  Command as Cmd,\n} from "commander";\n',
+      "whole.js": 'import commander from "commander";\n',
+      "namespace.js": 'import * as commander from "commander";\n',
+      "re-export.js": 'export { program } from "commander";\n',
+      "parser.js": 'import { InvalidArgumentError } from "commander";\n',
+      "options.js":
+        'import {\n  InvalidArgumentError,\n  Option,\n} from "commander";\n',
+      "other.js": 'import { Command } from "commander-plus";\n',
+    };
+    for (const [name, text] of Object.entries(files)) {
+      fs.writeFileSync(path.join(top, name), text);
+    }
+    assert.deepEqual(filesUsingCommander(top).sort(), [
+      "namespace.js",
+      "one-line.js",
+      "re-export.js",
+      "several-lines.js",
+      "whole.js",
+    ]);
   });
 });

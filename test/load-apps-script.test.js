@@ -115,7 +115,29 @@ describe("applyConfig", () => {
   it("refuses a field the object does not have, naming the fields it has", () => {
     assert.throws(
       () => applyConfig(loadFixture(), { CONFIG: { API_KEY: "k" } }),
-      /CONFIG has no field API_KEY\. Its fields: BASE_URL, KEY, TRIES/,
+      {
+        message:
+          "CONFIG → API_KEY is not a setting this tool reads\nThe script's CONFIG has the fields BASE_URL, KEY, TRIES.",
+      },
+    );
+  });
+
+  it("refuses a value of another kind than the script gives the field, listing every problem at once", () => {
+    const context = loadFixture();
+    assert.throws(
+      () =>
+        applyConfig(context, {
+          CONFIG: { KEY: 7, TRIES: "two", BASE_URL: "http://other.invalid" },
+        }),
+      {
+        message:
+          'CONFIG → KEY must be text; it is 7\nCONFIG → TRIES must be a list; it is "two"\nThe script\'s CONFIG has the fields BASE_URL, KEY, TRIES.',
+      },
+    );
+    assert.equal(
+      callScriptFunction(context, "readKey", []),
+      "placeholder",
+      "no field was set",
     );
   });
 

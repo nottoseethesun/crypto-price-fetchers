@@ -413,7 +413,7 @@ describe("crypto-price-fetchers.js, the command line", () => {
       path.join(folder, "missing.json"),
     ]);
     assert.equal(result.exitCode, 1);
-    assert.match(result.stderr, /Cannot read the config file/);
+    assert.match(result.stderr, /Cannot read \S*missing\.json: /);
   });
 
   it("runs as a program: node crypto-price-fetchers.js --help", () => {

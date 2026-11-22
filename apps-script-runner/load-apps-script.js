@@ -22,10 +22,14 @@
  *   so it reaches a value the script reads when a function is called, such
  *   as a key it sends with each request, and not one the script worked out
  *   as it loaded, such as a url built from a config field at the top
- *   level. Each object and field must already be in the script, so a
- *   misspelt name fails, naming it, instead of being ignored. Values are
- *   made in the script's own realm, so the script's `instanceof Array`
- *   holds for them.
+ *   level. Each object must already be in the script, so a misspelt name
+ *   fails, naming it, instead of being ignored. Each object's fields are
+ *   checked against a JSON Schema made from the object itself
+ *   (`fieldsSchema`, by `lib/settings-schema.js`): each field it names
+ *   must be one the object has, holding a value of the kind the script
+ *   gives it, so a text where the script keeps a number fails too; every
+ *   problem is listed at once. Values are made in the script's own realm,
+ *   so the script's `instanceof Array` holds for them.
  * - `callScriptFunction` calls one of the script's functions by name. A
  *   Date or an array among the arguments is remade in the script's realm
  *   first, so the script's `instanceof Date` and `instanceof Array` hold
@@ -36,6 +40,10 @@
  */
 
 import vm from "node:vm";
+import {
+  compileSettingsSchema,
+  settingsProblems,
+} from "../lib/settings-schema.js";
 
 /** What a name a script declares looks like. */
 const DECLARED_NAME = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
@@ -75,13 +83,52 @@ export function loadAppsScript(files, services) {
 }
 
 /**
+ * The kind of value a config field takes, as JSON Schema: the JSON type of
+ * the value the script gives it, with the words for it, or any value for a
+ * field the script leaves null.
+ *
+ * @param {*} value - The field's value in the script
+ * @returns {Object} The schema
+ */
+function fieldKind(value) {
+  if (value === null || value === undefined)
+    return { description: "any value" };
+  if (Array.isArray(value)) return { type: "array", description: "a list" };
+  const kinds = {
+    string: { type: "string", description: "text" },
+    number: { type: "number", description: "a number" },
+    boolean: { type: "boolean", description: "true or false" },
+    object: { type: "object", description: "an object" },
+  };
+  return kinds[typeof value] ?? { description: "any value" };
+}
+
+/**
+ * A JSON Schema of the fields a config may set on one of the script's
+ * objects: each field the object has, of the kind of value the script
+ * gives it, and no other.
+ *
+ * @param {Object} target - The script's config object
+ * @returns {Object} The schema
+ */
+export function fieldsSchema(target) {
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: Object.fromEntries(
+      Object.keys(target).map((field) => [field, fieldKind(target[field])]),
+    ),
+  };
+}
+
+/**
  * Sets the fields of one of the script's config objects.
  *
  * @param {Object} context - The script's context (`loadAppsScript`)
  * @param {string} name - The config object's name in the script, such as `CONFIG`
  * @param {Object} fields - The fields to set, by name
  * @returns {void}
- * @throws {Error} When the name is not one a script can declare, the fields are not an object, the script has no such object, or the object has no such field
+ * @throws {Error} When the name is not one a script can declare, the fields are not an object, the script has no such object, or its schema finds a problem in the fields: a field the object has not, or a value of another kind than the script's
  */
 function applyConfigObject(context, name, fields) {
   if (!DECLARED_NAME.test(name)) {
@@ -99,13 +146,18 @@ function applyConfigObject(context, name, fields) {
   if (target === null || typeof target !== "object") {
     throw new Error(`The script has no object named ${name} to configure`);
   }
+  const problems = settingsProblems(
+    name,
+    compileSettingsSchema(fieldsSchema(target)),
+    fields,
+  );
+  if (problems.length > 0) {
+    throw new Error(
+      `${problems.join("\n")}\nThe script's ${name} has the fields ${Object.keys(target).join(", ")}.`,
+    );
+  }
   const inScriptRealm = vm.runInContext("(json) => JSON.parse(json)", context);
   for (const [field, value] of Object.entries(fields)) {
-    if (!Object.hasOwn(target, field)) {
-      throw new Error(
-        `The script's ${name} has no field ${field}. Its fields: ${Object.keys(target).join(", ")}`,
-      );
-    }
     target[field] = inScriptRealm(JSON.stringify(value));
   }
 }

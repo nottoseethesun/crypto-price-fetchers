@@ -34,6 +34,7 @@ Two companion references sit alongside this one:
 - [Prices of Tokens That Trade in Pools](#prices-of-tokens-that-trade-in-pools)
 - [The Key Store](#the-key-store)
 - [The Summ CSV Writer](#the-summ-csv-writer)
+- [Settings Files](#settings-files)
 - [Projects That Use This One](#projects-that-use-this-one)
 - [Technology Choices](#technology-choices)
 
@@ -63,7 +64,7 @@ liquidity positions.
 | The versions tool | `github-project-deps.js`, `github-project-deps/` | The bin `github-project-deps`, which sets a project's dependencies from GitHub to their projects' main branch or latest release. |
 | The actionlint runner | `run-actionlint.js`, `actionlint/` | The bin `run-actionlint`, which runs actionlint, the checker of GitHub Actions workflow files, from its official release, refused unless its SHA-256, and the program's in it, are the ones this repo pins: every repo's lint runs it. |
 | The Summ CSV writer | `summ-csv.js`, `summ-csv/` | Writes the CSV files the owner imports into Summ, once every row has passed its rules: `npm run summ-csv`, the bin `summ-csv`, and `writeSummCsv` for a program. |
-| The shared helpers | `lib/` | Code more than one part, or more than one repo, uses, exported by the package's name for the projects that install this repo (`exports` in package.json): `messageOf`, which gives the message of something thrown (`crypto-price-fetchers/lib/message-of`); the checks of a command line's help, every option its examples use listed in it among them, and of its help into a closed pipe (`…/lib/command-line-help`); `endQuietlyWhenOutputCloses`, which ends a command line quietly when the program reading its output stops (`…/lib/closed-output`); `dayStartSeconds`, a day of the calendar written YYYY-MM-DD as the start of that day in UTC, refusing a day the calendar does not have (`…/lib/calendar-day`); `isHttpUrl` (`…/lib/http-url`); the checks of a repo's tracked files: EVM addresses in EIP-55's form, the npm targets and test files the docs must name, and the links and paths in the docs, which must point at files, folders and headings the repo keeps (`…/lib/repo-checks`); and `fetchWithinTimeLimit`, which sends a request and reads its whole answer within a time limit, naming the service when the time runs out (`…/lib/time-limited-fetch`): the price clients, the runner, the key store's checks and the downloads of actionlint and of DEX Screener's files send their requests through it. |
+| The shared helpers | `lib/` | Code more than one part, or more than one repo, uses, exported by the package's name for the projects that install this repo (`exports` in package.json): `messageOf`, which gives the message of something thrown (`crypto-price-fetchers/lib/message-of`); the checks of a command line's help, every option its examples use listed in it among them, and of its help into a closed pipe (`…/lib/command-line-help`); `endQuietlyWhenOutputCloses`, which ends a command line quietly when the program reading its output stops (`…/lib/closed-output`); `dayStartSeconds`, a day of the calendar written YYYY-MM-DD as the start of that day in UTC, refusing a day the calendar does not have (`…/lib/calendar-day`); `isHttpUrl` (`…/lib/http-url`); the checks of a repo's tracked files: EVM addresses in EIP-55's form, the npm targets and test files the docs must name, and the links and paths in the docs, which must point at files, folders and headings the repo keeps (`…/lib/repo-checks`); `fetchWithinTimeLimit`, which sends a request and reads its whole answer within a time limit, naming the service when the time runs out (`…/lib/time-limited-fetch`): the price clients, the runner, the key store's checks and the downloads of actionlint and of DEX Screener's files send their requests through it; the checks of a settings file against its JSON Schema, a description in JSON of the keys the file may hold and the kind of value each takes: the kinds of value, with the words of a refusal (`…/lib/settings-schema`), and `readSettingsFile`, which reads a settings file and checks it against its schema (`…/lib/settings-file`), as [Settings Files](#settings-files) describes; and `checkConflicts`, which refuses a typed option that conflicts with one a settings file sets (`…/lib/option-conflicts`). |
 
 ---
 
@@ -261,8 +262,11 @@ key store, each one saved. `backfill.js` fills the empty prices of a file
 already written.
 
 Its settings are `config-example.json`, committed, with its own
-`config.json`, which git ignores, laid over them. The exchange sources run
-on the script's own `CONFIG`.
+`config.json`, which git ignores, laid over them, and its tokens are those
+`supported-tokens.json` lists; each file is checked against its schema
+(`config.js`, `supported-tokens.js`) before the tool takes it, as
+[Settings Files](#settings-files) describes. The exchange sources run on
+the script's own `CONFIG`.
 
 ---
 
@@ -356,7 +360,9 @@ The utility works in three steps, each in a module of its own:
    chain's own coin, and, for a row on a blockchain, the forms of its hash
    and addresses and a contract address on every token. A chain's facts,
    its own coin and those forms, come from `settings.json`, by Summ's name
-   for the chain, so a chain is added there, with no change to the code. A
+   for the chain, so a chain is added there, with no change to the code;
+   the file is checked against its schema (`SUMM_CSV_SETTINGS_SCHEMA`) as
+   it is read. A
    last rule reads the cells that would be written and refuses a
    transaction's gas on a second row.
 3. **The cells.** `values.js` writes each value as text at the file's edge,
@@ -373,6 +379,70 @@ file beside it that is then renamed. `command-line.js` reads rows from a
 JSON file for `npm run summ-csv` and the bin `summ-csv`. A project that
 installs this repo imports `crypto-price-fetchers/summ-csv` to write such
 a file from its own code.
+
+---
+
+## Settings Files
+
+A tool keeps its settings in a JSON file, such as its `config.json`, and a
+setting in a file is a decision the owner made: a misspelled key that the
+tool passes over, or a value of the wrong kind that the tool bends to fit,
+runs the tool on a setting the owner did not choose. So each settings file
+has a JSON Schema, a description in JSON of the keys the file may hold and
+the kind of value each takes, and the file is checked against it before
+the tool takes any setting, as LP Ranger checks its settings.
+
+Ajv, an npm package of the ajv-validator project that checks JSON against
+a schema, compiles each schema on the 2020-12 draft of JSON Schema, strict, so a keyword or format it does
+not know is refused as the schema compiles. Every object in a schema
+names the keys it takes and refuses any other
+(`additionalProperties: false`). A value of the wrong kind is refused,
+never corrected, and every problem in the file is listed at once, one line
+each:
+
+```text
+crypto-price-filler/config.json → BACKFILL_HIGEST is not a setting this tool reads
+crypto-price-filler/config.json → BACKFILL_LOWEST must be true or false; it is "no"
+```
+
+`lib/settings-schema.js` holds the shared part:
+
+- `compileSettingsSchema` compiles a schema with the formats code checks,
+  since JSON Schema cannot: `http-url`, an http or https url
+  (`lib/http-url.js`), and `eip55-address`, an address in EIP-55's form
+  (`lib/repo-checks.js`).
+- `KINDS` holds the kinds of value the settings files share, each a schema
+  whose `description` is the words a refusal uses, such as "a whole number
+  above 0".
+- `kindParser` makes a command line's option parser from a kind, so a
+  value typed and the same value in a settings file meet one rule.
+- `settingsProblems` words Ajv's errors, one line for each value at
+  fault.
+
+`lib/settings-file.js` reads a file with them. A missing file gives no
+settings, so the tool runs on its defaults, unless the caller marks the
+file required; a file that cannot be read, is not JSON, holds no JSON
+object or has a problem its schema finds stops the run.
+
+The settings files of this repo, and the schemas they are held to:
+
+| File | Schema | Read by |
+| --- | --- | --- |
+| `config.json`, its `apiKeys` | `apiKeysSchema` in `api-key-store/project-keys.js`: a list of services the key store knows, each once; the file's other keys are the Node version's | The key store, for any project |
+| A Node version's `config.json` | Built from the script's own config objects (`fieldsSchema`, `apps-script-runner/load-apps-script.js`): each field the script has, of the kind its value has | The runner, before it sets a value |
+| `crypto-price-filler/config-example.json`, `crypto-price-filler/config.json` | `SETTINGS_SCHEMA` in `config.js` | crypto-price-filler |
+| `crypto-price-filler/supported-tokens.json` | `SUPPORTED_TOKENS_SCHEMA` in `supported-tokens.js` | crypto-price-filler |
+| `summ-csv/settings.json` | `SUMM_CSV_SETTINGS_SCHEMA` in `summ-csv/index.js` | The Summ CSV writer |
+
+A command line that takes its options' defaults from a settings file makes
+each option's parser from the kind its schema gives the setting. Commander
+refuses two conflicting options only when both are typed, so
+`checkConflicts` (`lib/option-conflicts.js`) refuses a typed option that
+conflicts with one the settings file sets.
+
+The projects that install this repo build their schemas from `KINDS` and
+read their settings with `readSettingsFile`, as
+`crypto-price-fetchers/lib/settings-schema` and `…/lib/settings-file`.
 
 ---
 
@@ -444,6 +514,10 @@ development packages.
   JavaScript, for crypto-price-filler, whose tests are written for it.
 - **commander**, the package that parses a command line and writes its
   help, for every command line.
+- **Ajv**, the package that checks JSON against a JSON Schema, for every
+  settings file, as LP Ranger checks its own: draft 2020-12, strict. It is
+  a dependency, since the projects that install this repo check their
+  settings with `lib/settings-schema.js`.
 - **esbuild**, a development package, for the build step's compile of DEX
   Screener's TypeScript, as DEX Screener's own build compiles it. zod and
   lodash, the two packages that code imports, are dependencies: the built

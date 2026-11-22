@@ -277,7 +277,7 @@ describe("openAppsScript, refusing to open", () => {
   it("with a config naming a field the script lacks", async () => {
     await assert.rejects(
       openAppsScript(RUNNER_CHECK, { config: { CONFIG: { API_KEY: "k" } } }),
-      /CONFIG has no field API_KEY/,
+      /CONFIG → API_KEY is not a setting this tool reads/,
     );
   });
 

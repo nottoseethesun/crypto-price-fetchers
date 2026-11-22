@@ -66,26 +66,31 @@ const PHEX_CONTRACT = "0x2b591e99afE9f32eAA6214f7B7629768c40Eeb39";
 const TEST_TOKENS_CONFIG = {
   tokens: {
     grc: {
+      name: "Gridcoin",
       coingecko_id: "gridcoin-research",
       coinpaprika_id: "grc-gridcoin",
       mexc_symbol: null,
     },
     xtm: {
+      name: "Minotari",
       coingecko_id: "minotari",
       coinpaprika_id: null,
       mexc_symbol: "XTM",
     },
     btc: {
+      name: "Bitcoin",
       coingecko_id: "bitcoin",
       coinpaprika_id: "btc-bitcoin",
       mexc_symbol: "BTC",
     },
     nogecko: {
+      name: "A token CoinGecko does not list",
       coingecko_id: null,
       coinpaprika_id: "ngk-nogecko",
       mexc_symbol: null,
     },
     phex: {
+      name: "HEX on PulseChain",
       coingecko_id: "hex-pulsechain",
       coinpaprika_id: "hex-hex-pulsechain",
       mexc_symbol: null,
@@ -94,6 +99,7 @@ const TEST_TOKENS_CONFIG = {
       moralis_chain: "0x171",
     },
     nomoralis: {
+      name: "A token with no Moralis chain",
       coingecko_id: null,
       coinpaprika_id: null,
       mexc_symbol: null,
@@ -101,6 +107,7 @@ const TEST_TOKENS_CONFIG = {
       geckoterminal_network: "pulsechain",
     },
     nogeckoterminal: {
+      name: "A token with no GeckoTerminal network",
       coingecko_id: null,
       coinpaprika_id: null,
       mexc_symbol: null,

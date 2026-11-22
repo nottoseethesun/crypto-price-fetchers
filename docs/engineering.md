@@ -252,16 +252,19 @@ that this section, or `CLAUDE.md`, names every one.
 | `http-url.test.js` | `lib/http-url.js`: an http or https url taken, anything else refused. |
 | `key-manager.test.js` | The key store's services, a project's key list, the key manager, and this repo's `manage-api-keys.js`. |
 | `key-prompts.test.js` | The flows that open the saved keys with one password and save a key once its service takes it. |
-| `load-apps-script.test.js` | A Sheets script loaded into a `vm` context, configured and called, in the test's thread. |
+| `load-apps-script.test.js` | A Sheets script loaded into a `vm` context, configured and called, in the test's thread; a config value refused when the script's object has no such field or holds another kind of value there. |
 | `message-of.test.js` | `lib/message-of.js`, and that the package ships `lib/`. |
 | `no-or-default.test.js` | `eslint-rules/no-or-default.js`, the lint's rule against a default made with `\|\|`. |
 | `package-exports.test.js` | Every module the package exports, loaded by the package's name, as a project that installs this repo loads it, and shipped. |
 | `no-secret-logging.test.js` | `eslint-rules/no-secret-logging.js`, the security lint's rule against printing a name that may hold a secret. |
+| `option-conflicts.test.js` | `lib/option-conflicts.js`: a typed option that conflicts with one a settings file sets refused, naming both and the file; the settings file's option alone, or neither option, passed; and two typed options left to commander, which refuses them as it parses. |
 | `repo-checks.test.js` | `lib/repo-checks.js`, on repos made in temp folders, and this repo held to it: its EVM addresses in EIP-55's form, its npm targets and test files named in the docs, and its docs' links and paths pointing at the files, folders and headings it keeps. |
 | `run-apps-script.test.js` | `openAppsScript`: a Sheets script run in a worker thread, with its web requests done on the caller's thread. |
+| `settings-file.test.js` | `lib/settings-file.js`: a settings file's JSON object read whole; a missing file giving no settings unless it is required; a file it cannot read, one that is not JSON and JSON that is no object refused, naming the file; and a file its schema finds problems in refused, listing every problem. |
+| `settings-schema.test.js` | `lib/settings-schema.js`: a schema compiled strict, with the shared formats and a project's own; every problem in a file named at once, in the words of its kind; a value no shape of a choice fits refused in one line; a key another needs named missing; and an option parser made from a kind. |
 | `summ-csv.test.js` | The Summ CSV writer, part one: a header's columns, the rules a row must pass, and the text of a file. |
 | `summ-csv-values.test.js` | How the Summ CSV writer turns a row's values into the text of cells. |
-| `summ-csv-files.test.js` | The Summ CSV writer, part two: the template it reads, the settings it ships, the file it writes, its command line, and what the package ships for it. |
+| `summ-csv-files.test.js` | The Summ CSV writer, part two: the template it reads, the settings it ships and their schema, the file it writes, its command line, and what the package ships for it. |
 | `time-limited-fetch.test.js` | `lib/time-limited-fetch.js`: an answer read in full, a server that never answers and one that stops in its body, each given up on at the limit with an error naming the service, a caller's own signal that aborts the request, an answer with no body, and a limit that is not a number of milliseconds above 0 refused. |
 | `unlock-api-keys.test.js` | `unlock-api-keys.sh`, in bash, and in zsh where zsh is installed. |
 
@@ -290,6 +293,7 @@ MEXC does.
 | `progress.test.js` | `utils/progress.js`, the progress bar. |
 | `regressions.test.js` | The fixed bugs of the tool, its Sheets script and the menu. |
 | `regressions-command-line.test.js` | The fixed bugs of the two command lines: their checks of a value, and the settings they fall back to. |
+| `settings-files.test.js` | `config.js` and `supported-tokens.js`: the committed settings and token list held to their schemas, the owner's `config.json` laid over the committed settings, and files with a key no schema names or a value of the wrong kind refused, listing every problem. |
 | `sheets-sources.test.js` | The exchange script's sources, MEXC, CoinGecko and CoinPaprika, which the sheet and the tool both price with. |
 | `token-validation.test.js` | A token with no sources refused, naming the tokens the tool supports. |
 | `xtm-coingecko-id.test.js` | XTM priced from CoinGecko under the id of Minotari, its project. |

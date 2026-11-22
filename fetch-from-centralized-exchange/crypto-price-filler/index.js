@@ -40,7 +40,10 @@
  *
  * Your own settings go in `config.json`, which git ignores: each setting in it
  * takes the place of the same setting in `config-example.json`, so it needs only
- * the ones that differ. Without it, the tool runs on the committed settings.
+ * the ones that differ. Without it, the tool runs on the committed settings. Each
+ * file is checked against its JSON Schema before the tool takes a setting: a key the
+ * schema does not name, or a value of the wrong kind, stops the run, with every
+ * problem listed.
  *
  * The CoinGecko, CoinPaprika and Moralis api keys are no settings: they are kept
  * encrypted, with a password you choose, in `api-keys.json` at the repo's top, which git
@@ -110,7 +113,9 @@
  *      for null checks and logging
  *
  *   Either way, the source's id field goes in `supported-tokens.json`, and its settings in
- *   `config-example.json`. An api key, if the service needs one, is no setting: list the
+ *   `config-example.json`, each named in its file's JSON Schema (`SUPPORTED_TOKENS_SCHEMA`
+ *   in `supported-tokens.js`, `SETTINGS_SCHEMA` in `config.js`), which refuses a key it
+ *   does not name. An api key, if the service needs one, is no setting: list the
  *   service in the repo's top `config.json` under `apiKeys`, with its check in
  *   `api-key-store/services.js`, and open it as `index.js` opens the others.
  *

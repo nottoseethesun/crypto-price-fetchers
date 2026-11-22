@@ -57,8 +57,7 @@ describe("readConfigFile", () => {
     const file = path.join(folder, "missing.json");
     assert.throws(
       () => readConfigFile(file, { required: true }),
-      (error) =>
-        error.message.startsWith(`Cannot read the config file ${file}`),
+      (error) => error.message.startsWith(`Cannot read ${file}: `),
     );
   });
 

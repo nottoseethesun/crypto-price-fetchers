@@ -163,9 +163,14 @@ The rules for a row on a blockchain read that chain's facts from
   names a `prefix`, an `alphabet` (`hex` or `base58`) and a `length`, or a
   `minLength` and a `maxLength`.
 - `referencePriceCurrencies`: the fiat currencies a reference price may be
-  in.
+  in, each once.
 
-A program can pass settings of its own as `settings`.
+`readSummCsvSettings` checks the file against `SUMM_CSV_SETTINGS_SCHEMA`,
+its JSON Schema, as it reads it, with crypto-price-fetchers'
+`readSettingsFile` (`lib/settings-file.js`): a key the schema does not
+name, a form with both a `length` and a `minLength`, or an alphabet the
+utility does not know stops the run, with every problem listed. A program
+can pass settings of its own as `settings`.
 
 ### Adding a chain
 

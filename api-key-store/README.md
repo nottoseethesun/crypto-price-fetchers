@@ -21,6 +21,12 @@ each key, and saves it encrypted once its service takes it:
   { "apiKeys": ["coingecko", "dextools", "x1ninja"] }
   ```
 
+  The key store checks `apiKeys` against its JSON Schema as it reads the
+  file (`readNeededKeys`, `project-keys.js`): a list of the services it
+  knows, each once. A file without the list, or with a service listed
+  twice or one the store does not know, stops the program, with every
+  problem listed. The file's other keys are the project's.
+
 - The project's key manager, which `npm run api-keys` runs (npm, Node's
   package manager, runs the commands a project's `package.json` names),
   lists those keys, each saved or not, and asks for each one not saved. Nothing it prints shows a

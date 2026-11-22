@@ -80,7 +80,7 @@ describe("combinedScript and its block", () => {
         combine([{ name: "a.gs", source: "const CONFIG = { A: 1 };" }], {
           CONFIG: { NO_SUCH_FIELD: 1 },
         }),
-      /The script's CONFIG has no field NO_SUCH_FIELD/,
+      /CONFIG → NO_SUCH_FIELD is not a setting this tool reads/,
     );
   });
 
