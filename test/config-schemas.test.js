@@ -6,17 +6,23 @@
  *
  * The runner's check (`apps-script-runner/config-schema-check.js`) is
  * tested on a fixture script, then run on each Node version's schemas, its
- * script loaded as the build joins it. A config.json is then checked
- * against the schemas as the runner and the build check it.
+ * script loaded as the build joins it. Each Node version's
+ * config-example.json, beside the config.json it reads, is held to its
+ * schemas and to the values written in its script. A config.json is then
+ * checked against the schemas as the runner and the build check it.
  */
 
 import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
+import vm from "node:vm";
 import { APPS_SCRIPTS } from "../build/tools/apps-script-build/index.js";
+import { createAppsScriptServices } from "../apps-script-runner/apps-script-services.js";
 import { readConfigFile } from "../apps-script-runner/config-file.js";
 import { configSchemaProblems } from "../apps-script-runner/config-schema-check.js";
+import { loadAppsScript } from "../apps-script-runner/load-apps-script.js";
 import { KINDS } from "../lib/settings-schema.js";
 import { makeTempFolder, removeTempFolders } from "./helpers/temp-folders.js";
 
@@ -123,6 +129,42 @@ for (const spec of APPS_SCRIPTS) {
       [],
     );
   });
+
+  it(`${spec.name}'s config-example.json, beside the config.json its Node version reads, sets each field its schemas name to the value written in the script`, () => {
+    const example = path.join(
+      path.dirname(spec.defaultConfigFile),
+      "config-example.json",
+    );
+    const values = readConfigFile(example, {
+      required: true,
+      schemas: spec.configSchemas,
+    });
+    const script = loadAppsScript(
+      spec.files.map((file) => ({
+        source: fs.readFileSync(file.path, "utf8"),
+        filename: file.path,
+      })),
+      createAppsScriptServices({
+        fetchSync: () => {
+          throw new Error("The script asked the web as it loaded");
+        },
+      }),
+    );
+    for (const [name, schema] of Object.entries(spec.configSchemas)) {
+      const written = JSON.parse(
+        vm.runInContext(`JSON.stringify(${name})`, script),
+      );
+      assert.deepEqual(
+        values[name],
+        Object.fromEntries(
+          Object.keys(schema.properties).map((field) => [
+            field,
+            written[field],
+          ]),
+        ),
+      );
+    }
+  });
 }
 
 describe("a config.json checked against a Node version's schemas", () => {
@@ -195,9 +237,8 @@ describe("a config.json checked against a Node version's schemas", () => {
     });
   });
 
-  it("gives the values that hold to the schemas, the project's list of api keys left out", () => {
+  it("gives the values that hold to the schemas", () => {
     const { read } = configOf(exchange, {
-      apiKeys: ["coingecko"],
       CONFIG: {
         COINGECKO_BASE: "https://pro-api.coingecko.com/api/v3",
         TIMEZONE_OFFSETS: { UTC: 0, IST: 5.5 },

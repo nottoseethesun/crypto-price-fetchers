@@ -20,16 +20,12 @@
  * Node version's own names, each field of the kind of value it takes, and
  * no other, an api key among the fields refused, since no key is a
  * setting; every problem is listed at once.
- * A project's top `config.json` also lists the api keys its programs use,
- * under `apiKeys`, for the key manager; that is no config object of a
- * script, so `readConfigFile` leaves it out.
  *
  * Fit: the command lines read their `--config` file with this
  * (`command-line.js`), and a program that imports a Node version can too.
  */
 
 import { readSettingsFile } from "../lib/settings-file.js";
-import { KINDS } from "../lib/settings-schema.js";
 import { MAX_CACHE_SECONDS } from "./apps-script-services.js";
 
 /**
@@ -46,8 +42,7 @@ export const CACHE_SECONDS_KIND = Object.freeze({
 
 /**
  * The JSON Schema of a config file: each of the script's config objects
- * the schemas name, by name, and the project's `apiKeys` list, which the
- * key store reads; no other key.
+ * the schemas name, by name, and no other key.
  *
  * @param {Object<string, Object>} schemas - Each config object's JSON Schema, by its name in the script
  * @returns {Object} The file's schema
@@ -56,16 +51,7 @@ export function configFileSchema(schemas) {
   return {
     type: "object",
     additionalProperties: false,
-    properties: {
-      ...schemas,
-      apiKeys: {
-        type: "array",
-        uniqueItems: true,
-        items: KINDS.text,
-        description:
-          "a list of the services whose keys the programs send, each once",
-      },
-    },
+    properties: { ...schemas },
   };
 }
 
@@ -77,18 +63,16 @@ export function configFileSchema(schemas) {
  * @param {Object} [options] - How to read it
  * @param {boolean} [options.required=false] - Whether a missing file is an error, rather than no values
  * @param {Object<string, Object>} [options.schemas] - Each config object's JSON Schema, by its name in the script (`configFileSchema`)
- * @returns {Object<string, Object>} The values, by config object, without the project's `apiKeys` list
+ * @returns {Object<string, Object>} The values, by config object
  * @throws {Error} When the file cannot be read (or is missing and required), is not JSON, holds no JSON object, or has a problem the schemas find, every problem listed
  */
 export function readConfigFile(file, { required = false, schemas } = {}) {
-  const values = {
+  return {
     ...readSettingsFile(file, {
       required,
       schema: schemas === undefined ? undefined : configFileSchema(schemas),
     }),
   };
-  delete values.apiKeys;
-  return values;
 }
 
 /**

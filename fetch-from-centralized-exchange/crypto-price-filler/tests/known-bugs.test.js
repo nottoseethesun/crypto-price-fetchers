@@ -14,15 +14,11 @@
  *
  * The Sheets scripts run unchanged in the test's thread, through
  * `tests/helpers/sheets-script.js`, with a stand-in for the Apps Script
- * service each test is about: the script lock. The test of the file the
- * tool writes parses its command line, which runs nothing, and asks git
- * whether it ignores that file.
+ * service each test is about: the script lock.
  */
 
 import { describe, it, expect } from "vitest";
-import { spawnSync } from "child_process";
 import path from "path";
-import { setupCommander } from "../commander.js";
 import {
   CUSTOM_FUNCTION_LIMIT_MS,
   busyLockService,
@@ -32,7 +28,7 @@ import {
 /** The DexTools script, at the repo's top. */
 const DEXTOOLS_SCRIPT = path.resolve(
   __dirname,
-  "../../../src/crypto-price-fetchers.gs",
+  "../../../crypto-price-fetchers/src/crypto-price-fetchers.gs",
 );
 
 describe("waits inside a custom function", () => {
@@ -49,31 +45,6 @@ describe("waits inside a custom function", () => {
       );
       expect(waits.length).toBeGreaterThan(0);
       expect(Math.max(...waits)).toBeLessThanOrEqual(CUSTOM_FUNCTION_LIMIT_MS);
-    },
-  );
-});
-
-/** The repo's top folder, from which the docs run the tool. */
-const REPO_TOP = path.resolve(__dirname, "../../..");
-
-describe("the file the tool writes when no --output is given", () => {
-  it.fails(
-    "is one git ignores, when the tool runs from the repo's top folder",
-    () => {
-      const { output } = setupCommander()
-        .parse([
-          "node",
-          "crypto-price-filler",
-          "--token=grc",
-          "--input=mining.csv",
-        ])
-        .opts();
-      const checked = spawnSync(
-        "git",
-        ["check-ignore", "-q", path.resolve(REPO_TOP, output)],
-        { cwd: REPO_TOP },
-      );
-      expect(checked.status).toBe(0);
     },
   );
 });

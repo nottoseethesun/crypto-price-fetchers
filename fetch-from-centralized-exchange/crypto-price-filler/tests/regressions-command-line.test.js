@@ -424,3 +424,23 @@ describe("the command lines' checks", () => {
     }
   });
 });
+
+describe("the file the tool writes when no --output is given", () => {
+  it("is one git ignores, when the tool runs from the repo's top folder", () => {
+    const repoTop = path.resolve(__dirname, "../../..");
+    const { output } = setupCommander()
+      .parse([
+        "node",
+        "crypto-price-filler",
+        "--token=grc",
+        "--input=mining.csv",
+      ])
+      .opts();
+    const checked = spawnSync(
+      "git",
+      ["check-ignore", "-q", path.resolve(repoTop, output)],
+      { cwd: repoTop },
+    );
+    expect(checked.status).toBe(0);
+  });
+});

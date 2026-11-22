@@ -51,15 +51,30 @@ keys encrypted, and the order in which the price clients ask the services
 that price pools follow LP Ranger, the owner's bot that manages his 9mm V3
 liquidity positions.
 
-The programs a reader runs from a terminal are in `bin/`, the Sheets
-scripts in `src/`, the build's tools in `build/tools/`, the install of
-the operating system's programs the tools use in `install/`, and the code
-the programs share in folders of its own; the file the build writes when
-there is no clipboard goes to `dist/apps-script/`, which git ignores.
+The programs a reader runs from a terminal are in `bin/`. Each of the two
+price tools has a folder of its own at the repo's top, which holds its
+Sheets scripts, in its `src/`, its README and its settings:
+`crypto-price-fetchers/`, a token's price now, and
+`fetch-from-centralized-exchange/`, a token's price at a past time, with
+crypto-price-filler's package. The top `src/` holds the menu, the build's
+tools are in `build/tools/`, the install of the operating system's
+programs the tools use in `install/`, and the code the programs share in
+folders of its own; the file the build writes when there is no clipboard
+goes to `dist/apps-script/`, which git ignores.
+
+A tool that reads the owner's own files, crypto-price-filler or the Summ
+CSV writer, takes them from its folder's `input/`, and writes its results
+in its folder's `output/`, in a folder for each kind of file, such as
+`output/csv/`. Those files hold the owner's data, and the repo is public,
+so git keeps each of those folders by its `.gitkeep`, an empty file, and
+ignores everything else in it, and so do the format check and the secret
+scan. A file a tool writes when no option names one goes in its own
+`output/` folder, wherever the tool runs: crypto-price-filler's default is
+`output/csv/output.csv` in its folder.
 
 | Part | Where | What it is |
 | ---- | ----- | ---------- |
-| The Sheets scripts | `src/crypto-price-fetchers.gs`, `src/getCryptoPriceFromCentralizedExchange*.gs`, `src/crypto-price-fetchers-menu.gs` | Apps Script functions a sheet's cells call, and the menu that runs them again and shows their help. |
+| The Sheets scripts | `crypto-price-fetchers/src/crypto-price-fetchers.gs`, `fetch-from-centralized-exchange/src/getCryptoPriceFromCentralizedExchange*.gs`, `src/crypto-price-fetchers-menu.gs` | Apps Script functions a sheet's cells call, and the menu that runs them again and shows their help. |
 | The runner | `apps-script-runner/` | Runs a Sheets script under Node, unchanged. |
 | The Node versions | `bin/crypto-price-fetchers.js`, `bin/getCryptoPriceFromCentralizedExchange.js` | Each Sheets script as a Node module and a command line, through the runner. |
 | The build step | `build/tools/build.js`, `build/tools/apps-script-build/`, `build/tools/audit-dex-screener.js` | Joins the Sheets scripts, and DEX Screener's functions when asked, into one file with the saved api keys set at its end, on the clipboard, for one paste into Apps Script; and audits DEX Screener's files. |
@@ -71,7 +86,7 @@ there is no clipboard goes to `dist/apps-script/`, which git ignores.
 | The versions tool | `bin/github-project-deps.js`, `github-project-deps/` | The bin `github-project-deps`, which sets a project's dependencies from GitHub to their projects' main branch or latest release. |
 | The actionlint runner | `bin/run-actionlint.js`, `actionlint/` | The bin `run-actionlint`, which runs actionlint, the checker of GitHub Actions workflow files, from its official release, refused unless its SHA-256, and the program's in it, are the ones this repo pins: every repo's lint runs it. |
 | The Summ CSV writer | `bin/summ-csv.js`, `summ-csv/` | Writes the CSV files the owner imports into Summ, once every row has passed its rules: `npm run summ-csv`, the bin `summ-csv`, and `writeSummCsv` for a program. |
-| The shared helpers | `lib/` | Code more than one part, or more than one repo, uses, exported by the package's name for the projects that install this repo (`exports` in package.json): `messageOf`, which gives the message of something thrown (`crypto-price-fetchers/lib/message-of`); the checks of a command line's help, every option its examples use listed in it among them, and of its help into a closed pipe (`…/lib/command-line-help`); `endQuietlyWhenOutputCloses`, which ends a command line quietly when the program reading its output stops (`…/lib/closed-output`); `dayStartSeconds`, a day of the calendar written YYYY-MM-DD as the start of that day in UTC, refusing a day the calendar does not have (`…/lib/calendar-day`); `isHttpUrl` (`…/lib/http-url`); the checks of a repo's tracked files: EVM addresses in EIP-55's form, the npm targets and test files the docs must name, and the links and paths in the docs, which must point at files, folders and headings the repo keeps (`…/lib/repo-checks`); `fetchWithinTimeLimit`, which sends a request and reads its whole answer within a time limit, naming the service when the time runs out (`…/lib/time-limited-fetch`): the price clients, the runner, the key store's checks and the downloads of actionlint and of DEX Screener's files send their requests through it; the checks of a settings file against its JSON Schema, a description in JSON of the keys the file may hold and the kind of value each takes: the kinds of value, with the words of a refusal (`…/lib/settings-schema`), and `readSettingsFile`, which reads a settings file and checks it against its schema (`…/lib/settings-file`), as [Settings Files](#settings-files) describes; and `checkConflicts`, which refuses a typed option that conflicts with one a settings file sets (`…/lib/option-conflicts`). Two more serve this repo's parts alone, and are not exported: `askLine`, which asks a question at the terminal and gives the line typed (`lib/ask-line.js`), and the desktop's clipboard tool, found, handed text, and the package that holds one named (`lib/clipboard.js`). |
+| The shared helpers | `lib/` | Code more than one part, or more than one repo, uses, exported by the package's name for the projects that install this repo (`exports` in package.json): `messageOf`, which gives the message of something thrown (`crypto-price-fetchers/lib/message-of`); the checks of a command line's help, every option its examples use listed in it among them, and of its help into a closed pipe (`…/lib/command-line-help`); `endQuietlyWhenOutputCloses`, which ends a command line quietly when the program reading its output stops (`…/lib/closed-output`); `dayStartSeconds`, a day of the calendar written YYYY-MM-DD as the start of that day in UTC, refusing a day the calendar does not have (`…/lib/calendar-day`); `isHttpUrl` (`…/lib/http-url`); the checks of a repo's tracked files: EVM addresses in EIP-55's form, the npm targets and test files the docs must name, the links and paths in the docs, which must point at files, folders and headings the repo keeps, and the `config-example.json` beside every `config.json` (`…/lib/repo-checks`); `fetchWithinTimeLimit`, which sends a request and reads its whole answer within a time limit, naming the service when the time runs out (`…/lib/time-limited-fetch`): the price clients, the runner, the key store's checks and the downloads of actionlint and of DEX Screener's files send their requests through it; the checks of a settings file against its JSON Schema, a description in JSON of the keys the file may hold and the kind of value each takes: the kinds of value, with the words of a refusal (`…/lib/settings-schema`), and `readSettingsFile`, which reads a settings file and checks it against its schema (`…/lib/settings-file`), as [Settings Files](#settings-files) describes; and `checkConflicts`, which refuses a typed option that conflicts with one a settings file sets (`…/lib/option-conflicts`). Two more serve this repo's parts alone, and are not exported: `askLine`, which asks a question at the terminal and gives the line typed (`lib/ask-line.js`), and the desktop's clipboard tool, found, handed text, and the package that holds one named (`lib/clipboard.js`). |
 
 ---
 
@@ -80,14 +95,14 @@ there is no clipboard goes to `dist/apps-script/`, which git ignores.
 A Sheets script is Google Apps Script: JavaScript that runs on Google's
 servers, inside a spreadsheet, where a cell calls one of its functions.
 
-`src/crypto-price-fetchers.gs` gives a token's current price and its fully
-diluted value, from DexTools, a service that prices tokens from the pools
+`crypto-price-fetchers/src/crypto-price-fetchers.gs` gives a token's
+current price and its fully diluted value, from DexTools, a service that prices tokens from the pools
 of decentralized exchanges, for the chains DexTools covers, and from
 x1.ninja, which does the same for X1, which DexTools does not list. A cell
 names the chain and the token, or a pool.
 
-`src/getCryptoPriceFromCentralizedExchange.gs` gives a token's price at a
-past minute: by default the average of the high and the low of the candle
+`fetch-from-centralized-exchange/src/getCryptoPriceFromCentralizedExchange.gs`
+gives a token's price at a past minute: by default the average of the high and the low of the candle
 that holds it, or else the candle's high, low or close, from MEXC, a
 centralized exchange, first, then CoinGecko, then CoinPaprika, two
 services that gather the exchanges' prices. MEXC keeps minute candles for
@@ -224,8 +239,9 @@ file that holds them all, with the keys written in, for one paste.
   (`src/crypto-price-fetchers-menu.gs`); then each script whose Node version
   exports a build spec, `APPS_SCRIPT_BUILD`, which names the script's
   files in Apps Script's order, the services whose keys it sends, and the
-  function that lays the keys over its config: `src/crypto-price-fetchers.gs`,
-  then the exchange script's three files, its in-editor tests included;
+  function that lays the keys over its config:
+  `crypto-price-fetchers/src/crypto-price-fetchers.gs`, then the exchange
+  script's three files, its in-editor tests included;
   then DEX Screener's functions, when the owner asks for them.
 - **DEX Screener's functions.** DEX Screener, a service that lists the pairs
   of decentralized exchanges with their prices, published Google Sheets
@@ -306,8 +322,8 @@ Its settings are `config-example.json`, committed, with its own
 `supported-tokens.json` lists; each file is checked against its schema
 (`config.js`, `supported-tokens.js`) before the tool takes it, as
 [Settings Files](#settings-files) describes. The exchange sources run on
-the script's own `CONFIG`, with the values of the `config.json` beside the
-script laid over it, which the script's Node version reads when it opens
+the script's own `CONFIG`, with the values of the `config.json` in the
+script's tool folder, `fetch-from-centralized-exchange/`, laid over it, which the script's Node version reads when it opens
 the script, at the first price. So the filler checks that file against
 the Node version's schemas before its first row
 (`checkExchangeSettings`, `sources/exchange.js`), and a file they refuse
@@ -482,10 +498,24 @@ The settings files of this repo, and the schemas they are held to:
 | File | Schema | Read by |
 | --- | --- | --- |
 | `config.json`, its `apiKeys` | `apiKeysSchema` in `api-key-store/project-keys.js`: a list of services the key store knows, each once; it reads no other key, since every other key of the file is the project's | The key store, for any project |
-| A Node version's `config.json` | `CONFIG_SCHEMAS` in the Node version (`bin/crypto-price-fetchers.js`, `bin/getCryptoPriceFromCentralizedExchange.js`), which it passes to the runner and the build as `configSchemas`: for each config object it names, every field the script reads each time it is called, of its kind of value. An api key, which the key store sets, and a field the script reads as it loads, which a value laid after the load does not reach, are refused. The runner's `configSchemaProblems` (`apps-script-runner/config-schema-check.js`) holds each schema to its script: it loads the script with each config object watched, and names a field a schema names that the script reads as it loads, holds a key or lacks, a field read only when called that no schema names, and a value of the script's own that its schema refuses; `test/config-schemas.test.js` runs it on each Node version | The runner, before the script opens (`apps-script-runner/config-file.js`), and the build step, before its first question |
+| A Node version's `config.json`, in its tool's folder: `crypto-price-fetchers/config.json`, `fetch-from-centralized-exchange/config.json` | `CONFIG_SCHEMAS` in the Node version (`bin/crypto-price-fetchers.js`, `bin/getCryptoPriceFromCentralizedExchange.js`), which it passes to the runner and the build as `configSchemas`: for each config object it names, every field the script reads each time it is called, of its kind of value. An api key, which the key store sets, and a field the script reads as it loads, which a value laid after the load does not reach, are refused. The runner's `configSchemaProblems` (`apps-script-runner/config-schema-check.js`) holds each schema to its script: it loads the script with each config object watched, and names a field a schema names that the script reads as it loads, holds a key or lacks, a field read only when called that no schema names, and a value of the script's own that its schema refuses; `test/config-schemas.test.js` runs it on each Node version | The runner, before the script opens (`apps-script-runner/config-file.js`), and the build step, before its first question |
 | `crypto-price-filler/config-example.json`, `crypto-price-filler/config.json` | `SETTINGS_SCHEMA` in `config.js` | crypto-price-filler |
 | `crypto-price-filler/supported-tokens.json` | `SUPPORTED_TOKENS_SCHEMA` in `supported-tokens.js` | crypto-price-filler |
 | `summ-csv/settings.json` | `SUMM_CSV_SETTINGS_SCHEMA` in `summ-csv/index.js` | The Summ CSV writer |
+
+Each kind of `config.json` ships with a `config-example.json` beside it,
+which git keeps and never ignores: the file's settings, each with its
+default value, so the owner sees every setting a file may hold and copies
+the example to make his own. Where the code holds the defaults, the
+example repeats them, and the code stays as it is for now: the Node
+versions' scripts hold theirs, and `test/config-schemas.test.js` holds
+each example to its schemas and to the values written in its script.
+crypto-price-filler is the one tool that reads its example, as its
+committed settings. The top `config-example.json` holds what the
+committed top `config.json` holds. `configExampleProblems`
+(`lib/repo-checks.js`), which every repo of the owner runs in its tests,
+finds a `config.json`, kept by git or named in the top `.gitignore`, with
+no example beside it.
 
 A command line that takes its options' defaults from a settings file makes
 each option's parser from the kind its schema gives the setting. Commander

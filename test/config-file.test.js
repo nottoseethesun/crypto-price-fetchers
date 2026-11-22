@@ -42,14 +42,6 @@ describe("readConfigFile", () => {
     assert.deepEqual(readConfigFile(file), { CONFIG: { CACHE_SECONDS: 60 } });
   });
 
-  it("leaves out the project's list of api keys, which is no config object of the script", () => {
-    const file = write(
-      "with-keys.json",
-      '{ "apiKeys": ["dextools"], "CONFIG": { "CACHE_SECONDS": 60 } }',
-    );
-    assert.deepEqual(readConfigFile(file), { CONFIG: { CACHE_SECONDS: 60 } });
-  });
-
   it("reads a missing optional file as no values", () => {
     assert.deepEqual(readConfigFile(path.join(folder, "missing.json")), {});
   });
@@ -92,11 +84,8 @@ describe("readConfigFile", () => {
       },
     };
 
-    it("reads the values that hold to the schemas, the project's list of api keys left out", () => {
-      const file = write(
-        "good.json",
-        '{ "apiKeys": ["dextools"], "CONFIG": { "CACHE_SECONDS": 60 } }',
-      );
+    it("reads the values that hold to the schemas", () => {
+      const file = write("good.json", '{ "CONFIG": { "CACHE_SECONDS": 60 } }');
       assert.deepEqual(readConfigFile(file, { schemas: SCHEMAS }), {
         CONFIG: { CACHE_SECONDS: 60 },
       });

@@ -3,7 +3,7 @@
  * CoinPaprika, which the sheet and the Node tool both price with.
  * @module tests/sheets-sources.test
  *
- * The script, src/getCryptoPriceFromCentralizedExchange.gs with its
+ * The script, fetch-from-centralized-exchange/src/getCryptoPriceFromCentralizedExchange.gs with its
  * `-sources.gs`, runs unchanged in the test's thread
  * (`helpers/sheets-script.js`), each test answering the urls it asks.
  * A source takes the time in UTC milliseconds and "high", "low" or
@@ -16,8 +16,8 @@ import { loadSheetsScript, rawReply, reply } from "./helpers/sheets-script.js";
 import { mexcKlines } from "../../../test/helpers/stand-in-mexc.js";
 
 const SHEETS_SCRIPT_PATH = [
-  "../../../src/getCryptoPriceFromCentralizedExchange.gs",
-  "../../../src/getCryptoPriceFromCentralizedExchange-sources.gs",
+  "../../src/getCryptoPriceFromCentralizedExchange.gs",
+  "../../src/getCryptoPriceFromCentralizedExchange-sources.gs",
 ].map((file) => path.resolve(__dirname, file));
 
 /** 12:30 UTC on 2025-06-15, the time most tests price. */

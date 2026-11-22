@@ -7,8 +7,8 @@ USE AT YOUR OWN RISK: SEE LICENSE FILE, INCLUDED TWO DIRECTORIES UP.
 This tool, which runs on Node, the program that runs JavaScript outside
 a browser, fills in a token's prices in a CSV file. It reads a CSV
 whose rows each hold a timestamp, finds the token's USD price at each
-time, down to the minute, and writes `output.csv`, with each row's
-timestamp and price.
+time, down to the minute, and writes the file again with each row's
+price, by default as `output.csv` in this folder's `output/csv/`.
 
 It prices two kinds of token, each where it trades:
 
@@ -19,9 +19,9 @@ It prices two kinds of token, each where it trades:
   price sources of the repo's script for Google Sheets, Google's
   spreadsheet app, written in Apps Script, Google's platform for scripts
   that run inside its apps:
-  `src/getCryptoPriceFromCentralizedExchange-sources.gs`, which it runs
-  unchanged under Node (`sources/exchange.js`), so the sheet and the tool
-  price alike.
+  `fetch-from-centralized-exchange/src/getCryptoPriceFromCentralizedExchange-sources.gs`,
+  which it runs unchanged under Node (`sources/exchange.js`), so the sheet
+  and the tool price alike.
 - A token that trades in a blockchain's pools, such as HEX on PulseChain,
   is asked of Moralis first, when a Moralis key is saved, then of
   GeckoTerminal, two services that price a token from its chain's pools,
@@ -71,7 +71,8 @@ Schemas (`SETTINGS_SCHEMA` in `config.js`, `SUPPORTED_TOKENS_SCHEMA` in
 not read, such as a misspelled one, or a value of the wrong kind stops the
 run, with every problem listed. The exchange sources run on the Sheets
 script's own settings, its `CONFIG`, with the values of the
-`config.json` in the folder above, which git ignores, laid over it; that
+`config.json` in the folder above, which git ignores and beside which
+`config-example.json` shows each field with its default, laid over it; that
 file is checked against the script's Node version's schemas
 (`CONFIG_SCHEMAS` in the repo's `bin/getCryptoPriceFromCentralizedExchange.js`)
 before the first row, and a problem stops the run the same way.
@@ -96,7 +97,10 @@ CoinPaprika's free server, and does not ask Moralis. See
 ## Run
 
 The tool's two programs are in the repo's `bin/` folder; the commands
-below run from the repo's top folder.
+below run from the repo's top folder. The files you give the tool go in
+this folder's `input/`, and the files it writes in its `output/csv/`:
+they hold your own data, and the repo is public, so git keeps nothing in
+either folder but the folder.
 
 ### crypto-price-filler.js
 
@@ -106,11 +110,12 @@ with examples and its exit codes, and the file header in `./index.js`
 says more about each.
 
 ```bash
-node bin/crypto-price-filler.js --token=grc --input=mining.csv --output=filled.csv
+node bin/crypto-price-filler.js --token=grc --input=fetch-from-centralized-exchange/crypto-price-filler/input/mining.csv --output=fetch-from-centralized-exchange/crypto-price-filler/output/csv/filled.csv
 ```
 
 The tool reads its own files, `supported-tokens.json`,
-`config-example.json` and `config.json`, from this folder, so it runs from
+`config-example.json` and `config.json`, from this folder, and writes
+`output/csv/output.csv` here when no `--output` is given, so it runs from
 any folder; the paths `--input` and `--output` name are taken from the
 folder it runs in. `npm start -- <options>`, in this folder, runs the same
 command line.
@@ -134,10 +139,10 @@ header in `./backfill.js` lists all its options.
 
 ```bash
 # Backfill with highest bracketing price (conservative tax estimates)
-node bin/backfill.js --input=output.csv --backfill-highest
+node bin/backfill.js --input=fetch-from-centralized-exchange/crypto-price-filler/output/csv/output.csv --backfill-highest
 
 # Backfill with lowest bracketing price (budgeting)
-node bin/backfill.js --input=output.csv --backfill-lowest
+node bin/backfill.js --input=fetch-from-centralized-exchange/crypto-price-filler/output/csv/output.csv --backfill-lowest
 ```
 
 ## Development

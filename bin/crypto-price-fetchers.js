@@ -1,13 +1,13 @@
 /**
- * The Node version of src/crypto-price-fetchers.gs: a token's price and fully
- * diluted value (FDV) in USD, from DexTools, or from x1.ninja for X1, for
- * Node programs and the command line.
+ * The Node version of crypto-price-fetchers/src/crypto-price-fetchers.gs:
+ * a token's price and fully diluted value (FDV) in USD, from DexTools, or
+ * from x1.ninja for X1, for Node programs and the command line.
  * @module bin/crypto-price-fetchers
  *
  * What: the same answers as the Sheets functions `dexToolsGetTokenPrice`
  * and `dexToolsGetTokenFDV`, worked out by the same code, because this
- * file runs `src/crypto-price-fetchers.gs` itself, unchanged, through the
- * shared runner (`apps-script-runner/`). The `.gs` file's header says what
+ * file runs `crypto-price-fetchers/src/crypto-price-fetchers.gs` itself,
+ * unchanged, through the shared runner (`apps-script-runner/`). The `.gs` file's header says what
  * the two functions take and return: a number, 0 when there is no data, or
  * a message for the cell.
  *
@@ -29,11 +29,12 @@
  *   keeps for a terminal, or asks for the password; with no key saved, the
  *   script sends the placeholder written in it, which the service refuses.
  *   `npm run api-keys` saves the keys.
- * - `config.json` at the repo's top lists the keys the project's programs
- *   use, for the key manager, and may set the fields of `DEXTOOLS_CONFIG`
- *   the script reads each time it is called, which `CONFIG_SCHEMAS` names,
- *   each with its kind of value: the runner checks the file against it
- *   before the script opens. A field the script reads as it loads, to
+ * - `crypto-price-fetchers/config.json`, which git ignores, may set the
+ *   fields of `DEXTOOLS_CONFIG` the script reads each time it is called,
+ *   which `CONFIG_SCHEMAS` names, each with its kind of value: the runner
+ *   checks the file against it before the script opens, and a missing file
+ *   leaves the values written in the script. `config-example.json`, beside
+ *   it, shows each field with that value. A field the script reads as it loads, to
  *   build its urls (`SUBSCRIPTION_PLAN`, `API_HOST` and `API_VERSION`, and
  *   `X1_CONFIG`'s two) or its spacing of requests
  *   (`MIN_SECONDS_BETWEEN_CALLS`), would keep the value written in the
@@ -46,8 +47,9 @@
  * open: one run of the command line. The sheet's menu, which the build
  * step adds from `src/crypto-price-fetchers-menu.gs`, is not here.
  *
- * Fit: in `bin/`, the programs' folder; `src/crypto-price-fetchers.gs` stays
- * the one copy of the logic, so a fix to it is a fix to both.
+ * Fit: in `bin/`, the programs' folder;
+ * `crypto-price-fetchers/src/crypto-price-fetchers.gs` stays the one copy
+ * of the logic, so a fix to it is a fix to both.
  */
 
 import { fileURLToPath } from "node:url";
@@ -64,13 +66,13 @@ import { endQuietlyWhenOutputCloses } from "../lib/closed-output.js";
 
 /** The Sheets script this runs. */
 export const SHEETS_SCRIPT = new URL(
-  "../src/crypto-price-fetchers.gs",
+  "../crypto-price-fetchers/src/crypto-price-fetchers.gs",
   import.meta.url,
 );
 
 /** The config file read when none is named. */
 export const DEFAULT_CONFIG_FILE = fileURLToPath(
-  new URL("../config.json", import.meta.url),
+  new URL("../crypto-price-fetchers/config.json", import.meta.url),
 );
 
 /** The project's top folder, which holds its key file. */
@@ -133,7 +135,7 @@ export const APPS_SCRIPT_BUILD = Object.freeze({
  *
  * @param {Object} [options] - How to open it (`openScriptFunctions`)
  * @param {Object<string, Object>} [options.config] - Values for the script's config objects, in place of the config file
- * @param {string} [options.configFile] - A config file in place of `config.json` at the repo's top
+ * @param {string} [options.configFile] - A config file in place of `crypto-price-fetchers/config.json`
  * @param {{dextools: (?string|undefined), x1ninja: (?string|undefined)}} [options.apiKeys={}] - The DexTools and x1.ninja keys the script sends, such as `unlockProjectKeys` opens; none when absent
  * @param {function(string, Object): Promise<Response>} [options.fetch] - Does the script's web requests, in place of Node's fetch
  * @param {?function({level: string, text: string}): void} [options.onLog] - Takes each line the script logs

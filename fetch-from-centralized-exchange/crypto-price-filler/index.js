@@ -98,7 +98,7 @@
  * ADDING A NEW DATA SOURCE:
  *
  *   A source that prices a coin by its ticker or a service's coin id (e.g., CryptoCompare,
- *   Binance) belongs in the Sheets script, `src/getCryptoPriceFromCentralizedExchange-sources.gs`,
+ *   Binance) belongs in the Sheets script, `fetch-from-centralized-exchange/src/getCryptoPriceFromCentralizedExchange-sources.gs`,
  *   so the sheet gets it too:
  *   1. Add its function there, and to the script's provider chain
  *   2. Add the function to those `openCentralizedExchangeSources` opens
@@ -169,7 +169,9 @@
  * Usage
  * -----
  *
- * Prepare your input CSV file with the following format (see `tests/mock-input.csv`):
+ * Prepare your input CSV file with the following format (see `tests/mock-input.csv`),
+ * in `input/`, the folder of the files you give the tool, where git keeps nothing
+ * but the folder:
  *   - Required column: "date (UTC)" in format YYYY-MM-DD HH:mm:ss
  *   - Required column: "amount" (quantity of tokens)
  *   - Optional columns are preserved in output
@@ -184,7 +186,8 @@
  * Command-Line Options:
  *   --token       {string}  Required. Token symbol (e.g. xtm, grc, btc). Case-insensitive.
  *   --input       {string}  Required. Path to input CSV. Supports ~ for home directory.
- *   --output      {string}  Output CSV path. Default: 'output.csv'
+ *   --output      {string}  Output CSV path. Default: output/csv/output.csv in this
+ *                           folder, where git keeps nothing but the folder
  *   --mode        {string}  Price type: 'high', 'low', or 'close'. Default: 'close'
  *                           high and low are those of the candle or hour around the time;
  *                           close is the candle's close, or the price nearest the time.
@@ -244,19 +247,19 @@
  * Examples:
  *
  *   # Basic close-price fill (UTC)
- *   node index.js --token=grc --input=mining.csv --output=filled.csv
+ *   node index.js --token=grc --input=input/mining.csv --output=output/csv/filled.csv
  *
  *   # High price, dates in US Central time, with verbose logging
- *   node index.js --token=xtm --input=input.csv --output=prices.csv --mode=high --tz=America/Chicago --verbose
+ *   node index.js --token=xtm --input=input/input.csv --output=output/csv/prices.csv --mode=high --tz=America/Chicago --verbose
  *
  *   # Every time zone --tz takes
  *   node index.js --list-valid-timezones
  *
  *   # Backfill the Error prices with the highest bracketing price (conservative tax estimates)
- *   node index.js --token=grc --input=mining.csv --output=filled.csv --backfill-highest
+ *   node index.js --token=grc --input=input/mining.csv --output=output/csv/filled.csv --backfill-highest
  *
  *   # Backfill the Error prices with the lowest bracketing price (budgeting)
- *   node index.js --token=grc --input=mining.csv --output=filled.csv --backfill-lowest
+ *   node index.js --token=grc --input=input/mining.csv --output=output/csv/filled.csv --backfill-lowest
  *
  *   # Show help
  *   node index.js --help
@@ -275,7 +278,7 @@
  *   This ensures files will actually load into Node.js, preventing production breakage.
  *
  * Production-Style Test with Real Data:
- *   node index.js --token=grc --input=tests/mock-input.csv --output=tests/mock-filled.csv --verbose
+ *   node index.js --token=grc --input=tests/mock-input.csv --output=output/csv/mock-filled.csv --verbose
  *
  *   Expected behavior:
  *   - Fetches real prices from configured sources (Moralis → GeckoTerminal for a token

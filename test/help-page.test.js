@@ -84,9 +84,9 @@ describe("helpSection", () => {
   it("reads the help section of each file the build takes one from", () => {
     const files = {
       "src/crypto-price-fetchers-menu.gs": "## The Crypto Price Fetchers menu",
-      "src/crypto-price-fetchers.gs":
+      "crypto-price-fetchers/src/crypto-price-fetchers.gs":
         "## Current prices: dexToolsGetTokenPrice and dexToolsGetTokenFDV",
-      "src/getCryptoPriceFromCentralizedExchange.gs":
+      "fetch-from-centralized-exchange/src/getCryptoPriceFromCentralizedExchange.gs":
         "## Past prices: getCryptoPrice",
       "build/tools/apps-script-build/dex-screener-help.md":
         "## DEX Screener's functions",

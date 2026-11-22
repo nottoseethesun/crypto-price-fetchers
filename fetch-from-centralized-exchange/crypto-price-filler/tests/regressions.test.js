@@ -328,14 +328,14 @@ describe("fixed bugs", () => {
   describe("no CoinGecko api key is committed", () => {
     it("no file of the Sheets script carries a CoinGecko api key", () => {
       const scriptFiles = fs
-        .readdirSync(path.resolve(__dirname, "../../../src"))
+        .readdirSync(path.resolve(__dirname, "../../src"))
         .filter((name) =>
           name.startsWith("getCryptoPriceFromCentralizedExchange"),
         );
       expect(scriptFiles.length).toBe(3);
       for (const name of scriptFiles) {
         const text = fs.readFileSync(
-          path.resolve(__dirname, "../../../src", name),
+          path.resolve(__dirname, "../../src", name),
           "utf8",
         );
         expect(text).not.toMatch(COINGECKO_KEY_PATTERN);

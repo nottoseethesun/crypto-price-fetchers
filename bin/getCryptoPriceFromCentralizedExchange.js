@@ -1,13 +1,14 @@
 /**
- * The Node version of src/getCryptoPriceFromCentralizedExchange.gs: a coin's
- * USD price at a past time, from centralized exchanges, for Node programs
- * and the command line.
+ * The Node version of
+ * fetch-from-centralized-exchange/src/getCryptoPriceFromCentralizedExchange.gs:
+ * a coin's USD price at a past time, from centralized exchanges, for Node
+ * programs and the command line.
  * @module bin/getCryptoPriceFromCentralizedExchange
  *
  * What: the same answer as the Sheets function `getCryptoPrice`, worked out
  * by the same code, because this file runs
- * `src/getCryptoPriceFromCentralizedExchange.gs` itself, unchanged, through the
- * shared runner (`../apps-script-runner/`). The `.gs` file's header says
+ * `fetch-from-centralized-exchange/src/getCryptoPriceFromCentralizedExchange.gs`
+ * itself, unchanged, through the shared runner (`../apps-script-runner/`). The `.gs` file's header says
  * what the function takes and returns: the average of the high and the
  * low of the period around the time, or its high, low or close, from MEXC,
  * then CoinGecko, then CoinPaprika, or a message for the cell when there
@@ -38,9 +39,10 @@
  *   `API_KEYS_PASSWORD`, which `bin/unlock-api-keys.sh` keeps for a terminal,
  *   or else one it asks for. With no key saved, the script asks without
  *   one. `npm run api-keys`, in the repo's top folder, saves a key.
- * - `fetch-from-centralized-exchange/config.json`, which git ignores, may set other
- *   fields of the script's `CONFIG`; without it, the script runs on the
- *   values written in it. `CONFIG_SCHEMAS` names each field it may set,
+ * - `fetch-from-centralized-exchange/config.json`, which git ignores, may
+ *   set other fields of the script's `CONFIG`; without it, the script runs
+ *   on the values written in it, which `config-example.json`, beside it,
+ *   shows for each field. `CONFIG_SCHEMAS` names each field it may set,
  *   with its kind of value, and the runner checks the file against it
  *   before the script opens: a field the script lacks, a value of the
  *   wrong kind, or an api key, which is no setting, stops the run, with
@@ -59,8 +61,8 @@
  * the sheet.
  *
  * Fit: in `bin/`, the folder of the programs a reader runs;
- * `src/getCryptoPriceFromCentralizedExchange.gs` stays the one copy of its
- * logic. crypto-price-filler, in
+ * `fetch-from-centralized-exchange/src/getCryptoPriceFromCentralizedExchange.gs`
+ * stays the one copy of its logic. crypto-price-filler, in
  * `fetch-from-centralized-exchange/crypto-price-filler/`, is a separate
  * tool that asks the script's price sources through
  * `openCentralizedExchangeSources`.
@@ -90,9 +92,12 @@ import { KINDS } from "../lib/settings-schema.js";
  * order Apps Script loads them. The third, its in-sheet tests, is left out.
  */
 export const SHEETS_SCRIPT = [
-  new URL("../src/getCryptoPriceFromCentralizedExchange.gs", import.meta.url),
   new URL(
-    "../src/getCryptoPriceFromCentralizedExchange-sources.gs",
+    "../fetch-from-centralized-exchange/src/getCryptoPriceFromCentralizedExchange.gs",
+    import.meta.url,
+  ),
+  new URL(
+    "../fetch-from-centralized-exchange/src/getCryptoPriceFromCentralizedExchange-sources.gs",
     import.meta.url,
   ),
 ];
@@ -201,7 +206,7 @@ export const CONFIG_SCHEMAS = Object.freeze({
 
 /** The script's in-editor tests, which the sheet works without. */
 const SHEETS_TESTS = new URL(
-  "../src/getCryptoPriceFromCentralizedExchange-tests.gs",
+  "../fetch-from-centralized-exchange/src/getCryptoPriceFromCentralizedExchange-tests.gs",
   import.meta.url,
 );
 

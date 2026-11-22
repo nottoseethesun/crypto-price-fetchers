@@ -96,13 +96,16 @@ it is unless told to replace it.
 
 ### From the command line
 
-From this repo's top folder:
+From this repo's top folder, with the rows and your copy of the template
+in this folder's `input/`, and the csv written in its `output/csv/`: the
+files hold your own data, and the repo is public, so git keeps nothing in
+either folder but the folder.
 
 ```sh
-npm run summ-csv -- --rows rows.json --template advanced-template-reference.csv --out missing-transactions.csv
+npm run summ-csv -- --rows summ-csv/input/rows.json --template summ-csv/input/advanced-template-reference.csv --out summ-csv/output/csv/missing-transactions.csv
 ```
 
-It prints `Wrote 2 rows to missing-transactions.csv.`, with exit code 0, or
+It prints `Wrote 2 rows to summ-csv/output/csv/missing-transactions.csv.`, with exit code 0, or
 every problem, with exit code 1. `--replace` writes over a file already at
 `--out`; `--help` gives the keys of a row.
 

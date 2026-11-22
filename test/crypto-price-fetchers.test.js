@@ -1,6 +1,6 @@
 /**
  * Tests for bin/crypto-price-fetchers.js, the Node version of
- * src/crypto-price-fetchers.gs.
+ * crypto-price-fetchers/src/crypto-price-fetchers.gs.
  * @module test/crypto-price-fetchers.test
  *
  * The real `.gs` runs under the real runner. Its requests go to a stand-in
@@ -17,12 +17,13 @@
 
 import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { saveEncryptedKey } from "../api-key-store/index.js";
 import {
+  DEFAULT_CONFIG_FILE,
   openCryptoPriceFetchers,
   runCommandLine,
 } from "../bin/crypto-price-fetchers.js";
@@ -169,11 +170,18 @@ describe("openCryptoPriceFetchers", () => {
     }, {});
   });
 
-  it("opens with this project's config.json, which lists the keys and sets no field of the script", async () => {
-    const fetchers = await openCryptoPriceFetchers({
-      fetch: standInFetch(() => null),
-    });
-    await fetchers.close();
+  it("reads crypto-price-fetchers/config.json when no other file is named, a file git ignores", () => {
+    const repoTop = fileURLToPath(new URL("..", import.meta.url));
+    assert.equal(
+      DEFAULT_CONFIG_FILE,
+      path.join(repoTop, "crypto-price-fetchers", "config.json"),
+    );
+    assert.equal(
+      spawnSync("git", ["check-ignore", "-q", DEFAULT_CONFIG_FILE], {
+        cwd: repoTop,
+      }).status,
+      0,
+    );
   });
 });
 

@@ -77,13 +77,23 @@ that hold no key and none of the owner's own settings.
 
 | File | In git | What it holds |
 | ---- | ------ | ------------- |
-| `config.json` | yes | The services whose keys the programs send, under `apiKeys`, and the fields of `DEXTOOLS_CONFIG` that `bin/crypto-price-fetchers.js`, the Node version of `src/crypto-price-fetchers.gs`, takes from a file, `CACHE_SECONDS` and `LOCK_WAIT_MS`, held to its schemas (`CONFIG_SCHEMAS`). Never a key. |
+| `config.json` | yes | The services whose keys the programs send, under `apiKeys`. Never a key. |
+| `config-example.json` | yes | What `config.json` holds, as the example of its settings that every `config.json` has beside it. |
 | `api-keys.json` | no | The keys, each encrypted with the owner's password (see [the key store](architecture.md#the-key-store)). `api-keys.json.tmp` is the file it is written through. `API_KEYS_FILE_PATH` names another, as the tests do. |
+| `crypto-price-fetchers/config.json` | no | The fields of `DEXTOOLS_CONFIG` that `bin/crypto-price-fetchers.js`, the Node version of `crypto-price-fetchers/src/crypto-price-fetchers.gs`, lays over the script's, `CACHE_SECONDS` and `LOCK_WAIT_MS`, held to its schemas (`CONFIG_SCHEMAS`), when the file is there. |
+| `crypto-price-fetchers/config-example.json` | yes | Those two fields, with the values written in the script. |
 | `fetch-from-centralized-exchange/config.json` | no | Values the exchange script's Node version lays over the script's `CONFIG`, held to its schemas of it (`CONFIG_SCHEMAS`), when the file is there. |
+| `fetch-from-centralized-exchange/config-example.json` | yes | Every field of `CONFIG` its schemas name, with the value written in the script. |
 | `summ-csv/settings.json` | yes | The Summ CSV writer's facts of each chain, by Summ's name for it (its own coin, the forms of its hashes and addresses), and the fiat currencies a reference price may be in. |
 | `crypto-price-filler/config-example.json` | yes | The filler's settings. |
 | `crypto-price-filler/config.json` | no | The owner's settings, laid over `config-example.json`. |
+| `fetch-from-centralized-exchange/crypto-price-filler/input/`, `summ-csv/input/` | `.gitkeep` alone | The owner's files a tool reads: the filler's dated rows, and the Summ CSV writer's rows and template. |
+| `fetch-from-centralized-exchange/crypto-price-filler/output/csv/`, `summ-csv/output/csv/` | `.gitkeep` alone | The csv files the tool writes: the filler's `output.csv` when no `--output` is given, and the Summ CSV writer's file at `--out` in its examples. |
 | `dist/apps-script/` | no | `crypto-price-fetchers.gs`, the one file `npm run build apps-script` writes when there is no clipboard tool: it holds the api keys in the clear, readable by the owner alone. The lint, the security lint and the secret scan, below, pass over the folder. |
+
+A folder git keeps by its `.gitkeep` alone holds the owner's own data:
+git ignores everything in it but that empty file, which keeps the folder
+in the repo, and the format check and the secret scan pass over it.
 
 ---
 
@@ -131,7 +141,10 @@ over is `dist/`, which git ignores: the build step writes its file there
 when there is no
 clipboard, and that file holds the compiled code of DEX Screener, a
 service that lists the pairs of decentralized exchanges with their prices,
-and the api keys.
+and the api keys. The format check and the secret scan also pass over the
+tools' `input/` and `output/` folders, which hold the owner's own files
+and which git ignores but for their `.gitkeep` (`.prettierignore`,
+`.secretlintignore`).
 
 ---
 
@@ -253,9 +266,9 @@ that this section, or `CLAUDE.md`, names every one.
 | `closed-output.test.js` | `lib/closed-output.js` and `helpIntoClosedPipe`: a command line that calls the helper ends with its exit code and writes nothing to stderr when its output's reader has closed the pipe, and one that does not shows the stack trace the check looks for. |
 | `command-line-help.test.js` | Every command line's help, `--help` and `-h`, and its help into a closed pipe; the list of command lines held to the repo; and the checks of `lib/command-line-help.js`. |
 | `config-file.test.js` | A Node version's config file read, with and without its schemas, and the opened keys laid over its values. |
-| `config-schemas.test.js` | The runner's check of a Node version's schemas of its script's config objects (`configSchemaProblems`), on a small script, `test/fixtures/config-schema-check.gs`; the check run on each Node version's `CONFIG_SCHEMAS`, its script loaded as the build joins it; and a config.json refused for a field read as it loads, an api key, or a value of the wrong kind. |
+| `config-schemas.test.js` | The runner's check of a Node version's schemas of its script's config objects (`configSchemaProblems`), on a small script, `test/fixtures/config-schema-check.gs`; the check run on each Node version's `CONFIG_SCHEMAS`, its script loaded as the build joins it; each Node version's `config-example.json` held to its schemas and to the values written in its script; and a config.json refused for a field read as it loads, an api key, or a value of the wrong kind. |
 | `crypto-price-fetchers-menu.test.js` | The menu (`src/crypto-price-fetchers-menu.gs`), against a spreadsheet held in memory. |
-| `crypto-price-fetchers.test.js` | `bin/crypto-price-fetchers.js`, the Node version of the script of current prices, and its command line. |
+| `crypto-price-fetchers.test.js` | `bin/crypto-price-fetchers.js`, the Node version of the script of current prices, its settings file, `crypto-price-fetchers/config.json`, which git ignores, and its command line. |
 | `dex-prices-geckoterminal.test.js` | The GeckoTerminal client, part one: its settings, the budget of requests every caller shares, a token's facts and pools, and the pool it reads a price from. |
 | `dex-prices-geckoterminal-candles.test.js` | The GeckoTerminal client, part two: a pool's candles, page by page, and the candle and price of a time. |
 | `dex-prices-dextools.test.js` | The DexTools client: a token's price now, asked at the plan's path with the key in its header only, a 429 waited out, the errors it throws, which never name the key, and its time limit, against a stand-in server that never answers. |
@@ -277,7 +290,7 @@ that this section, or `CLAUDE.md`, names every one.
 | `no-secret-logging.test.js` | `eslint-rules/no-secret-logging.js`, the security lint's rule against printing a name that may hold a secret. |
 | `option-conflicts.test.js` | `lib/option-conflicts.js`: a typed option that conflicts with one a settings file sets refused, naming both and the file; the settings file's option alone, or neither option, passed; and two typed options left to commander, which refuses them as it parses. |
 | `os-dependencies.test.js` | The install of the operating system's programs (`install/os-dependencies.js`): a clipboard tool already installed, none needed with no desktop session, xclip or wl-clipboard installed with Homebrew, Homebrew recommended and apt asked for without it, a package left to be installed by hand, an install's exit code; `runAtTerminal`; and the command line's exit codes. |
-| `repo-checks.test.js` | `lib/repo-checks.js`, on repos made in temp folders, and this repo held to it: its EVM addresses in EIP-55's form, its npm targets and test files named in the docs, and its docs' links and paths pointing at the files, folders and headings it keeps. |
+| `repo-checks.test.js` | `lib/repo-checks.js`, on repos made in temp folders, and this repo held to it: its EVM addresses in EIP-55's form, its npm targets and test files named in the docs, its docs' links and paths pointing at the files, folders and headings it keeps, and a `config-example.json` beside each `config.json`, the top one holding what the committed `config.json` holds. |
 | `run-apps-script.test.js` | `openAppsScript`: a Sheets script run in a worker thread, with its web requests done on the caller's thread. |
 | `settings-file.test.js` | `lib/settings-file.js`: a settings file's JSON object read whole; a missing file giving no settings unless it is required; a file it cannot read, one that is not JSON and JSON that is no object refused, naming the file; and a file its schema finds problems in refused, listing every problem. |
 | `settings-schema.test.js` | `lib/settings-schema.js`: a schema compiled strict, with the shared formats and a project's own; every problem in a file named at once, in the words of its kind; a value no shape of a choice fits refused in one line; a key another needs named missing; a key its object's `propertyNames` refuses named as the key; the kinds of a time limit and of a wait, up to the longest Node's timers keep; and an option parser made from a kind. |
@@ -311,7 +324,7 @@ stand-ins of both suites answer as MEXC does.
 | `price.test.js` | `sources/price.js`: the order the sources are asked in, and the cache. |
 | `progress.test.js` | `utils/progress.js`, the progress bar. |
 | `regressions.test.js` | The fixed bugs of the tool, its Sheets script and the menu, and of the Summ csv utility, which refuses a time past the year 9999, as a time in milliseconds given for seconds is. |
-| `regressions-command-line.test.js` | The fixed bugs of the Sheets scripts' Node versions' command lines, which name a time zone or a date the exchange script refuses, and a run on x1 with no `--pool`, before a key is opened or anything is asked, and of the exchange script's settings, which refuse a `GENERAL_DELAY_MS` of 0; and of crypto-price-filler's two command lines: their checks of a value, the settings they fall back to, a settings file or token list they cannot take refused as one error, a `config.json` of the exchange script its Node version's schemas refuse ending the run before its first row, what `index.js` logs, `validate-parse` failing when node does not exit with code 0, and backfill leaving the rows that hold no data, such as a Total row, out of the fill and the grand total, and bracketing a block of `Error` prices with the nearest priced rows past them; `test:ci` and `test:debug` giving vitest their flags; and an input file not found, or with no rows, named. |
+| `regressions-command-line.test.js` | The fixed bugs of the Sheets scripts' Node versions' command lines, which name a time zone or a date the exchange script refuses, and a run on x1 with no `--pool`, before a key is opened or anything is asked, and of the exchange script's settings, which refuse a `GENERAL_DELAY_MS` of 0; and of crypto-price-filler's two command lines: their checks of a value, the settings they fall back to, a settings file or token list they cannot take refused as one error, a `config.json` of the exchange script its Node version's schemas refuse ending the run before its first row, what `index.js` logs, `validate-parse` failing when node does not exit with code 0, the file the filler writes when no `--output` is given being one git ignores, run from the repo's top folder, and backfill leaving the rows that hold no data, such as a Total row, out of the fill and the grand total, and bracketing a block of `Error` prices with the nearest priced rows past them; `test:ci` and `test:debug` giving vitest their flags; and an input file not found, or with no rows, named. |
 | `regressions-lib.test.js` | The fixed bugs of the repo's shared helpers in `lib/`: a schema compiled once, the words for an empty text and an empty list, the search for command lines, and a time limit Node's timers cannot keep refused. |
 | `regressions-sheets.test.js` | Fixed bugs whose tests run a Sheets script in the test's thread: the exchange script's pairs quoted in `CONFIG.QUOTE_CURRENCY`; a cell's own cache seconds outside 1 to 21600 refused with a message before any request, an empty cell taking the config's; each token's own FDV when two cells name one pool, and an answer kept for one cell's seconds never given to a cell with others; and a time before MEXC listed a pair priced by CoinGecko, on an earlier day, before the first trade on the listing day, or, for a recent time, before it in the listing hour, while a time after it still climbs MEXC's windows, as does a recent time whose minute request fails or whose minute MEXC let go in the hour its minute candles begin in; a failed request for the day, which the script goes on past rather than take for no candle; a failed request for the day before, after a minute or an hour with no candle, for which CoinGecko answers, as it does for such a time on the listing day; a request with no response at all, which the next source answers; a call's waits for the lock and for requests refused as too many, within the time Google lets a custom function run, with the busy message, kept nowhere, when no source gave a price; and a call cut short by refusals, by answers with a server error or a request timeout, or by requests with no response, Apps Script's spent quota among them, after which CoinGecko is asked again, while its own lack of an answer is kept when only another source's request was cut short. |
 | `settings-files.test.js` | `config.js` and `supported-tokens.js`: the committed settings and token list held to their schemas, the owner's `config.json` laid over the committed settings, and files with a key no schema names or a value of the wrong kind refused, listing every problem. |
@@ -326,9 +339,11 @@ again rather than written again.
 
 A Sheets script is Google Apps Script: JavaScript that runs on Google's
 servers, inside a spreadsheet, where a cell calls one of its functions.
-The repo has two that give prices, and the menu, each in `src/`.
-`src/crypto-price-fetchers.gs` is one file. The exchange script is three:
-`src/getCryptoPriceFromCentralizedExchange.gs`, its price sources in
+The repo has two that give prices, each in the `src/` of its tool's
+folder, and the menu, in the top `src/`.
+`crypto-price-fetchers/src/crypto-price-fetchers.gs` is one file. The
+exchange script is three, in `fetch-from-centralized-exchange/src/`:
+`getCryptoPriceFromCentralizedExchange.gs`, its price sources in
 `-sources.gs`, and its tests in `-tests.gs`. The menu,
 `src/crypto-price-fetchers-menu.gs`, gives no price and has no Node
 version.
@@ -406,7 +421,7 @@ The Apps Script tests cover these three.
 
 Node's coverage report lists the `.gs` files, because the runner compiles
 each under its own path. So their lines count toward the top folder's 80%
-floor. The test functions inside `src/crypto-price-fetchers.gs` never run under
+floor. The test functions inside `crypto-price-fetchers/src/crypto-price-fetchers.gs` never run under
 Node, so their lines count as not covered. No Node test loads `-tests.gs`,
 so it is not in the report. crypto-price-filler's coverage, from vitest,
 does not count the `.gs` files.
@@ -419,13 +434,13 @@ api keys the scripts read. The owner runs each one by hand, from the Run
 button in the Apps Script editor, and reads its results in the editor's
 log. No automated run calls them.
 
-- **`src/crypto-price-fetchers.gs`** holds its own. `testDexToolsFunctions`
+- **`crypto-price-fetchers/src/crypto-price-fetchers.gs`** holds its own. `testDexToolsFunctions`
   asks for the prices and fully diluted values of a few tokens on
   PulseChain, Ethereum and X1, and logs each result. `testDexToolsVerbose`
   runs it with the lock attempts, the raw responses and the cache's state
   logged too.
 - **The exchange script's** are in its third file,
-  `src/getCryptoPriceFromCentralizedExchange-tests.gs`, which the build step
+  `fetch-from-centralized-exchange/src/getCryptoPriceFromCentralizedExchange-tests.gs`, which the build step
   puts in the one file with the rest; the sheet needs it for nothing else.
   `test` runs the file's two tests:
   - `testGetCryptoPrice` prices several coins at past dates through
