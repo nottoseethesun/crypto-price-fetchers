@@ -55,6 +55,7 @@ Exit codes:
  * @param {string} call.name - The script function's name
  * @param {Array} call.args - Its arguments
  * @param {Command} call.command - The parsed command, for `--config` and `--verbose`
+ * @param {Object<string, Object>|undefined} call.configSchemas - Each config object's JSON Schema, which the config file is checked against (`runScriptCommandLine`)
  * @param {function|undefined} call.fetch - The fetch to do the script's requests, or undefined for Node's own
  * @param {function(Object): Promise<{config: (Object|undefined), scriptProperties: (Object|undefined)}>} call.apiKeys - Opens the api keys the call sends (`runScriptCommandLine`)
  * @param {{stdout: {write: function}, stderr: {write: function}}} call.io - Where output goes
@@ -65,6 +66,7 @@ async function printCall({
   name,
   args,
   command,
+  configSchemas,
   fetch,
   apiKeys,
   io,
@@ -72,7 +74,10 @@ async function printCall({
   const options = command.optsWithGlobals();
   const required =
     command.getOptionValueSourceWithGlobals("config") !== "default";
-  const config = readConfigFile(options.config, { required });
+  const config = readConfigFile(options.config, {
+    required,
+    schemas: configSchemas,
+  });
   const keys = await apiKeys({ name, args, io });
   const script = await openAppsScript(scriptPath, {
     config: layConfig(config, keys.config ?? {}),
@@ -103,6 +108,7 @@ async function printCall({
  * @param {string[]} spec.argv - The arguments, shaped as `process.argv`: node, the file, then the arguments
  * @param {string|URL|Array<string|URL>} spec.scriptPath - The `.gs` file, or a script's files in the order Apps Script loads them
  * @param {string} spec.defaultConfigFile - The config file used when `--config` names none
+ * @param {Object<string, Object>} [spec.configSchemas] - Each of the script's config objects' JSON Schema, by its name, which the config file is checked against before the script opens
  * @param {function(Command, function(string, Array, Command): Promise<void>): void} spec.describe - Gives the program its name, description, arguments or commands; each action calls the function it is handed with the script function's name, its arguments, and the action's command
  * @param {function({name: string, args: Array, io: Object}): Promise<{config: (Object|undefined), scriptProperties: (Object|undefined)}>} [spec.apiKeys] - Opens the api keys the call sends, once the arguments are parsed and before the script opens, handed the call and where output goes; gives config values laid over the config file's, Script Properties, or both. None when absent
  * @param {Object} [deps] - What a test replaces
@@ -112,7 +118,7 @@ async function printCall({
  * @returns {Promise<number>} The exit code
  */
 export async function runScriptCommandLine(
-  { argv, scriptPath, defaultConfigFile, describe, apiKeys },
+  { argv, scriptPath, defaultConfigFile, configSchemas, describe, apiKeys },
   deps = {},
 ) {
   const io = {
@@ -141,6 +147,7 @@ export async function runScriptCommandLine(
       name,
       args,
       command,
+      configSchemas,
       fetch: deps.fetch,
       apiKeys: apiKeys ?? (async () => ({})),
       io,

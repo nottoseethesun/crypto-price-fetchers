@@ -359,7 +359,7 @@ describe("npm run build apps-script, on a desktop with a clipboard tool", () => 
     fs.writeFileSync(
       configFile,
       JSON.stringify({
-        CONFIG: { GENERAL_DELAY_MS: 500, COINGECKO_API_KEY: "" },
+        CONFIG: { GENERAL_DELAY_MS: 500 },
       }),
     );
     try {
@@ -368,6 +368,34 @@ describe("npm run build apps-script, on a desktop with a clipboard tool", () => 
         result.copies[0].text,
         /\nCONFIG\.GENERAL_DELAY_MS = 500;\nCONFIG\.COINGECKO_API_KEY = "gecko-key-1";\nCONFIG\.COINPAPRIKA_API_KEY = "paprika-key-2";\n/,
       );
+    } finally {
+      fs.rmSync(configFile);
+    }
+  });
+
+  it("refuses a config.json its Node version's schemas refuse, listing every problem, before it asks anything or opens a key", async () => {
+    const configFile = scripts[0].defaultConfigFile;
+    fs.writeFileSync(
+      configFile,
+      JSON.stringify({
+        DEXTOOLS_CONFIG: { SUBSCRIPTION_PLAN: "pro", CACHE_SECONDS: 0 },
+      }),
+    );
+    try {
+      const result = await build(["apps-script"]);
+      assert.equal(result.exitCode, 1);
+      assert.ok(
+        result.stderr.includes(
+          [
+            `${configFile} → DEXTOOLS_CONFIG.SUBSCRIPTION_PLAN is not a setting this tool reads`,
+            `${configFile} → DEXTOOLS_CONFIG.CACHE_SECONDS must be a whole number above 0; it is 0`,
+          ].join("\n"),
+        ),
+      );
+      assert.deepEqual(result.questions, []);
+      assert.deepEqual(result.webRequests, []);
+      assert.deepEqual(result.dexScreenerCalls, []);
+      assert.deepEqual(result.copies, []);
     } finally {
       fs.rmSync(configFile);
     }
@@ -415,7 +443,7 @@ describe("npm run build apps-script, on a desktop with a clipboard tool", () => 
     assert.match(result.stdout, /DEX Screener's Google Sheets functions/);
     assert.match(
       result.stdout,
-      /Exit codes: 0 once the file is on the clipboard or written; 1 when DEX/,
+      /Exit codes: 0 once the file is on the clipboard or written; 1 when a\nconfig\.json is refused, DEX/,
     );
     assert.deepEqual(result.questions, []);
   });

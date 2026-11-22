@@ -78,7 +78,7 @@ that hold no key and none of the owner's own settings.
 | ---- | ------ | ------------- |
 | `config.json` | yes | The services whose keys the programs send, under `apiKeys`. No key. |
 | `api-keys.json` | no | The keys, each encrypted with the owner's password (see [the key store](architecture.md#the-key-store)). `api-keys.json.tmp` is the file it is written through. `API_KEYS_FILE_PATH` names another, as the tests do. |
-| `config.json` beside a Node version | no | Values laid over the script's config objects. `crypto-price-fetchers.js` and the exchange script read one when it is there. |
+| `config.json` beside a Node version | no | Values laid over the script's config objects, held to the Node version's schemas of them (`CONFIG_SCHEMAS`). `crypto-price-fetchers.js` and the exchange script read one when it is there. |
 | `summ-csv/settings.json` | yes | The Summ CSV writer's facts of each chain, by Summ's name for it (its own coin, the forms of its hashes and addresses), and the fiat currencies a reference price may be in. |
 | `crypto-price-filler/config-example.json` | yes | The filler's settings. |
 | `crypto-price-filler/config.json` | no | The owner's settings, laid over `config-example.json`. |
@@ -240,7 +240,8 @@ that this section, or `CLAUDE.md`, names every one.
 | `calendar-day.test.js` | `lib/calendar-day.js`: the start of a day in UTC, and a day the calendar does not have refused. |
 | `closed-output.test.js` | `lib/closed-output.js` and `helpIntoClosedPipe`: a command line that calls the helper ends with its exit code and writes nothing to stderr when its output's reader has closed the pipe, and one that does not shows the stack trace the check looks for. |
 | `command-line-help.test.js` | Every command line's help, `--help` and `-h`, and its help into a closed pipe; the list of command lines held to the repo; and the checks of `lib/command-line-help.js`. |
-| `config-file.test.js` | A Node version's config file read, and the opened keys laid over its values. |
+| `config-file.test.js` | A Node version's config file read, with and without its schemas, and the opened keys laid over its values. |
+| `config-schemas.test.js` | Each Node version's schemas of its script's config objects (`CONFIG_SCHEMAS`): each script loaded as the build joins it, its config objects watched as it loads, and each schema held to what the watch saw, naming every field the script did not read as it loaded, the api keys aside, and taking the script's own values; and a config.json refused for a field read as it loads, an api key, or a value of the wrong kind. |
 | `crypto-price-fetchers-menu.test.js` | The menu (`crypto-price-fetchers-menu.gs`), against a spreadsheet held in memory. |
 | `crypto-price-fetchers.test.js` | `crypto-price-fetchers.js`, the Node version of the script of current prices, and its command line. |
 | `dex-prices-geckoterminal.test.js` | The GeckoTerminal client, part one: its settings, the budget of requests every caller shares, a token's facts and pools, and the pool it reads a price from. |

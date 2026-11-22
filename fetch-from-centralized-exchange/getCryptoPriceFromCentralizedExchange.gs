@@ -254,6 +254,13 @@
  *   Google gives a custom function, so a cell that waits them all shows
  *   #ERROR! before the busy message: a known bug, in the repo's CLAUDE.md.
  *
+ *   The build step also sets, at the end of the file it gives, the fields
+ *   of CONFIG that fetch-from-centralized-exchange/config.json sets, which
+ *   git ignores. The file may set any field above but the two keys, each
+ *   with a value of its kind, as the Node version's CONFIG_SCHEMAS says;
+ *   the build refuses a file that sets another field or a value of another
+ *   kind. A field that holds an object or a list is set whole.
+ *
  * TESTING
  * -------
  * The repo's tests run this file unchanged under Node. In the Apps Script

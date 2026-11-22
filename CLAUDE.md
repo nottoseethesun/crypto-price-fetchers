@@ -182,11 +182,16 @@ stops the run. The schemas here: the key store's of a project's `apiKeys`
 key of the file being the project's; crypto-price-filler's of its settings
 (`config.js`) and of its token list (`supported-tokens.js`); and the Summ
 csv utility's of its settings (`summ-csv/index.js`). A Node version's
-config file is held to a schema built from the script's own config
-objects (`apps-script-runner/load-apps-script.js`): each field the object
-has, of the JavaScript type of the value the script gives it, so a nested
-object, a list or a field the script leaves null takes any value inside.
-A schema names only
+config file is held, by the runner and by the build, to the schemas the
+Node version gives its script's config objects (`CONFIG_SCHEMAS`): each
+names every field the script reads each time it is called, of its kind of
+value, and refuses an api key, which the key store sets, and a field the
+script reads as it loads, which a value laid after the load does not
+reach; `test/config-schemas.test.js` holds each schema to its script. The
+runner holds every config it lays, a test's own among them, to a schema
+built from the script's objects as well
+(`apps-script-runner/load-apps-script.js`): each field the object has, of
+the JavaScript type of the value the script gives it. A schema names only
 the keys its file is read for; a key is added to one with the owner's
 go-ahead. The projects that install this repo build their schemas the same
 way, from `crypto-price-fetchers/lib/settings-schema` and

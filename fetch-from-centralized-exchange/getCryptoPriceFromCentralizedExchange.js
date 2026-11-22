@@ -37,7 +37,12 @@
  *   one. `npm run api-keys`, in the repo's top folder, saves a key.
  * - `config.json` beside this file, which git ignores, may set other
  *   fields of the script's `CONFIG`; without it, the script runs on the
- *   values written in it.
+ *   values written in it. `CONFIG_SCHEMAS` names each field it may set,
+ *   with its kind of value, and the runner checks the file against it
+ *   before the script opens: a field the script lacks, a value of the
+ *   wrong kind, or an api key, which is no setting, stops the run, with
+ *   every problem listed. A field that holds an object or a list is set
+ *   whole, so the schema asks for the whole of it.
  *
  * What differs from the sheet: it runs on this computer, so there is no
  * 30-second limit per call and no daily cap on requests. The cache lasts
@@ -62,6 +67,7 @@ import {
 } from "../apps-script-runner/index.js";
 import { unlockProjectKeys } from "../api-key-store/index.js";
 import { endQuietlyWhenOutputCloses } from "../lib/closed-output.js";
+import { KINDS } from "../lib/settings-schema.js";
 
 /**
  * The Sheets script this runs: its two files the function needs, in the
@@ -82,6 +88,75 @@ export const DEFAULT_CONFIG_FILE = fileURLToPath(
 
 /** The project's top folder, which holds its key file. */
 const PROJECT_TOP = fileURLToPath(new URL("..", import.meta.url));
+
+/** A list of waits, in milliseconds. */
+const WAITS_MS = Object.freeze({
+  type: "array",
+  items: KINDS.wholeAtLeast0,
+  description:
+    "a list of waits, each a whole number of milliseconds of at least 0",
+});
+
+/**
+ * The JSON Schema of each config object `config.json` may set, by its name
+ * in the script: each field of `CONFIG` but its two api keys, of its kind
+ * of value, and no other. A field that holds an object is set whole, so
+ * its schema asks for every part the script reads: `UTC` among the time
+ * zones, which an empty zone means, and both cache times.
+ */
+export const CONFIG_SCHEMAS = Object.freeze({
+  CONFIG: Object.freeze({
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      EXCHANGE_BASE_URL: KINDS.url,
+      QUOTE_CURRENCY: KINDS.text,
+      TIMEZONE_OFFSETS: {
+        type: "object",
+        required: ["UTC"],
+        properties: { UTC: { const: 0, description: "0" } },
+        propertyNames: {
+          type: "string",
+          pattern: "^\\P{Ll}+$",
+          description: "a time zone's abbreviation, with no lower-case letter",
+        },
+        additionalProperties: {
+          type: "number",
+          minimum: -12,
+          maximum: 14,
+          description: "an offset from UTC in hours, from -12 to 14",
+        },
+        description:
+          "each time zone's offset from UTC in hours, by its abbreviation, UTC among them",
+      },
+      CACHE_EXPIRY_SECONDS: {
+        type: "object",
+        additionalProperties: false,
+        required: ["DAILY_PRICE", "NEGATIVE_CACHE"],
+        properties: {
+          DAILY_PRICE: KINDS.wholeAbove0,
+          NEGATIVE_CACHE: KINDS.wholeAbove0,
+        },
+        description: "the seconds a price, and a price not found, are kept",
+      },
+      COINGECKO_BASE: KINDS.url,
+      COINPAPRIKA_BASE: KINDS.url,
+      COINPAPRIKA_PRO_BASE: KINDS.url,
+      COINGECKO_API_KEY_HEADER: KINDS.text,
+      COINPAPRIKA_API_KEY_HEADER: KINDS.text,
+      COINGECKO_HISTORY_TEMPLATE: KINDS.text,
+      COINGECKO_MARKET_CHART_RANGE_TEMPLATE: KINDS.text,
+      COINPAPRIKA_OHLCV_TEMPLATE: KINDS.text,
+      COINPAPRIKA_DAY_PRICE_TEMPLATE: KINDS.text,
+      RETRY_DELAYS_MS: WAITS_MS,
+      LOCK_WAIT_MS: KINDS.wholeAtLeast0,
+      GENERAL_DELAY_MS: KINDS.wholeAtLeast0,
+      MAX_LOCK_RETRIES: KINDS.wholeAbove0,
+      LOCK_RETRY_BACKOFF: WAITS_MS,
+    },
+    description: "fields of CONFIG",
+  }),
+});
 
 /** The script's in-editor tests, which the sheet works without. */
 const SHEETS_TESTS = new URL(
@@ -137,6 +212,7 @@ export const APPS_SCRIPT_BUILD = Object.freeze({
   services: Object.freeze(["coingecko", "coinpaprika"]),
   keyConfig,
   defaultConfigFile: DEFAULT_CONFIG_FILE,
+  configSchemas: CONFIG_SCHEMAS,
 });
 
 /**
@@ -162,6 +238,7 @@ function openWith(names, options) {
   return openScriptFunctions(SHEETS_SCRIPT, names, {
     ...rest,
     defaultConfigFile: DEFAULT_CONFIG_FILE,
+    configSchemas: CONFIG_SCHEMAS,
     configOverlay: keyConfig(apiKeys),
   });
 }
@@ -305,6 +382,7 @@ export function runCommandLine(argv, deps = {}) {
       argv,
       scriptPath: SHEETS_SCRIPT,
       defaultConfigFile: DEFAULT_CONFIG_FILE,
+      configSchemas: CONFIG_SCHEMAS,
       describe: describeCommandLine,
       apiKeys: (call) => openCallKey(deps, call),
     },
