@@ -107,9 +107,10 @@ async function waitForBudget(settings) {
 }
 
 /**
- * Completes a caller's settings for GeckoTerminal: its api's address, the
- * process's budget of requests, and the request settings of
- * `requestSettings`. A test hands in a clock and a record of its own.
+ * Completes a caller's settings for GeckoTerminal: its api's address, its
+ * name, for the error of a request that runs out of time, the process's
+ * budget of requests, and the request settings of `requestSettings`. A
+ * test hands in a clock and a record of its own.
  *
  * @param {Partial<GeckoTerminalSettings>} [settings={}] - The caller's settings
  * @returns {GeckoTerminalSettings} The completed settings
@@ -117,6 +118,7 @@ async function waitForBudget(settings) {
 export function geckoTerminalSettings(settings = {}) {
   const completed = {
     apiUrl: GECKO_TERMINAL_API_URL,
+    name: "GeckoTerminal",
     now: () => Date.now(),
     requestLog: recentRequests,
     ...requestSettings(settings),

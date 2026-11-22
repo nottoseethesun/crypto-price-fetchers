@@ -8,8 +8,10 @@
  * often, and takes the same request again once the caller has waited, so
  * a 429 is sent again after each of the waits in turn. Any other answer,
  * or a 429 once every wait is used up, is the response given. Each try
- * gives up at the request timeout, since a connection that hangs would
- * otherwise hold its caller forever.
+ * gives up at the request timeout, its answer's body included, since a
+ * connection that hangs would otherwise hold its caller forever: it goes
+ * through `fetchWithinTimeLimit` (`lib/time-limited-fetch.js`), whose error
+ * names the service, as the client's settings name it.
  *
  * How: `requestSettings` completes a caller's settings with Node's fetch,
  * real waits, the waits below and the timeout. The waits are LP Ranger's,
@@ -22,14 +24,16 @@
  * so a try sent again takes its place in the budget like any other. The
  * caller hears of each wait after a 429 through `onRetry`, for its log.
  *
- * Fit: the GeckoTerminal and Moralis clients beside this file send every
- * request through it, so each Node program that asks them, such as
+ * Fit: the GeckoTerminal, Moralis and DexTools clients beside this file
+ * send every request through it, so each Node program that asks them, such as
  * crypto-price-filler's pool sources, tries again the same way. A Sheets
  * script runs in Apps Script, which cannot load a Node module, so the
  * centralized-exchange script keeps a loop of its own, `fetchWithRetries`
  * in `getCryptoPriceFromCentralizedExchange-sources.gs`, which the filler
  * also runs for MEXC, CoinGecko and CoinPaprika.
  */
+
+import { fetchWithinTimeLimit } from "../lib/time-limited-fetch.js";
 
 /** The waits before each new try after a 429, in milliseconds. */
 export const RETRY_DELAYS_MS = Object.freeze([10000, 30000, 60000]);
@@ -55,7 +59,8 @@ function wait(ms) {
  * @property {function(string, Object): Promise<Response>} fetch - Sends a request, as Node's fetch does
  * @property {function(number): Promise<void>} sleep - Waits a number of milliseconds
  * @property {number[]} retryDelaysMs - The waits before each new try after a 429, in milliseconds
- * @property {number} timeoutMs - How long one try may take, in milliseconds
+ * @property {number} timeoutMs - How long one try may take, its answer's body included, in milliseconds
+ * @property {string} [name] - The service, as the error of a try that runs out of time names it; the url when none is given
  * @property {function(): Promise<void>} beforeTry - Settles when a try may be sent, such as once a service's budget has room
  * @property {function(number, number): void} onRetry - Hears the number of the try about to wait and the wait, in milliseconds
  */
@@ -88,14 +93,15 @@ export function requestSettings(settings = {}) {
  * @param {Object} options - The fetch options, such as the headers
  * @param {RequestSettings} settings - How to send it (`requestSettings`)
  * @returns {Promise<Response>} The first answer other than 429, or the last 429 once every wait is used up
- * @throws {Error} When the request fails or times out
+ * @throws {Error} When the request fails, or a try runs out of time, naming the service
  */
 export async function fetchWithRetries(url, options, settings) {
   for (let attempt = 0; ; attempt++) {
     await settings.beforeTry();
-    const response = await settings.fetch(url, {
-      ...options,
-      signal: AbortSignal.timeout(settings.timeoutMs),
+    const response = await fetchWithinTimeLimit(url, options, {
+      timeoutMs: settings.timeoutMs,
+      name: settings.name,
+      fetch: settings.fetch,
     });
     if (response.status !== 429 || attempt >= settings.retryDelaysMs.length) {
       return response;

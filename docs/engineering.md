@@ -240,8 +240,9 @@ that this section, or `CLAUDE.md`, names every one.
 | `crypto-price-fetchers.test.js` | `crypto-price-fetchers.js`, the Node version of the script of current prices, and its command line. |
 | `dex-prices-geckoterminal.test.js` | The GeckoTerminal client, part one: its settings, the budget of requests every caller shares, a token's facts and pools, and the pool it reads a price from. |
 | `dex-prices-geckoterminal-candles.test.js` | The GeckoTerminal client, part two: a pool's candles, page by page, and the candle and price of a time. |
-| `dex-prices-moralis.test.js` | The Moralis client: the block a chain had at a time, and a token's price at a block. |
-| `dex-prices-web-request.test.js` | `dex-prices/web-request.js`: a request sent again after each wait while the service answers 429. |
+| `dex-prices-dextools.test.js` | The DexTools client: a token's price now, asked at the plan's path with the key in its header only, a 429 waited out, the errors it throws, which never name the key, and its time limit, against a stand-in server that never answers. |
+| `dex-prices-moralis.test.js` | The Moralis client: the block a chain had at a time, a token's price at a block, and a pool's candles, read page by page and given oldest first, with the token Moralis priced. |
+| `dex-prices-web-request.test.js` | `dex-prices/web-request.js`: a request sent again after each wait while the service answers 429, each try with its time limit. |
 | `dex-screener.test.js` | DEX Screener's part of the build: its files downloaded at one commit, checked against their SHA-256, and compiled, from stand-in sources. |
 | `format-date.test.js` | `Utilities.formatDate` under Node. |
 | `get-crypto-price-from-centralized-exchange.test.js` | The exchange script's Node version, and its command line. |
@@ -261,6 +262,7 @@ that this section, or `CLAUDE.md`, names every one.
 | `summ-csv.test.js` | The Summ CSV writer, part one: a header's columns, the rules a row must pass, and the text of a file. |
 | `summ-csv-values.test.js` | How the Summ CSV writer turns a row's values into the text of cells. |
 | `summ-csv-files.test.js` | The Summ CSV writer, part two: the template it reads, the settings it ships, the file it writes, its command line, and what the package ships for it. |
+| `time-limited-fetch.test.js` | `lib/time-limited-fetch.js`: an answer read in full, a server that never answers and one that stops in its body, each given up on at the limit with an error naming the service, a caller's own signal that aborts the request, an answer with no body, and a limit that is not a number of milliseconds above 0 refused. |
 | `unlock-api-keys.test.js` | `unlock-api-keys.sh`, in bash, and in zsh where zsh is installed. |
 
 Its helpers (`test/helpers/`), besides those the paragraphs above name:

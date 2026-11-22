@@ -57,13 +57,13 @@ liquidity positions.
 | The Node versions | `crypto-price-fetchers.js`, `fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.js` | Each Sheets script as a Node module and a command line, through the runner. |
 | The build step | `build.js`, `apps-script-build/`, `audit-dex-screener.js` | Joins the Sheets scripts, and DEX Screener's functions when asked, into one file with the saved api keys set at its end, on the clipboard, for one paste into Apps Script; and audits DEX Screener's files. |
 | crypto-price-filler | `fetch-from-centralized-exchange/crypto-price-filler/` | A Node tool that fills a CSV's price columns, row by row, from the pools' price services and the exchange script's sources. A package of its own. |
-| The price clients | `dex-prices/` | Moralis and GeckoTerminal, which price a token from a blockchain's pools, and the one loop that sends a refused request again. |
+| The price clients | `dex-prices/` | Moralis, GeckoTerminal and DexTools, which price a token from a blockchain's pools, and the one loop that sends a refused request again. |
 | The key store | `api-key-store/`, `manage-api-keys.js`, `unlock-api-keys.sh` | Api keys kept encrypted with a password: LP Ranger's design, as a module. |
 | The lint rules | `eslint-rules/` | `no-secret-logging.js`, the security lint's, refuses printing a name that may hold a secret; `no-or-default.js`, the lint's, refuses a default made with `\|\|`. The other repos run both from here. |
 | The versions tool | `github-project-deps.js`, `github-project-deps/` | The bin `github-project-deps`, which sets a project's dependencies from GitHub to their projects' main branch or latest release. |
 | The actionlint runner | `run-actionlint.js`, `actionlint/` | The bin `run-actionlint`, which runs actionlint, the checker of GitHub Actions workflow files, from its official release, refused unless its SHA-256, and the program's in it, are the ones this repo pins: every repo's lint runs it. |
 | The Summ CSV writer | `summ-csv.js`, `summ-csv/` | Writes the CSV files the owner imports into Summ, once every row has passed its rules: `npm run summ-csv`, the bin `summ-csv`, and `writeSummCsv` for a program. |
-| The shared helpers | `lib/` | Code more than one part, or more than one repo, uses, exported by the package's name for the projects that install this repo (`exports` in package.json): `messageOf`, which gives the message of something thrown (`crypto-price-fetchers/lib/message-of`); the checks of a command line's help, every option its examples use listed in it among them, and of its help into a closed pipe (`…/lib/command-line-help`); `endQuietlyWhenOutputCloses`, which ends a command line quietly when the program reading its output stops (`…/lib/closed-output`); `dayStartSeconds`, a day of the calendar written YYYY-MM-DD as the start of that day in UTC, refusing a day the calendar does not have (`…/lib/calendar-day`); `isHttpUrl` (`…/lib/http-url`); and the checks of a repo's tracked files: EVM addresses in EIP-55's form, the npm targets and test files the docs must name, and the links and paths in the docs, which must point at files, folders and headings the repo keeps (`…/lib/repo-checks`). |
+| The shared helpers | `lib/` | Code more than one part, or more than one repo, uses, exported by the package's name for the projects that install this repo (`exports` in package.json): `messageOf`, which gives the message of something thrown (`crypto-price-fetchers/lib/message-of`); the checks of a command line's help, every option its examples use listed in it among them, and of its help into a closed pipe (`…/lib/command-line-help`); `endQuietlyWhenOutputCloses`, which ends a command line quietly when the program reading its output stops (`…/lib/closed-output`); `dayStartSeconds`, a day of the calendar written YYYY-MM-DD as the start of that day in UTC, refusing a day the calendar does not have (`…/lib/calendar-day`); `isHttpUrl` (`…/lib/http-url`); the checks of a repo's tracked files: EVM addresses in EIP-55's form, the npm targets and test files the docs must name, and the links and paths in the docs, which must point at files, folders and headings the repo keeps (`…/lib/repo-checks`); and `fetchWithinTimeLimit`, which sends a request and reads its whole answer within a time limit, naming the service when the time runs out (`…/lib/time-limited-fetch`). |
 
 ---
 
@@ -274,19 +274,30 @@ their clients, asked in LP Ranger's order:
 
 - Moralis (`moralis.js`) gives the token's price at a block: the block the
   chain had at a time, then the price there. It needs a key, and gives one
-  price, with no high or low.
+  price, with no high or low. It also gives a pool's candles over a span of
+  time (`pairCandles`), in USD, of the token the pool lists first, as in
+  HEX / WPLS, which prices HEX; its answer names that token.
 - GeckoTerminal (`geckoterminal.js`) gives a pool's candles. The pool is
   the one LP Ranger picks: of the first pools GeckoTerminal ranks for the
   token, the deepest that traded in the last day and holds the token on
   one of its sides. Its public api serves the last 180 days, and takes
   about thirty requests a minute, so the client keeps every caller in the
   process within one budget of twenty a minute.
+- DexTools (`dextools.js`) gives a token's price now. It needs a key,
+  which it sends at the path of the plan the caller names, the standard
+  plan unless another is named.
 - Every request goes through `web-request.js`, the one loop that sends a
   request again after each wait while a service refuses it as one too
-  many (status 429).
+  many (status 429). Each try has 30 seconds to answer in full, the body
+  included (`fetchWithinTimeLimit`, `lib/time-limited-fetch.js`), and a try
+  that runs out of time fails with an error that names the service.
 
 crypto-price-filler's pool sources use these clients, and other repos
-install them from this one.
+install them from this one: pulsechain-analytics' ratio chart, which charts
+the ratio of two tokens' prices, asks GeckoTerminal, Moralis and DexTools
+through them. The projects that install this repo send their other
+requests, to a chain's endpoint or a beacon node, through
+`fetchWithinTimeLimit` too.
 
 ---
 

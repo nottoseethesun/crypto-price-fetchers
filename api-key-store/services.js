@@ -18,7 +18,8 @@
  *   (`/key/info`), with the key as the whole `Authorization` header, as
  *   its paid plans take it. 200 takes the key; 401 and 403 refuse it.
  * - dextools: DexTools' list of blockchains, with the key in the
- *   `X-API-Key` header. DexTools serves each plan at its own path and
+ *   `X-API-Key` header, at the api its client asks
+ *   (`dex-prices/dextools.js`). DexTools serves each plan at its own path and
  *   answers 403 for a key that plan does not know, so the check asks each
  *   plan in turn, 1.1 seconds apart, since the free plan takes one request
  *   a second: a 200 from any plan takes the key, and 403 from every plan
@@ -40,6 +41,10 @@
  * `config.json` (`project-keys.js`).
  */
 
+import {
+  DEXTOOLS_API_URL,
+  DEXTOOLS_KEY_HEADER,
+} from "../dex-prices/dextools.js";
 import { MORALIS_API_URL, MORALIS_KEY_HEADER } from "../dex-prices/moralis.js";
 
 /** How long a service has to answer a check, in milliseconds. */
@@ -53,9 +58,6 @@ const COINGECKO_PING = "https://api.coingecko.com/api/v3/ping";
 
 /** What CoinPaprika's paid server says of the key it is sent. */
 const COINPAPRIKA_KEY_INFO = "https://api-pro.coinpaprika.com/v1/key/info";
-
-/** DexTools' api, which serves each plan at its own path. */
-const DEXTOOLS_API = "https://public-api.dextools.io";
 
 /** DexTools' plans, in the order the check asks them: the one the projects use first. */
 const DEXTOOLS_PLANS = Object.freeze([
@@ -158,9 +160,9 @@ async function checkDexTools(key, options = {}) {
   const sleep = options.sleep ?? wait;
   for (const [index, plan] of DEXTOOLS_PLANS.entries()) {
     if (index > 0) await sleep(DEXTOOLS_SPACING_MS);
-    const url = `${DEXTOOLS_API}/${plan}/v2/blockchain?sort=name&order=asc`;
+    const url = `${DEXTOOLS_API_URL}/${plan}/v2/blockchain?sort=name&order=asc`;
     const status = await statusOf(options, url, {
-      "X-API-Key": key,
+      [DEXTOOLS_KEY_HEADER]: key,
       Accept: "application/json",
     });
     if (status === 200) return "valid";
