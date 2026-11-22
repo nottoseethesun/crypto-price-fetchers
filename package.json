@@ -14,10 +14,12 @@
     "./eslint-rules/no-secret-logging": "./eslint-rules/no-secret-logging.js",
     "./lib/calendar-day": "./lib/calendar-day.js",
     "./lib/closed-output": "./lib/closed-output.js",
+    "./lib/command-defaults": "./lib/command-defaults.js",
     "./lib/command-line-help": "./lib/command-line-help.js",
     "./lib/http-url": "./lib/http-url.js",
     "./lib/message-of": "./lib/message-of.js",
     "./lib/repo-checks": "./lib/repo-checks.js",
+    "./lib/settings-file": "./lib/settings-file.js",
     "./lib/time-limited-fetch": "./lib/time-limited-fetch.js",
     "./summ-csv": "./summ-csv/index.js"
   },

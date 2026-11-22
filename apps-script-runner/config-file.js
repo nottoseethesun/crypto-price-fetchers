@@ -11,9 +11,10 @@
  * key file (`api-key-store/`) and lays them over the file's values with
  * `layConfig`.
  *
- * How: `readConfigFile` reads and parses the file. A missing file reads as
- * no values when it is optional, as the default file is, so the script
- * runs on the values written in it. A file named on purpose is required.
+ * How: `readConfigFile` reads and parses the file with `readSettingsFile`
+ * (`lib/settings-file.js`). A missing file reads as no values when it is
+ * optional, as the default file is, so the script runs on the values
+ * written in it. A file named on purpose is required.
  * A project's top `config.json` also lists the api keys its programs use,
  * under `apiKeys`, for the key manager; that is no config object of a
  * script, so `readConfigFile` leaves it out.
@@ -22,7 +23,7 @@
  * (`command-line.js`), and a program that imports a Node version can too.
  */
 
-import fs from "node:fs";
+import { readSettingsFile } from "../lib/settings-file.js";
 
 /**
  * Reads a config file.
@@ -34,28 +35,7 @@ import fs from "node:fs";
  * @throws {Error} When the file cannot be read (or is missing and required), is not JSON, or holds no JSON object
  */
 export function readConfigFile(file, { required = false } = {}) {
-  let text;
-  try {
-    text = fs.readFileSync(file, "utf8");
-  } catch (error) {
-    if (error.code === "ENOENT" && !required) return {};
-    throw new Error(`Cannot read the config file ${file}: ${error.message}`, {
-      cause: error,
-    });
-  }
-  let config;
-  try {
-    config = JSON.parse(text);
-  } catch (error) {
-    throw new Error(
-      `The config file ${file} is not valid JSON: ${error.message}`,
-      { cause: error },
-    );
-  }
-  if (config === null || typeof config !== "object" || Array.isArray(config)) {
-    throw new Error(`The config file ${file} holds no JSON object`);
-  }
-  const values = { ...config };
+  const values = { ...readSettingsFile(file, { required }) };
   delete values.apiKeys;
   return values;
 }

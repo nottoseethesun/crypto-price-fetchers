@@ -235,6 +235,7 @@ that this section, or `CLAUDE.md`, names every one.
 | `calendar-day.test.js` | `lib/calendar-day.js`: the start of a day in UTC, and a day the calendar does not have refused. |
 | `closed-output.test.js` | `lib/closed-output.js` and `helpIntoClosedPipe`: a command line that calls the helper ends with its exit code and writes nothing to stderr when its output's reader has closed the pipe, and one that does not shows the stack trace the check looks for. |
 | `command-line-help.test.js` | Every command line's help, `--help` and `-h`, and its help into a closed pipe; the list of command lines held to the repo; and the checks of `lib/command-line-help.js`. |
+| `command-defaults.test.js` | `lib/command-defaults.js`: a default its option's parser refuses, or outside its choices, refused with an error naming the settings file and the option; a typed value, a null and a false default passed over; a typed option that conflicts with one the settings file sets refused; and a refusal known by its code, from any copy of commander. |
 | `config-file.test.js` | A Node version's config file read, and the opened keys laid over its values. |
 | `crypto-price-fetchers-menu.test.js` | The menu (`crypto-price-fetchers-menu.gs`), against a spreadsheet held in memory. |
 | `crypto-price-fetchers.test.js` | `crypto-price-fetchers.js`, the Node version of the script of current prices, and its command line. |
@@ -259,6 +260,7 @@ that this section, or `CLAUDE.md`, names every one.
 | `no-secret-logging.test.js` | `eslint-rules/no-secret-logging.js`, the security lint's rule against printing a name that may hold a secret. |
 | `repo-checks.test.js` | `lib/repo-checks.js`, on repos made in temp folders, and this repo held to it: its EVM addresses in EIP-55's form, its npm targets and test files named in the docs, and its docs' links and paths pointing at the files, folders and headings it keeps. |
 | `run-apps-script.test.js` | `openAppsScript`: a Sheets script run in a worker thread, with its web requests done on the caller's thread. |
+| `settings-file.test.js` | `lib/settings-file.js`: a settings file's JSON object read whole; a missing file giving no settings unless it is required; and a file it cannot read, one that is not JSON and JSON that is no object refused, naming the file. |
 | `summ-csv.test.js` | The Summ CSV writer, part one: a header's columns, the rules a row must pass, and the text of a file. |
 | `summ-csv-values.test.js` | How the Summ CSV writer turns a row's values into the text of cells. |
 | `summ-csv-files.test.js` | The Summ CSV writer, part two: the template it reads, the settings it ships, the file it writes, its command line, and what the package ships for it. |

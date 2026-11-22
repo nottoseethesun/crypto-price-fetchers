@@ -212,7 +212,12 @@ such as `head`, ends with its exit code and no stack trace. A value a
 command line takes is checked as commander parses it, with
 `InvalidArgumentError`, so a mistake names its option before anything
 runs; `lib/calendar-day.js` checks a day and `lib/http-url.js` an http or
-https url, for every repo. The checks of a help, every option its
+https url, for every repo. A command line that takes its options' defaults
+from a settings file, such as a project's `config.json`, gives them the
+same checks with `lib/command-defaults.js`, since commander checks only
+what is typed, and reads the file with `lib/settings-file.js`, under which
+a missing file gives the defaults and a broken one stops the run. The
+checks of a help, every option its
 examples use listed in it among them, and of a help into a closed pipe,
 are in `lib/command-line-help.js`, exported as
 `crypto-price-fetchers/lib/command-line-help`:
@@ -310,8 +315,9 @@ package, and the projects that install this repo import each by the
 package's name, as `exports` in package.json names it:
 `crypto-price-fetchers/lib/message-of`, `…/lib/command-line-help`,
 `…/lib/closed-output`, `…/lib/calendar-day`, `…/lib/http-url`,
-`…/lib/repo-checks` and `…/lib/time-limited-fetch`
-(`test/package-exports.test.js` loads each by that name). The tests ask no
+`…/lib/repo-checks`, `…/lib/time-limited-fetch`, `…/lib/settings-file`
+and `…/lib/command-defaults` (`test/package-exports.test.js` loads each by
+that name). The tests ask no
 outside service: the scripts' requests go to a stand-in fetch or a stand-in
 server on the computer (`test/helpers/stand-in-web.js`). The key store's
 tests save keys in temp folders of their own
