@@ -141,7 +141,7 @@ describe("readSummCsvSettings", () => {
         'summ-csv/settings.json → chains.pulsechain.transactionHash must be a form: a prefix, an alphabet, and either a length or a minLength and a maxLength; it is {"prefix":"0x","alphabet":"hex"}',
         'summ-csv/settings.json → chains.pulsechain.address.alphabet must be an alphabet the utility knows: hex, base58; it is "bech32"',
         "summ-csv/settings.json → chains.pulsechain.address.maxLength is missing, since chains.pulsechain.address.minLength is set",
-        'summ-csv/settings.json → referencePriceCurrencies must be a list of currencies, each once; it is ["USD","USD"]',
+        'summ-csv/settings.json → referencePriceCurrencies must be a list of one or more currencies, each once; it is ["USD","USD"]',
       ].join("\n"),
     });
   });

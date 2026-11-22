@@ -58,7 +58,9 @@
  *
  * ADDING A NEW COIN (supported-tokens.json):
  *
- *   Open `supported-tokens.json` and add an entry under the "tokens" object:
+ *   Open `supported-tokens.json` and add an entry under the "tokens" object, keyed
+ *   by the token's symbol in lower case, as the tool looks a symbol up whatever case
+ *   it is typed in:
  *
  *   "symbol": {
  *     "name": "Human-readable name",
@@ -323,16 +325,31 @@ import { unlockProjectKeys } from "../../api-key-store/index.js";
 import { DateTime } from "luxon";
 
 import { parseArgs } from "./commander.js";
-import { readSupportedTokens } from "./supported-tokens.js";
 import { endQuietlyWhenOutputCloses } from "../../lib/closed-output.js";
 
 endQuietlyWhenOutputCloses();
 
-// The token list, and the settings: the committed ones, with the owner's laid over them
-const supportedTokens = readSupportedTokens();
-const config = loadConfig();
+/**
+ * Parses the command line, whose check of `--token` reads the token list,
+ * then reads the settings: the committed ones, with the owner's laid over
+ * them. `--help` and a mistake in an option end the run as commander ends
+ * it, before the settings are read. A problem of the token list or of a
+ * settings file, each checked against its JSON Schema, ends the run with
+ * exit code 1, every problem printed as one error.
+ *
+ * @returns {{args: Object, config: Object}} The options and the settings
+ */
+function optionsAndSettings() {
+  try {
+    const args = parseArgs();
+    return { args, config: loadConfig() };
+  } catch (error) {
+    console.error(`Error: ${error.message}`);
+    process.exit(1);
+  }
+}
 
-const args = parseArgs();
+const { args, config } = optionsAndSettings();
 
 const token = args.token;
 let inputFile = args.input;
@@ -349,17 +366,6 @@ const { highest: backfillHighest, lowest: backfillLowest } = backfillChoice(
 if (inputFile?.startsWith("~")) {
   inputFile = path.join(os.homedir(), inputFile.slice(1));
 }
-
-// Resolve CoinGecko and CoinPaprika IDs from central mapping
-const tokenConfig = supportedTokens.tokens?.[token.toLowerCase()] ?? {};
-const coingeckoId = tokenConfig.coingecko_id ?? token.toLowerCase();
-const coinpaprikaId = tokenConfig.coinpaprika_id ?? null;
-logv(verbose, 1, `Resolved CoinGecko ID for ${token}: ${coingeckoId}`);
-logv(
-  verbose,
-  1,
-  `Resolved CoinPaprika ID for ${token}: ${coinpaprikaId ?? "none"}`,
-);
 
 // No need for manual missing arg check — commander.requiredOption handles it
 console.log(
@@ -486,16 +492,7 @@ for (let i = 0; i < rows.length; i++) {
   logv(verbose, 1, `Processing row ${i + 1}: "${dateStr}"`);
 
   try {
-    price = await getCryptoPrice(
-      token,
-      dateStr,
-      tz,
-      mode,
-      verbose,
-      null,
-      coingeckoId,
-      coinpaprikaId,
-    );
+    price = await getCryptoPrice(token, dateStr, tz, mode, verbose);
     logv(verbose, 1, `Price fetched for row ${i + 1}: ${price}`);
   } catch (e) {
     logv(verbose, 1, `Error fetching price for row ${i + 1}: ${e.message}`);

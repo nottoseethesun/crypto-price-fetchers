@@ -179,7 +179,7 @@ describe("settingsProblems", () => {
       }),
       [
         'config.json → wallets has the key "0xzz", which must be an EIP-55 address',
-        `config.json → wallets.${EIP55_ADDRESS} must be text; it is 3`,
+        `config.json → wallets.${EIP55_ADDRESS} must be text that is not empty; it is 3`,
       ],
     );
   });

@@ -161,12 +161,16 @@ each file is checked against its JSON Schema, a description in JSON of
 the keys the file may hold and the kind of value each takes, before the
 tool takes any setting, as LP Ranger checks its settings: by Ajv, an npm
 package of the ajv-validator project that checks JSON against a schema, on
-the 2020-12 draft of JSON Schema, strict, with every object refusing a key its schema does not
-name. A value of the wrong kind is refused, never corrected, and every
-problem in a file is listed at once, one line each.
+the 2020-12 draft of JSON Schema, strict. An object of settings refuses a
+key its schema does not name. An object keyed by names the owner chooses
+takes any such key, held to a form where the code needs one: the filler's
+tokens by symbol, in lower case, and summ-csv's chains by name. A value of
+the wrong kind is refused, never corrected, and every problem in a file is
+listed at once, one line each.
 `lib/settings-schema.js` holds the shared part: `compileSettingsSchema`,
-which compiles a schema with the formats code checks (an http or https
-url, an EIP-55 address); `KINDS`, the kinds of value, each with the words
+which compiles a schema once, with the formats code checks (an http or
+https url, an EIP-55 address), and gives the same check at every later
+read; `KINDS`, the kinds of value, each with the words
 a refusal uses, such as "a whole number above 0"; `kindParser`, which
 makes a command line's option parser from a kind, so a typed value and
 the same value in a file meet one rule; and `settingsProblems`, which
@@ -174,11 +178,15 @@ words Ajv's errors. `lib/settings-file.js` reads a file with them: a
 missing file gives no settings unless the caller marks it required, and a
 file that cannot be read, is not JSON, or has a problem its schema finds
 stops the run. The schemas here: the key store's of a project's `apiKeys`
-(`api-key-store/project-keys.js`), crypto-price-filler's of its settings
-(`config.js`) and of its token list (`supported-tokens.js`), and the Summ
-csv utility's of its settings (`summ-csv/index.js`); a Node version's
+(`api-key-store/project-keys.js`), which reads only that key, every other
+key of the file being the project's; crypto-price-filler's of its settings
+(`config.js`) and of its token list (`supported-tokens.js`); and the Summ
+csv utility's of its settings (`summ-csv/index.js`). A Node version's
 config file is held to a schema built from the script's own config
-objects (`apps-script-runner/load-apps-script.js`). A schema names only
+objects (`apps-script-runner/load-apps-script.js`): each field the object
+has, of the JavaScript type of the value the script gives it, so a nested
+object, a list or a field the script leaves null takes any value inside.
+A schema names only
 the keys its file is read for; a key is added to one with the owner's
 go-ahead. The projects that install this repo build their schemas the same
 way, from `crypto-price-fetchers/lib/settings-schema` and
@@ -398,20 +406,14 @@ A bug found gets a test in crypto-price-filler's
 bug is present, and a row in the table below. Its fix makes the test fail;
 the same change declares the test with `it`, moves it to the tests that
 guard the fixed bugs, `tests/regressions-command-line.test.js` for the
-filler's command lines and `tests/regressions.test.js` for the rest, and
+filler's command lines, `tests/regressions-lib.test.js` for the shared
+helpers in `lib/`, and `tests/regressions.test.js` for the rest, and
 removes the row.
 
 Google stops a custom function, a function a cell calls, after 30 seconds,
-and the cell shows `#ERROR!`. The first two bugs below are waits longer than
-that.
+and the cell shows `#ERROR!`. Both bugs below are waits longer than that.
 
 | Bug | Test in `tests/known-bugs.test.js` |
 | --- | --- |
 | `dexToolsGetTokenPrice` and `dexToolsGetTokenFDV`, in `crypto-price-fetchers.gs`, wait up to `DEXTOOLS_CONFIG.LOCK_WAIT_MS`, 120 seconds, for the script lock, so a cell that waits more than 30 seconds shows `#ERROR!`, never the busy message the script returns when the wait ends. | dexToolsGetTokenPrice waits for the script lock no longer than Google lets a custom function run |
 | `getCryptoPrice`, in the exchange script, tries the script lock 3 times for 2 seconds each, waiting 5, 10 and 20 seconds after each failed try (`LOCK_RETRY_BACKOFF`): 41 seconds in all. | getCryptoPrice waits for the script lock, in all, no longer than Google lets a custom function run |
-| crypto-price-filler's `index.js` reads its token list and settings before it parses its options, outside any catch, so a file its schema refuses ends the run in a stack trace, even for `--help`. | index.js answers --help whatever its settings, and prints a settings file's or token list's problems as one error, with exit code 1 and no stack trace |
-| For a token `supported-tokens.json` gives no CoinGecko id, `index.js` logs the token's symbol as its CoinGecko id, which the run never asks, and it passes `getCryptoPrice` two arguments that function does not take. | index.js logs no CoinGecko id for a token supported-tokens.json gives none |
-| `SUPPORTED_TOKENS_SCHEMA` takes a token keyed in upper case, which no lookup finds. | refuses a token keyed in upper case in supported-tokens.json, which no lookup finds |
-| `compileSettingsSchema` (`lib/settings-schema.js`) compiles a schema anew at every read, about 10 ms, and the filler reads its token list for every row with a date. | compiles a settings file's schema once, however often a file is read against it |
-| A refusal misdescribes an empty value: an empty text "must be text", and an empty list that must hold at least one item "must be a list of …, each once". | describes an empty text and an empty list by what each lacks |
-| `filesUsingCommander` (`lib/command-line-help.js`) misses `export * from "commander"`, an import with a comment after it on the same line or an indent before it, and `await import("commander")`. | counts a file that brings in Command or the whole of commander in each form that loads |

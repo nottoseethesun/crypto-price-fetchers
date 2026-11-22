@@ -34,6 +34,7 @@ import {
   loadAppsScript,
 } from "../../../apps-script-runner/load-apps-script.js";
 import { getCryptoPrice } from "../sources/price.js";
+import { readSupportedTokens } from "../supported-tokens.js";
 import { closeExchangeSources, exchangeSources } from "../sources/exchange.js";
 import { canonicalTimeZone, parseInputToUtcMs } from "../utils/date.js";
 import { answerWith, asked as askedByTool } from "./helpers/stand-in-fetch.js";
@@ -455,6 +456,33 @@ describe("fixed bugs", () => {
       script.refreshCurrentPrices();
       expect(sheet.runsOf("Prices!B2")).toBe(1);
     });
+  });
+});
+
+describe("the token list", () => {
+  it("refuses a token keyed in upper case in supported-tokens.json, which no lookup finds", () => {
+    const folder = fs.mkdtempSync(path.join(os.tmpdir(), "filler-tokens-"));
+    try {
+      const file = path.join(folder, "supported-tokens.json");
+      fs.writeFileSync(
+        file,
+        JSON.stringify({
+          tokens: {
+            XMR: {
+              name: "Monero",
+              coingecko_id: "monero",
+              coinpaprika_id: "xmr-monero",
+              mexc_symbol: "XMR",
+            },
+          },
+        }),
+      );
+      expect(() => readSupportedTokens(file)).toThrow(
+        'crypto-price-filler/supported-tokens.json → tokens has the key "XMR", which must be a symbol in lower case',
+      );
+    } finally {
+      fs.rmSync(folder, { recursive: true, force: true });
+    }
   });
 });
 

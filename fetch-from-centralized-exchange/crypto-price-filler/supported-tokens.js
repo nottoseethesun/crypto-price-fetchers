@@ -46,7 +46,11 @@ const TOKEN_SCHEMA = Object.freeze({
   description: "a token's facts",
 });
 
-/** The JSON Schema of `supported-tokens.json`: the tokens, by symbol. */
+/**
+ * The JSON Schema of `supported-tokens.json`: the tokens, by symbol, each
+ * symbol in lower case, since the command line and the price lookup look a
+ * token up by its symbol in lower case, whatever case it is typed in.
+ */
 export const SUPPORTED_TOKENS_SCHEMA = Object.freeze({
   type: "object",
   additionalProperties: false,
@@ -54,6 +58,11 @@ export const SUPPORTED_TOKENS_SCHEMA = Object.freeze({
   properties: {
     tokens: {
       type: "object",
+      propertyNames: {
+        type: "string",
+        pattern: "^[^A-Z]+$",
+        description: "a symbol in lower case",
+      },
       additionalProperties: TOKEN_SCHEMA,
       description: "the tokens, by their symbols in lower case",
     },

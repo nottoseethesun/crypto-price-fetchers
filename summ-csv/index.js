@@ -132,7 +132,7 @@ export const SUMM_CSV_SETTINGS_SCHEMA = Object.freeze({
       minItems: 1,
       uniqueItems: true,
       items: KINDS.text,
-      description: "a list of currencies, each once",
+      description: "a list of one or more currencies, each once",
     },
   },
 });

@@ -394,9 +394,14 @@ the tool takes any setting, as LP Ranger checks its settings.
 
 Ajv, an npm package of the ajv-validator project that checks JSON against
 a schema, compiles each schema on the 2020-12 draft of JSON Schema, strict, so a keyword or format it does
-not know is refused as the schema compiles. Every object in a schema
-names the keys it takes and refuses any other
-(`additionalProperties: false`). A value of the wrong kind is refused,
+not know is refused as the schema compiles. Each schema is compiled once,
+the first time a file is read against it, and the check is kept for every
+later read: crypto-price-filler reads its token list for every row. An
+object of settings names the keys it takes and refuses any other
+(`additionalProperties: false`). An object keyed by names or addresses the
+owner chooses, such as the filler's tokens by symbol, takes any such key,
+held to a form where the code needs one (`propertyNames`): the filler's
+symbols in lower case. A value of the wrong kind is refused,
 never corrected, and every problem in the file is listed at once, one line
 each:
 
@@ -428,7 +433,7 @@ The settings files of this repo, and the schemas they are held to:
 
 | File | Schema | Read by |
 | --- | --- | --- |
-| `config.json`, its `apiKeys` | `apiKeysSchema` in `api-key-store/project-keys.js`: a list of services the key store knows, each once; the file's other keys are the Node version's | The key store, for any project |
+| `config.json`, its `apiKeys` | `apiKeysSchema` in `api-key-store/project-keys.js`: a list of services the key store knows, each once; it reads no other key, since every other key of the file is the project's | The key store, for any project |
 | A Node version's `config.json` | Built from the script's own config objects (`fieldsSchema`, `apps-script-runner/load-apps-script.js`): each field the script has, of the kind its value has | The runner, before it sets a value |
 | `crypto-price-filler/config-example.json`, `crypto-price-filler/config.json` | `SETTINGS_SCHEMA` in `config.js` | crypto-price-filler |
 | `crypto-price-filler/supported-tokens.json` | `SUPPORTED_TOKENS_SCHEMA` in `supported-tokens.js` | crypto-price-filler |

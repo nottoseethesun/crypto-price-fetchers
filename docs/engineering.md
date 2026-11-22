@@ -297,7 +297,8 @@ MEXC does.
 | `price.test.js` | `sources/price.js`: the order the sources are asked in, and the cache. |
 | `progress.test.js` | `utils/progress.js`, the progress bar. |
 | `regressions.test.js` | The fixed bugs of the tool, its Sheets script and the menu. |
-| `regressions-command-line.test.js` | The fixed bugs of the two command lines: their checks of a value, and the settings they fall back to. |
+| `regressions-command-line.test.js` | The fixed bugs of the two command lines: their checks of a value, the settings they fall back to, a settings file or token list they cannot take refused as one error, and what `index.js` logs. |
+| `regressions-lib.test.js` | The fixed bugs of the repo's shared helpers in `lib/`: a schema compiled once, the words for an empty text and an empty list, and the search for command lines. |
 | `settings-files.test.js` | `config.js` and `supported-tokens.js`: the committed settings and token list held to their schemas, the owner's `config.json` laid over the committed settings, and files with a key no schema names or a value of the wrong kind refused, listing every problem. |
 | `sheets-sources.test.js` | The exchange script's sources, MEXC, CoinGecko and CoinPaprika, which the sheet and the tool both price with. |
 | `token-validation.test.js` | A token with no sources refused, naming the tokens the tool supports. |
