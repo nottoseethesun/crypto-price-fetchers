@@ -14,7 +14,7 @@
  *
  * The Sheets scripts run unchanged in the test's thread, through
  * `tests/helpers/sheets-script.js`, with a stand-in for the Apps Script
- * service each test is about: the script lock.
+ * service each test is about: the script lock, or the web.
  */
 
 import { describe, it, expect } from "vitest";
@@ -23,7 +23,14 @@ import {
   CUSTOM_FUNCTION_LIMIT_MS,
   busyLockService,
   loadSheetsScript,
+  reply,
 } from "./helpers/sheets-script.js";
+import {
+  DAY_MS,
+  SHEETS_SCRIPT_PATH,
+  answerCoinGeckoForPastDay,
+  cellTime,
+} from "./helpers/regression-runs.js";
 
 /** The DexTools script, at the repo's top. */
 const DEXTOOLS_SCRIPT = path.resolve(
@@ -45,6 +52,24 @@ describe("waits inside a custom function", () => {
       );
       expect(waits.length).toBeGreaterThan(0);
       expect(Math.max(...waits)).toBeLessThanOrEqual(CUSTOM_FUNCTION_LIMIT_MS);
+    },
+  );
+});
+
+describe("a server's error", () => {
+  it.fails(
+    "getCryptoPrice shows the busy message, keeping nothing, when every source answers with a server error, which says nothing of whether it has a price",
+    () => {
+      let failing = true;
+      const script = loadSheetsScript(SHEETS_SCRIPT_PATH, (url) =>
+        failing ? reply(503, null) : answerCoinGeckoForPastDay(url),
+      );
+      const time = cellTime(Date.now() - 2 * DAY_MS);
+      expect(script.getCryptoPrice("xtm", time, "UTC", "close")).toBe(
+        "Rate limit busy - retry later",
+      );
+      failing = false;
+      expect(script.getCryptoPrice("xtm", time, "UTC", "close")).toBe(1.23);
     },
   );
 });
