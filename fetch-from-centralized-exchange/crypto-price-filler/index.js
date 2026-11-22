@@ -318,7 +318,10 @@ import { parse as csvParse } from "csv-parse/sync";
 import { createObjectCsvWriter } from "csv-writer";
 
 import { getCryptoPrice } from "./sources/price.js";
-import { closeExchangeSources } from "./sources/exchange.js";
+import {
+  checkExchangeSettings,
+  closeExchangeSources,
+} from "./sources/exchange.js";
 import { loadConfig } from "./config.js";
 import { getProgressBar } from "./utils/progress.js";
 import { backfillChoice, backfillPrices } from "./utils/backfill.js";
@@ -336,17 +339,21 @@ endQuietlyWhenOutputCloses();
 /**
  * Parses the command line, whose check of `--token` reads the token list,
  * then reads the settings: the committed ones, with the owner's laid over
- * them. `--help` and a mistake in an option end the run as commander ends
- * it, before the settings are read. A problem of the token list or of a
- * settings file, each checked against its JSON Schema, ends the run with
- * exit code 1, every problem printed as one error.
+ * them, and checks the exchange script's `config.json`, which the script
+ * reads only when it opens, at the first price. `--help` and a mistake in
+ * an option end the run as commander ends it, before the settings are
+ * read. A problem of the token list or of a settings file, each checked
+ * against its JSON Schema, ends the run with exit code 1, every problem
+ * printed as one error.
  *
  * @returns {{args: Object, config: Object}} The options and the settings
  */
 function optionsAndSettings() {
   try {
     const args = parseArgs();
-    return { args, config: loadConfig() };
+    const config = loadConfig();
+    checkExchangeSettings();
+    return { args, config };
   } catch (error) {
     console.error(`Error: ${error.message}`);
     process.exit(1);

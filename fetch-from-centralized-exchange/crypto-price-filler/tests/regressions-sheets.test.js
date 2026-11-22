@@ -6,11 +6,18 @@
  *
  * The Sheets scripts run unchanged in the test's thread, through
  * `tests/helpers/sheets-script.js`, against a stand-in MEXC, which answers
- * as MEXC does (`test/helpers/stand-in-mexc.js`), or a stand-in DexTools.
+ * as MEXC does (`test/helpers/stand-in-mexc.js`), or a stand-in DexTools,
+ * and, for the waits, a script lock that is never free.
  */
 
 import { describe, it, expect } from "vitest";
-import { loadSheetsScript, reply } from "./helpers/sheets-script.js";
+import {
+  CUSTOM_FUNCTION_LIMIT_MS,
+  busyLockService,
+  loadSheetsScript,
+  noResponse,
+  reply,
+} from "./helpers/sheets-script.js";
 import {
   MENU_AND_DEXTOOLS_SCRIPTS,
   SHEETS_SCRIPT_PATH,
@@ -262,17 +269,24 @@ function cellTime(utcMs) {
  * answers its klines with `klines`, and CoinGecko's answer for a past day.
  *
  * @param {function(string): *} klines - Answers a klines url
+ * @param {Object} [options] - More for `loadSheetsScript`, such as `sleep`
  * @returns {Object} The script's global scope
  */
-function exchangeScriptWith(klines) {
-  return loadSheetsScript(SHEETS_SCRIPT_PATH, (url) => {
-    if (url.includes("/exchangeInfo"))
-      return {
-        symbols: [{ symbol: "XTMUSDT", baseAsset: "XTM", quoteAsset: "USDT" }],
-      };
-    if (url.includes("/klines")) return klines(url);
-    return answerCoinGeckoForPastDay(url);
-  });
+function exchangeScriptWith(klines, options = {}) {
+  return loadSheetsScript(
+    SHEETS_SCRIPT_PATH,
+    (url) => {
+      if (url.includes("/exchangeInfo"))
+        return {
+          symbols: [
+            { symbol: "XTMUSDT", baseAsset: "XTM", quoteAsset: "USDT" },
+          ],
+        };
+      if (url.includes("/klines")) return klines(url);
+      return answerCoinGeckoForPastDay(url);
+    },
+    options,
+  );
 }
 
 describe("MEXC's minute candles", () => {
@@ -319,7 +333,7 @@ function asksForDay(url, dayStart) {
 }
 
 describe("MEXC's requests that fail", () => {
-  it("getCryptoPrice prices a time whose minute MEXC let go from MEXC's hour when the request for the day before fails, rather than taking the failure for no candle of it", () => {
+  it("getCryptoPrice asks CoinGecko for a recent time with no minute candle when the request for the day before fails, since nothing then tells whether the time comes before the pair's first trade", () => {
     const hour = Math.floor((Date.now() - 30 * DAY_MS) / 3600000) * 3600000;
     const keptFrom = hour + 30 * 60000;
     const dayBefore = Math.floor(hour / DAY_MS) * DAY_MS - DAY_MS;
@@ -331,10 +345,10 @@ describe("MEXC's requests that fail", () => {
           ),
     );
     const time = cellTime(hour + 10 * 60000);
-    expect(script.getCryptoPrice("xtm", time, "UTC", "close")).toBe(1.2);
+    expect(script.getCryptoPrice("xtm", time, "UTC", "close")).toBe(1.23);
   });
 
-  it("getCryptoPrice goes up from the 2 hours when MEXC keeps no candle of the hour and the request for the day before fails, rather than taking the failure for no candle of it", () => {
+  it("getCryptoPrice asks CoinGecko for a time with no hour candle when the request for the day before fails, since nothing then tells whether the time comes before the pair's first trade", () => {
     const time = Date.now() - 60 * DAY_MS;
     const dayBefore = Math.floor(time / DAY_MS) * DAY_MS - DAY_MS;
     const script = exchangeScriptWith((url) =>
@@ -345,7 +359,7 @@ describe("MEXC's requests that fail", () => {
           ),
     );
     expect(script.getCryptoPrice("xtm", cellTime(time), "UTC", "close")).toBe(
-      1.15,
+      1.23,
     );
   });
 
@@ -362,5 +376,76 @@ describe("MEXC's requests that fail", () => {
     expect(script.getCryptoPrice("xtm", cellTime(time), "UTC", "close")).toBe(
       1.15,
     );
+  });
+
+  it("getCryptoPrice asks the next source when MEXC gives no response at all, as a timeout or a refused connection gives, rather than show the error", () => {
+    const script = exchangeScriptWith(() =>
+      noResponse("The operation was aborted due to timeout"),
+    );
+    const time = cellTime(Date.now() - 2 * DAY_MS);
+    expect(script.getCryptoPrice("xtm", time, "UTC", "close")).toBe(1.23);
+  });
+
+  it("getCryptoPrice gives no MEXC price for a time on the day MEXC listed the pair when the request for the day before fails, rather than price it from the day's later trades", () => {
+    const listingDay = Math.floor((Date.now() - 60 * DAY_MS) / DAY_MS) * DAY_MS;
+    const firstTrade = listingDay + 12 * 3600000;
+    const script = exchangeScriptWith((url) =>
+      asksForDay(url, listingDay - DAY_MS)
+        ? reply(503, null)
+        : mexcKlines(url, (open, end) =>
+            end < firstTrade ? null : ["5.00", "9.00", "5.00", "8.00", "1000"],
+          ),
+    );
+    const time = cellTime(listingDay + 6 * 3600000);
+    expect(script.getCryptoPrice("xtm", time, "UTC", "close")).toBe(1.23);
+  });
+});
+
+describe("waits inside a custom function", () => {
+  it("getCryptoPrice waits for the script lock, in all, no longer than Google lets a custom function run", () => {
+    const waits = [];
+    const sleeps = [];
+    const script = loadSheetsScript(SHEETS_SCRIPT_PATH, () => null, {
+      services: { LockService: busyLockService(waits) },
+      sleep: (milliseconds) => sleeps.push(milliseconds),
+    });
+    script.getCryptoPrice("btc", "2026-01-15 14:30:00", "UTC", "high");
+    const waited = [...waits, ...sleeps].reduce((sum, ms) => sum + ms, 0);
+    expect(waits.length).toBeGreaterThan(0);
+    expect(waited).toBeLessThanOrEqual(CUSTOM_FUNCTION_LIMIT_MS);
+  });
+
+  it("getCryptoPrice waits, in all, no longer than Google lets a custom function run when every source refuses every request as one too many, and shows the busy message, keeping nothing", () => {
+    const sleeps = [];
+    let asked = 0;
+    const script = loadSheetsScript(
+      SHEETS_SCRIPT_PATH,
+      (url) => {
+        if (url.includes("/exchangeInfo"))
+          return {
+            symbols: [
+              { symbol: "XTMUSDT", baseAsset: "XTM", quoteAsset: "USDT" },
+            ],
+          };
+        asked += 1;
+        return reply(429, {});
+      },
+      { sleep: (milliseconds) => sleeps.push(milliseconds) },
+    );
+    const time = cellTime(Date.now() - 2 * DAY_MS);
+    expect(script.getCryptoPrice("xtm", time, "UTC", "close")).toBe(
+      "Rate limit busy - retry later",
+    );
+    const waited = sleeps.reduce((sum, milliseconds) => sum + milliseconds, 0);
+    expect(waited).toBeLessThanOrEqual(CUSTOM_FUNCTION_LIMIT_MS);
+    const askedFirst = asked;
+    script.getCryptoPrice("xtm", time, "UTC", "close");
+    expect(asked).toBeGreaterThan(askedFirst);
+  });
+
+  it("getCryptoPrice gives the next source's price when MEXC refuses every request as one too many", () => {
+    const script = exchangeScriptWith(() => reply(429, {}));
+    const time = cellTime(Date.now() - 2 * DAY_MS);
+    expect(script.getCryptoPrice("xtm", time, "UTC", "close")).toBe(1.23);
   });
 });

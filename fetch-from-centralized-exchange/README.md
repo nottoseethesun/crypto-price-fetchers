@@ -30,7 +30,7 @@ inside its apps:
 | ---- | --- | ------ |
 | **The Sheets script**, `getCryptoPriceFromCentralizedExchange.gs` | A price in a spreadsheet's cell | Google stops a cell's call after 30 seconds, and runs at most 30 calls of one person at once. |
 | **crypto-price-filler**, `crypto-price-filler/index.js` | Every row of a CSV file, in one run | None of Apps Script's. |
-| **The Sheets script's Node version**, `getCryptoPriceFromCentralizedExchange.js` | One price, from the command line or a Node program | None of Apps Script's. |
+| **The Sheets script's Node version**, `getCryptoPriceFromCentralizedExchange.js` | One price, from the command line or a Node program | None of Apps Script's; a call keeps to the 25 seconds the script allows a cell. |
 
 ---
 

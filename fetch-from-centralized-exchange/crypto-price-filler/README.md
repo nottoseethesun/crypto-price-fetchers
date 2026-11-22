@@ -68,7 +68,12 @@ Schemas (`SETTINGS_SCHEMA` in `config.js`, `SUPPORTED_TOKENS_SCHEMA` in
 `supported-tokens.js`) before the tool takes them: a setting the tool does
 not read, such as a misspelled one, or a value of the wrong kind stops the
 run, with every problem listed. The exchange sources run on the Sheets
-script's own settings, its `CONFIG`.
+script's own settings, its `CONFIG`, with the values of the
+`config.json` beside the script, in the folder above, which git ignores,
+laid over it; that file is checked
+against the script's Node version's schemas (`CONFIG_SCHEMAS` in
+`../getCryptoPriceFromCentralizedExchange.js`) before the first row, and a
+problem stops the run the same way.
 
 The api keys are no settings: the CoinGecko, CoinPaprika and Moralis keys
 are kept in `api-keys.json` at the repo's top, encrypted with a password you

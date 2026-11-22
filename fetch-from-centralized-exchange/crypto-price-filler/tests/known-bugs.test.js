@@ -19,40 +19,17 @@
 
 import { describe, it, expect } from "vitest";
 import path from "path";
-import { loadSheetsScript } from "./helpers/sheets-script.js";
-
-/** How long Google lets a custom function run before it stops it. */
-const CUSTOM_FUNCTION_LIMIT_MS = 30000;
+import {
+  CUSTOM_FUNCTION_LIMIT_MS,
+  busyLockService,
+  loadSheetsScript,
+} from "./helpers/sheets-script.js";
 
 /** The DexTools script, at the repo's top. */
 const DEXTOOLS_SCRIPT = path.resolve(
   __dirname,
   "../../../crypto-price-fetchers.gs",
 );
-
-/** The exchange script's files its function needs, in the order Apps Script loads them. */
-const EXCHANGE_SCRIPT = [
-  "../../getCryptoPriceFromCentralizedExchange.gs",
-  "../../getCryptoPriceFromCentralizedExchange-sources.gs",
-].map((file) => path.resolve(__dirname, file));
-
-/**
- * A script lock that is never free, recording each wait asked of it.
- *
- * @param {number[]} waits - Takes each wait, in ms
- * @returns {Object} The stand-in `LockService`
- */
-function busyLockService(waits) {
-  const lock = {
-    tryLock: (milliseconds) => {
-      waits.push(milliseconds);
-      return false;
-    },
-    releaseLock: () => {},
-    hasLock: () => false,
-  };
-  return { getScriptLock: () => lock, getDocumentLock: () => lock };
-}
 
 describe("waits inside a custom function", () => {
   it.fails(
@@ -68,22 +45,6 @@ describe("waits inside a custom function", () => {
       );
       expect(waits.length).toBeGreaterThan(0);
       expect(Math.max(...waits)).toBeLessThanOrEqual(CUSTOM_FUNCTION_LIMIT_MS);
-    },
-  );
-
-  it.fails(
-    "getCryptoPrice waits for the script lock, in all, no longer than Google lets a custom function run",
-    () => {
-      const waits = [];
-      const sleeps = [];
-      const script = loadSheetsScript(EXCHANGE_SCRIPT, () => null, {
-        services: { LockService: busyLockService(waits) },
-        sleep: (milliseconds) => sleeps.push(milliseconds),
-      });
-      script.getCryptoPrice("btc", "2026-01-15 14:30:00", "UTC", "high");
-      const waited = [...waits, ...sleeps].reduce((sum, ms) => sum + ms, 0);
-      expect(waits.length).toBeGreaterThan(0);
-      expect(waited).toBeLessThanOrEqual(CUSTOM_FUNCTION_LIMIT_MS);
     },
   );
 });

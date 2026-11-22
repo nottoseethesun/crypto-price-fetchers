@@ -455,13 +455,14 @@ nothing.
 a past time, from MEXC, then CoinGecko, then CoinPaprika. Each source
 prices a period that holds the time. MEXC's is the minute, for a time in
 about the last 30 days, else the hour; when nothing traded in it, the
-script widens it a step at a time, up to the year. CoinGecko also answers
-a time MEXC shows to come before it listed the coin: a recent minute MEXC
-answers with no candle, in an hour it keeps minute candles of, with no
-candle of the day before; or an hour with no candle and no candle of the
-day before. CoinGecko's is the 24
-hours from 12 hours before the time to 12 after, and CoinPaprika's the
-day, in UTC.
+script widens it a step at a time, up to the year. A larger period may
+hold only trades from after a time that comes before the coin's first
+trade on MEXC, which comes on the day MEXC listed it. So when MEXC gives
+no candle of a recent time's minute, or of the hour, or the request for it
+fails, the script asks for the day before, whose candle shows the coin
+traded before that day: with none, or when that request fails too,
+CoinGecko answers. CoinGecko's is the 24 hours from 12 hours before the
+time to 12 after, and CoinPaprika's the day, in UTC.
 
 - `token` is the coin's ticker symbol, such as `"btc"` or `"xmr"`.
 - `dateStr` is the time, written `"YYYY-MM-DD HH:MM:SS"` on a 24-hour
@@ -495,8 +496,9 @@ Monero's lowest price at the time in cell A1:
 
 A cell shows a message instead of a price when no source has one for that
 coin at that time, when the time is in the future, when other cells kept
-the script busy, or when it cannot read `tz` or `dateStr`; Help lists
-each message.
+the script busy or the sources refused its requests as too many until the
+call used the 25 seconds the script allows it, or when it cannot read
+`tz` or `dateStr`; Help lists each message.
 
 #### The Menu
 
@@ -877,8 +879,11 @@ request as it does in Apps Script ([why](docs/architecture.md#the-runner)).
 
 What differs from the sheet:
 
-- It runs on your computer, so there is no 30-second limit per call and no
-  daily cap on web requests.
+- It runs on your computer, so there is no daily cap on web requests.
+  Google's 30-second limit per call is not there either, though
+  `getCryptoPrice` keeps to the 25 seconds its script allows a call, as
+  in a cell, and shows the busy message when no source gave a price in
+  them.
 - The api keys come from the repo's encrypted key file
   ([The Api Keys](#2-the-api-keys)), not from the script. Each Node
   version sets them in the script's config as it opens the script, as the
@@ -987,14 +992,10 @@ future focus.
 
 Google stops a cell's call after 30 seconds, and the cell shows
 `#ERROR!`. The script's lock makes the calls of many cells take turns, and
-three of the functions can wait for it longer than that, so a busy sheet can
-show `#ERROR!` where the script would have given its busy message. The
-menu's Clean up errors runs such a cell again.
-
-| Function | Its longest wait for the lock |
-| -------- | ----------------------------- |
-| `dexToolsGetTokenPrice` and `dexToolsGetTokenFDV` | 120 seconds, `DEXTOOLS_CONFIG.LOCK_WAIT_MS` |
-| `getCryptoPrice` | 41 seconds: 3 tries of 2 seconds each, the failed tries followed by waits of 5, 10 and 20 seconds |
+`dexToolsGetTokenPrice` and `dexToolsGetTokenFDV` can wait for it up to
+120 seconds (`DEXTOOLS_CONFIG.LOCK_WAIT_MS`), so a busy sheet can show
+`#ERROR!` where the script would have given its busy message. The menu's
+Clean up errors runs such a cell again.
 
 ---
 

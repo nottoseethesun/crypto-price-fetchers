@@ -20,6 +20,7 @@
  */
 
 import { DateTime } from "luxon";
+import { logv } from "./log.js";
 
 /**
  * Every time zone a row's date can be read in, sorted: the names Node's
@@ -66,20 +67,18 @@ export function parseInputToUtcMs(dateStr, timeZone, verbose = false) {
   }
   const safeStr = (dateStr ?? "").trim();
   if (safeStr === "") {
-    if (verbose) console.log("[VERBOSE:1] Empty date string - returning null");
+    logv(verbose, 1, "Empty date string - returning null");
     return null;
   }
   const local = DateTime.fromFormat(safeStr, "yyyy-MM-dd HH:mm:ss", { zone });
   if (!local.isValid) {
-    if (verbose)
-      console.log(
-        `[VERBOSE:1] Invalid date format: "${safeStr}" - ${local.invalidExplanation ?? "unknown reason"}`,
-      );
+    logv(
+      verbose,
+      1,
+      `Invalid date format: "${safeStr}" - ${local.invalidExplanation ?? "unknown reason"}`,
+    );
     return null;
   }
-  if (verbose)
-    console.log(
-      `[VERBOSE:1] "${safeStr}" in ${zone} is ${local.toUTC().toISO()}`,
-    );
+  logv(verbose, 1, `"${safeStr}" in ${zone} is ${local.toUTC().toISO()}`);
   return local.toMillis();
 }

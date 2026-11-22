@@ -6,13 +6,27 @@
  *
  * One Map, held at this module's scope: each module of a run imports this
  * one module, so all of them share the Map. A value kept with a time to
- * live is dropped the first time it is asked for after that time.
+ * live is dropped the first time it is asked for after that time, as the
+ * cache's clock tells it: the system's, unless a test sets another
+ * (`setCacheClockForTests`), so no test replaces `Date`.
  *
  * @author Christopher M. Balz with Grok and Claude.ai
  */
 
 /** The cached entries, by key: each value, and when it expires in ms, or null. */
 const entries = new Map();
+
+/**
+ * The time now, in ms since 1970.
+ *
+ * @returns {number} The time
+ */
+function systemNow() {
+  return Date.now();
+}
+
+/** The cache's clock: the system's, or a test's own. */
+let now = systemNow;
 
 /**
  * The value cached for a key: a price, a pool, or null as it was cached.
@@ -23,7 +37,7 @@ const entries = new Map();
 export function getCache(key) {
   const entry = entries.get(key);
   if (entry === undefined) return undefined;
-  if (entry.expiresAtMs !== null && Date.now() > entry.expiresAtMs) {
+  if (entry.expiresAtMs !== null && now() > entry.expiresAtMs) {
     entries.delete(key);
     return undefined;
   }
@@ -39,8 +53,18 @@ export function getCache(key) {
  */
 export function setCache(key, value, ttlMs = null) {
   const expiresAtMs =
-    ttlMs === null || ttlMs === undefined ? null : Date.now() + ttlMs;
+    ttlMs === null || ttlMs === undefined ? null : now() + ttlMs;
   entries.set(key, { value, expiresAtMs });
+}
+
+/**
+ * Sets the cache's clock to a function of a test's own, or, given null,
+ * back to the system's: the seam a test ages an entry through.
+ *
+ * @param {?function(): number} clock - Gives the time now, in ms, or null for the system's
+ */
+export function setCacheClockForTests(clock) {
+  now = clock ?? systemNow;
 }
 
 /**

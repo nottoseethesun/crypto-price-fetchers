@@ -15,11 +15,14 @@
  * from the test's `answer` function, and sleeps return at once unless the
  * test passes its own. A test may hand more stand-ins, such as the
  * spreadsheet of `test/helpers/stand-in-spreadsheet.js` at the repo's top,
- * which replace the runner's services of the same name. `answer` gets the url and the whole request, its
- * headers included, and returns a json body, which goes with status 200,
- * null, which reads as a 404, `reply(status, body)` for any other status,
- * or `rawReply(status, text)` for a body that is no json. The script's log
- * lines are dropped.
+ * or the script lock of `busyLockService`, which is never free, which
+ * replace the runner's services of the same name. `answer` gets the url
+ * and the whole request, its headers included, and returns a json body,
+ * which goes with status 200, null, which reads as a 404,
+ * `reply(status, body)` for any other status, `rawReply(status, text)` for
+ * a body that is no json, or `noResponse(why)` for no response at all.
+ * The script's log lines are dropped. `CUSTOM_FUNCTION_LIMIT_MS` is the
+ * time Google lets a custom function, a function a cell calls, run.
  */
 
 import fs from "fs";
@@ -29,8 +32,26 @@ import {
   loadAppsScript,
 } from "../../../../apps-script-runner/load-apps-script.js";
 
+/** How long Google lets a custom function run before it stops it. */
+export const CUSTOM_FUNCTION_LIMIT_MS = 30000;
+
 /** Marks what `reply` returns, so no json body is taken for one. */
 const REPLY = Symbol("reply");
+
+/** Marks what `noResponse` returns. */
+const NO_RESPONSE = Symbol("no response");
+
+/**
+ * No response at all, as a timeout or a refused connection gives, for
+ * `answer` to return: the script's `UrlFetchApp.fetch` then throws, as
+ * Apps Script's does.
+ *
+ * @param {string} why - Why there was no response
+ * @returns {Object} The answer
+ */
+export function noResponse(why) {
+  return { [NO_RESPONSE]: why };
+}
 
 /**
  * A reply with a status of its own, for `answer` to return.
@@ -72,10 +93,29 @@ export function replyOf(answered) {
 }
 
 /**
+ * A script lock that is never free, recording each wait asked of it, for
+ * `options.services` of `loadSheetsScript`.
+ *
+ * @param {number[]} waits - Takes each wait, in ms
+ * @returns {Object} The stand-in `LockService`
+ */
+export function busyLockService(waits) {
+  const lock = {
+    tryLock: (milliseconds) => {
+      waits.push(milliseconds);
+      return false;
+    },
+    releaseLock: () => {},
+    hasLock: () => false,
+  };
+  return { getScriptLock: () => lock, getDocumentLock: () => lock };
+}
+
+/**
  * Loads a Sheets script whose web requests answer from `answer`.
  *
  * @param {string|string[]} scriptPath - Path of the `.gs` file, or of a script's files in the order Apps Script loads them
- * @param {function(string, {url: string, headers: Object<string, string>}): *} answer - A json body, null for a 404, `reply(status, body)` or `rawReply(status, text)`
+ * @param {function(string, {url: string, headers: Object<string, string>}): *} answer - A json body, null for a 404, `reply(status, body)`, `rawReply(status, text)` or `noResponse(why)`
  * @param {Object} [options] - What else the script starts with
  * @param {Object<string, Object>} [options.config={}] - Fields to set in its config objects, as its Node version sets them, such as `{ CONFIG: { COINGECKO_API_KEY: '...' } }`
  * @param {function(number): void} [options.sleep] - Takes each wait the script makes; returns at once when absent
@@ -85,7 +125,10 @@ export function replyOf(answered) {
 export function loadSheetsScript(scriptPath, answer, options = {}) {
   const services = createAppsScriptServices({
     fetchSync: (request) => {
-      const { status, text } = replyOf(answer(request.url, request));
+      const answered = answer(request.url, request);
+      if (answered !== null && answered?.[NO_RESPONSE] !== undefined)
+        return { failure: answered[NO_RESPONSE] };
+      const { status, text } = replyOf(answered);
       return { status, headers: {}, text };
     },
     sleep: options.sleep ?? (() => {}),

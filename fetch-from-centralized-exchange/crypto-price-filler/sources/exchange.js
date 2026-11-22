@@ -10,6 +10,9 @@
  * CoinGecko or CoinPaprika), the time in UTC milliseconds and "high", "low"
  * or "close", and gives the price in USD, or null when it has none.
  * `closeExchangeSources` closes them once the run is done.
+ * `checkExchangeSettings` checks the script's `config.json`, which the
+ * script reads only when it opens, at the first price, so a run checks it
+ * before its first row.
  *
  * How: the script runs unchanged in a worker thread, through the repo's
  * runner, opened by its Node version (`openCentralizedExchangeSources` in
@@ -24,7 +27,10 @@
  * script, where it reaches the sheet and this tool alike.
  */
 
-import { openCentralizedExchangeSources } from "../../getCryptoPriceFromCentralizedExchange.js";
+import {
+  openCentralizedExchangeSources,
+  readCentralizedExchangeConfig,
+} from "../../getCryptoPriceFromCentralizedExchange.js";
 import { getApiKey } from "../../../api-key-store/index.js";
 import { logv } from "../utils/log.js";
 
@@ -38,6 +44,18 @@ let opening = null;
  */
 function printScriptLine({ text }) {
   logv(true, 2, `[Sheets script] ${text}`);
+}
+
+/**
+ * Checks the exchange script's `config.json` against its schemas, as the
+ * script's opening does: a run calls it before its first row, since the
+ * script opens only at the first price, and a source that fails is
+ * passed over on every row.
+ *
+ * @throws {Error} When the file cannot be read, is not JSON, or has a problem the schemas find, every problem listed
+ */
+export function checkExchangeSettings() {
+  readCentralizedExchangeConfig();
 }
 
 /**

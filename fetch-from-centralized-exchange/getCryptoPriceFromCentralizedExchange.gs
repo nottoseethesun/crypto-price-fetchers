@@ -104,16 +104,16 @@
  *   time, through the hour, 2 hours, 4 hours, day, week (from Monday),
  *   month and year, in UTC, that hold the time, and the first in which
  *   something traded gives the average of its high and low, whatever the
- *   mode. A time in the last 30 days whose minute MEXC answers with no
- *   candle, while it keeps candles of other minutes of its hour and none
- *   of the day before, comes before the coin's first trade, and the next
- *   source answers. When MEXC keeps no
- *   candle of the hour, the script asks for the day before: with none, as
- *   on the day MEXC listed the coin or before, the next source answers;
- *   with one, the script goes up from the 2 hours. When nothing traded in
- *   the year, the next source answers. A request MEXC fails is never taken
- *   for a period with no candle: the script goes on to the next period, or,
- *   when the request for the day before fails, up from the 2 hours.
+ *   mode. When MEXC gives no candle of that minute or hour, or the request
+ *   for it fails, the script asks for the day before, since the larger
+ *   periods may hold only trades from after the time when it comes before
+ *   the coin's first trade, and a candle of the day before shows the coin
+ *   traded before that day: with one, the script goes on, from the minute
+ *   to the hour, or from the hour up; with none, as on the day MEXC listed
+ *   the coin or before, or when that request fails too, the next source
+ *   answers. When nothing traded in the year, the next source answers. A
+ *   request MEXC fails for a larger period is never taken for a period
+ *   with no candle: the script goes on up.
  * - CoinGecko, a service that gathers the exchanges' prices, asked next:
  *   24 hours of hourly prices, from 12 hours before the time to 12 hours
  *   after; for `"close"` only, the day's price at 00:00 UTC.
@@ -134,9 +134,11 @@
  *   coin at that time; `No data available (cached)` repeats that answer
  *   while the script keeps "no data" (above).
  * - `No data available for future dates`: the time is after now.
- * - `Rate limit busy - retry later`: other cells kept the script busy;
- *   choose Clean up errors in the Crypto Price Fetchers menu, which runs
- *   the cell again.
+ * - `Rate limit busy - retry later`: other cells kept the script busy, or
+ *   no source gave a price before the call used the 25 seconds the script
+ *   allows a cell, within the 30 Google gives one, as when the sources
+ *   refuse its requests as too many; choose Clean up errors in the Crypto
+ *   Price Fetchers menu, which runs the cell again.
  * - `Unknown time zone`, or `Invalid` with a part of the date: check
  *   `tz` or `dateStr`.
  * - `#ERROR!`: choose Clean up errors in the Crypto Price Fetchers menu.
@@ -148,41 +150,35 @@
  * out from its own data:
  *
  *   MEXC: Asks for the 1-minute candle of the minute containing the
- *     requested timestamp. MEXC keeps 1-minute candles for about the last
- *     30 days and gives none for an older minute, nor for a minute before
- *     the pair's first trade: within those 30 days, when MEXC answers the
- *     minute with no candle, the script asks for the hour's minute candles
- *     and the day before's candle, and when MEXC keeps minute candles of
- *     the hour and no candle of the day before, the time comes before the
- *     first trade, and MEXC gives no price. Otherwise, a failed request
- *     for the minute among them, the script asks for the 60-minute candle
- *     of the hour containing the timestamp. MEXC
- *     gives a candle for every period it keeps: one in which nothing
- *     traded has volume 0, and open, high, low and close all at the last
- *     trade's price. When it gives no candle of the hour, the script asks
- *     for the candle of the day before: with none, as on the day MEXC
- *     listed the pair or before, MEXC gives no price, since the larger
- *     windows may hold only trades from after the time; with one, the hour
- *     is older than the hour candles MEXC keeps, and the script asks for
- *     the next window up, as for an hour of volume 0. When the candle's
- *     volume is above 0, the script gives
- *     the mode's price from it. When it is 0, the script asks for the
- *     candles of the next window up, in MEXC_WINDOWS (-sources.gs): the
- *     hour, 2 hours, 4 hours, day, week, month and year containing the
- *     timestamp. MEXC serves no 2-hour or yearly candle, so the 2 hours
- *     join their two hour candles and the year its twelve month candles.
- *     The first window whose volume is above 0 gives the average of its
- *     high and low, whatever the mode. A request MEXC fails shows nothing
- *     of the candles it keeps, so the script never takes it for a window
- *     with no candle: a failed check of the hour's minute candles or of the
- *     day before, while it checks the minute, leaves it to ask for the
- *     hour; a failed request for the hour leaves the day before to decide,
- *     a failed request for the day before leaves it to go up from the 2
- *     hours, and a failed request for a larger window, to go on up. A coin for which MEXC lists no pair
- *     against the quote currency (QUOTE_CURRENCY, below, USDT as written),
- *     but one against BTC, is priced from its BTC pair, then in USD with
- *     the candle of BTC against the quote currency of the same window,
- *     read the same way.
+ *     requested timestamp. MEXC gives a candle for every period it keeps:
+ *     one in which nothing traded has volume 0, and open, high, low and
+ *     close all at the last trade's price. It keeps 1-minute candles for
+ *     about the last 30 days and gives none for an older minute, nor for a
+ *     period before the pair's first trade, which comes on the day MEXC
+ *     listed the pair; the larger windows that hold such a time may hold
+ *     only trades from after it. A candle of the day before shows the pair
+ *     traded before that day, so the day before decides. Within those 30
+ *     days, when MEXC gives no candle of the minute, or the request for it
+ *     fails, the script asks for the candle of the day before: with one,
+ *     it asks for the 60-minute candle of the hour containing the
+ *     timestamp, as it does for an older time; with none, or when that
+ *     request fails too, MEXC gives no price. When MEXC gives no candle of
+ *     the hour, or the request for it fails, the day before decides the
+ *     same way: with a candle, the script asks for the next window up, as
+ *     for an hour of volume 0; with none, or a failed request, MEXC gives
+ *     no price. When the candle's volume is above 0, the script gives the
+ *     mode's price from it. When it is 0, the script asks for the candles
+ *     of the next window up, in MEXC_WINDOWS (-sources.gs): the hour, 2
+ *     hours, 4 hours, day, week, month and year containing the timestamp.
+ *     MEXC serves no 2-hour or yearly candle, so the 2 hours join their
+ *     two hour candles and the year its twelve month candles. The first
+ *     window whose volume is above 0 gives the average of its high and
+ *     low, whatever the mode. A failed request for a larger window leaves
+ *     the script to go on up, since the pair traded before the time. A
+ *     coin for which MEXC lists no pair against the quote currency
+ *     (QUOTE_CURRENCY, below, USDT as written), but one against BTC, is
+ *     priced from its BTC pair, then in USD with the candle of BTC against
+ *     the quote currency of the same window, read the same way.
  *
  *   CoinGecko market_chart/range: Fetches hourly data points over a
  *     24-hour window centered on the requested time (12 hours before to
@@ -207,7 +203,10 @@
  * Providers are tried in order; the first successful result is returned.
  * None asks for the current price, which would put today's price on a
  * past date. A request a provider refuses as one too many (status 429) is
- * sent again after each wait in RETRY_DELAYS_MS.
+ * sent again after each wait in RETRY_DELAYS_MS, while the wait fits in
+ * the call's budget, CALL_BUDGET_MS, below; a request that gets no response at
+ * all, as a timeout or a refused connection gives, is a failed one, as a
+ * refusal is, and the next provider answers.
  *
  *   1. MEXC       - Primary. Real OHLCV candles (1-minute for about the
  *                   last 30 days, else 1-hour; up to the year when
@@ -299,10 +298,8 @@
  *     LOCK_WAIT_MS         - Lock acquisition timeout (2000ms)
  *     GENERAL_DELAY_MS     - Delay between API calls (200ms prod, 0ms test)
  *     MAX_LOCK_RETRIES     - Retry attempts on lock failure (3)
- *     LOCK_RETRY_BACKOFF   - Exponential backoff array [5000, 10000, 20000]
- *   The tries and waits add up to 41 seconds, longer than the 30 seconds
- *   Google gives a custom function, so a cell that waits them all shows
- *   #ERROR! before the busy message: a known bug, in the repo's CLAUDE.md.
+ *     LOCK_RETRY_BACKOFF   - Exponential backoff array [5000, 10000, 20000]:
+ *                            the waits after each failed try but the last
  *
  *   The build step also sets, at the end of the file it gives, the fields
  *   of CONFIG that fetch-from-centralized-exchange/config.json sets, which
@@ -392,8 +389,64 @@ const CONFIG = {
 const API_LOCK = LockService.getScriptLock();
 
 /**
- * What a cell shows when the call got no script lock in its tries. The
- * menu's Clean up errors runs again each cell that shows it.
+ * The time a call of getCryptoPrice may use, its waits included: Google
+ * stops a custom function after 30 seconds. A call waits for the lock or
+ * for a request refused as one too many only while the wait fits in it,
+ * and sends no request once it is used; when no source then gave a price,
+ * the cell shows the busy message, and nothing is cached. Not a setting:
+ * it follows Google's limit.
+ */
+const CALL_BUDGET_MS = 25000;
+
+/**
+ * The time a call of getCryptoPrice has used, for its budget
+ * (CALL_BUDGET_MS): when it began, or null outside a call; the
+ * waits it asked for; and whether it was cut short, a request refused as
+ * one too many that it could not wait out, or one it had no time to send,
+ * so that no source's silence is kept as no data.
+ */
+const CALL = { startMs: null, waitedMs: 0, cutShort: false };
+
+/**
+ * The time the call has used: the time since it began, or the waits it
+ * asked for, whichever is more, so a wait counts though the clock does not
+ * move for it, as under a stand-in.
+ *
+ * @return {number} The time, in ms; 0 outside a call
+ */
+function callTimeUsedMs() {
+  if (CALL.startMs === null) return 0;
+  return Math.max(Date.now() - CALL.startMs, CALL.waitedMs);
+}
+
+/**
+ * Whether the call has time for a wait of this long, within its budget;
+ * always, outside a call, as when a test function runs from the editor.
+ *
+ * @param {number} milliseconds - The wait
+ * @return {boolean} Whether it fits
+ */
+function callHasTimeFor(milliseconds) {
+  return (
+    CALL.startMs === null || callTimeUsedMs() + milliseconds <= CALL_BUDGET_MS
+  );
+}
+
+/**
+ * Waits, and counts the wait against the call's budget.
+ *
+ * @param {number} milliseconds - The wait
+ */
+function waitInCall(milliseconds) {
+  CALL.waitedMs += milliseconds;
+  Utilities.sleep(milliseconds);
+}
+
+/**
+ * What a cell shows when the call got no script lock in its tries, or was
+ * cut short before any source gave a price: a refusal as one too many it
+ * could not wait out, or a request it had no time to send. The menu's
+ * Clean up errors runs again each cell that shows it.
  *
  * @type {string}
  */
@@ -471,6 +524,28 @@ function getCryptoPrice(
   mode = "average",
   apiDelayMs = CONFIG.GENERAL_DELAY_MS,
 ) {
+  CALL.startMs = Date.now();
+  CALL.waitedMs = 0;
+  CALL.cutShort = false;
+  try {
+    return cryptoPriceInCall(token, dateStr, tz, mode, apiDelayMs);
+  } finally {
+    CALL.startMs = null;
+  }
+}
+
+/**
+ * getCryptoPrice's work, within the call's budget, which getCryptoPrice
+ * starts and ends.
+ *
+ * @param {string} token - The token, as the cell names it
+ * @param {string|Date} dateStr - The time
+ * @param {string} tz - The time zone
+ * @param {string} mode - The price to give
+ * @param {number} apiDelayMs - The wait after the lock is taken
+ * @return {number|string} The price, or what the cell shows
+ */
+function cryptoPriceInCall(token, dateStr, tz, mode, apiDelayMs) {
   Logger.log(
     `getCryptoPrice called: token=${token}, date=${dateStr}, tz=${tz}, mode=${mode}, delay=${apiDelayMs}ms`,
   );
@@ -502,6 +577,12 @@ function getCryptoPrice(
 
   try {
     const price = fetchPriceFromProviders(token, utcMs, target);
+    if (price === null && CALL.cutShort) {
+      Logger.log(
+        "No source gave a price, and the call was cut short, so nothing is cached",
+      );
+      return EXCHANGE_BUSY_MESSAGE;
+    }
     cacheAndReturn(cacheKey, price);
     return price !== null ? price : "No data available from any source";
   } catch (e) {
@@ -551,20 +632,32 @@ function priceTarget(mode) {
   return ["high", "low", "close"].includes(named) ? named : "average";
 }
 
-/** Attempts to acquire lock with exponential backoff retry */
+/**
+ * Attempts to acquire the lock, waiting LOCK_RETRY_BACKOFF after each
+ * failed try but the last, within the call's budget: a try or a wait that
+ * does not fit in it is not made.
+ *
+ * @param {number} apiDelayMs - The wait once the lock is taken; 0 takes none
+ * @return {boolean} Whether the lock was taken
+ */
 function acquireLockWithRetry(apiDelayMs) {
   if (apiDelayMs <= 0) return true;
 
   for (let attempt = 0; attempt < CONFIG.MAX_LOCK_RETRIES; attempt++) {
+    if (!callHasTimeFor(CONFIG.LOCK_WAIT_MS)) break;
     Logger.log(`Lock attempt ${attempt + 1}/${CONFIG.MAX_LOCK_RETRIES}`);
     if (API_LOCK.tryLock(CONFIG.LOCK_WAIT_MS)) {
       Logger.log(`Lock acquired, sleeping ${apiDelayMs}ms`);
-      Utilities.sleep(apiDelayMs);
+      waitInCall(apiDelayMs);
       return true;
     }
+    // tryLock waited all its time for the lock
+    CALL.waitedMs += CONFIG.LOCK_WAIT_MS;
     const backoff = CONFIG.LOCK_RETRY_BACKOFF[attempt] ?? 5000;
+    if (attempt === CONFIG.MAX_LOCK_RETRIES - 1 || !callHasTimeFor(backoff))
+      break;
     Logger.log(`Lock timeout - backoff ${backoff}ms`);
-    Utilities.sleep(backoff);
+    waitInCall(backoff);
   }
   Logger.log("All lock attempts failed");
   return false;

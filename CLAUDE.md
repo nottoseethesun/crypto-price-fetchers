@@ -394,9 +394,10 @@ functions inside the scripts that the owner runs by hand. crypto-price-filler's
 
 - `sheets-script.js` runs a Sheets script, one file or several, in the
   test's thread with the runner's services. Its `UrlFetchApp` answers from
-  a function the test gives, with any status, the script's config is set
-  as its Node version sets it, and a test may hand in more stand-in
-  services, such as the top folder's spreadsheet.
+  a function the test gives, with any status or no response at all, the
+  script's config is set as its Node version sets it, and a test may hand
+  in more stand-in services, such as the top folder's spreadsheet or a
+  script lock that is never free (`busyLockService`).
 - `stand-in-fetch.js` is a stand-in fetch for the Node tool's own sources:
   the exchange sources, whose Sheets script then runs for real in its
   worker, and the pool sources, whose shared clients then ask it.
@@ -427,9 +428,8 @@ for any other, and removes the row. `tests/regressions.test.js` also
 holds older tests that run a Sheets script that way.
 
 Google stops a custom function, a function a cell calls, after 30 seconds,
-and the cell shows `#ERROR!`. Both bugs below are waits longer than that.
+and the cell shows `#ERROR!`. The bug below is a wait longer than that.
 
 | Bug | Test in `tests/known-bugs.test.js` |
 | --- | --- |
 | `dexToolsGetTokenPrice` and `dexToolsGetTokenFDV`, in `crypto-price-fetchers.gs`, wait up to `DEXTOOLS_CONFIG.LOCK_WAIT_MS`, 120 seconds, for the script lock, so a cell that waits more than 30 seconds shows `#ERROR!`, never the busy message the script returns when the wait ends. | dexToolsGetTokenPrice waits for the script lock no longer than Google lets a custom function run |
-| `getCryptoPrice`, in the exchange script, tries the script lock 3 times for 2 seconds each, waiting 5, 10 and 20 seconds after each failed try (`LOCK_RETRY_BACKOFF`): 41 seconds in all. | getCryptoPrice waits for the script lock, in all, no longer than Google lets a custom function run |
