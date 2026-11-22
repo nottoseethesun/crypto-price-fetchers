@@ -21,6 +21,7 @@ gates work. This file covers how to drive them.
 ## Table of Contents
 
 - [Passing Flags](#passing-flags)
+- [Operating-System Programs](#operating-system-programs)
 - [Api Keys](#api-keys)
 - [Build](#build)
 - [Summ CSV Files](#summ-csv-files)
@@ -54,6 +55,19 @@ npm run build apps-script
 
 ---
 
+## Operating-System Programs
+
+One program the build step uses comes from the computer's operating
+system rather than from npm: the clipboard tool, which puts the built
+file on the clipboard. One command says whether it is installed and
+installs it where it is missing.
+
+| Command | Flags | Description | Example |
+| ------- | ----- | ----------- | ------- |
+| `os-dependencies` | `--help` | Runs `install/install-os-dependencies.js`. Says which clipboard tool is installed: pbcopy on macOS, clip on Windows, wl-copy, xclip or xsel in a Linux desktop session. Where none is, it installs wl-clipboard for a Wayland session or xclip for an X11 one with Homebrew, the package manager for macOS and Linux, when `brew` is installed. Without Homebrew, it recommends installing it, as <https://brew.sh> says, then running the command again, and, where apt is installed, asks whether to install the package with `sudo apt install -y` instead. With neither, or when an install fails, it names the package to install by hand. With no desktop session open, as over ssh, it installs nothing. Exits with 0 when nothing is missing, 1 when a program still is or an argument is not one it takes. | `npm run os-dependencies` · `node install/install-os-dependencies.js` |
+
+---
+
 ## Api Keys
 
 The api keys the programs send are kept encrypted in `api-keys.json` by
@@ -80,7 +94,7 @@ command gives that file.
 
 | Command | Flags | Description | Example |
 | ------- | ----- | ----------- | ------- |
-| `build` | `apps-script`, `--help` | `apps-script` first reads the config.json each Node version, the script's twin that runs it on Node, reads, and checks it as that Node version does, stopping, with every problem listed, when a file sets a field the script does not take or a value of the wrong kind. It then asks whether to include the Google Sheets functions of DEX Screener, a service that lists the pairs of decentralized exchanges with their prices (Enter or y includes them, n leaves them out), naming the commit of DEX Screener's repo they come from, and saying that the step is optional and that a build that fails should be run again with n. On a yes, it checks that those files are the ones this repo pinned: it downloads each and compares its SHA-256 with the one written in the repo, the check `audit:dex-screener` runs on its own; then it prints the result and compiles the files it checked. Then it opens the saved keys, as the programs do, and joins the menu, every Sheets script and DEX Screener's functions into one file, with the keys, the values of those config.json files, and the Help page set at its end. It puts the file on the clipboard, says how to paste it, waits for Enter, and clears the clipboard. With no clipboard tool installed, it offers to install one (`sudo apt install xclip`, or `wl-clipboard` on Wayland); declined, it warns that the keys go to disk in the clear, then writes the file to `build/apps-script/crypto-price-fetchers.gs`, readable by the owner alone. It takes no other argument; `--help` gives its exit codes. | `npm run build apps-script` |
+| `build` | `apps-script`, `--help` | `apps-script` first reads the config.json each Node version, the script's twin that runs it on Node, reads, and checks it as that Node version does, stopping, with every problem listed, when a file sets a field the script does not take or a value of the wrong kind. It then asks whether to include the Google Sheets functions of DEX Screener, a service that lists the pairs of decentralized exchanges with their prices (Enter or y includes them, n leaves them out), naming the commit of DEX Screener's repo they come from, and saying that the step is optional and that a build that fails should be run again with n. On a yes, it checks that those files are the ones this repo pinned: it downloads each and compares its SHA-256 with the one written in the repo, the check `audit:dex-screener` runs on its own; then it prints the result and compiles the files it checked. Then it opens the saved keys, as the programs do, and joins the menu, every Sheets script and DEX Screener's functions into one file, with the keys, the values of those config.json files, and the Help page set at its end. It puts the file on the clipboard, says how to paste it, waits for Enter, and clears the clipboard. With no clipboard tool installed, on a Linux desktop with Homebrew or apt, it offers the install `os-dependencies` runs; declined, failed, or with no install to offer, it warns that the keys go to disk in the clear, then writes the file to `dist/apps-script/crypto-price-fetchers.gs`, readable by the owner alone. It takes no other argument; `--help` gives its exit codes. | `npm run build apps-script` |
 
 ---
 

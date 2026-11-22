@@ -49,7 +49,7 @@ a script's function as it calls a built-in one. The build step,
 `npm run build apps-script` (`build/tools/build.js`), joins into it the
 Sheets scripts in `src/`, with the saved api keys set at its end, for one
 paste into a spreadsheet
-([Install in Google Sheets](#3-install-in-google-sheets)):
+([Install in Google Sheets](#4-install-in-google-sheets)):
 
 - `src/crypto-price-fetchers.gs` gives a token's current price, and its
   fully diluted value. It asks DexTools, a service that prices tokens
@@ -160,8 +160,9 @@ the lints of the projects that install this repo.
 - [Prerequisites](#prerequisites)
 - [Install](#install)
   - [1. Node and the Packages](#1-node-and-the-packages)
-  - [2. The Api Keys](#2-the-api-keys)
-  - [3. Install in Google Sheets](#3-install-in-google-sheets)
+  - [2. Operating-System Programs](#2-operating-system-programs)
+  - [3. The Api Keys](#3-the-api-keys)
+  - [4. Install in Google Sheets](#4-install-in-google-sheets)
 - [Optional: Verify Download](#optional-verify-download)
 - [Update](#update)
 - [Uninstall](#uninstall)
@@ -239,18 +240,22 @@ bar; it is now Crypto Price Fetchers.
 - For the Sheets scripts: a Google account and a spreadsheet in Google
   Sheets. A clipboard tool, which the build puts the built file on, saves
   a step: without one, the build writes the file to disk
-  ([Install in Google Sheets](#3-install-in-google-sheets) names the tools).
+  ([Operating-System Programs](#2-operating-system-programs) installs
+  one).
 - Optional: an api key for each service that takes one
-  ([The Api Keys](#2-the-api-keys)).
+  ([The Api Keys](#3-the-api-keys)).
 
 ---
 
 ## Install
 
-Step 1 installs the packages, which every tool needs. Step 2 saves the api
-keys, each of them optional: with none saved, a tool asks each service
-without a key, and gets what the table in step 2 says. Step 3 puts the
-Sheets scripts into a spreadsheet, as the one file the build step gives.
+Step 1 installs the packages, which every tool needs. Step 2 installs
+the programs of your computer's operating system that the tools use and
+npm does not install: today the clipboard tool of the build step. Step 3
+saves the api keys, each of them optional: with none saved, a tool asks
+each service without a key, and gets what the table in step 3 says. Step
+4 puts the Sheets scripts into a spreadsheet, as the one file the build
+step gives.
 
 ### 1. Node and the Packages
 
@@ -267,7 +272,34 @@ npm ci
 npm ci --prefix fetch-from-centralized-exchange/crypto-price-filler
 ```
 
-### 2. The Api Keys
+### 2. Operating-System Programs
+
+One program the build step uses comes from your computer's operating
+system rather than from npm: the clipboard tool, which puts the built
+file on the clipboard ([step 4](#4-install-in-google-sheets)). macOS and
+Windows come with theirs, pbcopy and clip. A Linux desktop needs
+wl-clipboard in a Wayland session, or xclip in an X11 one, unless a tool
+for the session, such as xsel, is installed. `npm run os-dependencies`
+runs `install/install-os-dependencies.js`, which says what is installed
+and installs what is missing. From the repo's top folder:
+
+```bash
+npm run os-dependencies
+```
+
+It installs the tool with Homebrew, the package manager for macOS and
+Linux, when Homebrew is installed. Without Homebrew, it recommends
+installing it, as [brew.sh](https://brew.sh) says, since it works on
+Linux and macOS alike, then running `npm run os-dependencies` again; and,
+where apt, the package manager of Debian and Ubuntu, is installed, it
+asks whether to install the tool with `sudo apt install` instead, sudo
+asking for your computer's password at its own prompt. With neither, or
+when the install fails, it names the package to install yourself. With
+no desktop session open, as over ssh, no clipboard can be reached, and
+it installs nothing. `npm run os-dependencies -- --help` lists its exit
+codes.
+
+### 3. The Api Keys
 
 The keys the tools send are kept in `api-keys.json` at the repo's top,
 which git ignores, encrypted with one password you choose, by this repo's
@@ -300,7 +332,7 @@ other uses, and [unlock-api-keys.sh](#unlock-api-keyssh-1) how to type the
 password once per terminal. The store itself is a module
 any Node project can use: see [its README](./api-key-store/README.md).
 
-### 3. Install in Google Sheets
+### 4. Install in Google Sheets
 
 A spreadsheet runs its scripts from its Apps Script project, the code
 Google keeps with the spreadsheet. Apps Script cannot read the key file,
@@ -365,11 +397,11 @@ functions under the Crypto Price Fetchers menu, build with them included.
 
 The clipboard is reached through the desktop's own tool: wl-copy, xclip or
 xsel on Linux, pbcopy on macOS, clip on Windows. When none is installed,
-on Linux with apt and a desktop session open, the build offers to install
-one with `sudo apt install`, and runs the install on a yes; sudo asks for
-your computer's password at its own prompt. Declined, or with no tool to
-offer, the build says first that your api keys will be written to disk in
-the clear, then writes the file to
+on a Linux desktop with Homebrew or apt, the build offers the install
+`npm run os-dependencies` runs ([step 2](#2-operating-system-programs)),
+and runs it on a yes. Declined, failed, or with no install to offer, the
+build says first that your api keys will be written to disk in the clear,
+then writes the file to
 `dist/apps-script/crypto-price-fetchers.gs`, which git ignores, readable
 by you alone, and prints its path and how to paste it, never its text.
 Delete it once it is pasted.
@@ -427,7 +459,7 @@ stops rather than write over your change, and `git stash`, then
 `git pull`, then `git stash pop` carries your change across. A spreadsheet keeps the scripts as
 they were pasted: to update them, run the build again and paste the new
 file over the old one, as in
-[Install in Google Sheets](#3-install-in-google-sheets). A project that
+[Install in Google Sheets](#4-install-in-google-sheets). A project that
 installs this repo takes its newest commit with
 `npm run github-project-deps -- main`
 ([github-project-deps.js](#github-project-depsjs-1)).
@@ -454,6 +486,10 @@ installs this repo takes its newest commit with
 4. A clipboard manager that keeps a history of what was copied keeps the
    built file, with its keys: delete it from that history. To retire the
    keys themselves, revoke them at each service.
+5. A clipboard tool that `npm run os-dependencies` installed stays: other
+   programs may use it too. `brew uninstall xclip` or
+   `sudo apt remove xclip`, with `wl-clipboard` in place of `xclip` for
+   a Wayland session, removes it.
 
 ---
 
@@ -471,7 +507,7 @@ The one file a spreadsheet runs, `crypto-price-fetchers.gs`, is not in
 `bin/`: `npm run build apps-script` makes it, and puts it on the
 clipboard, or, when no clipboard tool is installed, in
 `dist/apps-script/`, from where you paste it into the spreadsheet
-([Install in Google Sheets](#3-install-in-google-sheets)).
+([Install in Google Sheets](#4-install-in-google-sheets)).
 
 ### crypto-price-fetchers.gs
 
@@ -993,7 +1029,7 @@ What differs from the sheet:
   in a cell, and shows the busy message when no source gave a price and a
   request got no answer, as in a cell.
 - The api keys come from the repo's encrypted key file
-  ([The Api Keys](#2-the-api-keys)), not from the script. Each Node
+  ([The Api Keys](#3-the-api-keys)), not from the script. Each Node
   version sets them in the script's config as it opens the script, as the
   build step sets them in the file it gives for the sheet.
 - The cache lasts while the script is open: for the command line, one run.

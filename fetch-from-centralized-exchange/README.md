@@ -60,7 +60,7 @@ three files, with the repo's other Sheets scripts and the Crypto Price
 Fetchers menu, which runs a spreadsheet's price cells again, in one file
 to paste into a spreadsheet, with the CoinGecko and
 CoinPaprika keys saved in the repo set at its end: see
-[Install in Google Sheets](../README.md#3-install-in-google-sheets) in the
+[Install in Google Sheets](../README.md#4-install-in-google-sheets) in the
 repo's README. Without saved keys, the script asks both services without
 a key. The menu's Refresh & freeze historical prices item runs a tab's
 `getCryptoPrice` cells again and keeps each price as a number.
@@ -87,7 +87,7 @@ documentation, see the file header in
 and
 [`crypto-price-filler/README.md`](./crypto-price-filler/README.md).
 It sends the CoinGecko, CoinPaprika and Moralis keys saved, encrypted, in
-the repo's key file: see [The api keys](../README.md#2-the-api-keys) in
+the repo's key file: see [The api keys](../README.md#3-the-api-keys) in
 the repo's README.
 
 ---
@@ -104,7 +104,7 @@ node bin/getCryptoPriceFromCentralizedExchange.js xtm "2026-01-15 14:30:00" --tz
 ```
 
 It sends the CoinGecko and CoinPaprika keys saved, encrypted, in the
-repo's key file ([The api keys](../README.md#2-the-api-keys)), asking for
+repo's key file ([The api keys](../README.md#3-the-api-keys)), asking for
 its password first. The rest is in the
 [repo's README](../README.md#node-versions-of-the-sheets-scripts), and the
 file header in

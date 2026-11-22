@@ -91,7 +91,7 @@ the terminal, or else one it asks
 for, and asks each service once whether it takes its key. Without a saved
 key, the tool asks CoinGecko without one, at its lower rate limits, asks
 CoinPaprika's free server, and does not ask Moralis. See
-[The api keys](../../README.md#2-the-api-keys) in the repo's README.
+[The api keys](../../README.md#3-the-api-keys) in the repo's README.
 
 ## Run
 

@@ -36,7 +36,14 @@ the Summ csv utility, the key manager, the versions tool,
 build joins into one file, are in `src/`. The build's tools are in
 `build/tools/`: `build.js`, the build's modules in `apps-script-build/`,
 and `audit-dex-screener.js`. The file the build writes when there is no
-clipboard goes to `dist/apps-script/`, which git ignores. The code the
+clipboard goes to `dist/apps-script/`, which git ignores. The install of
+the programs of the computer's operating system that the tools use and
+npm does not install, today the build's clipboard tool, is in
+`install/`: `npm run os-dependencies` runs
+`install/install-os-dependencies.js`, the README's second step of
+Install, which installs with Homebrew, or, without it, recommends it and
+offers apt, and the build offers the same install
+(`install/os-dependencies.js`) when it finds no clipboard tool. The code the
 programs share stays in folders of its own (`lib/`, `dex-prices/`,
 `summ-csv/`, `api-key-store/`, `apps-script-runner/`, `actionlint/`,
 `github-project-deps/`), and crypto-price-filler's in its package,
@@ -168,7 +175,8 @@ config.json each Node version reads and the menu's Help page, as the last
 statements of the one file it gives, from each Node version's
 `APPS_SCRIPT_BUILD` spec. It puts the file on the clipboard, or, when no
 clipboard tool is installed and the owner declines the install it offers,
-writes it to `dist/apps-script/`, which git ignores, as do the lint, the
+the install `npm run os-dependencies` runs, or it fails, writes it to
+`dist/apps-script/`, which git ignores, as do the lint, the
 security lint, the format check and the secret scan (Gates and CI, below),
 readable by the owner alone. It prints no key. crypto-price-filler reads
 `config-example.json`, its committed settings, with its own `config.json`,
@@ -383,8 +391,8 @@ a doc pointing at a file, folder or heading the repo keeps. The menu runs agains
 built from stand-in sources written in its test, compiled with the real
 esbuild. Code
 that more than one part uses lives once, in `lib/`, which ships with the
-package, and the projects that install this repo import each by the
-package's name, as `exports` in package.json names it:
+package, and the projects that install this repo import those made for
+them by the package's name, as `exports` in package.json names them:
 `crypto-price-fetchers/lib/message-of`, `…/lib/command-line-help`,
 `…/lib/closed-output`, `…/lib/calendar-day`, `…/lib/http-url`,
 `…/lib/repo-checks`, `…/lib/time-limited-fetch`, `…/lib/settings-file`,

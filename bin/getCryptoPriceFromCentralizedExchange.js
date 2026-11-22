@@ -58,9 +58,11 @@
  * here. The script waits its 200 milliseconds before each lookup, as in
  * the sheet.
  *
- * Fit: beside `getCryptoPriceFromCentralizedExchange.gs`, which stays the
- * one copy of its logic. crypto-price-filler, in the folder below, is a
- * separate tool that asks the script's price sources through
+ * Fit: in `bin/`, the folder of the programs a reader runs;
+ * `src/getCryptoPriceFromCentralizedExchange.gs` stays the one copy of its
+ * logic. crypto-price-filler, in
+ * `fetch-from-centralized-exchange/crypto-price-filler/`, is a separate
+ * tool that asks the script's price sources through
  * `openCentralizedExchangeSources`.
  */
 
