@@ -1,9 +1,7 @@
 /**
- * Tests that guard the fixed bugs of a Sheets script alone, each run on
- * the script in the test's thread: each bug's test moved here from
- * `known-bugs.test.js` with its fix, beside the tests written with the
- * fix. The Sheets scripts' bugs fixed before this file was made stay in
- * `regressions.test.js`.
+ * Tests that guard fixed bugs, each running a Sheets script in the test's
+ * thread. A fix moves its known-bug test here from `known-bugs.test.js`
+ * when the test runs a Sheets script that way (see the repo's CLAUDE.md).
  * @module tests/regressions-sheets.test
  *
  * The Sheets scripts run unchanged in the test's thread, through
