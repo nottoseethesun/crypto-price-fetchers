@@ -99,10 +99,14 @@ already asked without asking again. So a sheet full of cells keeps within
 the services' rate limits. Google stops a call after 30 seconds, so each
 call keeps to 25 (`CALL_BUDGET_MS`): it waits for the lock, or for a
 request refused as one too many (status 429), only while the wait fits in
-them, and sends no request once they are used. When no source then gave a
-price, the cell shows the script's busy message, and nothing is cached. A
-request that gets no response at all, as a timeout gives, is a failed one,
-and the next source answers.
+them, and sends no request once they are used. A request that gets no
+response at all, as on a timeout or when Apps Script's daily quota of
+requests is spent, is a failed one, and the next source answers. Such a
+request, a refusal the call could not wait out, and a request it had no
+time to send are cut short: when no source then gave a price, the cell
+shows the script's busy message, and no source keeps the lack of an
+answer from a request cut short, since it says nothing of whether the
+source has a price.
 The script is
 in three files, which Apps Script loads into one scope: the function and
 its settings, the price sources (`-sources.gs`), and the tests run from the

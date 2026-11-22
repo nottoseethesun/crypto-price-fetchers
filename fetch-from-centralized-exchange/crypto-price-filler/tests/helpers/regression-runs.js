@@ -60,6 +60,19 @@ export function answerMexcCandle(url) {
   return null;
 }
 
+/** A day, in ms. */
+export const DAY_MS = 86400000;
+
+/**
+ * A time as a cell writes it, in UTC.
+ *
+ * @param {number} utcMs - The time, in ms since 1970 UTC
+ * @returns {string} The time, as `YYYY-MM-DD HH:MM:SS`
+ */
+export function cellTime(utcMs) {
+  return new Date(utcMs).toISOString().slice(0, 19).replace("T", " ");
+}
+
 /**
  * Answers for a coin MEXC does not list and CoinGecko lists against USD,
  * as it does Tezos: CoinGecko's hourly range has no prices, and its price

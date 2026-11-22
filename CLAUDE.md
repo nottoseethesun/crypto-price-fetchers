@@ -405,12 +405,13 @@ functions inside the scripts that the owner runs by hand. crypto-price-filler's
   child process against a stand-in MEXC, and a stand-in CoinGecko ping that
   takes the one key in `stand-in-coingecko-key.js`.
 - `stand-in-settings-preload.js` hands the command line, run in a child
-  process, a settings file or a token list of the test's own, from an
-  environment variable, since the tool reads both beside its own files and
-  a test never writes the owner's `config.json`.
-- `regression-runs.js` holds the settings, stand-in answers and runs that
-  `tests/regressions.test.js` and `tests/regressions-sheets.test.js`
-  share.
+  process, a settings file, a token list or a `config.json` of the
+  exchange script of the test's own, from an environment variable, since
+  the tool reads its two beside its own files, and the exchange script's
+  Node version its own beside the script, and a test never writes the
+  owner's settings.
+- `regression-runs.js` holds the settings, stand-in answers, times and
+  runs that the regression tests and the known-bug tests share.
 - `log-lines.js` reads the lines the tool prints through its log's seam
   (`utils/log.js`), so no test replaces `console.log`.
 

@@ -135,10 +135,12 @@
  *   while the script keeps "no data" (above).
  * - `No data available for future dates`: the time is after now.
  * - `Rate limit busy - retry later`: other cells kept the script busy, or
- *   no source gave a price before the call used the 25 seconds the script
- *   allows a cell, within the 30 Google gives one, as when the sources
- *   refuse its requests as too many; choose Clean up errors in the Crypto
- *   Price Fetchers menu, which runs the cell again.
+ *   no source gave a price and a request got no answer: the sources
+ *   refused it as too many until the call used the 25 seconds the script
+ *   allows a cell, within the 30 Google gives one, or it got no response,
+ *   as on a timeout or when Apps Script's daily quota of requests is
+ *   spent; choose Clean up errors in the Crypto Price Fetchers menu, which
+ *   runs the cell again.
  * - `Unknown time zone`, or `Invalid` with a part of the date: check
  *   `tz` or `dateStr`.
  * - `#ERROR!`: choose Clean up errors in the Crypto Price Fetchers menu.
@@ -204,9 +206,13 @@
  * None asks for the current price, which would put today's price on a
  * past date. A request a provider refuses as one too many (status 429) is
  * sent again after each wait in RETRY_DELAYS_MS, while the wait fits in
- * the call's budget, CALL_BUDGET_MS, below; a request that gets no response at
- * all, as a timeout or a refused connection gives, is a failed one, as a
- * refusal is, and the next provider answers.
+ * the call's budget, CALL_BUDGET_MS, below; a request that gets no
+ * response at all, as on a timeout, a refused connection or Apps Script's
+ * own quota of requests, is a failed one, as a refusal is, and the next
+ * provider answers. Such a request, a refusal the call cannot wait out and
+ * a request it has no time to send are cut short (CALL, below): when no
+ * provider then gives a price, the cell shows the busy message, and no
+ * provider's silence is kept as no data.
  *
  *   1. MEXC       - Primary. Real OHLCV candles (1-minute for about the
  *                   last 30 days, else 1-hour; up to the year when
@@ -393,19 +399,22 @@ const API_LOCK = LockService.getScriptLock();
  * stops a custom function after 30 seconds. A call waits for the lock or
  * for a request refused as one too many only while the wait fits in it,
  * and sends no request once it is used; when no source then gave a price,
- * the cell shows the busy message, and nothing is cached. Not a setting:
- * it follows Google's limit.
+ * the cell shows the busy message, and nothing is cached (CALL, below).
+ * Not a setting: it follows Google's limit.
  */
 const CALL_BUDGET_MS = 25000;
 
 /**
  * The time a call of getCryptoPrice has used, for its budget
- * (CALL_BUDGET_MS): when it began, or null outside a call; the
- * waits it asked for; and whether it was cut short, a request refused as
- * one too many that it could not wait out, or one it had no time to send,
- * so that no source's silence is kept as no data.
+ * (CALL_BUDGET_MS): when it began, or null outside a call; the waits it
+ * asked for; and how many of its requests were cut short: refused as one
+ * too many past the last try or the time left to wait, given no response,
+ * or not sent for want of time. A request cut short says nothing of
+ * whether its source has a price, so no source keeps the lack of an answer
+ * from one, and a call with one, which no source priced, shows the busy
+ * message rather than no data. Outside a call the count only grows.
  */
-const CALL = { startMs: null, waitedMs: 0, cutShort: false };
+const CALL = { startMs: null, waitedMs: 0, cutRequests: 0 };
 
 /**
  * The time the call has used: the time since it began, or the waits it
@@ -443,10 +452,11 @@ function waitInCall(milliseconds) {
 }
 
 /**
- * What a cell shows when the call got no script lock in its tries, or was
- * cut short before any source gave a price: a refusal as one too many it
- * could not wait out, or a request it had no time to send. The menu's
- * Clean up errors runs again each cell that shows it.
+ * What a cell shows when the call got no script lock in its tries, or no
+ * source gave a price and a request was cut short: refused as one too many
+ * past what the call could wait out, given no response, or not sent for
+ * want of time. The menu's Clean up errors runs again each cell that shows
+ * it.
  *
  * @type {string}
  */
@@ -526,7 +536,7 @@ function getCryptoPrice(
 ) {
   CALL.startMs = Date.now();
   CALL.waitedMs = 0;
-  CALL.cutShort = false;
+  CALL.cutRequests = 0;
   try {
     return cryptoPriceInCall(token, dateStr, tz, mode, apiDelayMs);
   } finally {
@@ -577,7 +587,7 @@ function cryptoPriceInCall(token, dateStr, tz, mode, apiDelayMs) {
 
   try {
     const price = fetchPriceFromProviders(token, utcMs, target);
-    if (price === null && CALL.cutShort) {
+    if (price === null && CALL.cutRequests > 0) {
       Logger.log(
         "No source gave a price, and the call was cut short, so nothing is cached",
       );

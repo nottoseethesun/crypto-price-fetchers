@@ -496,9 +496,10 @@ Monero's lowest price at the time in cell A1:
 
 A cell shows a message instead of a price when no source has one for that
 coin at that time, when the time is in the future, when other cells kept
-the script busy or the sources refused its requests as too many until the
-call used the 25 seconds the script allows it, or when it cannot read
-`tz` or `dateStr`; Help lists each message.
+the script busy, when no source gave a price and a request got no answer,
+refused as too many until the call used the 25 seconds the script allows
+it or given no response, as when Apps Script's daily quota of requests is
+spent, or when it cannot read `tz` or `dateStr`; Help lists each message.
 
 #### The Menu
 
