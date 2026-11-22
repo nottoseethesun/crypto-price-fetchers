@@ -427,9 +427,14 @@ for any other, and removes the row. `tests/regressions.test.js` also
 holds older tests that run a Sheets script that way.
 
 Google stops a custom function, a function a cell calls, after 30 seconds,
-and the cell shows `#ERROR!`. Both bugs below are waits longer than that.
+and the cell shows `#ERROR!`. The first two bugs below, and the fourth, are
+waits longer than that.
 
 | Bug | Test in `tests/known-bugs.test.js` |
 | --- | --- |
 | `dexToolsGetTokenPrice` and `dexToolsGetTokenFDV`, in `crypto-price-fetchers.gs`, wait up to `DEXTOOLS_CONFIG.LOCK_WAIT_MS`, 120 seconds, for the script lock, so a cell that waits more than 30 seconds shows `#ERROR!`, never the busy message the script returns when the wait ends. | dexToolsGetTokenPrice waits for the script lock no longer than Google lets a custom function run |
 | `getCryptoPrice`, in the exchange script, tries the script lock 3 times for 2 seconds each, waiting 5, 10 and 20 seconds after each failed try (`LOCK_RETRY_BACKOFF`): 41 seconds in all. | getCryptoPrice waits for the script lock, in all, no longer than Google lets a custom function run |
+| `fetchWithRetries`, in the exchange script, lets the throw of `UrlFetchApp.fetch` for a request that gets no response through, so the cell shows the error, and the next source is never asked. | getCryptoPrice asks the next source when MEXC gives no response at all, as a timeout or a refused connection gives, rather than show the error |
+| `fetchWithRetries` waits 5 seconds twice after each request refused as one too many (status 429), with no limit for the call: when MEXC refuses every request, 90 seconds. | getCryptoPrice waits, in all, no longer than Google lets a custom function run when MEXC refuses every request as one too many |
+| `mexcPairPrice` goes up the windows when the request for the day before fails, so a time on the day MEXC listed the pair, before its first trade, is priced from the day's later trades. | getCryptoPrice gives no MEXC price for a time on the day MEXC listed the pair when the request for the day before fails, rather than price it from the day's later trades |
+| crypto-price-filler takes a `config.json` of the exchange script that its schema refuses for no price from the exchange's sources, on every row, and ends with exit code 0. | stops before the first row, with exit code 1, on a config.json of the exchange script it refuses, naming the problem |

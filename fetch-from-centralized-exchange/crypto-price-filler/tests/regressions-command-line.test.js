@@ -24,21 +24,14 @@ import { spawnSync } from "child_process";
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { pathToFileURL } from "url";
 import { runBackfill, setupBackfillCommander } from "../backfill.js";
 import { setupCommander } from "../commander.js";
 import { backfillChoice, backfillPrices } from "../utils/backfill.js";
-import { runCommandLine } from "./helpers/regression-runs.js";
+import { runCommandLine, runIndexIn } from "./helpers/regression-runs.js";
 import { logLines } from "./helpers/log-lines.js";
 
-/** crypto-price-filler's folder, and the two preloads a run of index.js takes. */
+/** crypto-price-filler's folder. */
 const FILLER_DIR = path.resolve(__dirname, "..");
-const SETTINGS_PRELOAD = pathToFileURL(
-  path.resolve(__dirname, "helpers/stand-in-settings-preload.js"),
-).href;
-const FETCH_PRELOAD = pathToFileURL(
-  path.resolve(__dirname, "helpers/stand-in-fetch-preload.js"),
-).href;
 
 /** A token list of one token, XTM, which MEXC lists and CoinGecko does not. */
 const XTM_WITHOUT_COINGECKO = JSON.stringify({
@@ -71,27 +64,11 @@ afterAll(() => {
  * token list given in place of the tool's own.
  *
  * @param {string[]} args - Its arguments
- * @param {Object<string, string>} standIns - `STAND_IN_FILLER_CONFIG` and `STAND_IN_FILLER_TOKENS`, as the settings preload takes them
+ * @param {Object<string, string>} standIns - As the settings preload takes them
  * @returns {{status: number, stdout: string, stderr: string}} How it ended
  */
 function runIndex(args, standIns) {
-  return spawnSync(
-    process.execPath,
-    [
-      "--import",
-      SETTINGS_PRELOAD,
-      "--import",
-      FETCH_PRELOAD,
-      path.join(FILLER_DIR, "index.js"),
-      ...args,
-    ],
-    {
-      cwd: folder,
-      env: { ...process.env, ...standIns },
-      encoding: "utf8",
-      timeout: 30000,
-    },
-  );
+  return runIndexIn(folder, args, standIns);
 }
 
 /** A CSV of three rows, the second with no price, for backfill to fill. */

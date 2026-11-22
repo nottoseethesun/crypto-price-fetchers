@@ -172,6 +172,41 @@ export function runCommandLineForOneRow(options, cwd = FILLER_DIR) {
  * @param {string[]} args - The arguments
  * @returns {{status: number, stdout: string, stderr: string}} The exit code and what it printed
  */
+/** The preload that hands a run of index.js settings of the test's own. */
+const SETTINGS_PRELOAD_URL = new URL(
+  "./stand-in-settings-preload.js",
+  import.meta.url,
+).href;
+
+/**
+ * Runs index.js in a folder, with the stand-in settings and the stand-in
+ * fetch, as the owner runs it there.
+ *
+ * @param {string} folder - The folder it runs in
+ * @param {string[]} args - Its arguments
+ * @param {Object<string, string>} [standIns] - `STAND_IN_FILLER_CONFIG`, `STAND_IN_FILLER_TOKENS` or `STAND_IN_EXCHANGE_CONFIG`, as the settings preload takes them
+ * @returns {{status: number, stdout: string, stderr: string}} How it ended
+ */
+export function runIndexIn(folder, args, standIns = {}) {
+  return spawnSync(
+    process.execPath,
+    [
+      "--import",
+      SETTINGS_PRELOAD_URL,
+      "--import",
+      PRELOAD_URL,
+      path.join(FILLER_DIR, "index.js"),
+      ...args,
+    ],
+    {
+      cwd: folder,
+      env: { ...process.env, ...standIns },
+      encoding: "utf8",
+      timeout: 30000,
+    },
+  );
+}
+
 export function runCommandLine(args) {
   const run = spawnSync(
     process.execPath,

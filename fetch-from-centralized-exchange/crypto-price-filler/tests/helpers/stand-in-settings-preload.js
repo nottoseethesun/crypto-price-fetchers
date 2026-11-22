@@ -4,12 +4,14 @@
  * @module tests/helpers/stand-in-settings-preload
  *
  * The tool reads `config.json`, the owner's own settings, and
- * `supported-tokens.json` beside its own files, whichever folder it runs in,
- * so a test cannot hand it either by writing a file. A test starts
- * `node --import <this file> index.js ...`, with the text of either file in
- * the environment variable `STAND_IN_FILLER_CONFIG` or
- * `STAND_IN_FILLER_TOKENS`; this file makes the tool's read of that file
- * give the text, so a test never writes the owner's `config.json`.
+ * `supported-tokens.json` beside its own files, and the exchange script's
+ * Node version reads the `config.json` beside its own, whichever folder it
+ * runs in, so a test cannot hand any of them by writing a file. A test
+ * starts `node --import <this file> index.js ...`, with the text of a file
+ * in the environment variable `STAND_IN_FILLER_CONFIG`,
+ * `STAND_IN_FILLER_TOKENS` or `STAND_IN_EXCHANGE_CONFIG`; this file makes
+ * the read of that file give the text, so a test never writes the owner's
+ * settings.
  */
 
 import fs from "fs";
@@ -27,6 +29,7 @@ const STAND_INS = new Map(
   [
     ["config.json", process.env.STAND_IN_FILLER_CONFIG],
     ["supported-tokens.json", process.env.STAND_IN_FILLER_TOKENS],
+    ["../config.json", process.env.STAND_IN_EXCHANGE_CONFIG],
   ]
     .filter(([, text]) => text !== undefined)
     .map(([name, text]) => [path.join(FILLER_DIR, name), text]),

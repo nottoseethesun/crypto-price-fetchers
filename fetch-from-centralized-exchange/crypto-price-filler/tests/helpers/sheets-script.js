@@ -32,6 +32,21 @@ import {
 /** Marks what `reply` returns, so no json body is taken for one. */
 const REPLY = Symbol("reply");
 
+/** Marks what `noResponse` returns. */
+const NO_RESPONSE = Symbol("no response");
+
+/**
+ * No response at all, as a timeout or a refused connection gives, for
+ * `answer` to return: the script's `UrlFetchApp.fetch` then throws, as
+ * Apps Script's does.
+ *
+ * @param {string} why - Why there was no response
+ * @returns {Object} The answer
+ */
+export function noResponse(why) {
+  return { [NO_RESPONSE]: why };
+}
+
 /**
  * A reply with a status of its own, for `answer` to return.
  *
@@ -75,7 +90,7 @@ export function replyOf(answered) {
  * Loads a Sheets script whose web requests answer from `answer`.
  *
  * @param {string|string[]} scriptPath - Path of the `.gs` file, or of a script's files in the order Apps Script loads them
- * @param {function(string, {url: string, headers: Object<string, string>}): *} answer - A json body, null for a 404, `reply(status, body)` or `rawReply(status, text)`
+ * @param {function(string, {url: string, headers: Object<string, string>}): *} answer - A json body, null for a 404, `reply(status, body)`, `rawReply(status, text)` or `noResponse(why)`
  * @param {Object} [options] - What else the script starts with
  * @param {Object<string, Object>} [options.config={}] - Fields to set in its config objects, as its Node version sets them, such as `{ CONFIG: { COINGECKO_API_KEY: '...' } }`
  * @param {function(number): void} [options.sleep] - Takes each wait the script makes; returns at once when absent
@@ -85,7 +100,10 @@ export function replyOf(answered) {
 export function loadSheetsScript(scriptPath, answer, options = {}) {
   const services = createAppsScriptServices({
     fetchSync: (request) => {
-      const { status, text } = replyOf(answer(request.url, request));
+      const answered = answer(request.url, request);
+      if (answered !== null && answered?.[NO_RESPONSE] !== undefined)
+        return { failure: answered[NO_RESPONSE] };
+      const { status, text } = replyOf(answered);
       return { status, headers: {}, text };
     },
     sleep: options.sleep ?? (() => {}),
