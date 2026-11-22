@@ -425,9 +425,13 @@ for any other, and removes the row. `tests/regressions.test.js` also
 holds older tests that run a Sheets script that way.
 
 Google stops a custom function, a function a cell calls, after 30 seconds,
-and the cell shows `#ERROR!`. Both bugs below are waits longer than that.
+and the cell shows `#ERROR!`. The first two bugs below are waits longer
+than that.
 
 | Bug | Test in `tests/known-bugs.test.js` |
 | --- | --- |
 | `dexToolsGetTokenPrice` and `dexToolsGetTokenFDV`, in `crypto-price-fetchers.gs`, wait up to `DEXTOOLS_CONFIG.LOCK_WAIT_MS`, 120 seconds, for the script lock, so a cell that waits more than 30 seconds shows `#ERROR!`, never the busy message the script returns when the wait ends. | dexToolsGetTokenPrice waits for the script lock no longer than Google lets a custom function run |
 | `getCryptoPrice`, in the exchange script, tries the script lock 3 times for 2 seconds each, waiting 5, 10 and 20 seconds after each failed try (`LOCK_RETRY_BACKOFF`): 41 seconds in all. | getCryptoPrice waits for the script lock, in all, no longer than Google lets a custom function run |
+| `mexcPairPrice`, in the exchange script, takes a failed request for the day before a time whose minute MEXC let go for no candle of that day, so it says the time comes before the pair's first trade and gives no price. | getCryptoPrice prices a time whose minute MEXC let go from MEXC's hour when the request for the day before fails, rather than taking the failure for no candle of it |
+| `mexcPairPrice` takes a failed request for the day before, with no candle of the hour, for no candle of that day, and gives no price. | getCryptoPrice goes up from the 2 hours when MEXC keeps no candle of the hour and the request for the day before fails, rather than taking the failure for no candle of it |
+| `mexcPairPrice` takes a failed request for the day, as it goes up the windows, for no candle of the day, and gives no price. | getCryptoPrice goes on up to the week when the request for the day fails, rather than taking the failure for no candle of the day |
