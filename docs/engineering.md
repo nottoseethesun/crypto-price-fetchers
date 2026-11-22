@@ -527,5 +527,6 @@ fixed behavior from coming back: `tests/regressions-command-line.test.js`
 for the filler's two command lines, `tests/regressions-lib.test.js` for the
 shared helpers in `lib/`, `tests/regressions-sheets.test.js` for a test
 that runs a Sheets script in the test's thread, and
-`tests/regressions.test.js` for any other. The repo's `CLAUDE.md` lists the bugs
+`tests/regressions.test.js` for any other; the latter also holds older
+tests that run a Sheets script that way. The repo's `CLAUDE.md` lists the bugs
 known today, each with its test.

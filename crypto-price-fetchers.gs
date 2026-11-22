@@ -23,10 +23,11 @@
  * `dexToolsGetTokenFDV(chain, tokenAddress, [pool], [seconds])` gives its
  * fully diluted value (FDV): its price times its total supply. Both ask
  * DexTools, or x1.ninja for X1. The script keeps each number above 0, a
- * price or an FDV, for up to 5 minutes, or up to the seconds the fourth
- * argument gives, a whole number from 1 to 21600, the longest Apps Script's
- * cache keeps a value, so a cell that runs again within that time gives the
- * number it gave before.
+ * price or an FDV, for up to 5 minutes, as the script is written (the
+ * CACHE_SECONDS setting), or up to the seconds the fourth argument gives,
+ * a whole number from 1 to 21600, the longest Apps Script's cache keeps a
+ * value, so a cell that runs again within that time gives the number it
+ * gave before.
  *
  * Each function gives one of these:
  *
