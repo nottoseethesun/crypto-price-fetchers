@@ -10,8 +10,8 @@
     "test": "vitest run --coverage --silent",
     "validate-parse": "node index.js --help >/dev/null",
     "test:strict": "npm run validate-parse && vitest run --coverage --silent",
-    "test:ci": "vitest run -- --no-cache --coverage",
-    "test:debug": "VERBOSE=1 vitest run -- --no-cache --reporter=verbose --coverage",
+    "test:ci": "vitest run --no-cache --coverage",
+    "test:debug": "VERBOSE=1 vitest run --no-cache --reporter=verbose --coverage",
     "test:watch": "vitest --coverage"
   },
   "author": "Christopher M. Balz with Grok and Claude.ai",

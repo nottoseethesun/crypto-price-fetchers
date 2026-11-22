@@ -6,7 +6,7 @@
  * What: how to use the pasted script is written once, in a section of the
  * header of each Sheets script file that a person at the sheet needs.
  * `helpSection` takes one file's section, and `helpPage` turns the
- * sections into one HTML page, which the build sets as `HELP.HTML` in the
+ * sections into one HTML page, which the build sets as `HELP_PAGE.HTML` in the
  * file it gives, for the menu's Help item to show.
  *
  * How:

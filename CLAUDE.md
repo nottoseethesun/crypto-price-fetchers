@@ -305,8 +305,9 @@ and no branch is deleted. LP Ranger's eight steps in
 The security lint runs `eslint-rules/no-secret-logging.js`, which refuses
 printing a name that may hold a secret, through `console`, a stream's
 `write` or `say`. A name that sounds like a secret but holds none is
-renamed, never excused. pulsechain-analytics and x1-validator-analytics run
-the rule from this repo (`crypto-price-fetchers/eslint-rules/no-secret-logging`).
+renamed, never excused. pulsechain-analytics,
+pulsechain-validator-analytics and x1-validator-analytics run the rule
+from this repo (`crypto-price-fetchers/eslint-rules/no-secret-logging`).
 
 The lint runs `eslint-rules/no-or-default.js`, which refuses `a || b`
 whose value is kept, as a default is, unless `b` is a boolean: `||` takes

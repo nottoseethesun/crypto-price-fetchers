@@ -157,8 +157,9 @@ Examples:
 Exit codes:
   0  the output file was written; a row no service priced gets Error in
      its $usd price, unless a --backfill flag or config.json filled it
-  1  it was not: an option was wrong or missing, the input has no date
-     column, the api keys could not be opened, or a step failed
+  1  it was not: an option was wrong or missing, the input file was not
+     found, or has no rows or no date column, the api keys could not be
+     opened, or a step failed
 `,
     )
 

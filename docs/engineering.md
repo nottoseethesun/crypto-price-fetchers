@@ -279,9 +279,9 @@ that this section, or `CLAUDE.md`, names every one.
 Its helpers (`test/helpers/`), besides those the paragraphs above name:
 `captured-output.js`, a stream stand-in that keeps what is written to it,
 for the tests of the command lines; and `stand-in-mexc.js`, which gives
-the candle MEXC answers a request for candles with, the first that opens
-in the window asked, or none, so the stand-ins of both suites answer as
-MEXC does.
+the candles MEXC answers a request for candles with, every one that opens
+in the window asked, up to the request's limit, or none, so the
+stand-ins of both suites answer as MEXC does.
 
 **crypto-price-filler's** (`tests/`):
 
@@ -300,9 +300,9 @@ MEXC does.
 | `price.test.js` | `sources/price.js`: the order the sources are asked in, and the cache. |
 | `progress.test.js` | `utils/progress.js`, the progress bar. |
 | `regressions.test.js` | The fixed bugs of the tool, its Sheets script and the menu. |
-| `regressions-command-line.test.js` | The fixed bugs of the two command lines: their checks of a value, the settings they fall back to, a settings file or token list they cannot take refused as one error, what `index.js` logs, `validate-parse` failing when node does not exit with code 0, and backfill leaving the rows that hold no data, such as a Total row, out of the fill and the grand total, and bracketing a block of `Error` prices with the nearest priced rows past them. |
+| `regressions-command-line.test.js` | The fixed bugs of the two command lines: their checks of a value, the settings they fall back to, a settings file or token list they cannot take refused as one error, what `index.js` logs, `validate-parse` failing when node does not exit with code 0, and backfill leaving the rows that hold no data, such as a Total row, out of the fill and the grand total, and bracketing a block of `Error` prices with the nearest priced rows past them; `test:ci` and `test:debug` giving vitest their flags; and an input file not found, or with no rows, named. |
 | `regressions-lib.test.js` | The fixed bugs of the repo's shared helpers in `lib/`: a schema compiled once, the words for an empty text and an empty list, and the search for command lines. |
-| `regressions-sheets.test.js` | Fixed bugs whose tests run a Sheets script in the test's thread: the exchange script's pairs quoted in `CONFIG.QUOTE_CURRENCY`; a cell's own cache seconds outside 1 to 21600 refused with a message before any request, an empty cell taking the config's; each token's own FDV when two cells name one pool, and an answer kept for one cell's seconds never given to a cell with others; and a time before MEXC listed a pair priced by CoinGecko, on an earlier day or before the first trade on the listing day, while a time after it still climbs MEXC's windows. |
+| `regressions-sheets.test.js` | Fixed bugs whose tests run a Sheets script in the test's thread: the exchange script's pairs quoted in `CONFIG.QUOTE_CURRENCY`; a cell's own cache seconds outside 1 to 21600 refused with a message before any request, an empty cell taking the config's; each token's own FDV when two cells name one pool, and an answer kept for one cell's seconds never given to a cell with others; and a time before MEXC listed a pair priced by CoinGecko, on an earlier day, before the first trade on the listing day, or, for a recent time, before it in the listing hour, while a time after it still climbs MEXC's windows. |
 | `settings-files.test.js` | `config.js` and `supported-tokens.js`: the committed settings and token list held to their schemas, the owner's `config.json` laid over the committed settings, and files with a key no schema names or a value of the wrong kind refused, listing every problem. |
 | `sheets-sources.test.js` | The exchange script's sources, MEXC, CoinGecko and CoinPaprika, which the sheet and the tool both price with. |
 | `token-validation.test.js` | A token with no sources refused, naming the tokens the tool supports. |

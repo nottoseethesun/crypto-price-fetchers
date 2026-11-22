@@ -11,8 +11,9 @@
  * in the expressions of a template literal, and in a string built with
  * `+`. The security pass, `eslint-security.config.js`, runs it.
  *
- * pulsechain-analytics and x1-validator-analytics run it too, from this
- * repo: `crypto-price-fetchers/eslint-rules/no-secret-logging`.
+ * pulsechain-analytics, pulsechain-validator-analytics and
+ * x1-validator-analytics run it too, from this repo:
+ * `crypto-price-fetchers/eslint-rules/no-secret-logging`.
  */
 
 /** The names that may hold a secret. */

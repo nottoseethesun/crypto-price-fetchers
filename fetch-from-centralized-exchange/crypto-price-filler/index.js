@@ -378,6 +378,10 @@ console.log(
 console.log(`Input: ${inputFile}, Output: ${outputFile}`);
 logv(verbose, 1, "Verbose mode ENABLED. Starting CLI logic");
 
+if (!fs.existsSync(inputFile)) {
+  console.error(`Input file not found: ${inputFile}`);
+  process.exit(1);
+}
 const csvContent = fs.readFileSync(inputFile, "utf8");
 logv(
   verbose,
@@ -393,7 +397,11 @@ const records = csvParse(csvContent, {
   relax_column_count: true,
 });
 
-const headers = Object.keys(records[0] ?? {});
+if (records.length === 0) {
+  console.error(`The input CSV has no rows below its header: ${inputFile}`);
+  process.exit(1);
+}
+const headers = Object.keys(records[0]);
 console.log(`Detected headers (${headers.length}): ${headers.join(", ")}`);
 
 // Add new columns if not already present
@@ -487,6 +495,7 @@ for (let i = 0; i < rows.length; i++) {
     row[usdAmountColName] = "";
     row[grandTotalColName] = grandTotalUsd.toFixed(6);
     outputRows.push(row);
+    progressBar.increment();
     continue;
   }
 
