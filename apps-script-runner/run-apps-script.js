@@ -36,6 +36,7 @@
 import { fileURLToPath } from "node:url";
 import { MessageChannel, Worker } from "node:worker_threads";
 import { messageOf } from "../lib/message-of.js";
+import { LONGEST_TIME_LIMIT_MS } from "../lib/time-limited-fetch.js";
 import { fetchWithinTimeLimit } from "../lib/time-limited-fetch.js";
 
 /** The worker thread's entry point. */
@@ -113,12 +114,12 @@ function readOptions(options) {
   if (onLog !== null && typeof onLog !== "function")
     throw new TypeError("onLog must be a function");
   if (
-    typeof requestTimeoutMs !== "number" ||
-    !Number.isFinite(requestTimeoutMs) ||
-    requestTimeoutMs <= 0
+    !Number.isInteger(requestTimeoutMs) ||
+    requestTimeoutMs < 1 ||
+    requestTimeoutMs > LONGEST_TIME_LIMIT_MS
   ) {
     throw new TypeError(
-      "requestTimeoutMs must be a number of milliseconds above zero",
+      `requestTimeoutMs must be a whole number of milliseconds from 1 to ${LONGEST_TIME_LIMIT_MS}, as Node's timers keep`,
     );
   }
   if (!isTextByName(scriptProperties))
@@ -253,7 +254,7 @@ function startCall(session, name, args) {
  * @param {Object<string, Object>} [options.config={}] - Fields of the script's config objects to set, such as `{ CONFIG: { API_KEY: '...' } }` (`applyConfig`)
  * @param {function(string, Object): Promise<Response>} [options.fetch=globalThis.fetch] - Does the script's web requests; shaped as Node's own fetch
  * @param {?function({level: string, text: string}): void} [options.onLog=null] - Takes each line the script logs, or null to drop them
- * @param {number} [options.requestTimeoutMs=60000] - How long a request may take before it counts as having no response
+ * @param {number} [options.requestTimeoutMs=60000] - How long a request may take before it counts as having no response: a whole number of milliseconds from 1 to 2147483647, as Node's timers keep
  * @param {Object<string, string>} [options.scriptProperties={}] - The script's Script Properties as it opens, such as an api key it reads with `PropertiesService.getScriptProperties().getProperty(...)`
  * @returns {Promise<{call: function(string, ...*): Promise<*>, close: function(): Promise<void>}>} The open script: `call(name, ...args)` calls a function, `close()` stops the script
  * @throws {Error} When the script cannot be read, does not compile, throws as it loads, or the config names an object or field the script lacks

@@ -88,9 +88,9 @@ about the last 30 days, so for an older time its period is the hour that
 holds it. When nothing traded in that minute or hour, MEXC's price comes
 from the first larger period around it, up to a year, in which something
 did. The next source also answers a time MEXC shows to come before it
-listed the coin: a recent minute with no candle in an hour MEXC keeps
-minute candles of, or an hour with no candle and no candle of the day
-before. Apps Script runs the calls of many cells at
+listed the coin: a recent minute MEXC answers with no candle, in an hour
+it keeps minute candles of, with no candle of the day before; or an hour
+with no candle and no candle of the day before. Apps Script runs the calls of many cells at
 the same time. The script's lock makes those calls take turns at the
 services, and its cache answers a question already asked without asking
 again. So a sheet full of cells keeps within the services' rate limits.

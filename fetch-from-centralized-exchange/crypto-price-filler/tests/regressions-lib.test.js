@@ -17,6 +17,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { filesUsingCommander } from "../../../lib/command-line-help.js";
+import { fetchWithinTimeLimit } from "../../../lib/time-limited-fetch.js";
 import {
   compileSettingsSchema,
   KINDS,
@@ -94,5 +95,20 @@ describe("the search for command lines (lib/command-line-help.js)", () => {
       "indented.js",
       "re-export.js",
     ]);
+  });
+});
+
+describe("the time-limited fetch", () => {
+  it("fetchWithinTimeLimit refuses a limit Node's timers cannot keep, a fraction of a millisecond or more than 2147483647, saying so", async () => {
+    const answers = async () => new Response("{}");
+    for (const timeoutMs of [2009.9999999999998, 3e9]) {
+      await expect(
+        fetchWithinTimeLimit(
+          "http://localhost/",
+          {},
+          { timeoutMs, fetch: answers },
+        ),
+      ).rejects.toThrow(/a whole number of milliseconds from 1 to 2147483647/);
+    }
   });
 });

@@ -200,8 +200,14 @@ function findMEXCTradingPair(token, symbols) {
  * something traded gives the average of its high and low, whatever the
  * target. MEXC gives a candle for every period it keeps, one in which
  * nothing traded with volume 0. So for a time within the days MEXC keeps
- * minute candles, a minute with no candle in an hour MEXC keeps minute
- * candles of comes before the pair's first trade, and MEXC gives no price.
+ * minute candles, a minute MEXC answers with no candle, in an hour it
+ * keeps other minute candles of, comes before the pair's first trade when
+ * MEXC keeps no candle of the day before, as on the day it listed the
+ * pair, and MEXC gives no price. With a candle of the day before, the pair
+ * traded before the time, so the minute is one MEXC let go, as at the
+ * start of the days it keeps minute candles, and the script asks for the
+ * hour; so it does when the request for the minute fails, which shows
+ * nothing of the pair's trades.
  * When MEXC keeps no candle of the hour that holds the time, the script
  * asks for the day before: with no candle
  * of it, as on the day MEXC listed the pair or before, MEXC gives no
@@ -213,15 +219,20 @@ function findMEXCTradingPair(token, symbols) {
  * @param {string} symbol - The MEXC pair, such as XTMUSDT
  * @param {number} utcMs - The time, in ms since 1970 UTC
  * @param {string} target - The price to give: "average", "high", "low" or "close"
- * @return {?{window: Object, averaged: boolean, price: number}} The price, its window, and whether it is the average of the window's high and low; or null when the time comes before the pair's first trade, as a minute with no candle in an hour of minute candles shows, or MEXC keeps no candle of the hour that holds the time nor of the day before, or of the day that holds it, or nothing traded in the year that holds it
+ * @return {?{window: Object, averaged: boolean, price: number}} The price, its window, and whether it is the average of the window's high and low; or null when the time comes before the pair's first trade, as a minute MEXC answers with no candle, in an hour of minute candles, on a day with no candle of the day before, shows, or MEXC keeps no candle of the hour that holds the time nor of the day before, or of the day that holds it, or nothing traded in the year that holds it
  */
 function mexcPairPrice(symbol, utcMs, target) {
   let level = 0;
-  let candle = fetchWindowCandle(symbol, MEXC_WINDOWS[0], utcMs);
+  const minutes = fetchWindowCandles(symbol, MEXC_WINDOWS[0], utcMs);
+  let candle = joinedCandle(minutes);
   if (candle === null) {
-    if (mexcKeptMinutesOfHour(symbol, utcMs)) {
+    if (
+      minutes !== null &&
+      mexcKeptMinutesOfHour(symbol, utcMs) &&
+      !mexcKeptDayBefore(symbol, utcMs)
+    ) {
       Logger.log(
-        `MEXC: no candle of ${symbol} for the minute that holds the time, though it keeps others of its hour, so the time comes before the pair's first trade, and MEXC gives no price for it`,
+        `MEXC: no candle of ${symbol} for the minute that holds the time, though it keeps others of its hour, and none of the day before, so the time comes before the pair's first trade, and MEXC gives no price for it`,
       );
       return null;
     }
@@ -269,8 +280,9 @@ const MEXC_MINUTES_KEPT_MS = 31 * MEXC_DAY_MS;
  * time, for a time within the days it keeps minute candles. Once a pair
  * trades, MEXC keeps a candle for every minute, so another minute of the
  * hour with a candle, while the time's minute has none, puts the time
- * before the pair's first trade. For an older time, MEXC keeps no minute
- * candles to ask, and none is asked.
+ * before the pair's first trade, unless the pair traded the day before.
+ * For an older time, MEXC keeps no minute candles to ask, and none is
+ * asked.
  *
  * @param {string} symbol - The MEXC pair
  * @param {number} utcMs - The time, in ms since 1970 UTC
@@ -315,9 +327,23 @@ function priceOf(candle, target) {
  * @param {string} symbol - The MEXC pair
  * @param {Object} window - One of MEXC_WINDOWS
  * @param {number} utcMs - The time, in ms since 1970 UTC
- * @return {?{high: number, low: number, close: number, volume: number}} The candle, or null when MEXC keeps none of the window
+ * @return {?{high: number, low: number, close: number, volume: number}} The candle, or null when MEXC keeps none of the window or the request fails
  */
 function fetchWindowCandle(symbol, window, utcMs) {
+  return joinedCandle(fetchWindowCandles(symbol, window, utcMs));
+}
+
+/**
+ * The candles of a window that holds a time, as MEXC answers for it:
+ * none when it keeps none of the window, and null when the request
+ * fails, which says nothing of the candles MEXC keeps.
+ *
+ * @param {string} symbol - The MEXC pair
+ * @param {Object} window - One of MEXC_WINDOWS
+ * @param {number} utcMs - The time, in ms since 1970 UTC
+ * @return {?Array<Array>} The candles, oldest first, or null when the request fails
+ */
+function fetchWindowCandles(symbol, window, utcMs) {
   const { start, end } = window.bounds(utcMs);
   const candles = fetchKlines(
     symbol,
@@ -326,12 +352,23 @@ function fetchWindowCandle(symbol, window, utcMs) {
     end,
     window.candles,
   );
-  if (candles === null || candles.length === 0) {
+  if (candles !== null && candles.length === 0) {
     Logger.log(
       `MEXC keeps no candle of the ${window.name} that holds the time`,
     );
-    return null;
   }
+  return candles;
+}
+
+/**
+ * A window's candles joined into one: the highest high, the lowest low,
+ * the last close and the volumes summed.
+ *
+ * @param {?Array<Array>} candles - The candles, oldest first, or null when the request failed
+ * @return {?{high: number, low: number, close: number, volume: number}} The candle, or null when there is none
+ */
+function joinedCandle(candles) {
+  if (candles === null || candles.length === 0) return null;
   const values = (name) =>
     candles.map((candle) => Number(candle[MEXC_CANDLE_FIELD[name]]));
   return {

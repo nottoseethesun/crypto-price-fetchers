@@ -348,7 +348,7 @@ function dexToolsAddress(address) {
  * an answer, and a cell never gets one kept for longer than its seconds.
  *
  * @param {string} blockchain - Chain identifier (e.g. "pulse", "ether", "bsc", "x1")
- * @param {string} tokenAddress - Token contract address, or on X1 the token's mint, which the script does not send
+ * @param {string} tokenAddress - Token contract address, or on X1 the token's mint, which shows in the cell what is priced; the script sends it to x1.ninja in place of a pool only when the cell names none, and x1.ninja answers only for a pool
  * @param {Array<Array<string>>} [poolAddresses=[]] - Optional [[poolAddress, unused]]
  *                                 Use when you want price from specific pool
  * @param {number} [cacheSeconds=DEXTOOLS_CONFIG.CACHE_SECONDS] - The seconds to keep the answer, a whole number from 1 to 21600; the config's when absent or empty
@@ -406,7 +406,7 @@ function dexToolsGetTokenPrice(
  * slug changes. X1 ROUTING, in this file's header, says why.
  *
  * @param {string} blockchain - Chain identifier (e.g. "pulse", "ether", "x1")
- * @param {string} tokenAddress - Token contract address, or on X1 the token's mint, which the script does not send
+ * @param {string} tokenAddress - Token contract address, or on X1 the token's mint, which shows in the cell what is priced; the script sends it to x1.ninja in place of a pool only when the cell names none, and x1.ninja answers only for a pool
  * @param {Array<Array<string>>} [poolAddresses=[]] - Optional [[poolAddress, unused]].
  *                                 Required for X1 (x1.ninja keys on
  *                                 pool address). Ignored by the
