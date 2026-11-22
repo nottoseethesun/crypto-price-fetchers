@@ -459,8 +459,10 @@ for any other, and removes the row. `tests/regressions.test.js` also
 holds older tests that run a Sheets script that way.
 
 Google stops a custom function, a function a cell calls, after 30 seconds,
-and the cell shows `#ERROR!`. The bug below is a wait longer than that.
+and the cell shows `#ERROR!`. The first bug below is a wait longer than
+that.
 
 | Bug | Test in `tests/known-bugs.test.js` |
 | --- | --- |
 | `dexToolsGetTokenPrice` and `dexToolsGetTokenFDV`, in `crypto-price-fetchers.gs`, wait up to `DEXTOOLS_CONFIG.LOCK_WAIT_MS`, 120 seconds, for the script lock, so a cell that waits more than 30 seconds shows `#ERROR!`, never the busy message the script returns when the wait ends. | dexToolsGetTokenPrice waits for the script lock no longer than Google lets a custom function run |
+| crypto-price-filler, run from the repo's top folder as the docs run it, writes its output there when no `--output` is given, as `output.csv`, which git does not ignore. | is one git ignores, when the tool runs from the repo's top folder |
