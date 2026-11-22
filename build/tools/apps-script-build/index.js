@@ -42,13 +42,14 @@
  *   in (`help-page.js`).
  * - The parts are joined and checked as one Apps Script project
  *   (`built-script.js`).
- * - With no clipboard tool installed (`clipboard.js`), the run offers to
- *   install one with apt, where it can, and runs the install on a yes,
- *   sudo asking for the computer's password at its own prompt. Declined,
- *   or where no install can be offered, the run says first that the api
- *   keys will be written to disk in the clear, then writes the file to
- *   `dist/apps-script/` at the repo's top, which git ignores, readable
- *   by its owner alone, and prints its path.
+ * - With no clipboard tool installed (`lib/clipboard.js`), on a desktop
+ *   with Homebrew or apt to install one with, the run offers the install
+ *   `npm run os-dependencies` runs (`install/os-dependencies.js`), and
+ *   runs it on a yes. Declined, failed, or where no install can be
+ *   offered, the run says first that the api keys will be written to disk
+ *   in the clear, then writes the file to `dist/apps-script/` at the
+ *   repo's top, which git ignores, readable by its owner alone, and prints
+ *   its path.
  * - No line printed holds any character of a key: the file's text goes
  *   only to the clipboard or to that file.
  *
@@ -57,8 +58,6 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import readline from "node:readline";
-import { spawn as nodeSpawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { Command, CommanderError } from "commander";
 import { unlockProjectKeys } from "../../../api-key-store/index.js";
@@ -70,11 +69,19 @@ import { APPS_SCRIPT_BUILD as DEXTOOLS_SCRIPT } from "../../../bin/crypto-price-
 import { APPS_SCRIPT_BUILD as EXCHANGE_SCRIPT } from "../../../bin/getCryptoPriceFromCentralizedExchange.js";
 import { messageOf } from "../../../lib/message-of.js";
 import { BUILT_FILE_NAME, combinedScript } from "./built-script.js";
+import { askLine } from "../../../lib/ask-line.js";
 import {
+  clipboardPackage,
+  commandInstalled,
   copyToClipboard,
   findClipboardTool,
-  installCommand,
-} from "./clipboard.js";
+} from "../../../lib/clipboard.js";
+import {
+  INSTALL_COMMAND,
+  installByHand,
+  installOsDependencies,
+  runAtTerminal,
+} from "../../../install/os-dependencies.js";
 import { dexScreenerPart } from "./dex-screener.js";
 import { DEX_SCREENER } from "./dex-screener-files.js";
 import { helpPage, helpSection } from "./help-page.js";
@@ -172,46 +179,6 @@ Examples:
 
 Exit codes: 0 when the command named succeeds, or for --help; 1 when no
 command is named, the command is not one of these, or it fails.`;
-
-/**
- * Asks a question at the terminal and gives the line typed.
- *
- * @param {string} prompt - The question
- * @param {{input: NodeJS.ReadableStream, output: NodeJS.WritableStream}} streams - Where it is asked
- * @returns {Promise<?string>} The line typed, or null when the input ended first
- */
-function askLine(prompt, { input, output }) {
-  return new Promise((resolve) => {
-    const lines = readline.createInterface({ input, terminal: false });
-    let answered = false;
-    lines.once("line", (line) => {
-      answered = true;
-      lines.close();
-      resolve(line);
-    });
-    lines.once("close", () => {
-      if (!answered) resolve(null);
-    });
-    output.write(prompt);
-  });
-}
-
-/**
- * Runs an install command at the terminal, its prompts and output the
- * terminal's, and gives its exit code.
- *
- * @param {{command: string, args: string[]}} install - The command (`installCommand`)
- * @returns {Promise<number>} Its exit code
- */
-function runInstall(install) {
-  return new Promise((resolve) => {
-    const child = nodeSpawn(install.command, install.args, {
-      stdio: "inherit",
-    });
-    child.on("error", () => resolve(1));
-    child.on("exit", (code) => resolve(code ?? 1));
-  });
-}
 
 /**
  * Asks whether to include DEX Screener's functions, until the answer is
@@ -367,8 +334,9 @@ async function buildText(run) {
 }
 
 /**
- * Finds the clipboard tool, or offers to install one and installs it on a
- * yes.
+ * Finds the clipboard tool, or, on a desktop with Homebrew or apt to
+ * install one with, offers the install `npm run os-dependencies` runs, and
+ * runs it on a yes.
  *
  * @param {Object} run - The run (`runBuild`)
  * @returns {Promise<?{command: string, args: string[]}>} The tool, or null for none
@@ -376,18 +344,21 @@ async function buildText(run) {
 async function clipboardTool(run) {
   const tool = findClipboardTool(run.computer);
   if (tool !== null) return tool;
-  const install = installCommand(run.computer);
-  if (install === null) return null;
-  const answer = await run.ask(
-    `No clipboard tool is installed, so the script cannot go to the clipboard. ` +
-      `Install ${install.packageName} now, with: ${install.command} ${install.args.join(" ")}? (y/N) `,
+  const needed = clipboardPackage(run.computer);
+  if (needed === null) return null;
+  const installers = ["brew", "apt"].filter((command) =>
+    commandInstalled(command, run.computer),
   );
-  if (!/^y(es)?$/i.test((answer ?? "").trim())) return null;
-  const code = await run.runInstall(install);
-  if (code !== 0) {
-    run.say(`The install ended with exit code ${code}.`);
+  if (installers.length === 0) {
+    run.say(installByHand(needed.packageName));
     return null;
   }
+  const answer = await run.ask(
+    "No clipboard tool is installed, so the script cannot go to the clipboard. " +
+      `Install ${needed.packageName} now, as ${INSTALL_COMMAND} does? (y/N) `,
+  );
+  if (!/^y(es)?$/i.test((answer ?? "").trim())) return null;
+  await installOsDependencies(run);
   return findClipboardTool(run.computer);
 }
 
@@ -497,7 +468,7 @@ async function buildAppsScript(run) {
  * @param {function(string): Promise<Response>} [deps.fetch=globalThis.fetch] - Downloads DEX Screener's files
  * @param {function(): number} [deps.now=Date.now] - The time, for the build's date in the file
  * @param {function({command: string, args: string[]}, string): Promise<void>} [deps.copy] - Puts text on the clipboard (`copyToClipboard`)
- * @param {function({command: string, args: string[]}): Promise<number>} [deps.runInstall] - Runs the install command, giving its exit code
+ * @param {function({command: string, args: string[]}): Promise<number>} [deps.runCommand=runAtTerminal] - Runs an install at the terminal, giving its exit code
  * @param {{write: function(string): void}} [deps.stdout=process.stdout] - Where the steps go
  * @param {{write: function(string): void}} [deps.stderr=process.stderr] - Where the questions and messages go
  * @returns {Promise<number>} The exit code
@@ -530,7 +501,7 @@ export async function runBuild(argv, project, deps = {}) {
     fetch: deps.fetch ?? globalThis.fetch,
     now: deps.now ?? Date.now,
     copy: deps.copy ?? copyToClipboard,
-    runInstall: deps.runInstall ?? runInstall,
+    runCommand: deps.runCommand ?? runAtTerminal,
   };
   let exitCode = 0;
   const program = new Command()

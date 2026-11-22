@@ -52,8 +52,9 @@ that price pools follow LP Ranger, the owner's bot that manages his 9mm V3
 liquidity positions.
 
 The programs a reader runs from a terminal are in `bin/`, the Sheets
-scripts in `src/`, the build's tools in `build/tools/`, and the code the
-programs share in folders of its own; the file the build writes when
+scripts in `src/`, the build's tools in `build/tools/`, the install of
+the operating system's programs the tools use in `install/`, and the code
+the programs share in folders of its own; the file the build writes when
 there is no clipboard goes to `dist/apps-script/`, which git ignores.
 
 | Part | Where | What it is |
@@ -62,6 +63,7 @@ there is no clipboard goes to `dist/apps-script/`, which git ignores.
 | The runner | `apps-script-runner/` | Runs a Sheets script under Node, unchanged. |
 | The Node versions | `bin/crypto-price-fetchers.js`, `bin/getCryptoPriceFromCentralizedExchange.js` | Each Sheets script as a Node module and a command line, through the runner. |
 | The build step | `build/tools/build.js`, `build/tools/apps-script-build/`, `build/tools/audit-dex-screener.js` | Joins the Sheets scripts, and DEX Screener's functions when asked, into one file with the saved api keys set at its end, on the clipboard, for one paste into Apps Script; and audits DEX Screener's files. |
+| The install of the operating system's programs | `install/install-os-dependencies.js`, `install/os-dependencies.js` | `npm run os-dependencies`: says which of the programs the tools use from the computer's operating system, rather than from npm, is installed, today the build's clipboard tool, and installs what is missing: with Homebrew, the package manager for macOS and Linux, or, without it, it recommends Homebrew and offers apt, the package manager of Debian and Ubuntu. The build offers the same install when it finds no clipboard tool. |
 | crypto-price-filler | `fetch-from-centralized-exchange/crypto-price-filler/`, started by `bin/crypto-price-filler.js` and `bin/backfill.js` | A Node tool that fills a CSV's price columns, row by row, from the pools' price services and the exchange script's sources. A package of its own. |
 | The price clients | `dex-prices/` | Moralis, GeckoTerminal and DexTools, which price a token from a blockchain's pools, and the one loop that sends a refused request again. |
 | The key store | `api-key-store/`, `bin/manage-api-keys.js`, `bin/unlock-api-keys.sh` | Api keys kept encrypted with a password: LP Ranger's design, as a module. |
@@ -69,7 +71,7 @@ there is no clipboard goes to `dist/apps-script/`, which git ignores.
 | The versions tool | `bin/github-project-deps.js`, `github-project-deps/` | The bin `github-project-deps`, which sets a project's dependencies from GitHub to their projects' main branch or latest release. |
 | The actionlint runner | `bin/run-actionlint.js`, `actionlint/` | The bin `run-actionlint`, which runs actionlint, the checker of GitHub Actions workflow files, from its official release, refused unless its SHA-256, and the program's in it, are the ones this repo pins: every repo's lint runs it. |
 | The Summ CSV writer | `bin/summ-csv.js`, `summ-csv/` | Writes the CSV files the owner imports into Summ, once every row has passed its rules: `npm run summ-csv`, the bin `summ-csv`, and `writeSummCsv` for a program. |
-| The shared helpers | `lib/` | Code more than one part, or more than one repo, uses, exported by the package's name for the projects that install this repo (`exports` in package.json): `messageOf`, which gives the message of something thrown (`crypto-price-fetchers/lib/message-of`); the checks of a command line's help, every option its examples use listed in it among them, and of its help into a closed pipe (`…/lib/command-line-help`); `endQuietlyWhenOutputCloses`, which ends a command line quietly when the program reading its output stops (`…/lib/closed-output`); `dayStartSeconds`, a day of the calendar written YYYY-MM-DD as the start of that day in UTC, refusing a day the calendar does not have (`…/lib/calendar-day`); `isHttpUrl` (`…/lib/http-url`); the checks of a repo's tracked files: EVM addresses in EIP-55's form, the npm targets and test files the docs must name, and the links and paths in the docs, which must point at files, folders and headings the repo keeps (`…/lib/repo-checks`); `fetchWithinTimeLimit`, which sends a request and reads its whole answer within a time limit, naming the service when the time runs out (`…/lib/time-limited-fetch`): the price clients, the runner, the key store's checks and the downloads of actionlint and of DEX Screener's files send their requests through it; the checks of a settings file against its JSON Schema, a description in JSON of the keys the file may hold and the kind of value each takes: the kinds of value, with the words of a refusal (`…/lib/settings-schema`), and `readSettingsFile`, which reads a settings file and checks it against its schema (`…/lib/settings-file`), as [Settings Files](#settings-files) describes; and `checkConflicts`, which refuses a typed option that conflicts with one a settings file sets (`…/lib/option-conflicts`). |
+| The shared helpers | `lib/` | Code more than one part, or more than one repo, uses, exported by the package's name for the projects that install this repo (`exports` in package.json): `messageOf`, which gives the message of something thrown (`crypto-price-fetchers/lib/message-of`); the checks of a command line's help, every option its examples use listed in it among them, and of its help into a closed pipe (`…/lib/command-line-help`); `endQuietlyWhenOutputCloses`, which ends a command line quietly when the program reading its output stops (`…/lib/closed-output`); `dayStartSeconds`, a day of the calendar written YYYY-MM-DD as the start of that day in UTC, refusing a day the calendar does not have (`…/lib/calendar-day`); `isHttpUrl` (`…/lib/http-url`); the checks of a repo's tracked files: EVM addresses in EIP-55's form, the npm targets and test files the docs must name, and the links and paths in the docs, which must point at files, folders and headings the repo keeps (`…/lib/repo-checks`); `fetchWithinTimeLimit`, which sends a request and reads its whole answer within a time limit, naming the service when the time runs out (`…/lib/time-limited-fetch`): the price clients, the runner, the key store's checks and the downloads of actionlint and of DEX Screener's files send their requests through it; the checks of a settings file against its JSON Schema, a description in JSON of the keys the file may hold and the kind of value each takes: the kinds of value, with the words of a refusal (`…/lib/settings-schema`), and `readSettingsFile`, which reads a settings file and checks it against its schema (`…/lib/settings-file`), as [Settings Files](#settings-files) describes; and `checkConflicts`, which refuses a typed option that conflicts with one a settings file sets (`…/lib/option-conflicts`). Two more serve this repo's parts alone, and are not exported: `askLine`, which asks a question at the terminal and gives the line typed (`lib/ask-line.js`), and the desktop's clipboard tool, found, handed text, and the package that holds one named (`lib/clipboard.js`). |
 
 ---
 
@@ -265,12 +267,14 @@ file that holds them all, with the keys written in, for one paste.
   `const` prevents; each value must name a field the scripts have; and DEX
   Screener's functions, when asked for, must be functions.
 - **The hand-over.** The build puts the file on the clipboard, through the
-  desktop's tool (`clipboard.js`), says how to paste it, waits for Enter,
-  and clears the clipboard. With no tool installed, it offers to install
-  one with `sudo apt install`, the installer of Debian and Ubuntu Linux;
-  declined, it warns that the keys go to disk in the clear, then writes the
-  file to `dist/apps-script/`, which git, the version-control program that
-  keeps the repo's history, ignores, readable by the owner alone.
+  desktop's tool (`lib/clipboard.js`), says how to paste it, waits for
+  Enter, and clears the clipboard. With no tool installed, on a Linux
+  desktop with Homebrew or apt, it offers the install
+  `npm run os-dependencies` runs (`install/os-dependencies.js`), and runs
+  it on a yes. Declined, failed, or with no install to offer, it warns
+  that the keys go to disk in the clear, then writes the file to
+  `dist/apps-script/`, which git, the version-control program that keeps
+  the repo's history, ignores, readable by the owner alone.
 
 No line it prints holds a key.
 

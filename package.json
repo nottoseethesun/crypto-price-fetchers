@@ -45,6 +45,7 @@
   ],
   "scripts": {
     "api-keys": "node bin/manage-api-keys.js",
+    "os-dependencies": "node install/install-os-dependencies.js",
     "build": "node build/tools/build.js",
     "summ-csv": "node bin/summ-csv.js",
     "prelint": "husky",

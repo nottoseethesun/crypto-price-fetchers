@@ -3,6 +3,7 @@
   "entry": [
     "bin/*.js",
     "build/tools/*.js",
+    "install/install-os-dependencies.js",
     "eslint-security.config.js",
     "apps-script-runner/script-worker.js",
     "fetch-from-centralized-exchange/crypto-price-filler/index.js",

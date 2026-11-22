@@ -107,7 +107,7 @@ after(removeTempFolders);
  * @param {string[]} [options.installed=['xclip']] - The commands installed
  * @param {function(string): ?string} [options.answer] - Answers each question; Enter when absent
  * @param {function(Object): *} [options.web=takeEveryKey] - The services' answers
- * @param {function(Object): number} [options.install] - Runs the install, giving its exit code
+ * @param {function(Object): number} [options.install] - Runs an install, giving its exit code
  * @param {function(Object): Promise<Object>} [options.dexScreener] - Gives DEX Screener's part; the stand-in when absent
  * @returns {Promise<Object>} The exit code, the output, the copies, the questions, the installs, the web's requests and DEX Screener's calls
  */
@@ -147,11 +147,11 @@ async function build(args, options = {}) {
       },
       now: () => Date.UTC(2026, 10, 20, 12),
       copy: async (tool, text) => copies.push({ tool: tool.command, text }),
-      runInstall: async (install) => {
+      runCommand: async (install) => {
         installs.push([install.command, ...install.args]);
         const code = options.install === undefined ? 0 : options.install();
         if (code === 0)
-          installed.add(install.packageName === "xclip" ? "xclip" : "wl-copy");
+          installed.add(install.args.includes("xclip") ? "xclip" : "wl-copy");
         return code;
       },
       stdout,
@@ -451,36 +451,51 @@ describe("npm run build apps-script, on a desktop with a clipboard tool", () => 
 
 describe("npm run build apps-script, with no clipboard tool installed", () => {
   /**
-   * Answers the DEX Screener question with Enter and the install question as given.
+   * Answers the DEX Screener question with Enter, the build's install
+   * question as given, and the install's apt question as given.
    *
-   * @param {string} install - The answer to the install question
+   * @param {string} install - The answer to the build's install question
+   * @param {string} [apt=install] - The answer to the apt question
    * @returns {function(string): string} The answers
    */
-  const answering = (install) => (prompt) =>
-    prompt.includes("Install") ? install : "";
+  const answering =
+    (install, apt = install) =>
+    (prompt) => {
+      if (prompt.includes("with apt")) return apt;
+      return prompt.includes("Install") ? install : "";
+    };
 
-  it("offers to install xclip, runs the install on a yes, then copies", async () => {
+  it("offers the install npm run os-dependencies runs, installs xclip with Homebrew on a yes, then copies", async () => {
     const result = await build(["apps-script"], {
-      installed: ["apt"],
+      installed: ["brew"],
       answer: answering("y"),
     });
     assert.equal(result.exitCode, 0, result.output);
     assert.match(
       result.questions[1],
-      /Install xclip now, with: sudo apt install -y xclip\? \(y\/N\)/,
+      /Install xclip now, as npm run os-dependencies does\? \(y\/N\)/,
     );
-    assert.deepEqual(result.installs, [
-      ["sudo", "apt", "install", "-y", "xclip"],
-    ]);
+    assert.ok(
+      !result.questions.some((question) => question.includes("with apt")),
+    );
+    assert.deepEqual(result.installs, [["brew", "install", "xclip"]]);
     assert.equal(result.copies.length, 2);
   });
 
-  it("offers wl-clipboard in a Wayland session", async () => {
+  it("without Homebrew, recommends it and installs with apt on a second yes, wl-clipboard in a Wayland session", async () => {
     const result = await build(["apps-script"], {
       env: { WAYLAND_DISPLAY: "wayland-0" },
       installed: ["apt"],
       answer: answering("y"),
     });
+    assert.match(
+      result.stdout,
+      /Homebrew, the package manager for macOS and Linux, is not installed/,
+    );
+    assert.match(
+      result.questions[2],
+      /Or install wl-clipboard, the clipboard tool of Wayland sessions, now, with apt: sudo apt install -y wl-clipboard\? \(y\/N\)/,
+    );
     assert.deepEqual(result.installs, [
       ["sudo", "apt", "install", "-y", "wl-clipboard"],
     ]);
@@ -494,6 +509,7 @@ describe("npm run build apps-script, with no clipboard tool installed", () => {
     });
     assert.equal(result.exitCode, 0, result.output);
     assert.deepEqual(result.copies, []);
+    assert.deepEqual(result.installs, []);
     const warning = result.stdout.indexOf("written to disk in the clear");
     const folder = path.join(top, BUILD_FOLDER);
     assert.ok(warning >= 0 && warning < result.stdout.indexOf(folder));
@@ -508,7 +524,14 @@ describe("npm run build apps-script, with no clipboard tool installed", () => {
     assertNoKey(result.output);
   });
 
-  it("offers no install and writes the file where the install would fail: when the install fails, without apt, or with no desktop session", async () => {
+  it("writes the file when the apt install is declined or fails, and offers no install without Homebrew or apt, or with no desktop session", async () => {
+    const aptDeclined = await build(["apps-script"], {
+      installed: ["apt"],
+      answer: answering("y", "n"),
+    });
+    assert.deepEqual(aptDeclined.installs, []);
+    assert.match(aptDeclined.stdout, /Install xclip yourself/);
+    assert.match(aptDeclined.stdout, /in the clear/);
     const failed = await build(["apps-script"], {
       installed: ["apt"],
       answer: answering("y"),
@@ -516,14 +539,16 @@ describe("npm run build apps-script, with no clipboard tool installed", () => {
     });
     assert.match(failed.stdout, /The install ended with exit code 100\./);
     assert.deepEqual(failed.copies, []);
-    for (const options of [
-      { installed: [] },
-      { installed: ["apt", "xclip"], env: { DISPLAY: "" } },
-    ]) {
-      const result = await build(["apps-script"], options);
-      assert.equal(result.questions.length, 1);
-      assert.deepEqual(result.copies, []);
-      assert.match(result.stdout, /in the clear/);
-    }
+    const noInstaller = await build(["apps-script"], { installed: [] });
+    assert.equal(noInstaller.questions.length, 1);
+    assert.match(noInstaller.stdout, /Install xclip yourself/);
+    assert.match(noInstaller.stdout, /in the clear/);
+    const noSession = await build(["apps-script"], {
+      installed: ["apt", "xclip"],
+      env: { DISPLAY: "" },
+    });
+    assert.equal(noSession.questions.length, 1);
+    assert.deepEqual(noSession.copies, []);
+    assert.match(noSession.stdout, /in the clear/);
   });
 });

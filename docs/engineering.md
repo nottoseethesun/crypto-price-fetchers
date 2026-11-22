@@ -83,7 +83,7 @@ that hold no key and none of the owner's own settings.
 | `summ-csv/settings.json` | yes | The Summ CSV writer's facts of each chain, by Summ's name for it (its own coin, the forms of its hashes and addresses), and the fiat currencies a reference price may be in. |
 | `crypto-price-filler/config-example.json` | yes | The filler's settings. |
 | `crypto-price-filler/config.json` | no | The owner's settings, laid over `config-example.json`. |
-| `dist/apps-script/` | no | `crypto-price-fetchers.gs`, the one file `npm run build apps-script` writes when the owner declines a clipboard tool: it holds the api keys in the clear, readable by the owner alone. The lint, the security lint and the secret scan, below, pass over the folder. |
+| `dist/apps-script/` | no | `crypto-price-fetchers.gs`, the one file `npm run build apps-script` writes when there is no clipboard tool: it holds the api keys in the clear, readable by the owner alone. The lint, the security lint and the secret scan, below, pass over the folder. |
 
 ---
 
@@ -244,11 +244,12 @@ that this section, or `CLAUDE.md`, names every one.
 | ---- | -------------- |
 | `actionlint.test.js` | The actionlint runner (`actionlint/`), against archives built in the test: the archive for a system downloaded and refused unless its SHA-256 and its program's match the pinned ones, the tar file read, the program kept and checked on each run, and the command line. |
 | `api-key-store.test.js` | The key store (`api-key-store/`): keys encrypted with a password, saved, opened, and read from LP Ranger's key files. |
-| `apps-script-build-clipboard.test.js` | The build step's clipboard: the clipboard tool it finds, the install it offers, and the copy. |
-| `apps-script-build.test.js` | The build step, `npm run build apps-script`: its questions, the file it gives, and where it puts it. |
+| `apps-script-build.test.js` | The build step, `npm run build apps-script`: its questions, the file it gives, and where it puts it, the install it offers when there is no clipboard tool among them. |
 | `apps-script-services.test.js` | The runner's Node versions of the Apps Script services. |
+| `ask-line.test.js` | `lib/ask-line.js`: a question written, and the line typed given, or null when the input ends first. |
 | `built-script.test.js` | The joining of the built file's parts into one Apps Script project, on short scripts. |
 | `calendar-day.test.js` | `lib/calendar-day.js`: the start of a day in UTC, and a day the calendar does not have refused. |
+| `clipboard.test.js` | `lib/clipboard.js`: the clipboard tool found for each platform and session, the package that holds one named, a command found on `PATH`, and the copy. |
 | `closed-output.test.js` | `lib/closed-output.js` and `helpIntoClosedPipe`: a command line that calls the helper ends with its exit code and writes nothing to stderr when its output's reader has closed the pipe, and one that does not shows the stack trace the check looks for. |
 | `command-line-help.test.js` | Every command line's help, `--help` and `-h`, and its help into a closed pipe; the list of command lines held to the repo; and the checks of `lib/command-line-help.js`. |
 | `config-file.test.js` | A Node version's config file read, with and without its schemas, and the opened keys laid over its values. |
@@ -275,6 +276,7 @@ that this section, or `CLAUDE.md`, names every one.
 | `package-exports.test.js` | Every module the package exports, loaded by the package's name, as a project that installs this repo loads it, and shipped. |
 | `no-secret-logging.test.js` | `eslint-rules/no-secret-logging.js`, the security lint's rule against printing a name that may hold a secret. |
 | `option-conflicts.test.js` | `lib/option-conflicts.js`: a typed option that conflicts with one a settings file sets refused, naming both and the file; the settings file's option alone, or neither option, passed; and two typed options left to commander, which refuses them as it parses. |
+| `os-dependencies.test.js` | The install of the operating system's programs (`install/os-dependencies.js`): a clipboard tool already installed, none needed with no desktop session, xclip or wl-clipboard installed with Homebrew, Homebrew recommended and apt asked for without it, a package left to be installed by hand, an install's exit code; `runAtTerminal`; and the command line's exit codes. |
 | `repo-checks.test.js` | `lib/repo-checks.js`, on repos made in temp folders, and this repo held to it: its EVM addresses in EIP-55's form, its npm targets and test files named in the docs, and its docs' links and paths pointing at the files, folders and headings it keeps. |
 | `run-apps-script.test.js` | `openAppsScript`: a Sheets script run in a worker thread, with its web requests done on the caller's thread. |
 | `settings-file.test.js` | `lib/settings-file.js`: a settings file's JSON object read whole; a missing file giving no settings unless it is required; a file it cannot read, one that is not JSON and JSON that is no object refused, naming the file; and a file its schema finds problems in refused, listing every problem. |

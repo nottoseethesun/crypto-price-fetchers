@@ -57,6 +57,7 @@ const COMMAND_LINES = Object.freeze([
   { file: "bin/getCryptoPriceFromCentralizedExchange.js", command: [] },
   { file: "bin/crypto-price-filler.js", command: [] },
   { file: "bin/backfill.js", command: [] },
+  { file: "install/install-os-dependencies.js", command: [] },
 ]);
 
 /**
@@ -74,6 +75,7 @@ const COMMAND_MODULES = Object.freeze({
   "apps-script-runner/command-line.js": "bin/crypto-price-fetchers.js",
   [`${FILLER}/commander.js`]: "bin/crypto-price-filler.js",
   [`${FILLER}/backfill.js`]: "bin/backfill.js",
+  "install/os-dependencies.js": "install/install-os-dependencies.js",
 });
 
 /** A help that meets the rule, for the tests of the checks. */
