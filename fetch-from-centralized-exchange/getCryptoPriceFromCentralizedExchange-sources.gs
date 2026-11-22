@@ -39,18 +39,20 @@
  * while the provider refuses it as one too many (status 429), within the
  * time the call has left (callHasTimeFor). Returns the last response,
  * whatever its status; or null when the request got no response at all,
- * as a timeout or a refused connection gives, for which UrlFetchApp.fetch
- * throws, or the call had no time left to send it. A refusal as one too
- * many still there after the last try, or one the call has no time left
- * to wait out, and a request it has no time to send, cut the call short
- * (CALL.cutShort), so what it finds is no answer to keep.
+ * for which UrlFetchApp.fetch throws, as on a timeout, a refused
+ * connection or Apps Script's own quota of requests, or the call had no
+ * time left to send it. A refusal as one too many still there after the
+ * last try, or one the call has no time left to wait out, a request with
+ * no response, and a request it has no time to send are counted as cut
+ * short (CALL.cutRequests): the source then answers nothing, which is no
+ * answer to keep.
  */
 function fetchWithRetries(url, headers, label) {
   const delays = CONFIG.RETRY_DELAYS_MS;
   for (let attempt = 0; ; attempt++) {
     if (!callHasTimeFor(0)) {
       Logger.log(`${label}: the call has used its time, so it is not sent`);
-      CALL.cutShort = true;
+      CALL.cutRequests += 1;
       return null;
     }
     let response;
@@ -61,6 +63,7 @@ function fetchWithRetries(url, headers, label) {
       });
     } catch (e) {
       Logger.log(`${label} got no response: ${e.message}`);
+      CALL.cutRequests += 1;
       return null;
     }
     if (response.getResponseCode() !== 429) return response;
@@ -70,7 +73,7 @@ function fetchWithRetries(url, headers, label) {
           ? `${label} answered 429 to every try`
           : `${label} answered 429, and the call has no time left to wait`,
       );
-      CALL.cutShort = true;
+      CALL.cutRequests += 1;
       return response;
     }
     Logger.log(
@@ -438,7 +441,9 @@ function yearHolding(utcMs) {
 /**
  * A token's price at a time from CoinGecko: from its market chart over a
  * window centred on the time, or else, for close alone, from the day's
- * single price; each answer, or the lack of one, is cached.
+ * single price. Each answer is cached, and so is the lack of one, unless
+ * the request was cut short (CALL.cutRequests): a request with no answer,
+ * or one not sent, is no sign that CoinGecko has none.
  *
  * @param {string} id - The token's CoinGecko id, such as "bitcoin"
  * @param {number} utcMs - The time, in ms since 1970 UTC
@@ -463,6 +468,7 @@ function getPriceFromCoinGecko(id, utcMs, target) {
   if (typeof rangeCached === "number") return rangeCached;
 
   if (typeof rangeCached !== "string") {
+    const cutBeforeRange = CALL.cutRequests;
     const rangePrice = tryCoinGeckoMarketChartRange(id, utcMs, target);
     if (rangePrice !== null) {
       Logger.log(
@@ -471,11 +477,7 @@ function getPriceFromCoinGecko(id, utcMs, target) {
       setCachedResult(rangeCacheKey, rangePrice);
       return rangePrice;
     }
-    setCachedResult(
-      rangeCacheKey,
-      "NO_DATA",
-      CONFIG.CACHE_EXPIRY_SECONDS.NEGATIVE_CACHE,
-    );
+    keepNoData(rangeCacheKey, cutBeforeRange);
   }
 
   /*-
@@ -494,6 +496,7 @@ function getPriceFromCoinGecko(id, utcMs, target) {
   if (typeof dailyCached === "number") return dailyCached;
   if (typeof dailyCached === "string") return null;
 
+  const cutBeforeDay = CALL.cutRequests;
   const price = tryCoinGeckoHistory(id, dateStr);
   if (price !== null) {
     Logger.log(`CoinGecko history success: ${price} USD for ${dateStr}`);
@@ -501,12 +504,26 @@ function getPriceFromCoinGecko(id, utcMs, target) {
     return price;
   }
 
-  setCachedResult(
-    dailyCacheKey,
-    "NO_DATA",
-    CONFIG.CACHE_EXPIRY_SECONDS.NEGATIVE_CACHE,
-  );
+  keepNoData(dailyCacheKey, cutBeforeDay);
   return null;
+}
+
+/**
+ * Keeps CoinGecko's lack of an answer for a key, for NEGATIVE_CACHE
+ * seconds, unless the request asked for it was cut short, whose silence is
+ * no answer.
+ *
+ * @param {string} key - The cache key
+ * @param {number} cutBefore - CALL.cutRequests as the request was sent
+ */
+function keepNoData(key, cutBefore) {
+  if (CALL.cutRequests > cutBefore) {
+    Logger.log(
+      `CoinGecko: its request was cut short, so its lack of an answer is not kept (${key})`,
+    );
+    return;
+  }
+  setCachedResult(key, "NO_DATA", CONFIG.CACHE_EXPIRY_SECONDS.NEGATIVE_CACHE);
 }
 
 /**

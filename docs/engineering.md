@@ -215,16 +215,19 @@ holds the stand-ins:
   stand-in ping of CoinGecko, a service that gathers the exchanges' prices,
   that takes the one key in `stand-in-coingecko-key.js`.
 - `stand-in-settings-preload.js` hands the command line, run in a child
-  process, a settings file or a token list of the test's own, from the
-  environment variable `STAND_IN_FILLER_CONFIG` or `STAND_IN_FILLER_TOKENS`,
-  since the tool reads both beside its own files and a test never writes
-  the owner's `config.json`.
-- `regression-runs.js` holds the settings, stand-in answers and runs that
-  `tests/regressions.test.js` and `tests/regressions-sheets.test.js`
-  share: answers as MEXC,
-  CoinGecko and CoinPaprika give them, the command line run over one row
-  in a child process, and a call run with the computer's time zone set to
-  another.
+  process, a settings file, a token list or a `config.json` of the
+  exchange script of the test's own, from the environment variable
+  `STAND_IN_FILLER_CONFIG`, `STAND_IN_FILLER_TOKENS` or
+  `STAND_IN_EXCHANGE_CONFIG`, since the tool reads its two beside its own
+  files, and the exchange script's Node version its own beside the
+  script, and a test never writes the owner's settings.
+- `regression-runs.js` holds the settings, stand-in answers, times and
+  runs that the regression tests and the known-bug tests share: answers
+  as MEXC, CoinGecko and CoinPaprika give them, a time as a cell writes it
+  (`cellTime`), the command line run over one row in a child process, or
+  in a folder of the test's own with the stand-in settings (`runIndexIn`,
+  for `tests/regressions-command-line.test.js`), and a call run with the
+  computer's time zone set to another.
 - `log-lines.js` reads the lines the tool prints through the seam of its
   log, `utils/log.js`, a mock function in place of the console's log until
   the test ends, so no test replaces `console.log`, as LP Ranger's rules
@@ -308,7 +311,7 @@ stand-ins of both suites answer as MEXC does.
 | `regressions.test.js` | The fixed bugs of the tool, its Sheets script and the menu. |
 | `regressions-command-line.test.js` | The fixed bugs of the two command lines: their checks of a value, the settings they fall back to, a settings file or token list they cannot take refused as one error, a `config.json` of the exchange script its Node version's schemas refuse ending the run before its first row, what `index.js` logs, `validate-parse` failing when node does not exit with code 0, and backfill leaving the rows that hold no data, such as a Total row, out of the fill and the grand total, and bracketing a block of `Error` prices with the nearest priced rows past them; `test:ci` and `test:debug` giving vitest their flags; and an input file not found, or with no rows, named. |
 | `regressions-lib.test.js` | The fixed bugs of the repo's shared helpers in `lib/`: a schema compiled once, the words for an empty text and an empty list, the search for command lines, and a time limit Node's timers cannot keep refused. |
-| `regressions-sheets.test.js` | Fixed bugs whose tests run a Sheets script in the test's thread: the exchange script's pairs quoted in `CONFIG.QUOTE_CURRENCY`; a cell's own cache seconds outside 1 to 21600 refused with a message before any request, an empty cell taking the config's; each token's own FDV when two cells name one pool, and an answer kept for one cell's seconds never given to a cell with others; and a time before MEXC listed a pair priced by CoinGecko, on an earlier day, before the first trade on the listing day, or, for a recent time, before it in the listing hour, while a time after it still climbs MEXC's windows, as does a recent time whose minute request fails or whose minute MEXC let go in the hour its minute candles begin in; a failed request for the day, which the script goes on past rather than take for no candle; a failed request for the day before, after a minute or an hour with no candle, for which CoinGecko answers, as it does for such a time on the listing day; a request with no response at all, which the next source answers; and a call's waits for the lock and for requests refused as too many, within the time Google lets a custom function run, with the busy message, kept nowhere, when no source gave a price. |
+| `regressions-sheets.test.js` | Fixed bugs whose tests run a Sheets script in the test's thread: the exchange script's pairs quoted in `CONFIG.QUOTE_CURRENCY`; a cell's own cache seconds outside 1 to 21600 refused with a message before any request, an empty cell taking the config's; each token's own FDV when two cells name one pool, and an answer kept for one cell's seconds never given to a cell with others; and a time before MEXC listed a pair priced by CoinGecko, on an earlier day, before the first trade on the listing day, or, for a recent time, before it in the listing hour, while a time after it still climbs MEXC's windows, as does a recent time whose minute request fails or whose minute MEXC let go in the hour its minute candles begin in; a failed request for the day, which the script goes on past rather than take for no candle; a failed request for the day before, after a minute or an hour with no candle, for which CoinGecko answers, as it does for such a time on the listing day; a request with no response at all, which the next source answers; a call's waits for the lock and for requests refused as too many, within the time Google lets a custom function run, with the busy message, kept nowhere, when no source gave a price; and a call cut short by refusals or by requests with no response, Apps Script's spent quota among them, after which CoinGecko is asked again, while its own lack of an answer is kept when only another source's request was cut short. |
 | `settings-files.test.js` | `config.js` and `supported-tokens.js`: the committed settings and token list held to their schemas, the owner's `config.json` laid over the committed settings, and files with a key no schema names or a value of the wrong kind refused, listing every problem. |
 | `sheets-sources.test.js` | The exchange script's sources, MEXC, CoinGecko and CoinPaprika, which the sheet and the tool both price with. |
 | `token-validation.test.js` | A token with no sources refused, naming the tokens the tool supports. |

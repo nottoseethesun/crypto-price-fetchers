@@ -14,7 +14,7 @@
  *
  * The Sheets scripts run unchanged in the test's thread, through
  * `tests/helpers/sheets-script.js`, with a stand-in for the Apps Script
- * service each test is about: the script lock, or the web.
+ * service each test is about: the script lock.
  */
 
 import { describe, it, expect } from "vitest";
@@ -23,18 +23,7 @@ import {
   CUSTOM_FUNCTION_LIMIT_MS,
   busyLockService,
   loadSheetsScript,
-  noResponse,
-  reply,
 } from "./helpers/sheets-script.js";
-import {
-  DAY_MS,
-  SHEETS_SCRIPT_PATH,
-  answerCoinGeckoForPastDay,
-  cellTime,
-} from "./helpers/regression-runs.js";
-
-/** What a cell shows when the call was cut short. */
-const BUSY = "Rate limit busy - retry later";
 
 /** The DexTools script, at the repo's top. */
 const DEXTOOLS_SCRIPT = path.resolve(
@@ -56,40 +45,6 @@ describe("waits inside a custom function", () => {
       );
       expect(waits.length).toBeGreaterThan(0);
       expect(Math.max(...waits)).toBeLessThanOrEqual(CUSTOM_FUNCTION_LIMIT_MS);
-    },
-  );
-});
-
-describe("a call cut short", () => {
-  it.fails(
-    "getCryptoPrice asks CoinGecko again on the call after one it cut short, rather than keep the cut-short requests' silence as no data",
-    () => {
-      let refusing = true;
-      const script = loadSheetsScript(SHEETS_SCRIPT_PATH, (url) => {
-        if (url.includes("api.coingecko.com") && refusing)
-          return reply(429, {});
-        return answerCoinGeckoForPastDay(url);
-      });
-      const time = cellTime(Date.now() - 2 * DAY_MS);
-      expect(script.getCryptoPrice("xtm", time, "UTC", "close")).toBe(BUSY);
-      refusing = false;
-      expect(script.getCryptoPrice("xtm", time, "UTC", "close")).toBe(1.23);
-    },
-  );
-
-  it.fails(
-    "getCryptoPrice shows the busy message, keeping nothing, when every request gets no response, as when Apps Script's daily quota of web requests is spent",
-    () => {
-      let spent = true;
-      const script = loadSheetsScript(SHEETS_SCRIPT_PATH, (url) =>
-        spent
-          ? noResponse("Service invoked too many times for one day: urlfetch.")
-          : answerCoinGeckoForPastDay(url),
-      );
-      const time = cellTime(Date.now() - 2 * DAY_MS);
-      expect(script.getCryptoPrice("xtm", time, "UTC", "close")).toBe(BUSY);
-      spent = false;
-      expect(script.getCryptoPrice("xtm", time, "UTC", "close")).toBe(1.23);
     },
   );
 });

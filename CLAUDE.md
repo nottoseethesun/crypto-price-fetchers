@@ -405,12 +405,13 @@ functions inside the scripts that the owner runs by hand. crypto-price-filler's
   child process against a stand-in MEXC, and a stand-in CoinGecko ping that
   takes the one key in `stand-in-coingecko-key.js`.
 - `stand-in-settings-preload.js` hands the command line, run in a child
-  process, a settings file or a token list of the test's own, from an
-  environment variable, since the tool reads both beside its own files and
-  a test never writes the owner's `config.json`.
-- `regression-runs.js` holds the settings, stand-in answers and runs that
-  `tests/regressions.test.js` and `tests/regressions-sheets.test.js`
-  share.
+  process, a settings file, a token list or a `config.json` of the
+  exchange script of the test's own, from an environment variable, since
+  the tool reads its two beside its own files, and the exchange script's
+  Node version its own beside the script, and a test never writes the
+  owner's settings.
+- `regression-runs.js` holds the settings, stand-in answers, times and
+  runs that the regression tests and the known-bug tests share.
 - `log-lines.js` reads the lines the tool prints through its log's seam
   (`utils/log.js`), so no test replaces `console.log`.
 
@@ -428,11 +429,8 @@ for any other, and removes the row. `tests/regressions.test.js` also
 holds older tests that run a Sheets script that way.
 
 Google stops a custom function, a function a cell calls, after 30 seconds,
-and the cell shows `#ERROR!`. The first bug below is a wait longer than
-that.
+and the cell shows `#ERROR!`. The bug below is a wait longer than that.
 
 | Bug | Test in `tests/known-bugs.test.js` |
 | --- | --- |
 | `dexToolsGetTokenPrice` and `dexToolsGetTokenFDV`, in `crypto-price-fetchers.gs`, wait up to `DEXTOOLS_CONFIG.LOCK_WAIT_MS`, 120 seconds, for the script lock, so a cell that waits more than 30 seconds shows `#ERROR!`, never the busy message the script returns when the wait ends. | dexToolsGetTokenPrice waits for the script lock no longer than Google lets a custom function run |
-| `getPriceFromCoinGecko`, in the exchange script, keeps "no data" for 5 minutes in its own caches when its requests are cut short, so the call the busy message asks for skips CoinGecko, and a coin no other source prices is cached as `No data available from any source`. | getCryptoPrice asks CoinGecko again on the call after one it cut short, rather than keep the cut-short requests' silence as no data |
-| `fetchWithRetries`, in the exchange script, takes every throw of `UrlFetchApp.fetch`, Apps Script's own quota errors among them, for a request with no response that leaves the call whole, so a call whose every request throws shows `No data available from any source`, cached for 5 minutes. | getCryptoPrice shows the busy message, keeping nothing, when every request gets no response, as when Apps Script's daily quota of web requests is spent |

@@ -390,6 +390,9 @@ describe("MEXC's requests that fail", () => {
   });
 });
 
+/** What a cell shows when the call got no lock, or no source priced it and a request was cut short. */
+const BUSY = "Rate limit busy - retry later";
+
 describe("waits inside a custom function", () => {
   it("getCryptoPrice waits for the script lock, in all, no longer than Google lets a custom function run", () => {
     const waits = [];
@@ -422,9 +425,7 @@ describe("waits inside a custom function", () => {
       { sleep: (milliseconds) => sleeps.push(milliseconds) },
     );
     const time = cellTime(Date.now() - 2 * DAY_MS);
-    expect(script.getCryptoPrice("xtm", time, "UTC", "close")).toBe(
-      "Rate limit busy - retry later",
-    );
+    expect(script.getCryptoPrice("xtm", time, "UTC", "close")).toBe(BUSY);
     const waited = sleeps.reduce((sum, milliseconds) => sum + milliseconds, 0);
     expect(waited).toBeLessThanOrEqual(CUSTOM_FUNCTION_LIMIT_MS);
     const askedFirst = asked;
@@ -436,5 +437,47 @@ describe("waits inside a custom function", () => {
     const script = exchangeScriptWith(() => reply(429, {}));
     const time = cellTime(Date.now() - 2 * DAY_MS);
     expect(script.getCryptoPrice("xtm", time, "UTC", "close")).toBe(1.23);
+  });
+});
+
+describe("a call cut short", () => {
+  it("getCryptoPrice asks CoinGecko again on the call after one it cut short, rather than keep the cut-short requests' silence as no data", () => {
+    let refusing = true;
+    const script = loadSheetsScript(SHEETS_SCRIPT_PATH, (url) => {
+      if (url.includes("api.coingecko.com") && refusing) return reply(429, {});
+      return answerCoinGeckoForPastDay(url);
+    });
+    const time = cellTime(Date.now() - 2 * DAY_MS);
+    expect(script.getCryptoPrice("xtm", time, "UTC", "close")).toBe(BUSY);
+    refusing = false;
+    expect(script.getCryptoPrice("xtm", time, "UTC", "close")).toBe(1.23);
+  });
+
+  it("getCryptoPrice shows the busy message, keeping nothing, when every request gets no response, as when Apps Script's daily quota of web requests is spent", () => {
+    let spent = true;
+    const script = loadSheetsScript(SHEETS_SCRIPT_PATH, (url) =>
+      spent
+        ? noResponse("Service invoked too many times for one day: urlfetch.")
+        : answerCoinGeckoForPastDay(url),
+    );
+    const time = cellTime(Date.now() - 2 * DAY_MS);
+    expect(script.getCryptoPrice("xtm", time, "UTC", "close")).toBe(BUSY);
+    spent = false;
+    expect(script.getCryptoPrice("xtm", time, "UTC", "close")).toBe(1.23);
+  });
+
+  it("getCryptoPrice keeps CoinGecko's lack of an answer when only another source's request was cut short", () => {
+    let coinGeckoAsked = 0;
+    const script = loadSheetsScript(SHEETS_SCRIPT_PATH, (url) => {
+      if (url.includes("/exchangeInfo"))
+        return noResponse("The operation was aborted due to timeout");
+      if (url.includes("api.coingecko.com")) coinGeckoAsked += 1;
+      return answerCoinGeckoForPastDay(url);
+    });
+    const time = cellTime(Date.now() - 2 * DAY_MS);
+    expect(script.getCryptoPrice("xtm", time, "UTC", "average")).toBe(BUSY);
+    expect(coinGeckoAsked).toBe(1);
+    expect(script.getCryptoPrice("xtm", time, "UTC", "average")).toBe(BUSY);
+    expect(coinGeckoAsked).toBe(1);
   });
 });
