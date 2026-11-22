@@ -199,12 +199,15 @@ function findMEXCTradingPair(token, symbols) {
  * script goes up one window at a time, to the year, and the first in which
  * something traded gives the average of its high and low, whatever the
  * target. MEXC gives a candle for every period it keeps, one in which
- * nothing traded with volume 0.
+ * nothing traded with volume 0. So when MEXC keeps no candle of the hour
+ * that holds the time, as for a time before it listed the pair, MEXC gives
+ * no price: a larger window would hold only candles of other hours, which
+ * may all come from after the time.
  *
  * @param {string} symbol - The MEXC pair, such as XTMUSDT
  * @param {number} utcMs - The time, in ms since 1970 UTC
  * @param {string} target - The price to give: "average", "high", "low" or "close"
- * @return {?{window: Object, averaged: boolean, price: number}} The price, its window, and whether it is the average of the window's high and low; or null when nothing traded in the year that holds the time
+ * @return {?{window: Object, averaged: boolean, price: number}} The price, its window, and whether it is the average of the window's high and low; or null when MEXC keeps no candle of the hour that holds the time, or nothing traded in the year that holds it
  */
 function mexcPairPrice(symbol, utcMs, target) {
   let level = 0;
@@ -213,7 +216,13 @@ function mexcPairPrice(symbol, utcMs, target) {
     level = 1;
     candle = fetchWindowCandle(symbol, MEXC_WINDOWS[1], utcMs);
   }
-  if (candle !== null && candle.volume > 0) {
+  if (candle === null) {
+    Logger.log(
+      `MEXC: no candle of ${symbol} for the hour that holds the time, so MEXC gives no price for it`,
+    );
+    return null;
+  }
+  if (candle.volume > 0) {
     const window = MEXC_WINDOWS[level];
     return {
       window,

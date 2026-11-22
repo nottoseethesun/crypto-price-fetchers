@@ -538,3 +538,32 @@ describe("the runner's Apps Script services", () => {
     ]);
   });
 });
+
+describe("backfill and the rows that hold no data", () => {
+  it("backfillPrices leaves out of the backfill and the grand total the rows the filler leaves blank on purpose, such as a Total row", async () => {
+    const { backfillPrices } = await import("../utils/backfill.js");
+    const row = (date, amount, price) => ({
+      date,
+      amount,
+      "$usd price": price,
+      "$usd amount": "",
+      "grand total ($usd)": "",
+    });
+    const rows = [
+      row("2025-06-01", "10", "2"),
+      row("2025-06-02", "10", "Error"),
+      row("2025-06-03", "10", "3"),
+      row("Total", "30", ""),
+    ];
+    backfillPrices(rows, {
+      priceColName: "$usd price",
+      amountColName: "amount",
+      usdAmountColName: "$usd amount",
+      grandTotalColName: "grand total ($usd)",
+      useHighest: true,
+    });
+    expect(rows[1]["$usd price"]).toBe(3);
+    expect(rows[3]["$usd price"]).toBe("");
+    expect(rows[3]["grand total ($usd)"]).toBe((80).toFixed(6));
+  });
+});

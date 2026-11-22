@@ -76,20 +76,17 @@ describe("utils/backfill", () => {
   });
 
   describe("isPriceEmpty", () => {
-    it("returns true for empty string", () => {
-      expect(isPriceEmpty("")).toBe(true);
-    });
-
-    it('returns true for "Error"', () => {
+    it('returns true for "Error", the price the filler could not find', () => {
       expect(isPriceEmpty("Error")).toBe(true);
     });
 
-    it("returns true for null", () => {
-      expect(isPriceEmpty(null)).toBe(true);
+    it("returns false for a blank price, which marks a row that holds no data", () => {
+      expect(isPriceEmpty("")).toBe(false);
     });
 
-    it("returns true for undefined", () => {
-      expect(isPriceEmpty(undefined)).toBe(true);
+    it("returns false for null and undefined", () => {
+      expect(isPriceEmpty(null)).toBe(false);
+      expect(isPriceEmpty(undefined)).toBe(false);
     });
 
     it("returns false for valid price number", () => {
@@ -117,7 +114,7 @@ describe("utils/backfill", () => {
   describe("backfillPrices", () => {
     describe("middle block - highest", () => {
       it("fills empty prices with highest bracketing price", () => {
-        const rows = [createRow(10), createRow(""), createRow(20)];
+        const rows = [createRow(10), createRow("Error"), createRow(20)];
 
         const stats = backfillPrices(rows, {
           ...defaultOptions,
@@ -134,9 +131,9 @@ describe("utils/backfill", () => {
       it("fills multiple empty rows with highest bracketing price", () => {
         const rows = [
           createRow(10),
-          createRow(""),
-          createRow(""),
-          createRow(""),
+          createRow("Error"),
+          createRow("Error"),
+          createRow("Error"),
           createRow(30),
         ];
 
@@ -150,7 +147,7 @@ describe("utils/backfill", () => {
 
     describe("middle block - lowest", () => {
       it("fills empty prices with lowest bracketing price", () => {
-        const rows = [createRow(10), createRow(""), createRow(20)];
+        const rows = [createRow(10), createRow("Error"), createRow(20)];
 
         backfillPrices(rows, { ...defaultOptions, useHighest: false });
 
@@ -162,8 +159,8 @@ describe("utils/backfill", () => {
       it("fills multiple empty rows with lowest bracketing price", () => {
         const rows = [
           createRow(25),
-          createRow(""),
-          createRow(""),
+          createRow("Error"),
+          createRow("Error"),
           createRow(15),
         ];
 
@@ -176,7 +173,7 @@ describe("utils/backfill", () => {
 
     describe("empty at beginning", () => {
       it("uses first available price after empty block", () => {
-        const rows = [createRow(""), createRow(""), createRow(15)];
+        const rows = [createRow("Error"), createRow("Error"), createRow(15)];
 
         backfillPrices(rows, { ...defaultOptions, useHighest: true });
 
@@ -186,7 +183,7 @@ describe("utils/backfill", () => {
       });
 
       it("works with lowest mode too", () => {
-        const rows = [createRow(""), createRow(25)];
+        const rows = [createRow("Error"), createRow(25)];
 
         backfillPrices(rows, { ...defaultOptions, useHighest: false });
 
@@ -196,7 +193,7 @@ describe("utils/backfill", () => {
 
     describe("empty at end", () => {
       it("uses last available price before empty block", () => {
-        const rows = [createRow(10), createRow(""), createRow("")];
+        const rows = [createRow(10), createRow("Error"), createRow("Error")];
 
         backfillPrices(rows, { ...defaultOptions, useHighest: true });
 
@@ -226,16 +223,20 @@ describe("utils/backfill", () => {
 
     describe("all rows empty", () => {
       it("makes no changes when all rows are empty", () => {
-        const rows = [createRow(""), createRow(""), createRow("")];
+        const rows = [
+          createRow("Error"),
+          createRow("Error"),
+          createRow("Error"),
+        ];
 
         const stats = backfillPrices(rows, {
           ...defaultOptions,
           useHighest: true,
         });
 
-        expect(rows[0]["$usd price"]).toBe("");
-        expect(rows[1]["$usd price"]).toBe("");
-        expect(rows[2]["$usd price"]).toBe("");
+        expect(rows[0]["$usd price"]).toBe("Error");
+        expect(rows[1]["$usd price"]).toBe("Error");
+        expect(rows[2]["$usd price"]).toBe("Error");
         expect(stats.emptyRowsFilled).toBe(0);
       });
     });
@@ -244,7 +245,7 @@ describe("utils/backfill", () => {
       it("recalculates USD amounts after backfill", () => {
         const rows = [
           createRow(10, "5"),
-          createRow("", "10"),
+          createRow("Error", "10"),
           createRow(20, "2"),
         ];
 
@@ -258,7 +259,7 @@ describe("utils/backfill", () => {
       it("recalculates grand totals correctly", () => {
         const rows = [
           createRow(10, "5"),
-          createRow("", "10"),
+          createRow("Error", "10"),
           createRow(20, "2"),
         ];
 
@@ -274,9 +275,9 @@ describe("utils/backfill", () => {
       it("handles multiple separate empty blocks", () => {
         const rows = [
           createRow(10),
-          createRow(""),
+          createRow("Error"),
           createRow(20),
-          createRow(""),
+          createRow("Error"),
           createRow(30),
         ];
 
@@ -294,9 +295,9 @@ describe("utils/backfill", () => {
       it("handles multiple separate empty blocks with lowest", () => {
         const rows = [
           createRow(10),
-          createRow(""),
+          createRow("Error"),
           createRow(20),
-          createRow(""),
+          createRow("Error"),
           createRow(5),
         ];
 
@@ -317,11 +318,11 @@ describe("utils/backfill", () => {
       });
 
       it("handles single empty row", () => {
-        const rows = [createRow("")];
+        const rows = [createRow("Error")];
 
         backfillPrices(rows, { ...defaultOptions, useHighest: true });
 
-        expect(rows[0]["$usd price"]).toBe("");
+        expect(rows[0]["$usd price"]).toBe("Error");
       });
 
       it("handles empty array", () => {
@@ -332,9 +333,10 @@ describe("utils/backfill", () => {
         }).not.toThrow();
       });
 
-      it("handles null and undefined values", () => {
+      it("leaves a blank, null or undefined price as it is, as a row that holds no data", () => {
         const rows = [
           createRow(10),
+          createRow(""),
           createRow(null),
           createRow(undefined),
           createRow(20),
@@ -342,8 +344,10 @@ describe("utils/backfill", () => {
 
         backfillPrices(rows, { ...defaultOptions, useHighest: true });
 
-        expect(rows[1]["$usd price"]).toBe(20);
-        expect(rows[2]["$usd price"]).toBe(20);
+        expect(rows[1]["$usd price"]).toBe("");
+        expect(rows[2]["$usd price"]).toBe(null);
+        expect(rows[3]["$usd price"]).toBe(undefined);
+        expect(rows[4]["grand total ($usd)"]).toBe((300).toFixed(6));
       });
     });
 
@@ -351,10 +355,10 @@ describe("utils/backfill", () => {
       it("returns correct statistics", () => {
         const rows = [
           createRow(10),
-          createRow(""),
-          createRow(""),
+          createRow("Error"),
+          createRow("Error"),
           createRow(20),
-          createRow(""),
+          createRow("Error"),
           createRow(30),
         ];
 
@@ -374,7 +378,7 @@ describe("utils/backfill", () => {
         const consoleSpy = vi
           .spyOn(console, "log")
           .mockImplementation(() => {});
-        const rows = [createRow(10), createRow(""), createRow(20)];
+        const rows = [createRow(10), createRow("Error"), createRow(20)];
 
         backfillPrices(rows, {
           ...defaultOptions,

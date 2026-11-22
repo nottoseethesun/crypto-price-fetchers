@@ -424,15 +424,9 @@ for any other, and removes the row. `tests/regressions.test.js` also
 holds older tests that run a Sheets script that way.
 
 Google stops a custom function, a function a cell calls, after 30 seconds,
-and the cell shows `#ERROR!`. The first two bugs below are waits longer
-than that.
+and the cell shows `#ERROR!`. Both bugs below are waits longer than that.
 
 | Bug | Test in `tests/known-bugs.test.js` |
 | --- | --- |
 | `dexToolsGetTokenPrice` and `dexToolsGetTokenFDV`, in `crypto-price-fetchers.gs`, wait up to `DEXTOOLS_CONFIG.LOCK_WAIT_MS`, 120 seconds, for the script lock, so a cell that waits more than 30 seconds shows `#ERROR!`, never the busy message the script returns when the wait ends. | dexToolsGetTokenPrice waits for the script lock no longer than Google lets a custom function run |
 | `getCryptoPrice`, in the exchange script, tries the script lock 3 times for 2 seconds each, waiting 5, 10 and 20 seconds after each failed try (`LOCK_RETRY_BACKOFF`): 41 seconds in all. | getCryptoPrice waits for the script lock, in all, no longer than Google lets a custom function run |
-| `dexToolsGetTokenFDV`, in `crypto-price-fetchers.gs`, keys its cache on the pool a cell names, while outside X1 it asks DexTools for the token, so two cells that name one pool for different tokens share one FDV. | dexToolsGetTokenFDV gives each token its own FDV when two cells name the same pool |
-| No cache key of `crypto-price-fetchers.gs` holds a cell's cache seconds, so a cell can show a value that another cell kept for longer than its own seconds. | dexToolsGetTokenPrice asks again for a cell whose cache seconds differ from the cell that kept the answer |
-| `mexcPairPrice`, in the exchange script's `-sources.gs`, moves up from a window MEXC keeps no candle of as from one in which nothing traded, so a time before MEXC listed a pair is priced from the candles after the listing, and CoinGecko and CoinPaprika are never asked. | getCryptoPrice asks CoinGecko for a time before MEXC listed the pair, rather than pricing it from MEXC's later candles |
-| crypto-price-filler's backfill, `utils/backfill.js`, fills the rows the filler leaves blank on purpose, such as a Total row, and adds their amounts to the grand total. | backfillPrices leaves out of the backfill and the grand total the rows the filler leaves blank on purpose, such as a Total row |
-| crypto-price-filler's `validate-parse` takes node's exit code 1, which a broken import gives, as success. | validate-parse fails when node exits with code 1, as it does when index.js cannot load |

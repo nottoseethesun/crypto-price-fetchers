@@ -338,9 +338,14 @@ function dexToolsAddress(address) {
  * impact. X1 ROUTING, in this file's header, says why.
  *
  * For X1, the call pattern is as in example C: pass the token mint as
- * `tokenAddress` (for documentation/cache-key clarity) and the pool
+ * `tokenAddress`, which shows in the cell what is priced, and the pool
  * address as the third argument: `[[poolAddress, 0]]`. The fetcher
  * uses the pool address to query `/v1/pools/{poolAddress}`.
+ *
+ * The answer is kept under what was asked: the provider, the chain, the
+ * pool, or the token when no pool is named, and the cell's cache seconds.
+ * So cells that ask the same of the same source, for the same time, share
+ * an answer, and a cell never gets one kept for longer than its seconds.
  *
  * @param {string} blockchain - Chain identifier (e.g. "pulse", "ether", "bsc", "x1")
  * @param {string} tokenAddress - Token contract address (or pool address for X1)
@@ -362,7 +367,7 @@ function dexToolsGetTokenPrice(
   const address = dexToolsAddress(pool ?? tokenAddress);
   const isPool = pool !== null;
   const provider = isX1 ? "x1" : "dt";
-  const cacheKey = `${provider}_price_${blockchain}_${address}_${isPool ? "pool" : "token"}`;
+  const cacheKey = `${provider}_price_${blockchain}_${address}_${isPool ? "pool" : "token"}_${seconds}s`;
 
   const cached = CACHE.get(cacheKey);
   if (cached) return Number(cached);
@@ -391,6 +396,10 @@ function dexToolsGetTokenPrice(
  *               is the chain-native (Wrapped XNT).
  *   - other   → DexTools `/token/.../info` (FDV is per-token, not per-pool)
  *
+ * The answer is kept under what was asked: the provider, the chain, on X1
+ * the pool, or the token when no pool is named, elsewhere the token,
+ * whatever pool the cell names, and the cell's cache seconds.
+ *
  * Design note: DexTools (as of January 2026) does not list X1 among its
  * supported chains. The X1 branch is folded into this function so
  * spreadsheet formulas stay uniform across chains — only the chain
@@ -414,11 +423,13 @@ function dexToolsGetTokenFDV(
   const seconds = cacheSecondsOf(cacheSeconds);
   if (typeof seconds === "string") return seconds;
   const isX1 = String(blockchain ?? "").toLowerCase() === "x1";
-  const pool = poolNamed(poolAddresses);
+  // x1.ninja gives a pool's FDV; DexTools gives a token's, whatever pool
+  // the cell names.
+  const pool = isX1 ? poolNamed(poolAddresses) : null;
   const address = dexToolsAddress(pool ?? tokenAddress);
   const isPool = pool !== null;
   const provider = isX1 ? "x1" : "dt";
-  const cacheKey = `${provider}_fdv_${blockchain}_${address}_${isPool ? "pool" : "token"}`;
+  const cacheKey = `${provider}_fdv_${blockchain}_${address}_${isPool ? "pool" : "token"}_${seconds}s`;
 
   const cached = CACHE.get(cacheKey);
   if (cached) return Number(cached);
@@ -427,10 +438,7 @@ function dexToolsGetTokenFDV(
     if (isX1) {
       return fetchX1NinjaFDV(address);
     }
-    const info = fetchDexToolsTokenInfo(
-      blockchain,
-      dexToolsAddress(tokenAddress),
-    );
+    const info = fetchDexToolsTokenInfo(blockchain, address);
     return (
       info?.fdv ??
       info?.fullyDilutedValue ??

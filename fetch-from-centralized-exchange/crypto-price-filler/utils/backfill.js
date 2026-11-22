@@ -2,7 +2,11 @@
  * Backfill utility functions for Crypto Price Filler
  * @module utils/backfill
  * @description Shared backfill logic used by both index.js and backfill.js.
- * Provides functions to fill empty/error price values using bracketing prices.
+ * Provides functions to fill the prices index.js could not find, marked
+ * "Error", using bracketing prices. index.js leaves the price blank on
+ * purpose for the rows that hold no data (a "Total" row, a row with no
+ * date, the rows after the last date), so a blank price is never filled,
+ * and those rows stay out of the grand total.
  * @version 1.0.0
  * @author Christopher M. Balz with Claude.ai
  */
@@ -28,14 +32,13 @@ export function backfillChoice(options, config) {
 }
 
 /**
- * Checks if a price value should be considered empty/missing.
+ * Checks whether a price is one index.js could not find: "Error". A blank
+ * price marks a row that holds no data, which backfill leaves as it is.
  * @param {*} price - The price value to check
- * @returns {boolean} True if the price is empty, 'Error', or missing
+ * @returns {boolean} True if the price is "Error"
  */
 export function isPriceEmpty(price) {
-  return (
-    price === "" || price === "Error" || price === null || price === undefined
-  );
+  return price === "Error";
 }
 
 /**
