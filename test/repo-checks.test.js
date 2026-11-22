@@ -241,7 +241,7 @@ describe("the check of the docs' pointers, on a repo made for the test", () => {
 });
 
 describe("the check of the config examples, on a repo made for the test", () => {
-  it("finds each config.json, kept or named in the top .gitignore, with no config-example.json kept beside it, and each kept example the ignore rules match", () => {
+  it("finds each config.json, kept or named in the top .gitignore, with no config-example.json kept beside it, each kept example the ignore rules match, and each example holding other settings than the config.json git keeps beside it", () => {
     const top = repoWith({
       ".gitignore": [
         "# the owner's settings",
@@ -251,10 +251,12 @@ describe("the check of the config examples, on a repo made for the test", () => 
         "*.log",
         "",
       ].join("\n"),
-      "config.json": "{}",
-      "config-example.json": "{}",
+      "config.json": '{ "apiKeys": ["dextools"] }',
+      "config-example.json": '{\n  "apiKeys": ["dextools"]\n}\n',
       "kept/config.json": "{}",
       "tool/config-example.json": "{}",
+      "other-kept/config.json": '{ "rpc": "https://rpc.test" }',
+      "other-kept/config-example.json": '{ "rpc": "https://other.test" }',
     });
     fs.mkdirSync(path.join(top, "ignored-example"));
     fs.writeFileSync(
@@ -274,6 +276,10 @@ describe("the check of the config examples, on a repo made for the test", () => 
       {
         file: "ignored-example/config-example.json",
         why: "git's ignore rules match it",
+      },
+      {
+        file: "other-kept/config-example.json",
+        why: "it holds other settings than other-kept/config.json, which git keeps",
       },
     ]);
   });
@@ -311,13 +317,7 @@ describe("this repo", () => {
     assert.deepEqual(localReferencesMissing(REPO_TOP), []);
   });
 
-  it("ships a config-example.json, which git keeps, beside each of its config.json files", () => {
+  it("ships a config-example.json, which git keeps, beside each of its config.json files, the top one holding what the committed config.json holds", () => {
     assert.deepEqual(configExampleProblems(REPO_TOP), []);
-  });
-
-  it("holds in its top config-example.json what its committed config.json holds", () => {
-    const read = (file) =>
-      JSON.parse(fs.readFileSync(path.join(REPO_TOP, file), "utf8"));
-    assert.deepEqual(read("config-example.json"), read("config.json"));
   });
 });
