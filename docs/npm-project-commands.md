@@ -8,6 +8,10 @@ CSV's price columns on Node, the program that runs JavaScript outside a
 browser, which has a package of its own; with what each does and what to
 type.
 
+Each command runs on both major versions of Node the repo supports: the
+newest LTS (long-term support) version, today 26, and the version two
+majors before it, today 24.
+
 Companion to [`docs/engineering.md`](engineering.md), which covers how the
 gates work. This file covers how to drive them.
 
