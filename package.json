@@ -14,12 +14,13 @@
     "./eslint-rules/no-secret-logging": "./eslint-rules/no-secret-logging.js",
     "./lib/calendar-day": "./lib/calendar-day.js",
     "./lib/closed-output": "./lib/closed-output.js",
-    "./lib/command-defaults": "./lib/command-defaults.js",
     "./lib/command-line-help": "./lib/command-line-help.js",
     "./lib/http-url": "./lib/http-url.js",
     "./lib/message-of": "./lib/message-of.js",
+    "./lib/option-conflicts": "./lib/option-conflicts.js",
     "./lib/repo-checks": "./lib/repo-checks.js",
     "./lib/settings-file": "./lib/settings-file.js",
+    "./lib/settings-schema": "./lib/settings-schema.js",
     "./lib/time-limited-fetch": "./lib/time-limited-fetch.js",
     "./summ-csv": "./summ-csv/index.js"
   },
@@ -66,6 +67,7 @@
   "license": "Apache-2.0",
   "dependencies": {
     "@noble/hashes": "^2.4.0",
+    "ajv": "^8.20.0",
     "commander": "^12.1.0",
     "lodash": "^4.18.1",
     "zod": "^4.6.7"

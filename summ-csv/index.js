@@ -35,9 +35,13 @@
  */
 
 import fs from "node:fs";
+import { fileURLToPath } from "node:url";
+import { readSettingsFile } from "../lib/settings-file.js";
+import { KINDS } from "../lib/settings-schema.js";
 import { SUMM_COLUMNS, columnKeysOf } from "./columns.js";
 import { chainOf, gasProblems, rowProblems } from "./rules.js";
 import {
+  ALPHABET_NAMES,
   amountText,
   caseFree,
   csvField,
@@ -61,20 +65,96 @@ const FORM_OF_KEY = Object.freeze({
   contractAddress: "address",
 });
 
+/** The path of `summ-csv/settings.json`, beside this file. */
+export const SUMM_CSV_SETTINGS_PATH = fileURLToPath(
+  new URL("./settings.json", import.meta.url),
+);
+
 /**
- * The utility's settings, as `summ-csv/settings.json` holds them: under
- * `chains`, each chain by the name Summ gives it, with its own coin and
- * the forms of its transaction hashes and addresses; and under
- * `referencePriceCurrencies`, the fiat currencies a reference price may
- * be in.
+ * The form of a chain's transaction hashes or addresses: a prefix, an
+ * alphabet the utility knows, and either one length or a least and a most
+ * length, never both.
+ */
+const TEXT_FORM_SCHEMA = Object.freeze({
+  type: "object",
+  additionalProperties: false,
+  required: ["prefix", "alphabet"],
+  properties: {
+    prefix: { type: "string", description: "text, empty for none" },
+    alphabet: {
+      enum: [...ALPHABET_NAMES],
+      description: `an alphabet the utility knows: ${ALPHABET_NAMES.join(", ")}`,
+    },
+    length: KINDS.wholeAbove0,
+    minLength: KINDS.wholeAbove0,
+    maxLength: KINDS.wholeAbove0,
+  },
+  oneOf: [
+    { type: "object", properties: { length: true }, required: ["length"] },
+    {
+      type: "object",
+      properties: { minLength: true, maxLength: true },
+      required: ["minLength", "maxLength"],
+    },
+  ],
+  dependentRequired: { minLength: ["maxLength"], maxLength: ["minLength"] },
+  description:
+    "a form: a prefix, an alphabet, and either a length or a minLength and a maxLength",
+});
+
+/**
+ * The JSON Schema of `summ-csv/settings.json`: each chain by the name Summ
+ * gives it, with its own coin and the forms of its transaction hashes and
+ * addresses, and the fiat currencies a reference price may be in.
+ */
+export const SUMM_CSV_SETTINGS_SCHEMA = Object.freeze({
+  type: "object",
+  additionalProperties: false,
+  required: ["chains", "referencePriceCurrencies"],
+  properties: {
+    chains: {
+      type: "object",
+      additionalProperties: {
+        type: "object",
+        additionalProperties: false,
+        required: ["ownCoin", "transactionHash", "address"],
+        properties: {
+          ownCoin: KINDS.text,
+          transactionHash: TEXT_FORM_SCHEMA,
+          address: TEXT_FORM_SCHEMA,
+        },
+        description: "a chain's facts",
+      },
+      description: "the chains, by the names Summ gives them",
+    },
+    referencePriceCurrencies: {
+      type: "array",
+      minItems: 1,
+      uniqueItems: true,
+      items: KINDS.text,
+      description: "a list of currencies, each once",
+    },
+  },
+});
+
+/**
+ * The utility's settings, as `summ-csv/settings.json` holds them, checked
+ * against `SUMM_CSV_SETTINGS_SCHEMA`: under `chains`, each chain by the
+ * name Summ gives it, with its own coin and the forms of its transaction
+ * hashes and addresses; and under `referencePriceCurrencies`, the fiat
+ * currencies a reference price may be in.
  *
+ * @param {string} [file=SUMM_CSV_SETTINGS_PATH] - The file to read, which a test names
  * @returns {{chains: Object<string, object>,
  *   referencePriceCurrencies: string[]}} The settings
+ * @throws {Error} When the file cannot be read, is not JSON, or the schema finds a problem in it, every problem listed
  */
-export function readSummCsvSettings() {
-  return JSON.parse(
-    fs.readFileSync(new URL("./settings.json", import.meta.url), "utf8"),
-  );
+export function readSummCsvSettings(file = SUMM_CSV_SETTINGS_PATH) {
+  return readSettingsFile(file, {
+    required: true,
+    schema: SUMM_CSV_SETTINGS_SCHEMA,
+    name: "summ-csv/settings.json",
+  });
 }
 
 /**

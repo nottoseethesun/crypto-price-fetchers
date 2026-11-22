@@ -270,22 +270,22 @@ describe("a project's key list and key file", () => {
     );
   });
 
-  it("refuse a config.json that is missing, lists no apiKeys, lists one twice, or names an unknown service", () => {
+  it("refuse a config.json that is missing, lists no apiKeys, lists one twice, or names an unknown service, as its schema says", () => {
     assert.throws(
       () => readNeededKeys(path.join(os.tmpdir(), "no-such-project")),
-      /Cannot read the api keys the project uses from/,
+      /: Cannot read \S*no-such-project\/config\.json: ENOENT/,
     );
     assert.throws(
       () => readNeededKeys(makeProject(undefined)),
-      /lists no apiKeys/,
+      /config\.json → apiKeys is missing$/,
     );
     assert.throws(
       () => readNeededKeys(makeProject(["dextools", "dextools"])),
-      /lists a service twice under apiKeys/,
+      /config\.json → apiKeys must be a list of the services the project's programs use, each once; it is \["dextools","dextools"\]$/,
     );
     assert.throws(
       () => readNeededKeys(makeProject(["dexscreener"])),
-      /No service is named "dexscreener"/,
+      /config\.json → apiKeys\[0\] must be a service the key store knows: coingecko, coinpaprika, dextools, moralis, x1ninja; it is "dexscreener"$/,
     );
   });
 

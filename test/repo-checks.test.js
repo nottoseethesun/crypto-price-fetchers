@@ -48,9 +48,19 @@ const ADDRESSES_WRITTEN_OTHERWISE = Object.freeze([
     why: "GeckoTerminal names a token in lower case, in its ids",
   },
   {
+    file: "fetch-from-centralized-exchange/crypto-price-filler/tests/settings-files.test.js",
+    address: "0x2b591e99afe9f32eaa6214f7b7629768c40eeb39",
+    why: "a contract in lower case, to show supported-tokens.json's schema refuses an address not in EIP-55's form",
+  },
+  {
     file: "test/helpers/summ-csv-rows.js",
     address: "0xAbCdEf0123456789aBcDeF0123456789AbCdEf01",
     why: "a made-up wallet in a mixed case, to show the Summ csv utility writes it in lower case",
+  },
+  {
+    file: "test/settings-schema.test.js",
+    address: "0x2b591e99afe9f32eaa6214f7b7629768c40eeb39",
+    why: "an address in lower case, to show the shared format refuses one not in EIP-55's form",
   },
 ]);
 

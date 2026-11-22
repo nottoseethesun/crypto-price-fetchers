@@ -46,6 +46,9 @@ const ALPHABETS = Object.freeze({
   },
 });
 
+/** The names of the alphabets a chain's form may name. */
+export const ALPHABET_NAMES = Object.freeze(Object.keys(ALPHABETS));
+
 /**
  * Whether a cell is left empty: a value that is absent, `null` or empty
  * text.

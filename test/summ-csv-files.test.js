@@ -110,6 +110,43 @@ describe("the shipped settings", () => {
   });
 });
 
+describe("readSummCsvSettings", () => {
+  it("refuses a settings file its schema finds a problem in, listing every problem", () => {
+    const file = path.join(
+      makeTempFolder("summ-csv-settings"),
+      "settings.json",
+    );
+    fs.writeFileSync(
+      file,
+      JSON.stringify({
+        chains: {
+          pulsechain: {
+            ownCoin: "PLS",
+            transactionHash: { prefix: "0x", alphabet: "hex" },
+            address: {
+              prefix: "0x",
+              alphabet: "bech32",
+              length: 40,
+              minLength: 40,
+            },
+            explorer: "https://scan.pulsechain.com",
+          },
+        },
+        referencePriceCurrencies: ["USD", "USD"],
+      }),
+    );
+    assert.throws(() => readSummCsvSettings(file), {
+      message: [
+        "summ-csv/settings.json → chains.pulsechain.explorer is not a setting this tool reads",
+        'summ-csv/settings.json → chains.pulsechain.transactionHash must be a form: a prefix, an alphabet, and either a length or a minLength and a maxLength; it is {"prefix":"0x","alphabet":"hex"}',
+        'summ-csv/settings.json → chains.pulsechain.address.alphabet must be an alphabet the utility knows: hex, base58; it is "bech32"',
+        "summ-csv/settings.json → chains.pulsechain.address.maxLength is missing, since chains.pulsechain.address.minLength is set",
+        'summ-csv/settings.json → referencePriceCurrencies must be a list of currencies, each once; it is ["USD","USD"]',
+      ].join("\n"),
+    });
+  });
+});
+
 describe("readTemplateHeader", () => {
   it("gives the template's first line as it is written, padding and all", () => {
     assert.match(summHeader(), /^Timestamp \(UTC\),Type,/);

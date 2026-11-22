@@ -1,8 +1,9 @@
 /**
  * Tests for `lib/settings-file.js`, which reads a file of settings written
- * in JSON: a missing file gives no settings unless it is required, and a
- * file that cannot be read, is not JSON or holds no JSON object is an
- * error that names it.
+ * in JSON: a missing file gives no settings unless it is required, a file
+ * that cannot be read, is not JSON or holds no JSON object is an error
+ * that names it, and a file its schema finds a problem in is refused,
+ * every problem listed.
  * @module test/settings-file.test
  *
  * The files are written in a temp folder of the tests' own
@@ -14,6 +15,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { readSettingsFile } from "../lib/settings-file.js";
+import { KINDS } from "../lib/settings-schema.js";
 import { makeTempFolder, removeTempFolders } from "./helpers/temp-folders.js";
 
 let folder;
@@ -88,5 +90,45 @@ describe("readSettingsFile", () => {
         message: `${file} holds no JSON object`,
       });
     }
+  });
+
+  describe("with the file's schema", () => {
+    /** A schema of two settings, one required. */
+    const SCHEMA = {
+      type: "object",
+      additionalProperties: false,
+      required: ["rpcUrl"],
+      properties: { rpcUrl: KINDS.url, maxCandles: KINDS.wholeAbove0 },
+    };
+
+    it("gives the settings when the schema finds no problem", () => {
+      const file = write("good.json", '{ "rpcUrl": "https://rpc.test" }');
+      assert.deepEqual(readSettingsFile(file, { schema: SCHEMA }), {
+        rpcUrl: "https://rpc.test",
+      });
+    });
+
+    it("refuses the file, listing every problem at once under the name given", () => {
+      const file = write("bad.json", '{ "maxCandles": 0, "colour": "red" }');
+      assert.throws(
+        () => readSettingsFile(file, { schema: SCHEMA, name: "config.json" }),
+        (error) => {
+          assert.deepEqual(error.problems, [
+            "config.json → rpcUrl is missing",
+            "config.json → colour is not a setting this tool reads",
+            "config.json → maxCandles must be a whole number above 0; it is 0",
+          ]);
+          assert.equal(error.message, error.problems.join("\n"));
+          return true;
+        },
+      );
+    });
+
+    it("gives no settings for a missing file that is not required, checking nothing", () => {
+      assert.deepEqual(
+        readSettingsFile(path.join(folder, "absent.json"), { schema: SCHEMA }),
+        {},
+      );
+    });
   });
 });

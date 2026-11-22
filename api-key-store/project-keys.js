@@ -21,8 +21,8 @@
  * the same `config.json`.
  */
 
-import fs from "node:fs";
 import path from "node:path";
+import { readSettingsFile } from "../lib/settings-file.js";
 import { unlockApiKeys } from "./key-prompts.js";
 import { SERVICES, serviceNamed } from "./services.js";
 
@@ -47,34 +47,49 @@ export function keyFileFor(projectTop, env = process.env) {
 }
 
 /**
- * Reads the services a project's `config.json` lists under `apiKeys`.
+ * The JSON Schema of the part of a project's `config.json` the key store
+ * reads: `apiKeys`, a list of services it knows, each once. The file's
+ * other keys are the project's, which its own schema holds.
+ *
+ * @param {Object<string, import('./services.js').Service>} services - The services known
+ * @returns {Object} The schema
+ */
+function apiKeysSchema(services) {
+  const names = Object.keys(services);
+  return {
+    type: "object",
+    required: ["apiKeys"],
+    properties: {
+      apiKeys: {
+        type: "array",
+        uniqueItems: true,
+        items: {
+          enum: names,
+          description: `a service the key store knows: ${names.join(", ")}`,
+        },
+        description:
+          "a list of the services the project's programs use, each once",
+      },
+    },
+  };
+}
+
+/**
+ * Reads the services a project's `config.json` lists under `apiKeys`,
+ * once the file holds to `apiKeysSchema` (`lib/settings-file.js`).
  *
  * @param {string} projectTop - The project's top folder
  * @param {Object<string, import('./services.js').Service>} [services=SERVICES] - The services known
  * @returns {Array<import('./services.js').Service>} The services, in the order listed
- * @throws {Error} When the file cannot be read, is not JSON, or its `apiKeys` is not a list of known services, each once
+ * @throws {Error} When the file is missing, cannot be read or is not JSON, or its `apiKeys` is missing or is not a list of known services, each once, every problem listed
  */
 export function readNeededKeys(projectTop, services = SERVICES) {
   const file = path.join(projectTop, PROJECT_CONFIG_FILE);
-  let config;
-  try {
-    config = JSON.parse(fs.readFileSync(file, "utf8"));
-  } catch (error) {
-    throw new Error(
-      `Cannot read the api keys the project uses from ${file}: ${error.message}`,
-      { cause: error },
-    );
-  }
-  const listed =
-    config !== null && typeof config === "object" ? config.apiKeys : undefined;
-  if (!Array.isArray(listed)) {
-    throw new Error(
-      `${file} lists no apiKeys: give the services the project's programs use, such as "apiKeys": ["coingecko"]`,
-    );
-  }
-  if (new Set(listed).size !== listed.length)
-    throw new Error(`${file} lists a service twice under apiKeys`);
-  return listed.map((name) => serviceNamed(name, services));
+  const config = readSettingsFile(file, {
+    required: true,
+    schema: apiKeysSchema(services),
+  });
+  return config.apiKeys.map((name) => serviceNamed(name, services));
 }
 
 /**
