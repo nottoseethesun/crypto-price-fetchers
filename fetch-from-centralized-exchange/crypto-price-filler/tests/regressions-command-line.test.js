@@ -99,6 +99,18 @@ describe("crypto-price-filler's command line", () => {
     expect(broken.stderr).not.toMatch(/\n\s+at /);
   });
 
+  it("stops before the first row, with exit code 1, on a config.json of the exchange script it refuses, naming the problem", () => {
+    const run = runIndex(["--token", "xtm", "--input", "in.csv"], {
+      STAND_IN_EXCHANGE_CONFIG: "{ not json",
+    });
+    expect(run.status).toBe(1);
+    expect(run.stderr).toMatch(
+      /^Error: \S*fetch-from-centralized-exchange[/\\]config\.json is not valid JSON: /,
+    );
+    expect(run.stderr).not.toMatch(/\n\s+at /);
+    expect(run.stdout).toBe("");
+  });
+
   it("logs no CoinGecko id for a token supported-tokens.json gives none", () => {
     const run = runIndex(
       [

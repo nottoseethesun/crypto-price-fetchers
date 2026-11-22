@@ -38,11 +38,11 @@ const STAND_INS = new Map(
 const readFileSync = fs.readFileSync;
 
 /*-
- *  TEST-ONLY swap: the tool reads both files with `fs.readFileSync`, at
- *  paths fixed beside its own files, and offers no seam for them. This
- *  file runs only in a child process a test starts for one run of the
- *  command line, so the swap is never seen outside that process, and it
- *  ends with the process.
+ *  TEST-ONLY global swap: the tool and the exchange script's Node version
+ *  read these files with `fs.readFileSync`, at paths fixed beside their
+ *  own files, and offer no seam for them. This file runs only in a child
+ *  process a test starts for one run of the command line, so the swap is
+ *  never seen outside that process, and it ends with the process.
  */
 fs.readFileSync = (file, ...rest) => {
   const asPath = file instanceof URL ? fileURLToPath(file) : String(file);

@@ -28,7 +28,7 @@
  */
 
 // Declared in getCryptoPriceFromCentralizedExchange.gs, in the same project:
-/* global CONFIG, getCachedResult, setCachedResult */
+/* global CONFIG, CALL, callHasTimeFor, getCachedResult, setCachedResult, waitInCall */
 
 /** ============================================================================
  *                          REQUESTS
@@ -36,27 +36,53 @@
 
 /**
  * Asks a url, and asks it again after each wait in CONFIG.RETRY_DELAYS_MS
- * while the provider refuses it as one too many (status 429). Returns the
- * last response, whatever its status.
+ * while the provider refuses it as one too many (status 429), within the
+ * time the call has left (callHasTimeFor). Returns the last response,
+ * whatever its status; or null when the request got no response at all,
+ * as a timeout or a refused connection gives, for which UrlFetchApp.fetch
+ * throws, or the call had no time left to send it. A refusal as one too
+ * many still there after the last try, or one the call has no time left
+ * to wait out, and a request it has no time to send, cut the call short
+ * (CALL.cutShort), so what it finds is no answer to keep.
  */
 function fetchWithRetries(url, headers, label) {
   const delays = CONFIG.RETRY_DELAYS_MS;
   for (let attempt = 0; ; attempt++) {
-    const response = UrlFetchApp.fetch(url, {
-      muteHttpExceptions: true,
-      headers: headers,
-    });
-    if (response.getResponseCode() !== 429 || attempt >= delays.length)
+    if (!callHasTimeFor(0)) {
+      Logger.log(`${label}: the call has used its time, so it is not sent`);
+      CALL.cutShort = true;
+      return null;
+    }
+    let response;
+    try {
+      response = UrlFetchApp.fetch(url, {
+        muteHttpExceptions: true,
+        headers: headers,
+      });
+    } catch (e) {
+      Logger.log(`${label} got no response: ${e.message}`);
+      return null;
+    }
+    if (response.getResponseCode() !== 429) return response;
+    if (attempt >= delays.length || !callHasTimeFor(delays[attempt])) {
+      Logger.log(
+        attempt >= delays.length
+          ? `${label} answered 429 to every try`
+          : `${label} answered 429, and the call has no time left to wait`,
+      );
+      CALL.cutShort = true;
       return response;
+    }
     Logger.log(
       `${label} answered 429 - waiting ${delays[attempt]} ms (try ${attempt + 2} of ${delays.length + 1} next)`,
     );
-    Utilities.sleep(delays[attempt]);
+    waitInCall(delays[attempt]);
   }
 }
 
-/** The json body of a response with status 200, or null for any other status or a body that is not json */
+/** The json body of a response with status 200, or null for any other status, a body that is not json, or no response */
 function jsonOf(response, label) {
+  if (response === null) return null;
   const code = response.getResponseCode();
   if (code !== 200) {
     Logger.log(`${label} failed: HTTP ${code}`);
@@ -199,49 +225,50 @@ function findMEXCTradingPair(token, symbols) {
  * script goes up one window at a time, to the year, and the first in which
  * something traded gives the average of its high and low, whatever the
  * target. MEXC gives a candle for every period it keeps, one in which
- * nothing traded with volume 0. So for a time within the days MEXC keeps
- * minute candles, a minute MEXC answers with no candle, in an hour it
- * keeps other minute candles of, comes before the pair's first trade when
- * MEXC keeps no candle of the day before, as on the day it listed the
- * pair, and MEXC gives no price. With a candle of the day before, the pair
- * traded before the time, so the minute is one MEXC let go, as at the
- * start of the days it keeps minute candles, and the script asks for the
- * hour.
- * When MEXC keeps no candle of the hour that holds the time, the script
- * asks for the day before: with no candle
- * of it, as on the day MEXC listed the pair or before, MEXC gives no
- * price, since the larger windows may hold only trades from after the
- * time; with one, the hour is older than the hour candles MEXC keeps, and
- * the script goes up from the 2 hours, as for an hour in which nothing
- * traded.
- * A request MEXC fails shows nothing of the candles it keeps, so the
- * script never takes it for a window with no candle: a failed request for
- * the minute, or for the hour's minute candles or the day before while it
- * checks the minute, leaves it to ask for the hour; a failed request for
- * the hour leaves the day before to decide, and a failed request for the
- * day before, to go up from the 2 hours; a failed request for a larger
- * window leaves it to go on up.
+ * nothing traded with volume 0.
+ * The larger windows may hold only trades from after the time when the
+ * time comes before the pair's first trade, which happens only on the day
+ * MEXC listed the pair, or before it; a candle of the day before shows the
+ * pair traded before that day. So for a recent time whose minute MEXC
+ * gives no candle of, as for a minute before the first trade, a minute it
+ * let go at the start of the days it keeps minute candles, or a failed
+ * request, the script asks for the day before: with a candle, it asks for
+ * the hour; with none, the time comes before the first trade, and MEXC
+ * gives no price. When MEXC gives no candle of the hour, the day before
+ * decides the same way: with a candle, the hour is older than the hour
+ * candles MEXC keeps, or its request failed, and the script goes up from
+ * the 2 hours; with none, MEXC gives no price. When the request for the
+ * day before fails, the script cannot tell whether the time comes before
+ * the first trade, and MEXC gives no price. A failed request for a larger
+ * window, in which something traded before the time, leaves the script to
+ * go on up.
  *
  * @param {string} symbol - The MEXC pair, such as XTMUSDT
  * @param {number} utcMs - The time, in ms since 1970 UTC
  * @param {string} target - The price to give: "average", "high", "low" or "close"
- * @return {?{window: Object, averaged: boolean, price: number}} The price, its window, and whether it is the average of the window's high and low; or null when the time comes before the pair's first trade, as a minute MEXC answers with no candle, in an hour of minute candles, on a day with no candle of the day before, shows, or MEXC answers with no candle of the hour that holds the time, or a failed request for it, and no candle of the day before, or with no candle of the day that holds it, or nothing traded in the year that holds it
+ * @return {?{window: Object, averaged: boolean, price: number}} The price, its window, and whether it is the average of the window's high and low; or null when the script asks for the day before, as above, and MEXC gives no candle of it or fails the request, or MEXC gives no candle of the day that holds the time, or nothing traded in the year that holds it
  */
 function mexcPairPrice(symbol, utcMs, target) {
+  let dayBefore;
+  /** Whether MEXC gives a candle of the day before, asked once. */
+  const keptDayBefore = () => {
+    if (dayBefore === undefined) dayBefore = mexcKeptDayBefore(symbol, utcMs);
+    return dayBefore;
+  };
+  /** Logs why MEXC gives no price, as the day before decided, and says so. */
+  const noPriceFor = (what) => {
+    Logger.log(
+      dayBefore === false
+        ? `MEXC: no candle of ${symbol} for the ${what} that holds the time, nor for the day before, so the time comes before the pair's first trade, and MEXC gives no price for it`
+        : `MEXC: no candle of ${symbol} for the ${what} that holds the time, and the request for the day before failed, so the script cannot tell whether the time comes before the pair's first trade, and MEXC gives no price for it`,
+    );
+    return null;
+  };
   let level = 0;
-  const minutes = fetchWindowCandles(symbol, MEXC_WINDOWS[0], utcMs);
-  let candle = joinedCandle(minutes);
+  let candle = fetchWindowCandle(symbol, MEXC_WINDOWS[0], utcMs);
   if (candle === null) {
-    if (
-      minutes !== null &&
-      mexcKeptMinutesOfHour(symbol, utcMs) === true &&
-      mexcKeptDayBefore(symbol, utcMs) === false
-    ) {
-      Logger.log(
-        `MEXC: no candle of ${symbol} for the minute that holds the time, though it keeps others of its hour, and none of the day before, so the time comes before the pair's first trade, and MEXC gives no price for it`,
-      );
-      return null;
-    }
+    if (Date.now() - utcMs <= MEXC_MINUTES_KEPT_MS && keptDayBefore() !== true)
+      return noPriceFor("minute");
     level = 1;
     candle = fetchWindowCandle(symbol, MEXC_WINDOWS[1], utcMs);
   }
@@ -253,19 +280,7 @@ function mexcPairPrice(symbol, utcMs, target) {
       price: priceOf(candle, target),
     };
   }
-  if (candle === null) {
-    const dayBefore = mexcKeptDayBefore(symbol, utcMs);
-    if (dayBefore === false) {
-      Logger.log(
-        `MEXC: no candle of ${symbol} for the hour that holds the time, nor for the day before, so MEXC gives no price for it`,
-      );
-      return null;
-    }
-    if (dayBefore === null)
-      Logger.log(
-        `MEXC: the request for the day before failed, so the script goes up from the 2 hours`,
-      );
-  }
+  if (candle === null && keptDayBefore() !== true) return noPriceFor("hour");
   for (level += 1; level < MEXC_WINDOWS.length; level++) {
     const window = MEXC_WINDOWS[level];
     const candles = fetchWindowCandles(symbol, window, utcMs);
@@ -288,26 +303,6 @@ function mexcPairPrice(symbol, utcMs, target) {
 
 /** How long MEXC keeps a pair's minute candles: about 30 days, and a day more. */
 const MEXC_MINUTES_KEPT_MS = 31 * MEXC_DAY_MS;
-
-/**
- * Whether MEXC keeps minute candles of a pair for the hour that holds a
- * time, for a time within the days it keeps minute candles. Once a pair
- * trades, MEXC keeps a candle for every minute, so another minute of the
- * hour with a candle, while the time's minute has none, puts the time
- * before the pair's first trade, unless the pair traded the day before.
- * For an older time, MEXC keeps no minute candles to ask, and none is
- * asked.
- *
- * @param {string} symbol - The MEXC pair
- * @param {number} utcMs - The time, in ms since 1970 UTC
- * @return {?boolean} Whether MEXC gives a minute candle of the hour, or null when the request fails
- */
-function mexcKeptMinutesOfHour(symbol, utcMs) {
-  if (Date.now() - utcMs > MEXC_MINUTES_KEPT_MS) return false;
-  const { start, end } = MEXC_WINDOWS[1].bounds(utcMs);
-  const candles = fetchKlines(symbol, "1m", start, end, 60);
-  return candles === null ? null : candles.length > 0;
-}
 
 /**
  * Whether MEXC keeps a candle of a pair for the day before the one that
@@ -665,6 +660,7 @@ function coinPaprikaCandlePrice(access, id, day, target) {
     .replace("{end}", day);
   const label = "CoinPaprika OHLCV";
   const response = fetchWithRetries(url, access.headers, label);
+  if (response === null) return { price: null, askDayPrice: false };
   if (response.getResponseCode() === 402) {
     Logger.log(`CoinPaprika's plan does not reach the candle of ${day}`);
     return { price: null, askDayPrice: true };

@@ -87,13 +87,22 @@ services that gather the exchanges' prices. MEXC keeps minute candles for
 about the last 30 days, so for an older time its period is the hour that
 holds it. When nothing traded in that minute or hour, MEXC's price comes
 from the first larger period around it, up to a year, in which something
-did. The next source also answers a time MEXC shows to come before it
-listed the coin: a recent minute MEXC answers with no candle, in an hour
-it keeps minute candles of, with no candle of the day before; or an hour
-with no candle and no candle of the day before. Apps Script runs the calls of many cells at
-the same time. The script's lock makes those calls take turns at the
-services, and its cache answers a question already asked without asking
-again. So a sheet full of cells keeps within the services' rate limits.
+did. A larger period may hold only trades from after a time that comes
+before the coin's first trade on MEXC, which comes on the day MEXC listed
+it, and a candle of the day before shows the coin traded before that day.
+So when MEXC gives no candle of a recent time's minute, or of the hour, or
+the request for it fails, the script asks for the day before: with none,
+or when that request fails too, the next source answers. Apps Script runs
+the calls of many cells at the same time. The script's lock makes those
+calls take turns at the services, and its cache answers a question
+already asked without asking again. So a sheet full of cells keeps within
+the services' rate limits. Google stops a call after 30 seconds, so each
+call keeps to 25 (`CALL_BUDGET_MS`): it waits for the lock, or for a
+request refused as one too many (status 429), only while the wait fits in
+them, and sends no request once they are used. When no source then gave a
+price, the cell shows the script's busy message, and nothing is cached. A
+request that gets no response at all, as a timeout gives, is a failed one,
+and the next source answers.
 The script is
 in three files, which Apps Script loads into one scope: the function and
 its settings, the price sources (`-sources.gs`), and the tests run from the
@@ -173,9 +182,11 @@ A Node version opens its Sheets script through the runner and exports its
 functions, which take the Sheets arguments and return what the cell would
 show. It never copies the script's logic: a fix in the `.gs` fixes both.
 
-What differs from the sheet: there is no 30-second limit per call and no
-daily cap on requests; the cache lasts while the script is open; and the
-api keys come from the key store, not the script. Each Node version lays
+What differs from the sheet: there is no daily cap on requests, and no
+30-second limit per call, though the exchange script's `getCryptoPrice`
+keeps to its 25 seconds a call (`CALL_BUDGET_MS`) under Node too; the
+cache lasts while the script is open; and the api keys come from the key
+store, not the script. Each Node version lays
 the keys it opens over the script's config: `crypto-price-fetchers.js`
 opens only the key its call needs, DexTools' or x1.ninja's, for
 `DEXTOOLS_CONFIG.API_KEY` or `X1_CONFIG.API_KEY`;
@@ -279,7 +290,12 @@ Its settings are `config-example.json`, committed, with its own
 `supported-tokens.json` lists; each file is checked against its schema
 (`config.js`, `supported-tokens.js`) before the tool takes it, as
 [Settings Files](#settings-files) describes. The exchange sources run on
-the script's own `CONFIG`.
+the script's own `CONFIG`, with the values of the `config.json` beside the
+script laid over it, which the script's Node version reads when it opens
+the script, at the first price. So the filler checks that file against
+the Node version's schemas before its first row
+(`checkExchangeSettings`, `sources/exchange.js`), and a file they refuse
+ends the run there, with exit code 1, as its own settings files do.
 
 ---
 

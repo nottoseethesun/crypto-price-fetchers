@@ -165,13 +165,6 @@ export function runCommandLineForOneRow(options, cwd = FILLER_DIR) {
   }
 }
 
-/**
- * Runs the command line, `index.js`, with the arguments given, in a child
- * process with the stand-in MEXC, and gives back how it ended.
- *
- * @param {string[]} args - The arguments
- * @returns {{status: number, stdout: string, stderr: string}} The exit code and what it printed
- */
 /** The preload that hands a run of index.js settings of the test's own. */
 const SETTINGS_PRELOAD_URL = new URL(
   "./stand-in-settings-preload.js",
@@ -207,6 +200,13 @@ export function runIndexIn(folder, args, standIns = {}) {
   );
 }
 
+/**
+ * Runs the command line, `index.js`, with the arguments given, in a child
+ * process with the stand-in MEXC, and gives back how it ended.
+ *
+ * @param {string[]} args - The arguments
+ * @returns {{status: number, stdout: string, stderr: string}} The exit code and what it printed
+ */
 export function runCommandLine(args) {
   const run = spawnSync(
     process.execPath,

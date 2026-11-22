@@ -3,8 +3,30 @@
  * @module tests/cache.test
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { getCache, setCache, clearCache, cacheSize } from "../utils/cache.js";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import {
+  getCache,
+  setCache,
+  clearCache,
+  cacheSize,
+  setCacheClockForTests,
+} from "../utils/cache.js";
+
+/**
+ * Sets the cache's clock to one a test moves by hand, starting at the
+ * system's time, through the cache's seam.
+ *
+ * @returns {{advance: function(number): void}} Moves the clock on by the ms given
+ */
+function testClock() {
+  let nowMs = Date.now();
+  setCacheClockForTests(() => nowMs);
+  return {
+    advance(milliseconds) {
+      nowMs += milliseconds;
+    },
+  };
+}
 
 describe("Cache Utils", () => {
   beforeEach(() => {
@@ -12,6 +34,7 @@ describe("Cache Utils", () => {
   });
 
   afterEach(() => {
+    setCacheClockForTests(null);
     clearCache();
   });
 
@@ -54,41 +77,35 @@ describe("Cache Utils", () => {
 
   describe("TTL expiration", () => {
     it("returns value before TTL expires", () => {
-      vi.useFakeTimers();
+      const clock = testClock();
       setCache("ttl-test", 123.45, 5000); // 5 second TTL
 
       // Advance 3 seconds - should still be valid
-      vi.advanceTimersByTime(3000);
+      clock.advance(3000);
       expect(getCache("ttl-test")).toBe(123.45);
-
-      vi.useRealTimers();
     });
 
     it("returns undefined and deletes entry after TTL expires", () => {
-      vi.useFakeTimers();
+      const clock = testClock();
       setCache("expired-key", 999.99, 1000); // 1 second TTL
 
       // Advance past expiration
-      vi.advanceTimersByTime(1500);
+      clock.advance(1500);
       const value = getCache("expired-key");
 
       expect(value).toBeUndefined();
 
       // The expired entry left the cache when it was asked for
       expect(cacheSize()).toBe(0);
-
-      vi.useRealTimers();
     });
 
     it("does not expire entries without TTL", () => {
-      vi.useFakeTimers();
+      const clock = testClock();
       setCache("no-ttl-key", 777.77); // No TTL
 
       // Advance a long time
-      vi.advanceTimersByTime(1000000);
+      clock.advance(1000000);
       expect(getCache("no-ttl-key")).toBe(777.77);
-
-      vi.useRealTimers();
     });
   });
 

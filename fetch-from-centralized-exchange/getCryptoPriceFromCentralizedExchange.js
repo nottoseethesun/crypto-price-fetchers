@@ -43,9 +43,13 @@
  *   wrong kind, or an api key, which is no setting, stops the run, with
  *   every problem listed. A field that holds an object or a list is set
  *   whole, so the schema asks for the whole of it.
+ *   `readCentralizedExchangeConfig` reads and checks the file the same
+ *   way, for a program that opens the script only later: crypto-price-filler
+ *   checks it before its first row.
  *
  * What differs from the sheet: it runs on this computer, so there is no
- * 30-second limit per call and no daily cap on requests. The cache lasts
+ * daily cap on requests, though the script keeps the budget of 25 seconds
+ * a call it keeps for Google's 30-second limit (CALL_BUDGET_MS). The cache lasts
  * while the script is open: one run of the command line. The sheet's menu,
  * which the build step adds from `crypto-price-fetchers-menu.gs`, is not
  * here. The script waits its 200 milliseconds before each lookup, as in
@@ -64,6 +68,7 @@ import {
   Option,
   isEntryPoint,
   openScriptFunctions,
+  readConfigFile,
   runScriptCommandLine,
 } from "../apps-script-runner/index.js";
 import { unlockProjectKeys } from "../api-key-store/index.js";
@@ -267,6 +272,21 @@ function openWith(names, options) {
     configSchemas: CONFIG_SCHEMAS,
     configOverlay: keyConfig(apiKeys),
   });
+}
+
+/**
+ * Reads `config.json` beside this file, or the file named, and checks it
+ * against `CONFIG_SCHEMAS`, as the runner does when the script opens: for
+ * a program that opens the script only later, as crypto-price-filler does
+ * at its first price, so a file the schemas refuse stops it before it
+ * starts.
+ *
+ * @param {string} [file] - The config file: `config.json` beside this file, unless another is named
+ * @returns {Object<string, Object>} The values it sets, by config object
+ * @throws {Error} When the file cannot be read, is not JSON, or has a problem the schemas find, every problem listed
+ */
+export function readCentralizedExchangeConfig(file = DEFAULT_CONFIG_FILE) {
+  return readConfigFile(file, { schemas: CONFIG_SCHEMAS });
 }
 
 /**
