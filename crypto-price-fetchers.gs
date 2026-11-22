@@ -134,7 +134,7 @@
  * SUBSCRIPTION PLAN
  *   DexTools' url names the plan of the key:
  *   https://public-api.dextools.io/{plan}/v2/... SUBSCRIPTION_PLAN must
- *   be the key's plan: "free", "standard", "advanced" or "pro". With
+ *   be the key's plan: "free", "trial", "standard", "advanced" or "pro". With
  *   another plan, DexTools answers 401 or 403, 404, or 200 with an empty
  *   data object. The plan shows in DexTools' developer portal,
  *   https://developer.dextools.io/, in the key's product and billing pages
@@ -198,7 +198,7 @@
 /**
  * @typedef {Object} DexToolsConfig
  * @property {string} API_KEY                   DexTools' key; the build step sets it
- * @property {string} SUBSCRIPTION_PLAN         The key's plan: "free"|"standard"|"advanced"|"pro"
+ * @property {string} SUBSCRIPTION_PLAN         The key's plan: "free"|"trial"|"standard"|"advanced"|"pro"
  * @property {number} MIN_SECONDS_BETWEEN_CALLS Least seconds between two requests to a service
  * @property {string} API_HOST                  DexTools' api host
  * @property {string} API_VERSION               DexTools' api version

@@ -52,6 +52,7 @@ import { fileURLToPath } from "node:url";
 import { unlockProjectKeys } from "./api-key-store/index.js";
 import { KINDS } from "./lib/settings-schema.js";
 import {
+  CACHE_SECONDS_KIND,
   InvalidArgumentError,
   isEntryPoint,
   openScriptFunctions,
@@ -86,7 +87,7 @@ export const CONFIG_SCHEMAS = Object.freeze({
     type: "object",
     additionalProperties: false,
     properties: {
-      CACHE_SECONDS: KINDS.wholeAbove0,
+      CACHE_SECONDS: CACHE_SECONDS_KIND,
       LOCK_WAIT_MS: KINDS.wholeAtLeast0,
     },
     description: "fields of DEXTOOLS_CONFIG",

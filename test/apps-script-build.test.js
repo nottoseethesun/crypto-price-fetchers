@@ -388,7 +388,7 @@ describe("npm run build apps-script, on a desktop with a clipboard tool", () => 
         result.stderr.includes(
           [
             `${configFile} → DEXTOOLS_CONFIG.SUBSCRIPTION_PLAN is not a setting this tool reads`,
-            `${configFile} → DEXTOOLS_CONFIG.CACHE_SECONDS must be a whole number above 0; it is 0`,
+            `${configFile} → DEXTOOLS_CONFIG.CACHE_SECONDS must be a whole number of seconds from 1 to 21600; it is 0`,
           ].join("\n"),
         ),
       );

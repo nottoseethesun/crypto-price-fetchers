@@ -164,7 +164,8 @@ package of the ajv-validator project that checks JSON against a schema, on
 the 2020-12 draft of JSON Schema, strict. An object of settings refuses a
 key its schema does not name. An object keyed by names the owner chooses
 takes any such key, held to a form where the code needs one: the filler's
-tokens by symbol, in lower case, and summ-csv's chains by name. A value of
+tokens by symbol, in lower case, summ-csv's chains by name, and the
+exchange script's time zones by abbreviation, with no lower-case letter. A value of
 the wrong kind is refused, never corrected, and every problem in a file is
 listed at once, one line each.
 `lib/settings-schema.js` holds the shared part: `compileSettingsSchema`,
@@ -418,11 +419,9 @@ helpers in `lib/`, and `tests/regressions.test.js` for the rest, and
 removes the row.
 
 Google stops a custom function, a function a cell calls, after 30 seconds,
-and the cell shows `#ERROR!`. The first two bugs below are waits longer
-than that.
+and the cell shows `#ERROR!`. Both bugs below are waits longer than that.
 
 | Bug | Test in `tests/known-bugs.test.js` |
 | --- | --- |
 | `dexToolsGetTokenPrice` and `dexToolsGetTokenFDV`, in `crypto-price-fetchers.gs`, wait up to `DEXTOOLS_CONFIG.LOCK_WAIT_MS`, 120 seconds, for the script lock, so a cell that waits more than 30 seconds shows `#ERROR!`, never the busy message the script returns when the wait ends. | dexToolsGetTokenPrice waits for the script lock no longer than Google lets a custom function run |
 | `getCryptoPrice`, in the exchange script, tries the script lock 3 times for 2 seconds each, waiting 5, 10 and 20 seconds after each failed try (`LOCK_RETRY_BACKOFF`): 41 seconds in all. | getCryptoPrice waits for the script lock, in all, no longer than Google lets a custom function run |
-| `getPriceFromMEXC`, in the exchange script's `-sources.gs`, never reads `CONFIG.QUOTE_CURRENCY`: it looks for the token's pair quoted in USDT, and converts a BTC-quoted price through BTCUSDT, both written in the code. | getPriceFromMEXC asks for the pairs quoted in CONFIG.QUOTE_CURRENCY, the token's and BTC's |

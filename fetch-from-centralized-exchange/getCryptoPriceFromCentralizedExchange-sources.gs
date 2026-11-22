@@ -113,8 +113,9 @@ const MEXC_WINDOWS = Object.freeze([
 
 /**
  * A token's price at a time from MEXC: from the candles of the trading
- * pair MEXC lists for it against USDT, or else against BTC, whose price
- * over the same window then turns it into USD.
+ * pair MEXC lists for it against CONFIG.QUOTE_CURRENCY, USDT as written,
+ * or else against BTC, whose price in that currency over the same window
+ * then turns it into USD.
  *
  * @param {string} token - The token's symbol, such as "btc"
  * @param {number} utcMs - The time, in ms since 1970 UTC
@@ -140,7 +141,11 @@ function getPriceFromMEXC(token, utcMs, target) {
 
   let price = found.price;
   if (pairInfo.useBTC) {
-    const btc = fetchWindowCandle("BTCUSDT", found.window, utcMs);
+    const btc = fetchWindowCandle(
+      "BTC" + CONFIG.QUOTE_CURRENCY,
+      found.window,
+      utcMs,
+    );
     if (btc === null) return null;
     price *= priceOf(btc, found.averaged ? "average" : target);
   }
@@ -160,7 +165,7 @@ function fetchMEXCSymbols() {
   return body === null ? null : (body.symbols ?? []);
 }
 
-/** Finds USDT or BTC trading pair for token */
+/** Finds the token's pair quoted in CONFIG.QUOTE_CURRENCY, or else in BTC */
 function findMEXCTradingPair(token, symbols) {
   const upperToken = token.toUpperCase();
   let symbol = null;
@@ -168,8 +173,8 @@ function findMEXCTradingPair(token, symbols) {
 
   for (const sym of symbols) {
     if (sym.baseAsset.toUpperCase() !== upperToken) continue;
-    if (sym.quoteAsset === "USDT") {
-      return { symbol: upperToken + "USDT", useBTC: false };
+    if (sym.quoteAsset === CONFIG.QUOTE_CURRENCY) {
+      return { symbol: upperToken + CONFIG.QUOTE_CURRENCY, useBTC: false };
     }
     if (sym.quoteAsset === "BTC") {
       symbol = upperToken + "BTC";

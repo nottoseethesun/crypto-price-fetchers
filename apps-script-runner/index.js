@@ -15,8 +15,9 @@
  *   (`open-script-functions.js`). Either can open the script with Script
  *   Properties set, such as an api key the script reads from them.
  * - `readConfigFile` reads a Node version's `config.json`, the values it
- *   sets in the script's config objects, such as api keys
- *   (`config-file.js`).
+ *   sets in the script's config objects, checked against the Node
+ *   version's schemas of them, and `CACHE_SECONDS_KIND` is the kind of a
+ *   field that holds a cache's seconds (`config-file.js`).
  * - `runScriptCommandLine` and `isEntryPoint` make a Node version a
  *   command line (`command-line.js`); `InvalidArgumentError` and `Option`
  *   are commander's, for checking an argument as it is parsed and for an
@@ -34,7 +35,7 @@
 export { InvalidArgumentError, Option } from "commander";
 export { createAppsScriptServices } from "./apps-script-services.js";
 export { isEntryPoint, runScriptCommandLine } from "./command-line.js";
-export { readConfigFile } from "./config-file.js";
+export { CACHE_SECONDS_KIND, readConfigFile } from "./config-file.js";
 export { configSchemaProblems } from "./config-schema-check.js";
 export {
   applyConfig,

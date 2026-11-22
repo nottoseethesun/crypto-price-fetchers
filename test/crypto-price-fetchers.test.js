@@ -1,6 +1,6 @@
 /**
  * Tests for crypto-price-fetchers.js, the Node version of
- * crypto-price-fetchers.gs (item 14).
+ * crypto-price-fetchers.gs.
  * @module test/crypto-price-fetchers.test
  *
  * The real `.gs` runs under the real runner. Its requests go to a stand-in

@@ -76,9 +76,9 @@ that hold no key and none of the owner's own settings.
 
 | File | In git | What it holds |
 | ---- | ------ | ------------- |
-| `config.json` | yes | The services whose keys the programs send, under `apiKeys`. No key. |
+| `config.json` | yes | The services whose keys the programs send, under `apiKeys`, and the fields of `DEXTOOLS_CONFIG` that `crypto-price-fetchers.js`, the Node version beside it, takes from a file, `CACHE_SECONDS` and `LOCK_WAIT_MS`, held to its schemas (`CONFIG_SCHEMAS`). Never a key. |
 | `api-keys.json` | no | The keys, each encrypted with the owner's password (see [the key store](architecture.md#the-key-store)). `api-keys.json.tmp` is the file it is written through. `API_KEYS_FILE_PATH` names another, as the tests do. |
-| `config.json` beside a Node version | no | Values laid over the script's config objects, held to the Node version's schemas of them (`CONFIG_SCHEMAS`). `crypto-price-fetchers.js` and the exchange script read one when it is there. |
+| `fetch-from-centralized-exchange/config.json` | no | Values the exchange script's Node version lays over the script's `CONFIG`, held to its schemas of it (`CONFIG_SCHEMAS`), when the file is there. |
 | `summ-csv/settings.json` | yes | The Summ CSV writer's facts of each chain, by Summ's name for it (its own coin, the forms of its hashes and addresses), and the fiat currencies a reference price may be in. |
 | `crypto-price-filler/config-example.json` | yes | The filler's settings. |
 | `crypto-price-filler/config.json` | no | The owner's settings, laid over `config-example.json`. |
