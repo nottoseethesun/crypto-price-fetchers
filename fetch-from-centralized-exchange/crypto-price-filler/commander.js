@@ -11,10 +11,14 @@
  * named in full. `--list-valid-timezones` prints every zone `--tz` takes and
  * exits, as `--help` does. The backfill flags take no default, so a flag
  * not given leaves config.json's setting to decide (`backfillChoice`, in
- * `utils/backfill.js`). `parseArgs` parses the process's arguments.
+ * `utils/backfill.js`). With no `--output`, the tool writes `output.csv`
+ * in its own folder's `output/csv/` (`DEFAULT_OUTPUT`), wherever it runs,
+ * where git keeps nothing but the folder. `parseArgs` parses the process's
+ * arguments.
  */
 
-import { Command, InvalidArgumentError } from "commander";
+import { fileURLToPath } from "url";
+import { Command, InvalidArgumentError, Option } from "commander";
 import { canonicalTimeZone, validTimeZones } from "./utils/date.js";
 import { readSupportedTokens } from "./supported-tokens.js";
 
@@ -35,6 +39,15 @@ export function parseTimeZone(value) {
       "Run with --list-valid-timezones to see every valid one.",
   );
 }
+
+/**
+ * The file the tool writes when no `--output` is given: `output.csv` in
+ * the `output/csv/` folder beside this file, which git ignores but for its
+ * `.gitkeep`, the empty file that keeps the folder in the repo.
+ */
+export const DEFAULT_OUTPUT = fileURLToPath(
+  new URL("./output/csv/output.csv", import.meta.url),
+);
 
 /** The prices a row can take from its candle. */
 const PRICE_TARGETS = Object.freeze(["high", "low", "close"]);
@@ -105,7 +118,12 @@ export function setupCommander() {
     )
 
     // Optional options with defaults
-    .option("--output <path>", "Path to output CSV file", "output.csv")
+    .addOption(
+      new Option("--output <path>", "Path to output CSV file").default(
+        DEFAULT_OUTPUT,
+        "output/csv/output.csv, in crypto-price-filler's folder",
+      ),
+    )
     .option(
       "--mode <mode>",
       "Price target to fetch: high, low, or close",
@@ -138,18 +156,22 @@ export function setupCommander() {
     .addHelpText(
       "after",
       `
+The examples run from the repo's top folder, with the files you give the
+tool in its input/ folder, fetch-from-centralized-exchange/crypto-price-filler/input/,
+where git keeps nothing but the folder.
+
 Examples:
-  Basic usage:
-    $ node bin/crypto-price-filler.js --token=grc --input=mining.csv
+  Basic usage, writing output/csv/output.csv in crypto-price-filler's folder:
+    $ node bin/crypto-price-filler.js --token=grc --input=fetch-from-centralized-exchange/crypto-price-filler/input/mining.csv
 
   Full options:
-    $ node bin/crypto-price-filler.js --token=xtm --input=input.csv --output=prices.csv --mode=high --tz=America/Chicago --verbose
+    $ node bin/crypto-price-filler.js --token=xtm --input=fetch-from-centralized-exchange/crypto-price-filler/input/input.csv --output=fetch-from-centralized-exchange/crypto-price-filler/output/csv/prices.csv --mode=high --tz=America/Chicago --verbose
 
   Backfill the Error prices (conservative tax estimates - use higher bracketing price):
-    $ node bin/crypto-price-filler.js --token=grc --input=mining.csv --backfill-highest
+    $ node bin/crypto-price-filler.js --token=grc --input=fetch-from-centralized-exchange/crypto-price-filler/input/mining.csv --backfill-highest
 
   Backfill the Error prices (budgeting - use lower bracketing price):
-    $ node bin/crypto-price-filler.js --token=grc --input=mining.csv --backfill-lowest
+    $ node bin/crypto-price-filler.js --token=grc --input=fetch-from-centralized-exchange/crypto-price-filler/input/mining.csv --backfill-lowest
 
   Show help:
     $ node bin/crypto-price-filler.js --help
@@ -182,7 +204,7 @@ Exit codes:
  * message and exits with 1.
  *
  * @param {string[]} [argv=process.argv] - The arguments, as process.argv holds them
- * @returns {Object} The options, such as { token: 'grc', input: '...', output: 'output.csv' }
+ * @returns {Object} The options, such as { token: 'grc', input: '...', output: DEFAULT_OUTPUT }
  */
 export function parseArgs(argv = process.argv) {
   return setupCommander().parse(argv).opts();

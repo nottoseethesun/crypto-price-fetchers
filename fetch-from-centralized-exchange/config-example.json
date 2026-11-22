@@ -1,0 +1,36 @@
+{
+  "CONFIG": {
+    "EXCHANGE_BASE_URL": "https://api.mexc.com/api/v3",
+    "QUOTE_CURRENCY": "USDT",
+    "TIMEZONE_OFFSETS": {
+      "UTC": 0,
+      "GMT": 0,
+      "EST": -5,
+      "EDT": -4,
+      "CST": -6,
+      "CDT": -5,
+      "MST": -7,
+      "MDT": -6,
+      "PST": -8,
+      "PDT": -7
+    },
+    "CACHE_EXPIRY_SECONDS": {
+      "DAILY_PRICE": 21600,
+      "NEGATIVE_CACHE": 300
+    },
+    "COINGECKO_BASE": "https://api.coingecko.com/api/v3",
+    "COINPAPRIKA_BASE": "https://api.coinpaprika.com/v1",
+    "COINPAPRIKA_PRO_BASE": "https://api-pro.coinpaprika.com/v1",
+    "COINGECKO_API_KEY_HEADER": "x-cg-demo-api-key",
+    "COINPAPRIKA_API_KEY_HEADER": "Authorization",
+    "COINGECKO_HISTORY_TEMPLATE": "{base}/coins/{id}/history?date={date}",
+    "COINGECKO_MARKET_CHART_RANGE_TEMPLATE": "{base}/coins/{id}/market_chart/range?vs_currency=usd&from={from}&to={to}",
+    "COINPAPRIKA_OHLCV_TEMPLATE": "{base}/coins/{id}/ohlcv/historical?start={start}&end={end}&quote=usd",
+    "COINPAPRIKA_DAY_PRICE_TEMPLATE": "{base}/tickers/{id}/historical?start={date}&interval=1d&limit=1&quote=usd",
+    "RETRY_DELAYS_MS": [5000, 5000],
+    "LOCK_WAIT_MS": 2000,
+    "GENERAL_DELAY_MS": 200,
+    "MAX_LOCK_RETRIES": 3,
+    "LOCK_RETRY_BACKOFF": [5000, 10000, 20000]
+  }
+}

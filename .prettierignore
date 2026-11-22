@@ -13,3 +13,10 @@ api-keys.json
 # The file the build step writes when there is no clipboard: generated, with
 # code that is not this repo's, and ignored by git.
 dist/
+
+# Each tool's input/ and output/ folders: the owner's own files, which git
+# ignores.
+fetch-from-centralized-exchange/crypto-price-filler/input/
+fetch-from-centralized-exchange/crypto-price-filler/output/
+summ-csv/input/
+summ-csv/output/

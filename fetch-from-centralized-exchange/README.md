@@ -28,7 +28,7 @@ inside its apps:
 
 | Tool | Use | Limits |
 | ---- | --- | ------ |
-| **The Sheets script**, `src/getCryptoPriceFromCentralizedExchange.gs`, at the repo's top | A price in a spreadsheet's cell | Google stops a cell's call after 30 seconds, and runs at most 30 calls of one person at once. |
+| **The Sheets script**, `src/getCryptoPriceFromCentralizedExchange.gs`, in this folder | A price in a spreadsheet's cell | Google stops a cell's call after 30 seconds, and runs at most 30 calls of one person at once. |
 | **crypto-price-filler**, `crypto-price-filler/`, started by `bin/crypto-price-filler.js` at the repo's top | Every row of a CSV file, in one run | None of Apps Script's. |
 | **The Sheets script's Node version**, `bin/getCryptoPriceFromCentralizedExchange.js`, at the repo's top | One price, from the command line or a Node program | None of Apps Script's; a call keeps to the 25 seconds the script allows a cell. |
 
@@ -43,15 +43,15 @@ MEXC for the price first, then CoinGecko, then CoinPaprika. It caches
 each answer, and its lock makes the calls of many cells take turns,
 so a sheet stays within each service's rate limit.
 
-The script is in three files, in the repo's `src/`, which work as one,
-since Apps Script runs every script file of a project in one global
+The script is in three files, in this folder's `src/`, which work as
+one, since Apps Script runs every script file of a project in one global
 scope:
 
-- [`getCryptoPriceFromCentralizedExchange.gs`](../src/getCryptoPriceFromCentralizedExchange.gs):
+- [`getCryptoPriceFromCentralizedExchange.gs`](src/getCryptoPriceFromCentralizedExchange.gs):
   `=getCryptoPrice()`, its settings and the cache.
-- [`getCryptoPriceFromCentralizedExchange-sources.gs`](../src/getCryptoPriceFromCentralizedExchange-sources.gs):
+- [`getCryptoPriceFromCentralizedExchange-sources.gs`](src/getCryptoPriceFromCentralizedExchange-sources.gs):
   the price sources.
-- [`getCryptoPriceFromCentralizedExchange-tests.gs`](../src/getCryptoPriceFromCentralizedExchange-tests.gs):
+- [`getCryptoPriceFromCentralizedExchange-tests.gs`](src/getCryptoPriceFromCentralizedExchange-tests.gs):
   the tests to run from the Apps Script editor.
 
 The repo's build step, `npm run build apps-script` (npm, Node's package
@@ -66,7 +66,7 @@ a key. The menu's Refresh & freeze historical prices item runs a tab's
 `getCryptoPrice` cells again and keeps each price as a number.
 
 The help section of the header of
-[`getCryptoPriceFromCentralizedExchange.gs`](../src/getCryptoPriceFromCentralizedExchange.gs),
+[`getCryptoPriceFromCentralizedExchange.gs`](src/getCryptoPriceFromCentralizedExchange.gs),
 which the spreadsheet shows under Crypto Price Fetchers > Help, says how
 to call the function; the rest of the header covers its settings and
 data sources.
@@ -95,8 +95,8 @@ the repo's README.
 ### 3. Node version of the Apps Script (`bin/getCryptoPriceFromCentralizedExchange.js`)
 
 The repo's `bin/getCryptoPriceFromCentralizedExchange.js` runs
-`src/getCryptoPriceFromCentralizedExchange.gs` itself, unchanged, under
-Node, so it answers as `=getCryptoPrice()` does, from a Node program or the
+`src/getCryptoPriceFromCentralizedExchange.gs`, in this folder, itself,
+unchanged, under Node, so it answers as `=getCryptoPrice()` does, from a Node program or the
 command line, run from the repo's top folder:
 
 ```bash
@@ -105,7 +105,10 @@ node bin/getCryptoPriceFromCentralizedExchange.js xtm "2026-01-15 14:30:00" --tz
 
 It sends the CoinGecko and CoinPaprika keys saved, encrypted, in the
 repo's key file ([The api keys](../README.md#3-the-api-keys)), asking for
-its password first. The rest is in the
+its password first. Its settings are `config.json`, in this folder, which
+git ignores and which may set fields of the script's `CONFIG`; without
+it, the script runs on the values written in it, which
+`config-example.json`, beside it, shows for each field. The rest is in the
 [repo's README](../README.md#node-versions-of-the-sheets-scripts), and the
 file header in
 [`getCryptoPriceFromCentralizedExchange.js`](../bin/getCryptoPriceFromCentralizedExchange.js)

@@ -8,8 +8,9 @@
  * those its tests write otherwise on purpose (this file's own among them,
  * the forms it tests the check with), its npm targets named in
  * `docs/project-commands.md`, its test files and helpers named in
- * `docs/engineering.md` or `CLAUDE.md`, and its docs' links and paths
- * pointing at what it keeps.
+ * `docs/engineering.md` or `CLAUDE.md`, its docs' links and paths
+ * pointing at what it keeps, and a config-example.json beside each of its
+ * config.json files.
  */
 
 import { after, describe, it } from "node:test";
@@ -20,6 +21,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   addressesNotInEip55,
+  configExampleProblems,
   eip55,
   headingAnchors,
   localReferencesMissing,
@@ -238,6 +240,45 @@ describe("the check of the docs' pointers, on a repo made for the test", () => {
   });
 });
 
+describe("the check of the config examples, on a repo made for the test", () => {
+  it("finds each config.json, kept or named in the top .gitignore, with no config-example.json kept beside it, and each kept example the ignore rules match", () => {
+    const top = repoWith({
+      ".gitignore": [
+        "# the owner's settings",
+        "/tool/config.json",
+        "/other/config.json",
+        "/ignored-example/config-example.json",
+        "*.log",
+        "",
+      ].join("\n"),
+      "config.json": "{}",
+      "config-example.json": "{}",
+      "kept/config.json": "{}",
+      "tool/config-example.json": "{}",
+    });
+    fs.mkdirSync(path.join(top, "ignored-example"));
+    fs.writeFileSync(
+      path.join(top, "ignored-example/config-example.json"),
+      "{}",
+    );
+    execFileSync("git", ["add", "-f", "ignored-example"], { cwd: top });
+    assert.deepEqual(configExampleProblems(top), [
+      {
+        file: "kept/config.json",
+        why: "no config-example.json that git keeps is beside it",
+      },
+      {
+        file: "other/config.json",
+        why: "no config-example.json that git keeps is beside it",
+      },
+      {
+        file: "ignored-example/config-example.json",
+        why: "git's ignore rules match it",
+      },
+    ]);
+  });
+});
+
 describe("this repo", () => {
   it("writes every EVM address in EIP-55's form, but those its tests write otherwise on purpose", () => {
     const found = addressesNotInEip55(REPO_TOP)
@@ -268,5 +309,15 @@ describe("this repo", () => {
 
   it("points its docs' links and paths only at files, folders and headings it keeps", () => {
     assert.deepEqual(localReferencesMissing(REPO_TOP), []);
+  });
+
+  it("ships a config-example.json, which git keeps, beside each of its config.json files", () => {
+    assert.deepEqual(configExampleProblems(REPO_TOP), []);
+  });
+
+  it("holds in its top config-example.json what its committed config.json holds", () => {
+    const read = (file) =>
+      JSON.parse(fs.readFileSync(path.join(REPO_TOP, file), "utf8"));
+    assert.deepEqual(read("config-example.json"), read("config.json"));
   });
 });

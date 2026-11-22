@@ -27,13 +27,13 @@ export const COMMAND_LINE = fileURLToPath(
 );
 /** The Sheets script's files its function needs, in the order Apps Script loads them. */
 export const SHEETS_SCRIPT_PATH = [
-  "../../../../src/getCryptoPriceFromCentralizedExchange.gs",
-  "../../../../src/getCryptoPriceFromCentralizedExchange-sources.gs",
+  "../../../src/getCryptoPriceFromCentralizedExchange.gs",
+  "../../../src/getCryptoPriceFromCentralizedExchange-sources.gs",
 ].map((file) => fileURLToPath(new URL(file, import.meta.url)));
 /** The menu and the DexTools script, as the build joins them, from the repo's top. */
 export const MENU_AND_DEXTOOLS_SCRIPTS = [
   "../../../../src/crypto-price-fetchers-menu.gs",
-  "../../../../src/crypto-price-fetchers.gs",
+  "../../../../crypto-price-fetchers/src/crypto-price-fetchers.gs",
 ].map((file) => fileURLToPath(new URL(file, import.meta.url)));
 const PRELOAD_URL = new URL("./stand-in-fetch-preload.js", import.meta.url)
   .href;

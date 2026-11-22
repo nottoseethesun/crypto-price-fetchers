@@ -24,14 +24,17 @@
  * Quick Start
  * -----------
  *
+ * From the repo's top folder, on a file the filler wrote in its folder's
+ * `output/csv/`, where git keeps nothing but the folder.
+ *
  * Basic usage (conservative tax estimates - use highest bracketing price):
- *   node bin/backfill.js --input=output.csv --backfill-highest
+ *   node bin/backfill.js --input=fetch-from-centralized-exchange/crypto-price-filler/output/csv/output.csv --backfill-highest
  *
  * Budgeting (avoid over-estimating - use lowest bracketing price):
- *   node bin/backfill.js --input=output.csv --backfill-lowest
+ *   node bin/backfill.js --input=fetch-from-centralized-exchange/crypto-price-filler/output/csv/output.csv --backfill-lowest
  *
  * Write to a different file:
- *   node bin/backfill.js --input=output.csv --output=backfilled.csv --backfill-highest
+ *   node bin/backfill.js --input=fetch-from-centralized-exchange/crypto-price-filler/output/csv/output.csv --output=fetch-from-centralized-exchange/crypto-price-filler/output/csv/backfilled.csv --backfill-highest
  *
  * Command-Line Options
  * --------------------
@@ -59,13 +62,13 @@
  * --------
  *
  *   # Backfill in place with highest price (conservative for taxes)
- *   node bin/backfill.js --input=mining-output.csv --backfill-highest
+ *   node bin/backfill.js --input=fetch-from-centralized-exchange/crypto-price-filler/output/csv/mining-output.csv --backfill-highest
  *
  *   # Backfill to new file with lowest price (for budgeting)
- *   node bin/backfill.js --input=output.csv --output=budget.csv --backfill-lowest
+ *   node bin/backfill.js --input=fetch-from-centralized-exchange/crypto-price-filler/output/csv/output.csv --output=fetch-from-centralized-exchange/crypto-price-filler/output/csv/budget.csv --backfill-lowest
  *
  *   # Verbose mode to see which rows are being filled
- *   node bin/backfill.js --input=output.csv --backfill-highest --verbose
+ *   node bin/backfill.js --input=fetch-from-centralized-exchange/crypto-price-filler/output/csv/output.csv --backfill-highest --verbose
  *
  * Exit Codes
  * ----------
@@ -246,15 +249,18 @@ export function setupBackfillCommander() {
     .addHelpText(
       "after",
       `
+The examples run from the repo's top folder, on a file the filler wrote in
+its folder's output/csv/, fetch-from-centralized-exchange/crypto-price-filler/output/csv/.
+
 Examples:
   Backfill in place (conservative tax estimates):
-    $ node bin/backfill.js --input=output.csv --backfill-highest
+    $ node bin/backfill.js --input=fetch-from-centralized-exchange/crypto-price-filler/output/csv/output.csv --backfill-highest
 
   Backfill to new file (budgeting):
-    $ node bin/backfill.js --input=output.csv --output=budget.csv --backfill-lowest
+    $ node bin/backfill.js --input=fetch-from-centralized-exchange/crypto-price-filler/output/csv/output.csv --output=fetch-from-centralized-exchange/crypto-price-filler/output/csv/budget.csv --backfill-lowest
 
   Verbose mode:
-    $ node bin/backfill.js --input=output.csv --backfill-highest --verbose
+    $ node bin/backfill.js --input=fetch-from-centralized-exchange/crypto-price-filler/output/csv/output.csv --backfill-highest --verbose
 
 Exit codes:
   0  the output file was written

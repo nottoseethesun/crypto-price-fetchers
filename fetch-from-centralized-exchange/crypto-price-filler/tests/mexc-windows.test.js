@@ -7,7 +7,7 @@
  * it listed the pair or before.
  * @module tests/mexc-windows.test
  *
- * The script, src/getCryptoPriceFromCentralizedExchange.gs with its
+ * The script, fetch-from-centralized-exchange/src/getCryptoPriceFromCentralizedExchange.gs with its
  * `-sources.gs`, runs unchanged in the test's thread
  * (`helpers/sheets-script.js`). A stand-in MEXC answers its candle
  * requests as MEXC does (`test/helpers/stand-in-mexc.js`), with a candle
@@ -21,8 +21,8 @@ import { loadSheetsScript } from "./helpers/sheets-script.js";
 import { mexcKlines } from "../../../test/helpers/stand-in-mexc.js";
 
 const SHEETS_SCRIPT_PATH = [
-  "../../../src/getCryptoPriceFromCentralizedExchange.gs",
-  "../../../src/getCryptoPriceFromCentralizedExchange-sources.gs",
+  "../../src/getCryptoPriceFromCentralizedExchange.gs",
+  "../../src/getCryptoPriceFromCentralizedExchange-sources.gs",
 ].map((file) => path.resolve(__dirname, file));
 
 /** 12:30 UTC on Sunday 2025-06-15, the time the tests price. */

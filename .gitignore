@@ -6,12 +6,24 @@
 api-keys.json
 api-keys.json.tmp
 
-# The local settings of the exchange script's Node version and of
-# crypto-price-filler, each laid over the committed ones. The top
-# config.json is committed: it lists the services whose keys the project
-# keeps, and holds no key.
+# The local settings of the two Sheets scripts' Node versions and of
+# crypto-price-filler: the values each lays over the ones written in its
+# code or in its committed config-example.json. Beside each, a
+# config-example.json, which git keeps, shows the settings with those
+# values. The top config.json is committed: it lists the services whose
+# keys the project keeps, and holds no key.
+/crypto-price-fetchers/config.json
 /fetch-from-centralized-exchange/config.json
 /fetch-from-centralized-exchange/crypto-price-filler/config.json
+
+# The owner's own files: those a tool reads from its input/ folder, and
+# those it writes in its output/ folder, by kind (output/csv/). Git keeps
+# each folder by its .gitkeep, an empty file, and nothing else in it.
+/fetch-from-centralized-exchange/crypto-price-filler/input/*
+/fetch-from-centralized-exchange/crypto-price-filler/output/*/*
+/summ-csv/input/*
+/summ-csv/output/*/*
+!.gitkeep
 
 # The Sheets file as `npm run build apps-script` writes it when there is
 # no clipboard: it holds the api keys in the clear
