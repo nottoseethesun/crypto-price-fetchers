@@ -424,9 +424,11 @@ for any other, and removes the row. `tests/regressions.test.js` also
 holds older tests that run a Sheets script that way.
 
 Google stops a custom function, a function a cell calls, after 30 seconds,
-and the cell shows `#ERROR!`. Both bugs below are waits longer than that.
+and the cell shows `#ERROR!`. The first two bugs below are waits longer
+than that.
 
 | Bug | Test in `tests/known-bugs.test.js` |
 | --- | --- |
 | `dexToolsGetTokenPrice` and `dexToolsGetTokenFDV`, in `crypto-price-fetchers.gs`, wait up to `DEXTOOLS_CONFIG.LOCK_WAIT_MS`, 120 seconds, for the script lock, so a cell that waits more than 30 seconds shows `#ERROR!`, never the busy message the script returns when the wait ends. | dexToolsGetTokenPrice waits for the script lock no longer than Google lets a custom function run |
 | `getCryptoPrice`, in the exchange script, tries the script lock 3 times for 2 seconds each, waiting 5, 10 and 20 seconds after each failed try (`LOCK_RETRY_BACKOFF`): 41 seconds in all. | getCryptoPrice waits for the script lock, in all, no longer than Google lets a custom function run |
+| `mexcPairPrice`, in the exchange script's `-sources.gs`, climbs from an hour MEXC keeps no candle of to the 4 hours and the day, which on the day MEXC lists a pair hold only trades after the listing, so a time before the first trade is priced from later trades. | getCryptoPrice asks CoinGecko for a time before the first trade on the listing day, rather than pricing it from the later trades of the 4 hours that hold it |
