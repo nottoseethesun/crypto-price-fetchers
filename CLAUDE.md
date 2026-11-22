@@ -429,10 +429,8 @@ for any other, and removes the row. `tests/regressions.test.js` also
 holds older tests that run a Sheets script that way.
 
 Google stops a custom function, a function a cell calls, after 30 seconds,
-and the cell shows `#ERROR!`. The first bug below is a wait longer than
-that.
+and the cell shows `#ERROR!`. The bug below is a wait longer than that.
 
 | Bug | Test in `tests/known-bugs.test.js` |
 | --- | --- |
 | `dexToolsGetTokenPrice` and `dexToolsGetTokenFDV`, in `crypto-price-fetchers.gs`, wait up to `DEXTOOLS_CONFIG.LOCK_WAIT_MS`, 120 seconds, for the script lock, so a cell that waits more than 30 seconds shows `#ERROR!`, never the busy message the script returns when the wait ends. | dexToolsGetTokenPrice waits for the script lock no longer than Google lets a custom function run |
-| `fetchWithRetries`, in the exchange script, counts no answer with a server error (5xx) as cut short, so a call no source priced for such answers shows `No data available from any source`, cached for 5 minutes, and CoinGecko keeps its lack of an answer. | getCryptoPrice shows the busy message, keeping nothing, when every source answers with a server error, which says nothing of whether it has a price |

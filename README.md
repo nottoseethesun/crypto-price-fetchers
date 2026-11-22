@@ -496,10 +496,11 @@ Monero's lowest price at the time in cell A1:
 
 A cell shows a message instead of a price when no source has one for that
 coin at that time, when the time is in the future, when other cells kept
-the script busy, when no source gave a price and a request got no answer,
-refused as too many until the call used the 25 seconds the script allows
-it or given no response, as when Apps Script's daily quota of requests is
-spent, or when it cannot read `tz` or `dateStr`; Help lists each message.
+the script busy, when no source gave a price and a request got no answer
+(refused as too many on its last try or past the 25 seconds the script
+allows a call, answered with a server error, or given no response, as when
+Apps Script's daily quota of requests is spent), or when it cannot read
+`tz` or `dateStr`; Help lists each message.
 
 #### The Menu
 
@@ -883,8 +884,8 @@ What differs from the sheet:
 - It runs on your computer, so there is no daily cap on web requests.
   Google's 30-second limit per call is not there either, though
   `getCryptoPrice` keeps to the 25 seconds its script allows a call, as
-  in a cell, and shows the busy message when no source gave a price in
-  them.
+  in a cell, and shows the busy message when no source gave a price and a
+  request got no answer, as in a cell.
 - The api keys come from the repo's encrypted key file
   ([The Api Keys](#2-the-api-keys)), not from the script. Each Node
   version sets them in the script's config as it opens the script, as the

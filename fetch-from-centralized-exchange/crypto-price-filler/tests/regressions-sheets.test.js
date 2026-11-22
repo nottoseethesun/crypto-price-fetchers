@@ -466,6 +466,17 @@ describe("a call cut short", () => {
     expect(script.getCryptoPrice("xtm", time, "UTC", "close")).toBe(1.23);
   });
 
+  it("getCryptoPrice shows the busy message, keeping nothing, when every source answers with a server error, which says nothing of whether it has a price", () => {
+    let failing = true;
+    const script = loadSheetsScript(SHEETS_SCRIPT_PATH, (url) =>
+      failing ? reply(503, null) : answerCoinGeckoForPastDay(url),
+    );
+    const time = cellTime(Date.now() - 2 * DAY_MS);
+    expect(script.getCryptoPrice("xtm", time, "UTC", "close")).toBe(BUSY);
+    failing = false;
+    expect(script.getCryptoPrice("xtm", time, "UTC", "close")).toBe(1.23);
+  });
+
   it("getCryptoPrice keeps CoinGecko's lack of an answer when only another source's request was cut short", () => {
     let coinGeckoAsked = 0;
     const script = loadSheetsScript(SHEETS_SCRIPT_PATH, (url) => {

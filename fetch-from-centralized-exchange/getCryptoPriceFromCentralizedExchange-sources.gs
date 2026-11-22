@@ -42,10 +42,11 @@
  * for which UrlFetchApp.fetch throws, as on a timeout, a refused
  * connection or Apps Script's own quota of requests, or the call had no
  * time left to send it. A refusal as one too many still there after the
- * last try, or one the call has no time left to wait out, a request with
- * no response, and a request it has no time to send are counted as cut
- * short (CALL.cutRequests): the source then answers nothing, which is no
- * answer to keep.
+ * last try, or one the call has no time left to wait out, an answer with a
+ * server error (5xx) or a request timeout (408), a request with no
+ * response, and a request it has no time to send are counted as cut short
+ * (CALL.cutRequests): the source then answers nothing, which is no answer
+ * to keep, since none of them says whether it has a price.
  */
 function fetchWithRetries(url, headers, label) {
   const delays = CONFIG.RETRY_DELAYS_MS;
@@ -66,7 +67,13 @@ function fetchWithRetries(url, headers, label) {
       CALL.cutRequests += 1;
       return null;
     }
-    if (response.getResponseCode() !== 429) return response;
+    const code = response.getResponseCode();
+    if (code >= 500 || code === 408) {
+      Logger.log(`${label} answered ${code}, which says nothing of its data`);
+      CALL.cutRequests += 1;
+      return response;
+    }
+    if (code !== 429) return response;
     if (attempt >= delays.length || !callHasTimeFor(delays[attempt])) {
       Logger.log(
         attempt >= delays.length
