@@ -37,7 +37,8 @@ inside its apps:
 ### 1. Google Apps Script (`getCryptoPriceFromCentralizedExchange.gs`)
 
 A custom `=getCryptoPrice()` function for Google Sheets, which gives
-the high, the low or the close of the period around a time. It asks
+the average of the high and the low, by default, or the high, the low or
+the close, of the period around a time. It asks
 MEXC for the price first, then CoinGecko, then CoinPaprika. It caches
 each answer, and its lock makes the calls of many cells take turns,
 so a sheet stays within each service's rate limit.

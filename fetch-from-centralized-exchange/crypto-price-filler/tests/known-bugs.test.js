@@ -19,13 +19,7 @@
 
 import { describe, it, expect } from "vitest";
 import path from "path";
-import fs from "fs";
 import { loadSheetsScript } from "./helpers/sheets-script.js";
-import {
-  answerCoinGeckoForPastDay,
-  runCommandLine,
-} from "./helpers/regression-runs.js";
-import { mexcKlines } from "../../../test/helpers/stand-in-mexc.js";
 
 /** How long Google lets a custom function run before it stops it. */
 const CUSTOM_FUNCTION_LIMIT_MS = 30000;
@@ -90,64 +84,6 @@ describe("waits inside a custom function", () => {
       const waited = [...waits, ...sleeps].reduce((sum, ms) => sum + ms, 0);
       expect(waits.length).toBeGreaterThan(0);
       expect(waited).toBeLessThanOrEqual(CUSTOM_FUNCTION_LIMIT_MS);
-    },
-  );
-});
-
-describe("the exchange script in the hour MEXC lists a pair", () => {
-  it.fails(
-    "getCryptoPrice asks CoinGecko for a recent time in the listing hour before the first trade, rather than pricing it from the hour's later trades",
-    () => {
-      const hour = Math.floor((Date.now() - 2 * 86400000) / 3600000) * 3600000;
-      const firstTrade = hour + 20 * 60000;
-      const time = new Date(hour + 10 * 60000)
-        .toISOString()
-        .slice(0, 19)
-        .replace("T", " ");
-      const script = loadSheetsScript(EXCHANGE_SCRIPT, (url) => {
-        if (url.includes("/exchangeInfo"))
-          return {
-            symbols: [
-              { symbol: "XTMUSDT", baseAsset: "XTM", quoteAsset: "USDT" },
-            ],
-          };
-        if (url.includes("/klines"))
-          return mexcKlines(url, (open, end) =>
-            end >= firstTrade ? ["0.10", "0.30", "0.10", "0.20", "10"] : null,
-          );
-        return answerCoinGeckoForPastDay(url);
-      });
-      expect(script.getCryptoPrice("xtm", time, "UTC", "close")).toBe(1.23);
-    },
-  );
-});
-
-describe("the filler's test commands", () => {
-  it.fails(
-    "test:ci and test:debug give vitest their flags before any bare --, which vitest never reads",
-    () => {
-      const scripts = JSON.parse(
-        fs.readFileSync(path.resolve(__dirname, "../package.json"), "utf8"),
-      ).scripts;
-      for (const name of ["test:ci", "test:debug"]) {
-        expect(scripts[name]).not.toMatch(/ -- --/);
-      }
-    },
-  );
-});
-
-describe("the filler's command line, given an input it cannot read", () => {
-  it.fails(
-    "names an input file that does not exist, with exit code 1 and no stack trace",
-    () => {
-      const run = runCommandLine([
-        "--token=xtm",
-        "--input=no-such-input.csv",
-        "--output=/tmp/never-written.csv",
-      ]);
-      expect(run.status).toBe(1);
-      expect(run.stderr).toContain("Input file not found: no-such-input.csv");
-      expect(run.stderr).not.toMatch(/\n\s+at /);
     },
   );
 });

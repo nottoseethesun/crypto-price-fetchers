@@ -218,3 +218,28 @@ describe("the exchange script on the day MEXC lists a pair", () => {
     ).toBe(1.23);
   });
 });
+
+describe("the exchange script in the hour MEXC lists a pair", () => {
+  it("getCryptoPrice asks CoinGecko for a recent time in the listing hour before the first trade, rather than pricing it from the hour's later trades", () => {
+    const hour = Math.floor((Date.now() - 2 * 86400000) / 3600000) * 3600000;
+    const firstTrade = hour + 20 * 60000;
+    const time = new Date(hour + 10 * 60000)
+      .toISOString()
+      .slice(0, 19)
+      .replace("T", " ");
+    const script = loadSheetsScript(SHEETS_SCRIPT_PATH, (url) => {
+      if (url.includes("/exchangeInfo"))
+        return {
+          symbols: [
+            { symbol: "XTMUSDT", baseAsset: "XTM", quoteAsset: "USDT" },
+          ],
+        };
+      if (url.includes("/klines"))
+        return mexcKlines(url, (open, end) =>
+          end >= firstTrade ? ["0.10", "0.30", "0.10", "0.20", "10"] : null,
+        );
+      return answerCoinGeckoForPastDay(url);
+    });
+    expect(script.getCryptoPrice("xtm", time, "UTC", "close")).toBe(1.23);
+  });
+});

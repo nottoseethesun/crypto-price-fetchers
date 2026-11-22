@@ -305,8 +305,9 @@ and no branch is deleted. LP Ranger's eight steps in
 The security lint runs `eslint-rules/no-secret-logging.js`, which refuses
 printing a name that may hold a secret, through `console`, a stream's
 `write` or `say`. A name that sounds like a secret but holds none is
-renamed, never excused. pulsechain-analytics and x1-validator-analytics run
-the rule from this repo (`crypto-price-fetchers/eslint-rules/no-secret-logging`).
+renamed, never excused. pulsechain-analytics,
+pulsechain-validator-analytics and x1-validator-analytics run the rule
+from this repo (`crypto-price-fetchers/eslint-rules/no-secret-logging`).
 
 The lint runs `eslint-rules/no-or-default.js`, which refuses `a || b`
 whose value is kept, as a default is, unless `b` is a boolean: `||` takes
@@ -424,13 +425,9 @@ for any other, and removes the row. `tests/regressions.test.js` also
 holds older tests that run a Sheets script that way.
 
 Google stops a custom function, a function a cell calls, after 30 seconds,
-and the cell shows `#ERROR!`. The first two bugs below are waits longer
-than that.
+and the cell shows `#ERROR!`. Both bugs below are waits longer than that.
 
 | Bug | Test in `tests/known-bugs.test.js` |
 | --- | --- |
 | `dexToolsGetTokenPrice` and `dexToolsGetTokenFDV`, in `crypto-price-fetchers.gs`, wait up to `DEXTOOLS_CONFIG.LOCK_WAIT_MS`, 120 seconds, for the script lock, so a cell that waits more than 30 seconds shows `#ERROR!`, never the busy message the script returns when the wait ends. | dexToolsGetTokenPrice waits for the script lock no longer than Google lets a custom function run |
 | `getCryptoPrice`, in the exchange script, tries the script lock 3 times for 2 seconds each, waiting 5, 10 and 20 seconds after each failed try (`LOCK_RETRY_BACKOFF`): 41 seconds in all. | getCryptoPrice waits for the script lock, in all, no longer than Google lets a custom function run |
-| `mexcPairPrice`, in the exchange script's `-sources.gs`, prices a recent time in the hour MEXC lists a pair, before its first trade, from the hour's later trades: the minute has no candle, and the hour has one. | getCryptoPrice asks CoinGecko for a recent time in the listing hour before the first trade, rather than pricing it from the hour's later trades |
-| crypto-price-filler's `test:ci` and `test:debug` put their flags after a bare `--`, which vitest never reads. | test:ci and test:debug give vitest their flags before any bare --, which vitest never reads |
-| crypto-price-filler's command line throws a raw stack trace for an input file that does not exist. | names an input file that does not exist, with exit code 1 and no stack trace |

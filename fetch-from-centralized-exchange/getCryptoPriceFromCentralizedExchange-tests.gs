@@ -190,7 +190,11 @@ function testGetCryptoPrice() {
     {
       name: "Future date",
       token: "xtm",
-      dateStr: "2026-12-31 23:59:59",
+      // A year from now, so the date stays in the future
+      dateStr: new Date(Date.now() + 365 * 86400000)
+        .toISOString()
+        .slice(0, 19)
+        .replace("T", " "),
       tz: "CST",
       mode: "high",
       expectedRange: null,

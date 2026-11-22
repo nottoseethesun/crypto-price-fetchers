@@ -83,11 +83,14 @@ names the chain and the token, or a pool.
 minute: by default the average of the high and the low of the candle
 that holds it, or else the candle's high, low or close, from MEXC, a
 centralized exchange, first, then CoinGecko, then CoinPaprika, two
-services that gather the exchanges' prices. When nothing traded in that
-minute, MEXC's price comes from the first larger period around it, up to
-a year, in which something did; when MEXC keeps no candle of the hour
-that holds the time nor of the day before, as on the day it listed the
-coin or before, the next source answers. Apps Script runs the calls of many cells at
+services that gather the exchanges' prices. MEXC keeps minute candles for
+about the last 30 days, so for an older time its period is the hour that
+holds it. When nothing traded in that minute or hour, MEXC's price comes
+from the first larger period around it, up to a year, in which something
+did. The next source also answers a time MEXC shows to come before it
+listed the coin: a recent minute with no candle in an hour MEXC keeps
+minute candles of, or an hour with no candle and no candle of the day
+before. Apps Script runs the calls of many cells at
 the same time. The script's lock makes those calls take turns at the
 services, and its cache answers a question already asked without asking
 again. So a sheet full of cells keeps within the services' rate limits.

@@ -326,7 +326,7 @@ function dexToolsAddress(address) {
  *   - `"x1"`  → x1.ninja `/v1/pools/{poolAddress}` — returns the pool's
  *               current `priceUsd`. The pool address must be supplied
  *               via the third argument (`poolAddresses`), as in
- *               example C. The free tier does not include token→pool
+ *               example E. The free tier does not include token→pool
  *               resolution.
  *   - other   → DexTools (token endpoint, or pool endpoint when poolAddresses given)
  *
@@ -337,7 +337,7 @@ function dexToolsAddress(address) {
  * the X1 branch here can be deleted in one step with no spreadsheet
  * impact. X1 ROUTING, in this file's header, says why.
  *
- * For X1, the call pattern is as in example C: pass the token mint as
+ * For X1, the call pattern is as in example E: pass the token mint as
  * `tokenAddress`, which shows in the cell what is priced, and the pool
  * address as the third argument: `[[poolAddress, 0]]`. The fetcher
  * uses the pool address to query `/v1/pools/{poolAddress}`.
@@ -348,7 +348,7 @@ function dexToolsAddress(address) {
  * an answer, and a cell never gets one kept for longer than its seconds.
  *
  * @param {string} blockchain - Chain identifier (e.g. "pulse", "ether", "bsc", "x1")
- * @param {string} tokenAddress - Token contract address (or pool address for X1)
+ * @param {string} tokenAddress - Token contract address, or on X1 the token's mint, which the script does not send
  * @param {Array<Array<string>>} [poolAddresses=[]] - Optional [[poolAddress, unused]]
  *                                 Use when you want price from specific pool
  * @param {number} [cacheSeconds=DEXTOOLS_CONFIG.CACHE_SECONDS] - The seconds to keep the answer, a whole number from 1 to 21600; the config's when absent or empty
@@ -391,7 +391,7 @@ function dexToolsGetTokenPrice(
  * Routes by `blockchain`:
  *   - `"x1"`  → x1.ninja `/v1/pools/{poolAddress}` — returns the
  *               pool's `fdv`. The pool address must be supplied via
- *               the third argument (`poolAddresses`), as in example C.
+ *               the third argument (`poolAddresses`), as in example F.
  *               x1.ninja reports `fdv: 0` for pools whose base token
  *               is the chain-native (Wrapped XNT).
  *   - other   → DexTools `/token/.../info` (FDV is per-token, not per-pool)
@@ -406,7 +406,7 @@ function dexToolsGetTokenPrice(
  * slug changes. X1 ROUTING, in this file's header, says why.
  *
  * @param {string} blockchain - Chain identifier (e.g. "pulse", "ether", "x1")
- * @param {string} tokenAddress - Token contract address (or pool address for X1)
+ * @param {string} tokenAddress - Token contract address, or on X1 the token's mint, which the script does not send
  * @param {Array<Array<string>>} [poolAddresses=[]] - Optional [[poolAddress, unused]].
  *                                 Required for X1 (x1.ninja keys on
  *                                 pool address). Ignored by the
@@ -607,7 +607,7 @@ function getOptions() {
  * Returns the pool's current `priceUsd` field.
  *
  * Pool-spec required: pass the pool address via the public function's
- * third argument (the `poolAddresses` slot, as in example C). x1.ninja
+ * third argument (the `poolAddresses` slot, as in example E). x1.ninja
  * does not let free-tier callers resolve token-mint → pool, so the
  * caller must know which pool to query.
  *

@@ -104,10 +104,13 @@
  *   time, through the hour, 2 hours, 4 hours, day, week (from Monday),
  *   month and year, in UTC, that hold the time, and the first in which
  *   something traded gives the average of its high and low, whatever the
- *   mode. When MEXC keeps no candle of that hour, the script asks for the
- *   day before: with none, as on the day MEXC listed the coin or before,
- *   the next source answers; with one, the script goes up from the 2
- *   hours. When nothing traded in the year, the next source answers.
+ *   mode. A time in the last 30 days whose minute has no candle, while
+ *   MEXC keeps candles of other minutes of its hour, comes before the
+ *   coin's first trade, and the next source answers. When MEXC keeps no
+ *   candle of the hour, the script asks for the day before: with none, as
+ *   on the day MEXC listed the coin or before, the next source answers;
+ *   with one, the script goes up from the 2 hours. When nothing traded in
+ *   the year, the next source answers.
  * - CoinGecko, a service that gathers the exchanges' prices, asked next:
  *   24 hours of hourly prices, from 12 hours before the time to 12 hours
  *   after; for `"close"` only, the day's price at 00:00 UTC.
@@ -143,8 +146,12 @@
  *
  *   MEXC: Asks for the 1-minute candle of the minute containing the
  *     requested timestamp. MEXC keeps 1-minute candles for about the last
- *     30 days and gives none for an older minute; the script then asks for
- *     the 60-minute candle of the hour containing the timestamp. MEXC
+ *     30 days and gives none for an older minute, nor for a minute before
+ *     the pair's first trade: within those 30 days, the script asks for
+ *     the hour's minute candles, and when MEXC keeps any, the time comes
+ *     before the first trade, and MEXC gives no price. Otherwise the
+ *     script asks for the 60-minute candle of the hour containing the
+ *     timestamp. MEXC
  *     gives a candle for every period it keeps: one in which nothing
  *     traded has volume 0, and open, high, low and close all at the last
  *     trade's price. When it gives no candle of the hour, the script asks

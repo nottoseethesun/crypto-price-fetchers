@@ -28,6 +28,7 @@ import { pathToFileURL } from "url";
 import { runBackfill, setupBackfillCommander } from "../backfill.js";
 import { setupCommander } from "../commander.js";
 import { backfillChoice, backfillPrices } from "../utils/backfill.js";
+import { runCommandLine } from "./helpers/regression-runs.js";
 
 /** crypto-price-filler's folder, and the two preloads a run of index.js takes. */
 const FILLER_DIR = path.resolve(__dirname, "..");
@@ -281,5 +282,46 @@ describe("backfill beside a row that holds no data", () => {
     ];
     backfillPrices(lowest, { ...options, useHighest: false });
     expect(lowest[2]["$usd price"]).toBe(10);
+  });
+});
+
+describe("the filler's test commands and its input", () => {
+  it("test:ci and test:debug give vitest their flags before any bare --, which vitest never reads", () => {
+    const scripts = JSON.parse(
+      fs.readFileSync(path.resolve(__dirname, "../package.json"), "utf8"),
+    ).scripts;
+    for (const name of ["test:ci", "test:debug"]) {
+      expect(scripts[name]).not.toMatch(/ -- --/);
+    }
+  });
+
+  it("names an input file that does not exist, with exit code 1 and no stack trace", () => {
+    const run = runCommandLine([
+      "--token=xtm",
+      "--input=no-such-input.csv",
+      "--output=/tmp/never-written.csv",
+    ]);
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain("Input file not found: no-such-input.csv");
+    expect(run.stderr).not.toMatch(/\n\s+at /);
+  });
+
+  it("names an input with a header and no rows", () => {
+    const folder = fs.mkdtempSync(path.join(os.tmpdir(), "filler-no-rows-"));
+    const input = path.join(folder, "header-only.csv");
+    fs.writeFileSync(input, '"date (UTC)","amount"\n');
+    try {
+      const run = runCommandLine([
+        "--token=xtm",
+        `--input=${input}`,
+        `--output=${path.join(folder, "out.csv")}`,
+      ]);
+      expect(run.status).toBe(1);
+      expect(run.stderr).toContain(
+        "The input CSV has no rows below its header",
+      );
+    } finally {
+      fs.rmSync(folder, { recursive: true, force: true });
+    }
   });
 });
