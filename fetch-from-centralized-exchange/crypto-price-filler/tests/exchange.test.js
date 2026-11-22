@@ -12,6 +12,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { closeExchangeSources, exchangeSources } from "../sources/exchange.js";
 import { openCentralizedExchangeSources } from "../../getCryptoPriceFromCentralizedExchange.js";
 import { getApiKey } from "../../../api-key-store/index.js";
+import { logLines } from "./helpers/log-lines.js";
 
 vi.mock("../../getCryptoPriceFromCentralizedExchange.js", () => ({
   openCentralizedExchangeSources: vi.fn(),
@@ -60,13 +61,12 @@ describe("exchangeSources", () => {
   });
 
   it("prints the script's lines, marked as the script's, when verbose", async () => {
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const printed = logLines();
     await exchangeSources(true);
     mockOpen.mock.calls[0][0].onLog({ level: "info", text: "Trying MEXC" });
-    expect(consoleSpy).toHaveBeenCalledWith(
+    expect(printed).toHaveBeenCalledWith(
       "[VERBOSE:2] [Sheets script] Trying MEXC",
     );
-    consoleSpy.mockRestore();
   });
 
   it("drops the script's lines when not verbose", async () => {

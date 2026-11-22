@@ -14,6 +14,7 @@ import { getApiKey } from "../../../api-key-store/index.js";
 import { MORALIS_API_URL } from "../../../dex-prices/moralis.js";
 import { answerWith, requests } from "./helpers/stand-in-fetch.js";
 import { reply } from "./helpers/sheets-script.js";
+import { logLines } from "./helpers/log-lines.js";
 
 vi.mock("../../../api-key-store/index.js", () => ({
   getApiKey: vi.fn(),
@@ -104,13 +105,12 @@ describe("getPriceFromMoralis", () => {
 
   it("gives null, and says why when verbose, when Moralis answers with an error", async () => {
     answerWith(() => reply(401, { message: "Invalid key" }));
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const printed = logLines();
     expect(await getPriceFromMoralis(PHEX, TIME_MS, "close", true)).toBeNull();
-    const lines = consoleSpy.mock.calls.map(([line]) => line);
+    const lines = printed.mock.calls.map(([line]) => line);
     expect(
       lines.some((line) => line.startsWith("[VERBOSE:1] Moralis failed:")),
     ).toBe(true);
     expect(lines.some((line) => line.includes("moralis-key"))).toBe(false);
-    consoleSpy.mockRestore();
   });
 });

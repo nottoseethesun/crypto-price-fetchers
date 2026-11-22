@@ -14,6 +14,7 @@ import { getPriceFromGeckoTerminal } from "../sources/geckoterminal.js";
 import { clearCache } from "../utils/cache.js";
 import { answerWith, requests } from "./helpers/stand-in-fetch.js";
 import { reply } from "./helpers/sheets-script.js";
+import { logLines } from "./helpers/log-lines.js";
 
 // The shared client, asking the stand-in fetch and waiting for nothing
 vi.mock("../../../dex-prices/geckoterminal.js", async (importOriginal) => {
@@ -196,15 +197,14 @@ describe("getPriceFromGeckoTerminal", () => {
 
   it("gives null, and says why when verbose, when GeckoTerminal answers with an error", async () => {
     answerWith(() => reply(500, {}));
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const printed = logLines();
     expect(
       await getPriceFromGeckoTerminal(PHEX, TIME_MS, "close", true),
     ).toBeNull();
     expect(
-      consoleSpy.mock.calls.some(([line]) =>
+      printed.mock.calls.some(([line]) =>
         line.startsWith("[VERBOSE:1] GeckoTerminal failed:"),
       ),
     ).toBe(true);
-    consoleSpy.mockRestore();
   });
 });

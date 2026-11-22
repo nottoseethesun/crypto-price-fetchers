@@ -99,7 +99,7 @@ import {
   backfillPrices,
   DEFAULT_COLUMNS,
 } from "./utils/backfill.js";
-import { logv } from "./utils/log.js";
+import { logv, say } from "./utils/log.js";
 
 /**
  * Expands ~ to home directory in file path.
@@ -309,7 +309,7 @@ export async function runBackfill(options, config = loadConfig()) {
   logv(verbose, 1, `Price column: ${priceColName}`);
   logv(verbose, 1, `Amount column: ${amountColName}`);
 
-  console.log(`Backfilling ${rows.length} rows from ${inputFile}...`);
+  say(`Backfilling ${rows.length} rows from ${inputFile}...`);
 
   const stats = backfillPrices(rows, {
     priceColName,
@@ -324,10 +324,10 @@ export async function runBackfill(options, config = loadConfig()) {
 
   await writeCsvFile(outputFile, headers, rows);
 
-  console.log(
+  say(
     `Backfill complete: ${stats.emptyRowsFilled} rows filled in ${stats.blocksFound} block(s)`,
   );
-  console.log(`Output written to ${outputFile}`);
+  say(`Output written to ${outputFile}`);
 
   return stats;
 }

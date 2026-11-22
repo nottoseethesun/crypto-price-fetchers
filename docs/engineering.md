@@ -223,6 +223,10 @@ holds the stand-ins:
   CoinGecko and CoinPaprika give them, the command line run over one row
   in a child process, and a call run with the computer's time zone set to
   another.
+- `log-lines.js` reads the lines the tool prints through the seam of its
+  log, `utils/log.js`, a mock function in place of the console's log until
+  the test ends, so no test replaces `console.log`, as LP Ranger's rules
+  ask.
 
 ### Test Files
 

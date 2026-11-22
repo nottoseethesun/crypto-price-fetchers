@@ -29,6 +29,7 @@ import { runBackfill, setupBackfillCommander } from "../backfill.js";
 import { setupCommander } from "../commander.js";
 import { backfillChoice, backfillPrices } from "../utils/backfill.js";
 import { runCommandLine } from "./helpers/regression-runs.js";
+import { logLines } from "./helpers/log-lines.js";
 
 /** crypto-price-filler's folder, and the two preloads a run of index.js takes. */
 const FILLER_DIR = path.resolve(__dirname, "..");
@@ -191,7 +192,7 @@ describe("backfill.js's command line", () => {
     const folder = fs.mkdtempSync(path.join(os.tmpdir(), "backfill-config-"));
     const input = path.join(folder, "prices.csv");
     fs.writeFileSync(input, CSV_WITH_A_GAP);
-    vi.spyOn(console, "log").mockImplementation(() => {});
+    logLines();
     try {
       const options = setupBackfillCommander()
         .parse(["node", "backfill.js", "--input", input])
