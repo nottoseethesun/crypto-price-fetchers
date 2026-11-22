@@ -81,8 +81,9 @@
  * ```
  *
  * A price for a time is kept for up to 6 hours, the longest Apps Script's
- * cache keeps a value, and "no data" for up to 5 minutes, so a cell that
- * runs again within that time gives the answer it gave before. A past
+ * cache keeps a value, and "no data" for up to 5 minutes, as the script is
+ * written (the CACHE_EXPIRY_SECONDS setting), so a cell that runs again
+ * within that time gives the answer it gave before. A past
  * price does not change, so Refresh & freeze historical prices, in the
  * Crypto Price Fetchers menu, can replace these formulas with their
  * numbers.
@@ -122,7 +123,7 @@
  *
  * - `No data available from any source`: no source had a price for that
  *   coin at that time; `No data available (cached)` repeats that answer
- *   for 5 minutes.
+ *   for up to 5 minutes.
  * - `No data available for future dates`: the time is after now.
  * - `Rate limit busy - retry later`: other cells kept the script busy;
  *   choose Clean up errors in the Crypto Price Fetchers menu, which runs
@@ -150,7 +151,7 @@
  *     timestamp. MEXC serves no 2-hour or yearly candle, so the 2 hours
  *     join their two hour candles and the year its twelve month candles.
  *     The first window whose volume is above 0 gives the average of its
- *     high and low, whatever the mode. A coin MEXC lists no pair for
+ *     high and low, whatever the mode. A coin for which MEXC lists no pair
  *     against the quote currency (QUOTE_CURRENCY, below, USDT as written),
  *     but one against BTC, is priced from its BTC pair, then in USD with
  *     the candle of BTC against the quote currency of the same window,
