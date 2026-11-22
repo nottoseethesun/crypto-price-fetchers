@@ -384,6 +384,10 @@ functions inside the scripts that the owner runs by hand. crypto-price-filler's
 - `stand-in-fetch-preload.js` runs the real command line, `index.js`, in a
   child process against a stand-in MEXC, and a stand-in CoinGecko ping that
   takes the one key in `stand-in-coingecko-key.js`.
+- `stand-in-settings-preload.js` hands the command line, run in a child
+  process, a settings file or a token list of the test's own, from an
+  environment variable, since the tool reads both beside its own files and
+  a test never writes the owner's `config.json`.
 - `regression-runs.js` holds the settings, stand-in answers and runs that
   `tests/regressions.test.js` shares among its tests.
 
@@ -398,9 +402,16 @@ filler's command lines and `tests/regressions.test.js` for the rest, and
 removes the row.
 
 Google stops a custom function, a function a cell calls, after 30 seconds,
-and the cell shows `#ERROR!`. Both bugs below are waits longer than that.
+and the cell shows `#ERROR!`. The first two bugs below are waits longer than
+that.
 
 | Bug | Test in `tests/known-bugs.test.js` |
 | --- | --- |
 | `dexToolsGetTokenPrice` and `dexToolsGetTokenFDV`, in `crypto-price-fetchers.gs`, wait up to `DEXTOOLS_CONFIG.LOCK_WAIT_MS`, 120 seconds, for the script lock, so a cell that waits more than 30 seconds shows `#ERROR!`, never the busy message the script returns when the wait ends. | dexToolsGetTokenPrice waits for the script lock no longer than Google lets a custom function run |
 | `getCryptoPrice`, in the exchange script, tries the script lock 3 times for 2 seconds each, waiting 5, 10 and 20 seconds after each failed try (`LOCK_RETRY_BACKOFF`): 41 seconds in all. | getCryptoPrice waits for the script lock, in all, no longer than Google lets a custom function run |
+| crypto-price-filler's `index.js` reads its token list and settings before it parses its options, outside any catch, so a file its schema refuses ends the run in a stack trace, even for `--help`. | index.js answers --help whatever its settings, and prints a settings file's or token list's problems as one error, with exit code 1 and no stack trace |
+| For a token `supported-tokens.json` gives no CoinGecko id, `index.js` logs the token's symbol as its CoinGecko id, which the run never asks, and it passes `getCryptoPrice` two arguments that function does not take. | index.js logs no CoinGecko id for a token supported-tokens.json gives none |
+| `SUPPORTED_TOKENS_SCHEMA` takes a token keyed in upper case, which no lookup finds. | refuses a token keyed in upper case in supported-tokens.json, which no lookup finds |
+| `compileSettingsSchema` (`lib/settings-schema.js`) compiles a schema anew at every read, about 10 ms, and the filler reads its token list for every row with a date. | compiles a settings file's schema once, however often a file is read against it |
+| A refusal misdescribes an empty value: an empty text "must be text", and an empty list that must hold at least one item "must be a list of …, each once". | describes an empty text and an empty list by what each lacks |
+| `filesUsingCommander` (`lib/command-line-help.js`) misses `export * from "commander"`, an import with a comment after it on the same line or an indent before it, and `await import("commander")`. | counts a file that brings in Command or the whole of commander in each form that loads |

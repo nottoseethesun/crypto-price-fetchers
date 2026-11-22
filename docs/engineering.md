@@ -211,6 +211,11 @@ holds the stand-ins:
   child process against a stand-in MEXC, a centralized exchange, and a
   stand-in ping of CoinGecko, a service that gathers the exchanges' prices,
   that takes the one key in `stand-in-coingecko-key.js`.
+- `stand-in-settings-preload.js` hands the command line, run in a child
+  process, a settings file or a token list of the test's own, from the
+  environment variable `STAND_IN_FILLER_CONFIG` or `STAND_IN_FILLER_TOKENS`,
+  since the tool reads both beside its own files and a test never writes
+  the owner's `config.json`.
 - `regression-runs.js` holds the settings, stand-in answers and runs that
   `tests/regressions.test.js` shares among its tests: answers as MEXC,
   CoinGecko and CoinPaprika give them, the command line run over one row
