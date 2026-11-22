@@ -83,8 +83,11 @@ describe("the package", () => {
     const files = packed.files.map((file) => file.path);
     const manifest = JSON.parse(readFile(repoTop, "package.json"));
 
-    assert.equal(manifest.bin["github-project-deps"], "github-project-deps.js");
-    assert.ok(files.includes("github-project-deps.js"));
+    assert.equal(
+      manifest.bin["github-project-deps"],
+      "bin/github-project-deps.js",
+    );
+    assert.ok(files.includes("bin/github-project-deps.js"));
     assert.ok(files.includes("github-project-deps/index.js"));
   });
 });

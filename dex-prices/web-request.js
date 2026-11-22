@@ -29,7 +29,7 @@
  * crypto-price-filler's pool sources, tries again the same way. A Sheets
  * script runs in Apps Script, which cannot load a Node module, so the
  * centralized-exchange script keeps a loop of its own, `fetchWithRetries`
- * in `getCryptoPriceFromCentralizedExchange-sources.gs`, which the filler
+ * in `src/getCryptoPriceFromCentralizedExchange-sources.gs`, which the filler
  * also runs for MEXC, CoinGecko and CoinPaprika.
  */
 

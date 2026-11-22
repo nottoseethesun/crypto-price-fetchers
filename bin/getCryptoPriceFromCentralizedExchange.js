@@ -1,12 +1,12 @@
 /**
- * The Node version of getCryptoPriceFromCentralizedExchange.gs: a coin's
+ * The Node version of src/getCryptoPriceFromCentralizedExchange.gs: a coin's
  * USD price at a past time, from centralized exchanges, for Node programs
  * and the command line.
- * @module fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange
+ * @module bin/getCryptoPriceFromCentralizedExchange
  *
  * What: the same answer as the Sheets function `getCryptoPrice`, worked out
  * by the same code, because this file runs
- * `getCryptoPriceFromCentralizedExchange.gs` itself, unchanged, through the
+ * `src/getCryptoPriceFromCentralizedExchange.gs` itself, unchanged, through the
  * shared runner (`../apps-script-runner/`). The `.gs` file's header says
  * what the function takes and returns: the average of the high and the
  * low of the period around the time, or its high, low or close, from MEXC,
@@ -27,7 +27,7 @@
  * - Either takes the CoinGecko demo api key and the CoinPaprika api key,
  *   and sets each in the script's `CONFIG` (`keyConfig`), as the repo's
  *   build step sets them in the script it gives for the sheet.
- * - The command line, `node getCryptoPriceFromCentralizedExchange.js <token>
+ * - The command line, `node bin/getCryptoPriceFromCentralizedExchange.js <token>
  *   "<date>"`, with `--tz` and `--mode`, prints the price (`--help` gives
  *   the rest). It first checks the time zone and the date as the script
  *   reads them, with the script loaded in this thread, which asks nothing,
@@ -35,10 +35,10 @@
  *   (`checkTimeArguments`). Before it asks for a price, it opens the CoinGecko and
  *   CoinPaprika keys saved in the project's encrypted key file and hands
  *   them to the script (`../api-key-store/`): with the password in
- *   `API_KEYS_PASSWORD`, which `unlock-api-keys.sh` keeps for a terminal,
+ *   `API_KEYS_PASSWORD`, which `bin/unlock-api-keys.sh` keeps for a terminal,
  *   or else one it asks for. With no key saved, the script asks without
  *   one. `npm run api-keys`, in the repo's top folder, saves a key.
- * - `config.json` beside this file, which git ignores, may set other
+ * - `fetch-from-centralized-exchange/config.json`, which git ignores, may set other
  *   fields of the script's `CONFIG`; without it, the script runs on the
  *   values written in it. `CONFIG_SCHEMAS` names each field it may set,
  *   with its kind of value, and the runner checks the file against it
@@ -88,16 +88,16 @@ import { KINDS } from "../lib/settings-schema.js";
  * order Apps Script loads them. The third, its in-sheet tests, is left out.
  */
 export const SHEETS_SCRIPT = [
-  new URL("./getCryptoPriceFromCentralizedExchange.gs", import.meta.url),
+  new URL("../src/getCryptoPriceFromCentralizedExchange.gs", import.meta.url),
   new URL(
-    "./getCryptoPriceFromCentralizedExchange-sources.gs",
+    "../src/getCryptoPriceFromCentralizedExchange-sources.gs",
     import.meta.url,
   ),
 ];
 
 /** The config file read when none is named. */
 export const DEFAULT_CONFIG_FILE = fileURLToPath(
-  new URL("./config.json", import.meta.url),
+  new URL("../fetch-from-centralized-exchange/config.json", import.meta.url),
 );
 
 /** The project's top folder, which holds its key file. */
@@ -199,7 +199,7 @@ export const CONFIG_SCHEMAS = Object.freeze({
 
 /** The script's in-editor tests, which the sheet works without. */
 const SHEETS_TESTS = new URL(
-  "./getCryptoPriceFromCentralizedExchange-tests.gs",
+  "../src/getCryptoPriceFromCentralizedExchange-tests.gs",
   import.meta.url,
 );
 
@@ -259,7 +259,7 @@ export const APPS_SCRIPT_BUILD = Object.freeze({
  *
  * @typedef {Object} OpenOptions
  * @property {Object<string, Object>} [config] - Values for the script's config objects, in place of the config file
- * @property {string} [configFile] - A config file in place of `config.json` beside this file
+ * @property {string} [configFile] - A config file in place of `fetch-from-centralized-exchange/config.json`
  * @property {ScriptKeys} [apiKeys={}] - The api keys the script sends; none when absent
  * @property {function(string, Object): Promise<Response>} [fetch] - Does the script's web requests, in place of Node's fetch
  * @property {?function({level: string, text: string}): void} [onLog] - Takes each line the script logs
@@ -283,13 +283,13 @@ function openWith(names, options) {
 }
 
 /**
- * Reads `config.json` beside this file, or the file named, and checks it
+ * Reads `fetch-from-centralized-exchange/config.json`, or the file named, and checks it
  * against `CONFIG_SCHEMAS`, as the runner does when the script opens: for
  * a program that opens the script only later, as crypto-price-filler does
  * at its first price, so a file the schemas refuse stops it before it
  * starts.
  *
- * @param {string} [file] - The config file: `config.json` beside this file, unless another is named
+ * @param {string} [file] - The config file: `fetch-from-centralized-exchange/config.json`, unless another is named
  * @returns {Object<string, Object>} The values it sets, by config object
  * @throws {Error} When the file cannot be read, is not JSON, or has a problem the schemas find, every problem listed
  */
@@ -327,18 +327,18 @@ Api keys:
   The command sends a CoinGecko demo api key and a CoinPaprika api key
   when either is saved (npm run api-keys, in the repo's top folder). It
   opens them with the password in API_KEYS_PASSWORD, which
-  source ./unlock-api-keys.sh keeps for a terminal, or else asks for the
+  source ./bin/unlock-api-keys.sh keeps for a terminal, or else asks for the
   password on stderr. Without a key, it asks that service without one.`;
 
 /** The examples of the help: one of each common use. */
 const EXAMPLES_HELP = `
 Examples:
   Bitcoin's average price in the period around 14:30 UTC on 15 January 2026:
-    $ node getCryptoPriceFromCentralizedExchange.js btc "2026-01-15 14:30:00"
+    $ node bin/getCryptoPriceFromCentralizedExchange.js btc "2026-01-15 14:30:00"
   Gridcoin's close at a time given in US Central time:
-    $ node getCryptoPriceFromCentralizedExchange.js grc "2026-01-15 08:30:00" --tz CST --mode close
+    $ node bin/getCryptoPriceFromCentralizedExchange.js grc "2026-01-15 08:30:00" --tz CST --mode close
   Monero's low, with the script's log on stderr, to see which service answered:
-    $ node getCryptoPriceFromCentralizedExchange.js xmr "2026-01-15 14:30:00" --mode low --verbose`;
+    $ node bin/getCryptoPriceFromCentralizedExchange.js xmr "2026-01-15 14:30:00" --mode low --verbose`;
 
 /**
  * Checks that an argument is not empty.

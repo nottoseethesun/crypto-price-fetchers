@@ -21,7 +21,7 @@
  * Each source takes the time as UTC milliseconds and a target, "high",
  * "low" or "close", and returns the price in USD, or null when it has
  * none. crypto-price-filler, the repo's tool for whole CSV files, which
- * runs on Node, calls the three sources itself, through getCryptoPriceFromCentralizedExchange.js,
+ * runs on Node, calls the three sources itself, through bin/getCryptoPriceFromCentralizedExchange.js,
  * so they are its price sources too.
  *
  * @see https://github.com/nottoseethesun/crypto-price-fetchers

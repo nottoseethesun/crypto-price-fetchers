@@ -4,7 +4,7 @@
  * GitHub Actions workflow files: `run-actionlint [files...]`, which each
  * repo's `npm run lint` runs on `.github/workflows/*.yml`, and
  * `run-actionlint --check`, which `npm run audit:actionlint` runs.
- * @module run-actionlint
+ * @module bin/run-actionlint
  *
  * What: it runs actionlint from the official release that
  * `actionlint/release.js` pins, downloaded once and checked against the
@@ -15,8 +15,8 @@
  * with commander: `--help` gives the rest, its exit codes included.
  */
 
-import { runActionlint } from "./actionlint/index.js";
-import { endQuietlyWhenOutputCloses } from "./lib/closed-output.js";
+import { runActionlint } from "../actionlint/index.js";
+import { endQuietlyWhenOutputCloses } from "../lib/closed-output.js";
 
 endQuietlyWhenOutputCloses();
 

@@ -1,5 +1,5 @@
 /**
- * Tests for apps-script-build/built-script.js, which joins the parts of the
+ * Tests for build/tools/apps-script-build/built-script.js, which joins the parts of the
  * one file the build step gives and checks that they make one Apps Script
  * project.
  * @module test/built-script.test
@@ -16,7 +16,7 @@ import {
   BUILT_FILE_NAME,
   combinedScript,
   configBlock,
-} from "../apps-script-build/built-script.js";
+} from "../build/tools/apps-script-build/built-script.js";
 
 /**
  * Loads a built file as Apps Script would, with the runner's services.

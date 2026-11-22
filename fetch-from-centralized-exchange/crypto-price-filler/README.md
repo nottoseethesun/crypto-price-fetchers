@@ -16,10 +16,10 @@ It prices two kinds of token, each where it trades:
   as Bitcoin and Monero, has no pool for a pool's price service to read.
   The tool asks MEXC, a centralized exchange, then CoinGecko, then
   CoinPaprika, two services that gather the exchanges' prices, through the
-  price sources of the script beside this folder for Google Sheets,
-  Google's spreadsheet app, written in Apps Script, Google's platform for
-  scripts that run inside its apps:
-  `getCryptoPriceFromCentralizedExchange-sources.gs`, which it runs
+  price sources of the repo's script for Google Sheets, Google's
+  spreadsheet app, written in Apps Script, Google's platform for scripts
+  that run inside its apps:
+  `src/getCryptoPriceFromCentralizedExchange-sources.gs`, which it runs
   unchanged under Node (`sources/exchange.js`), so the sheet and the tool
   price alike.
 - A token that trades in a blockchain's pools, such as HEX on PulseChain,
@@ -34,8 +34,10 @@ The order of the sources, and what each gives, is in the file header of
 
 ### Current Roster of Utilities
 
-- `index.js` - Main CLI tool for fetching prices and filling CSV files
-- `backfill.js` - Standalone utility to backfill the Error prices in existing CSV files
+- `index.js` - Main CLI tool for fetching prices and filling CSV files,
+  started by the repo's `bin/crypto-price-filler.js`
+- `backfill.js` - Standalone utility to backfill the Error prices in
+  existing CSV files, started by the repo's `bin/backfill.js`
 
 ## Prerequisites
 
@@ -69,11 +71,10 @@ Schemas (`SETTINGS_SCHEMA` in `config.js`, `SUPPORTED_TOKENS_SCHEMA` in
 not read, such as a misspelled one, or a value of the wrong kind stops the
 run, with every problem listed. The exchange sources run on the Sheets
 script's own settings, its `CONFIG`, with the values of the
-`config.json` beside the script, in the folder above, which git ignores,
-laid over it; that file is checked
-against the script's Node version's schemas (`CONFIG_SCHEMAS` in
-`../getCryptoPriceFromCentralizedExchange.js`) before the first row, and a
-problem stops the run the same way.
+`config.json` in the folder above, which git ignores, laid over it; that
+file is checked against the script's Node version's schemas
+(`CONFIG_SCHEMAS` in the repo's `bin/getCryptoPriceFromCentralizedExchange.js`)
+before the first row, and a problem stops the run the same way.
 
 The api keys are no settings: the CoinGecko, CoinPaprika and Moralis keys
 are kept in `api-keys.json` at the repo's top, encrypted with a password you
@@ -85,39 +86,45 @@ npm run api-keys
 ```
 
 Each run then opens them before it prices anything, with the password
-`source ./unlock-api-keys.sh` keeps for the terminal, or else one it asks
+`source ./bin/unlock-api-keys.sh`, run in the repo's top folder, keeps for
+the terminal, or else one it asks
 for, and asks each service once whether it takes its key. Without a saved
 key, the tool asks CoinGecko without one, at its lower rate limits, asks
 CoinPaprika's free server, and does not ask Moralis. See
 [The api keys](../../README.md#2-the-api-keys) in the repo's README.
 
-## Usage
+## Run
 
-### index.js: Price Fetching
+The tool's two programs are in the repo's `bin/` folder; the commands
+below run from the repo's top folder.
 
-`index.js` prices every row of a CSV file. `node index.js --help` lists
-all its options, with examples and its exit codes, and the file header in
-`./index.js` says more about each.
+### crypto-price-filler.js
+
+`bin/crypto-price-filler.js` runs `index.js`, which prices every row of a
+CSV file. `node bin/crypto-price-filler.js --help` lists all its options,
+with examples and its exit codes, and the file header in `./index.js`
+says more about each.
 
 ```bash
-node index.js --token=grc --input=mining.csv --output=filled.csv
+node bin/crypto-price-filler.js --token=grc --input=mining.csv --output=filled.csv
 ```
 
 The tool reads its own files, `supported-tokens.json`,
 `config-example.json` and `config.json`, from this folder, so it runs from
 any folder; the paths `--input` and `--output` name are taken from the
-folder it runs in.
+folder it runs in. `npm start -- <options>`, in this folder, runs the same
+command line.
 
 The dates are read in UTC unless `--tz` names another time zone in full, such
 as `America/Chicago`; each row gets the offset the zone had at that time,
-daylight saving included. `node index.js --list-valid-timezones` prints every
-name `--tz` takes.
+daylight saving included. `node bin/crypto-price-filler.js
+--list-valid-timezones` prints every name `--tz` takes.
 
-### backfill.js: Filling Empty Prices
+### backfill.js
 
 A row whose price no service gave gets `Error` in the output's
-`$usd price` column. `backfill.js` fills such rows in an output CSV file
-already written, without asking any
+`$usd price` column. `bin/backfill.js` runs `backfill.js`, which fills
+such rows in an output CSV file already written, without asking any
 service again: each takes the price of the nearest priced row before or
 after it, the higher of the two with `--backfill-highest`, the lower with
 `--backfill-lowest`. The rows that hold no data, a "Total" row, a row
@@ -127,10 +134,10 @@ header in `./backfill.js` lists all its options.
 
 ```bash
 # Backfill with highest bracketing price (conservative tax estimates)
-node backfill.js --input=output.csv --backfill-highest
+node bin/backfill.js --input=output.csv --backfill-highest
 
 # Backfill with lowest bracketing price (budgeting)
-node backfill.js --input=output.csv --backfill-lowest
+node bin/backfill.js --input=output.csv --backfill-lowest
 ```
 
 ## Development

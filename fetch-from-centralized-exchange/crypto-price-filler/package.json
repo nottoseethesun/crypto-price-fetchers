@@ -5,10 +5,10 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "start": "node index.js",
+    "start": "node ../../bin/crypto-price-filler.js",
     "clean": "rm -f tests/mock-filled*.csv test.log test.html",
     "test": "vitest run --coverage --silent",
-    "validate-parse": "node index.js --help >/dev/null",
+    "validate-parse": "node ../../bin/crypto-price-filler.js --help >/dev/null",
     "test:strict": "npm run validate-parse && vitest run --coverage --silent",
     "test:ci": "vitest run --no-cache --coverage",
     "test:debug": "VERBOSE=1 vitest run --no-cache --reporter=verbose --coverage",

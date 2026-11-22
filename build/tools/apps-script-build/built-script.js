@@ -39,12 +39,12 @@
  */
 
 import vm from "node:vm";
-import { createAppsScriptServices } from "../apps-script-runner/apps-script-services.js";
+import { createAppsScriptServices } from "../../../apps-script-runner/apps-script-services.js";
 import {
   applyConfig,
   loadAppsScript,
-} from "../apps-script-runner/load-apps-script.js";
-import { messageOf } from "../lib/message-of.js";
+} from "../../../apps-script-runner/load-apps-script.js";
+import { messageOf } from "../../../lib/message-of.js";
 
 /** A name that can follow a dot, as each part of a dotted name must be. */
 const IDENTIFIER = /^[A-Za-z_$][\w$]*$/;

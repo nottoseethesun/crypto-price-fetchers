@@ -14,7 +14,7 @@ import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
-import { APPS_SCRIPTS } from "../apps-script-build/index.js";
+import { APPS_SCRIPTS } from "../build/tools/apps-script-build/index.js";
 import { readConfigFile } from "../apps-script-runner/config-file.js";
 import { configSchemaProblems } from "../apps-script-runner/config-schema-check.js";
 import { KINDS } from "../lib/settings-schema.js";

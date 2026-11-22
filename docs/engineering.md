@@ -77,14 +77,13 @@ that hold no key and none of the owner's own settings.
 
 | File | In git | What it holds |
 | ---- | ------ | ------------- |
-| `config.json` | yes | The services whose keys the programs send, under `apiKeys`, and the fields of `DEXTOOLS_CONFIG` that `crypto-price-fetchers.js`, the Node version beside it, takes from a file, `CACHE_SECONDS` and `LOCK_WAIT_MS`, held to its schemas (`CONFIG_SCHEMAS`). Never a key. |
+| `config.json` | yes | The services whose keys the programs send, under `apiKeys`, and the fields of `DEXTOOLS_CONFIG` that `bin/crypto-price-fetchers.js`, the Node version of `src/crypto-price-fetchers.gs`, takes from a file, `CACHE_SECONDS` and `LOCK_WAIT_MS`, held to its schemas (`CONFIG_SCHEMAS`). Never a key. |
 | `api-keys.json` | no | The keys, each encrypted with the owner's password (see [the key store](architecture.md#the-key-store)). `api-keys.json.tmp` is the file it is written through. `API_KEYS_FILE_PATH` names another, as the tests do. |
 | `fetch-from-centralized-exchange/config.json` | no | Values the exchange script's Node version lays over the script's `CONFIG`, held to its schemas of it (`CONFIG_SCHEMAS`), when the file is there. |
 | `summ-csv/settings.json` | yes | The Summ CSV writer's facts of each chain, by Summ's name for it (its own coin, the forms of its hashes and addresses), and the fiat currencies a reference price may be in. |
 | `crypto-price-filler/config-example.json` | yes | The filler's settings. |
 | `crypto-price-filler/config.json` | no | The owner's settings, laid over `config-example.json`. |
-| `build/apps-script/` | no | `crypto-price-fetchers.gs`, the one file `npm run build apps-script` writes when the owner declines a clipboard tool: it holds the api keys in the clear, readable by the owner alone. The lint, the security lint and the secret scan, below, pass over the folder. |
-| `coverage/` | no | A test run's coverage report. |
+| `dist/apps-script/` | no | `crypto-price-fetchers.gs`, the one file `npm run build apps-script` writes when the owner declines a clipboard tool: it holds the api keys in the clear, readable by the owner alone. The lint, the security lint and the secret scan, below, pass over the folder. |
 
 ---
 
@@ -128,7 +127,7 @@ file stops the commit; `npm run format` or
 `npm run lint:fix` fixes formatting. No rule is ever switched off in a file,
 no file git keeps is left out of the lint, and a file over 500 lines is
 split, not excused. The one folder the lint and the security lint pass
-over is `build/`, which git ignores: the build step writes its file there
+over is `dist/`, which git ignores: the build step writes its file there
 when there is no
 clipboard, and that file holds the compiled code of DEX Screener, a
 service that lists the pairs of decentralized exchanges with their prices,
@@ -145,7 +144,7 @@ outside the computer, and neither reads the owner's key file or password.
 
 **The top folder's tests** (`test/`, Node's test runner) cover the runner
 (`apps-script-runner/`), which runs a Sheets script under Node; the Node
-versions; the build step; the menu (`crypto-price-fetchers-menu.gs`), which
+versions; the build step; the menu (`src/crypto-price-fetchers-menu.gs`), which
 runs a spreadsheet's price cells again; the price clients (`dex-prices/`),
 which ask the services that price a token from its chain's pools; the key
 store; `no-secret-logging`, the lint rule that refuses printing a name
@@ -166,7 +165,7 @@ sources, written in the test with their checksums, served by a stand-in
 fetch, and compiled with the real esbuild, the program that compiles
 TypeScript and JavaScript into one file; `test/built-script.test.js`
 checks the joining of parts on short scripts. The menu's tests run
-`crypto-price-fetchers-menu.gs` unchanged against a spreadsheet held in
+`src/crypto-price-fetchers-menu.gs` unchanged against a spreadsheet held in
 memory (`test/helpers/stand-in-spreadsheet.js`), which records each
 formula written. The versions tool's tests run
 it on projects in temp folders, with a stand-in npm that writes the
@@ -186,7 +185,7 @@ folders of their own (`test/helpers/temp-folders.js`), removed when a test
 file ends; `test/fixtures/lp-ranger-api-keys.json`, written by LP Ranger's
 own code, checks that the store opens LP Ranger's files. A test that starts
 a program gives it an environment without `API_KEYS_PASSWORD`, and a key
-file of its own in `API_KEYS_FILE_PATH`. `unlock-api-keys.sh`, the script
+file of its own in `API_KEYS_FILE_PATH`. `bin/unlock-api-keys.sh`, the script
 that keeps the password for a terminal, is tested in
 bash, and in zsh where zsh is installed. `npm run test:coverage` fails below
 80% of lines covered.
@@ -210,7 +209,8 @@ holds the stand-ins:
 - `stand-in-fetch.js` is a stand-in fetch for the tool's own sources: the
   exchange sources, whose Sheets script then runs for real in the runner's
   worker, and the pool sources, whose shared clients then ask it.
-- `stand-in-fetch-preload.js` runs the real command line, `index.js`, in a
+- `stand-in-fetch-preload.js` runs the real command line,
+  `bin/crypto-price-filler.js`, in a
   child process against a stand-in MEXC, a centralized exchange, and a
   stand-in ping of CoinGecko, a service that gathers the exchanges' prices,
   that takes the one key in `stand-in-coingecko-key.js`.
@@ -253,8 +253,8 @@ that this section, or `CLAUDE.md`, names every one.
 | `command-line-help.test.js` | Every command line's help, `--help` and `-h`, and its help into a closed pipe; the list of command lines held to the repo; and the checks of `lib/command-line-help.js`. |
 | `config-file.test.js` | A Node version's config file read, with and without its schemas, and the opened keys laid over its values. |
 | `config-schemas.test.js` | The runner's check of a Node version's schemas of its script's config objects (`configSchemaProblems`), on a small script, `test/fixtures/config-schema-check.gs`; the check run on each Node version's `CONFIG_SCHEMAS`, its script loaded as the build joins it; and a config.json refused for a field read as it loads, an api key, or a value of the wrong kind. |
-| `crypto-price-fetchers-menu.test.js` | The menu (`crypto-price-fetchers-menu.gs`), against a spreadsheet held in memory. |
-| `crypto-price-fetchers.test.js` | `crypto-price-fetchers.js`, the Node version of the script of current prices, and its command line. |
+| `crypto-price-fetchers-menu.test.js` | The menu (`src/crypto-price-fetchers-menu.gs`), against a spreadsheet held in memory. |
+| `crypto-price-fetchers.test.js` | `bin/crypto-price-fetchers.js`, the Node version of the script of current prices, and its command line. |
 | `dex-prices-geckoterminal.test.js` | The GeckoTerminal client, part one: its settings, the budget of requests every caller shares, a token's facts and pools, and the pool it reads a price from. |
 | `dex-prices-geckoterminal-candles.test.js` | The GeckoTerminal client, part two: a pool's candles, page by page, and the candle and price of a time. |
 | `dex-prices-dextools.test.js` | The DexTools client: a token's price now, asked at the plan's path with the key in its header only, a 429 waited out, the errors it throws, which never name the key, and its time limit, against a stand-in server that never answers. |
@@ -267,7 +267,7 @@ that this section, or `CLAUDE.md`, names every one.
 | `github-project-deps-files.test.js` | The versions tool, part two: the package.json files a run reads, and what the package ships for the bin. |
 | `help-page.test.js` | The page the menu's Help item shows. |
 | `http-url.test.js` | `lib/http-url.js`: an http or https url taken, anything else refused. |
-| `key-manager.test.js` | The key store's services, a project's key list, the key manager, and this repo's `manage-api-keys.js`. |
+| `key-manager.test.js` | The key store's services, a project's key list, the key manager, and this repo's `bin/manage-api-keys.js`. |
 | `key-prompts.test.js` | The flows that open the saved keys with one password and save a key once its service takes it. |
 | `load-apps-script.test.js` | A Sheets script loaded into a `vm` context, configured and called, in the test's thread; a config value refused when the script's object has no such field or holds another kind of value there. |
 | `message-of.test.js` | `lib/message-of.js`, and that the package ships `lib/`. |
@@ -283,7 +283,7 @@ that this section, or `CLAUDE.md`, names every one.
 | `summ-csv-values.test.js` | How the Summ CSV writer turns a row's values into the text of cells. |
 | `summ-csv-files.test.js` | The Summ CSV writer, part two: the template it reads, the settings it ships and their schema, the file it writes, its command line, and what the package ships for it. |
 | `time-limited-fetch.test.js` | `lib/time-limited-fetch.js`: an answer read in full, a server that never answers and one that stops in its body, each given up on at the limit with an error naming the service, a caller's own signal that aborts the request, an answer with no body, and a limit that is not a whole number of milliseconds from 1 to 2147483647, as Node's timers keep, refused. |
-| `unlock-api-keys.test.js` | `unlock-api-keys.sh`, in bash, and in zsh where zsh is installed. |
+| `unlock-api-keys.test.js` | `bin/unlock-api-keys.sh`, in bash, and in zsh where zsh is installed. |
 
 Its helpers (`test/helpers/`), besides those the paragraphs above name:
 `captured-output.js`, a stream stand-in that keeps what is written to it,
@@ -296,13 +296,13 @@ stand-ins of both suites answer as MEXC does.
 
 | File | What it covers |
 | ---- | -------------- |
-| `backfill-cli.test.js` | `backfill.js`'s command and run, with stand-ins for `fs`, csv-writer and `loadConfig`. |
+| `backfill-cli.test.js` | `backfill.js`'s command and run, which `bin/backfill.js` starts, with stand-ins for `fs`, csv-writer and `loadConfig`. |
 | `backfill.test.js` | `utils/backfill.js`: the bracketing prices of a run of rows marked `Error`, the fill, the totals, a blank price left as it is, and `backfillChoice`. |
 | `cache.test.js` | `utils/cache.js`, the cache held in memory, with each entry's expiry, aged through the cache's clock (`setCacheClockForTests`). |
-| `coingecko-api-key.test.js` | `index.js` opening the saved CoinGecko key before it prices anything. |
+| `coingecko-api-key.test.js` | The command line, `bin/crypto-price-filler.js`, opening the saved CoinGecko key before it prices anything. |
 | `exchange.test.js` | `sources/exchange.js`: the exchange script's price sources, opened once per run with the run's keys and closed at its end. |
 | `geckoterminal-source.test.js` | `sources/geckoterminal.js`: a token that trades in pools, priced from the GeckoTerminal candle that holds a row's time. |
-| `index.test.js` | The command line's helpers, the time zones and the reading of a date, and the command line, run as a program. |
+| `index.test.js` | The command line's helpers, the time zones and the reading of a date, and the command line, `bin/crypto-price-filler.js`, run as a program. |
 | `known-bugs.test.js` | The known bugs, each declared with `it.fails`. |
 | `mexc-windows.test.js` | The windows the exchange script asks MEXC for: the minute, or for an older time the hour, and, when nothing traded in it, each window up to the year, whose average of high and low then answers; and, when MEXC keeps no candle of the hour, the climb when it keeps one of the day before, or no price when it does not. |
 | `moralis-source.test.js` | `sources/moralis.js`: a token that trades in pools, priced by Moralis at the block its chain had at a row's time. |
@@ -324,11 +324,12 @@ again rather than written again.
 
 A Sheets script is Google Apps Script: JavaScript that runs on Google's
 servers, inside a spreadsheet, where a cell calls one of its functions.
-The repo has two that give prices, and the menu. `crypto-price-fetchers.gs`
-is one file. The exchange script is three:
-`getCryptoPriceFromCentralizedExchange.gs`, its price sources in
+The repo has two that give prices, and the menu, each in `src/`.
+`src/crypto-price-fetchers.gs` is one file. The exchange script is three:
+`src/getCryptoPriceFromCentralizedExchange.gs`, its price sources in
 `-sources.gs`, and its tests in `-tests.gs`. The menu,
-`crypto-price-fetchers-menu.gs`, gives no price and has no Node version.
+`src/crypto-price-fetchers-menu.gs`, gives no price and has no Node
+version.
 
 Two separate sets of tests check the scripts:
 
@@ -403,7 +404,7 @@ The Apps Script tests cover these three.
 
 Node's coverage report lists the `.gs` files, because the runner compiles
 each under its own path. So their lines count toward the top folder's 80%
-floor. The test functions inside `crypto-price-fetchers.gs` never run under
+floor. The test functions inside `src/crypto-price-fetchers.gs` never run under
 Node, so their lines count as not covered. No Node test loads `-tests.gs`,
 so it is not in the report. crypto-price-filler's coverage, from vitest,
 does not count the `.gs` files.
@@ -416,13 +417,13 @@ api keys the scripts read. The owner runs each one by hand, from the Run
 button in the Apps Script editor, and reads its results in the editor's
 log. No automated run calls them.
 
-- **`crypto-price-fetchers.gs`** holds its own. `testDexToolsFunctions`
+- **`src/crypto-price-fetchers.gs`** holds its own. `testDexToolsFunctions`
   asks for the prices and fully diluted values of a few tokens on
   PulseChain, Ethereum and X1, and logs each result. `testDexToolsVerbose`
   runs it with the lock attempts, the raw responses and the cache's state
   logged too.
 - **The exchange script's** are in its third file,
-  `getCryptoPriceFromCentralizedExchange-tests.gs`, which the build step
+  `src/getCryptoPriceFromCentralizedExchange-tests.gs`, which the build step
   puts in the one file with the rest; the sheet needs it for nothing else.
   `test` runs the file's two tests:
   - `testGetCryptoPrice` prices several coins at past dates through
@@ -451,7 +452,7 @@ every file, through secretlint, which looks for keys and credentials.
 | Command | What it runs | What it catches |
 | ------- | ------------ | --------------- |
 | `npm run audit:deps` | `npm audit --audit-level=high --omit=dev`, for the repo and crypto-price-filler, then `npm run audit:dex-screener` and `npm run audit:actionlint` | Known vulnerabilities, of high severity or worse, in the packages that ship; then what the next two rows say. |
-| `npm run audit:dex-screener` | `audit-dex-screener.js`: downloads each file of DEX Screener's Google Sheets functions at the commit `apps-script-build/dex-screener-files.js` names | A file that cannot be downloaded, or whose SHA-256 differs from the one written there. npm audit covers only packages installed from npm, and this code is not one. The build step runs the same audit before it compiles those files. |
+| `npm run audit:dex-screener` | `build/tools/audit-dex-screener.js`: downloads each file of DEX Screener's Google Sheets functions at the commit `build/tools/apps-script-build/dex-screener-files.js` names | A file that cannot be downloaded, or whose SHA-256 differs from the one written there. npm audit covers only packages installed from npm, and this code is not one. The build step runs the same audit before it compiles those files. |
 | `npm run audit:actionlint` | `run-actionlint --check`: downloads every archive of the actionlint release `actionlint/release.js` names | An archive that cannot be downloaded, or whose SHA-256, or its program's, differs from the one written there. npm audit does not cover actionlint, which is no npm package; the lint makes the same checks on the one archive it runs. |
 | `npm run audit:security` | ESLint with `eslint-security.config.js` | Code open to attack (eslint-plugin-security), strings that look like keys (eslint-plugin-no-secrets), and printing a name that may hold a secret (`no-secret-logging`). |
 | `npm run audit:secrets` | secretlint, with `.secretlintrc.json` and `.secretlintignore` | Keys and credentials in any file. |
@@ -474,7 +475,8 @@ things are this repo's own:
 
 `npm run build apps-script`, the build step, joins the Sheets scripts into
 `crypto-price-fetchers.gs`, the one file the owner pastes into a
-spreadsheet's Apps Script project; [The Build Step](architecture.md#the-build-step)
+spreadsheet's Apps Script project, on the clipboard, or in
+`dist/apps-script/` when there is no clipboard tool; [The Build Step](architecture.md#the-build-step)
 in `docs/architecture.md` says how it works. When the owner asks, it also
 compiles DEX Screener's Google Sheets functions into that file.
 

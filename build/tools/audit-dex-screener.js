@@ -1,7 +1,7 @@
 /**
  * The audit of DEX Screener's files: `npm run audit:dex-screener`, which
  * `npm run audit:deps` runs after npm audit.
- * @module audit-dex-screener
+ * @module build/tools/audit-dex-screener
  *
  * What: the build step (`npm run build apps-script`) can put DEX Screener's
  * Google Sheets functions in the file it gives, downloaded from DEX
@@ -16,7 +16,7 @@
  */
 
 import { runDexScreenerAudit } from "./apps-script-build/dex-screener-files.js";
-import { endQuietlyWhenOutputCloses } from "./lib/closed-output.js";
+import { endQuietlyWhenOutputCloses } from "../../lib/closed-output.js";
 
 endQuietlyWhenOutputCloses();
 

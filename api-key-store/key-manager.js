@@ -10,7 +10,7 @@
  *   asks for each key not saved; Enter alone skips one.
  * - `set <service>` asks for one key, in place of the one saved.
  * - `check-password` says whether the password in `API_KEYS_PASSWORD`
- *   opens every key saved. `unlock-api-keys.sh` runs it before it keeps a
+ *   opens every key saved. `bin/unlock-api-keys.sh` runs it before it keeps a
  *   password for a terminal.
  *
  * How:
@@ -28,7 +28,7 @@
  *   prompts and messages to stderr. A key not saved, a password that opens
  *   nothing, or a mistake in the arguments ends with exit code 1.
  *
- * Fit: a project's `manage-api-keys.js` runs `runKeyManager` with its top
+ * Fit: a project's `bin/manage-api-keys.js` runs `runKeyManager` with its top
  * folder.
  */
 
@@ -63,7 +63,7 @@ Examples:
   Replace the saved DexTools key, as after DexTools issues a new one:
     $ npm run api-keys -- set dextools
   Check that the password kept for this terminal opens every saved key:
-    $ source ./unlock-api-keys.sh
+    $ source ./bin/unlock-api-keys.sh
     $ npm run api-keys -- check-password
 
 Exit codes:
@@ -88,7 +88,7 @@ const CHECK_PASSWORD_HELP_AFTER = `
 Examples:
   Check the password kept for this terminal, before a long run that needs
   the keys:
-    $ source ./unlock-api-keys.sh
+    $ source ./bin/unlock-api-keys.sh
     $ npm run api-keys -- check-password
 
 Exit codes:

@@ -33,11 +33,11 @@ import { backfillChoice, backfillPrices } from "../utils/backfill.js";
 import { runCommandLine, runIndexIn } from "./helpers/regression-runs.js";
 import { logLines } from "./helpers/log-lines.js";
 import { saveEncryptedKey } from "../../../api-key-store/key-file.js";
-import { runCommandLine as runPriceNowCommandLine } from "../../../crypto-price-fetchers.js";
+import { runCommandLine as runPriceNowCommandLine } from "../../../bin/crypto-price-fetchers.js";
 import {
   readCentralizedExchangeConfig,
   runCommandLine as runPastPriceCommandLine,
-} from "../../getCryptoPriceFromCentralizedExchange.js";
+} from "../../../bin/getCryptoPriceFromCentralizedExchange.js";
 
 /** crypto-price-filler's folder. */
 const FILLER_DIR = path.resolve(__dirname, "..");
@@ -208,12 +208,12 @@ describe("backfill.js's command line", () => {
 });
 
 describe("the check that the command line loads", () => {
-  it("validate-parse fails when node exits with code 1, as it does when index.js cannot load", () => {
+  it("validate-parse fails when node exits with code 1, as it does when the command line cannot load", () => {
     const scripts = JSON.parse(
       fs.readFileSync(path.resolve(__dirname, "../package.json"), "utf8"),
     ).scripts;
     const command = scripts["validate-parse"].replace(
-      "node index.js --help",
+      "node ../../bin/crypto-price-filler.js --help",
       'node -e "process.exit(1)"',
     );
     expect(command).not.toBe(scripts["validate-parse"]);

@@ -20,15 +20,20 @@ import { reply } from "./sheets-script.js";
 import { mexcKlines } from "../../../../test/helpers/stand-in-mexc.js";
 
 export const FILLER_DIR = fileURLToPath(new URL("../..", import.meta.url));
+
+/** The command line, as its owner runs it: the start file in the repo's bin/. */
+export const COMMAND_LINE = fileURLToPath(
+  new URL("../../../../bin/crypto-price-filler.js", import.meta.url),
+);
 /** The Sheets script's files its function needs, in the order Apps Script loads them. */
 export const SHEETS_SCRIPT_PATH = [
-  "../../../getCryptoPriceFromCentralizedExchange.gs",
-  "../../../getCryptoPriceFromCentralizedExchange-sources.gs",
+  "../../../../src/getCryptoPriceFromCentralizedExchange.gs",
+  "../../../../src/getCryptoPriceFromCentralizedExchange-sources.gs",
 ].map((file) => fileURLToPath(new URL(file, import.meta.url)));
 /** The menu and the DexTools script, as the build joins them, from the repo's top. */
 export const MENU_AND_DEXTOOLS_SCRIPTS = [
-  "../../../../crypto-price-fetchers-menu.gs",
-  "../../../../crypto-price-fetchers.gs",
+  "../../../../src/crypto-price-fetchers-menu.gs",
+  "../../../../src/crypto-price-fetchers.gs",
 ].map((file) => fileURLToPath(new URL(file, import.meta.url)));
 const PRELOAD_URL = new URL("./stand-in-fetch-preload.js", import.meta.url)
   .href;
@@ -124,7 +129,7 @@ export function answerPaprikaBeyondCandles(url) {
 }
 
 /**
- * Runs the command line, `index.js`, over one XTM row (12:30 on 2025-06-15)
+ * Runs the command line, `bin/crypto-price-filler.js`, over one XTM row (12:30 on 2025-06-15)
  * in a child process, with the stand-in MEXC of
  * `helpers/stand-in-fetch-preload.js`, in a temp folder removed afterwards.
  *
@@ -149,7 +154,7 @@ export function runCommandLineForOneRow(options, cwd = FILLER_DIR) {
       [
         "--import",
         PRELOAD_URL,
-        path.join(FILLER_DIR, "index.js"),
+        COMMAND_LINE,
         "--token=xtm",
         `--input=${input}`,
         `--output=${output}`,
@@ -201,7 +206,7 @@ export function runIndexIn(folder, args, standIns = {}) {
       SETTINGS_PRELOAD_URL,
       "--import",
       PRELOAD_URL,
-      path.join(FILLER_DIR, "index.js"),
+      COMMAND_LINE,
       ...args,
     ],
     {
@@ -214,7 +219,7 @@ export function runIndexIn(folder, args, standIns = {}) {
 }
 
 /**
- * Runs the command line, `index.js`, with the arguments given, in a child
+ * Runs the command line, `bin/crypto-price-filler.js`, with the arguments given, in a child
  * process with the stand-in MEXC, and gives back how it ended.
  *
  * @param {string[]} args - The arguments
@@ -223,7 +228,7 @@ export function runIndexIn(folder, args, standIns = {}) {
 export function runCommandLine(args) {
   const run = spawnSync(
     process.execPath,
-    ["--import", PRELOAD_URL, "index.js", ...args],
+    ["--import", PRELOAD_URL, COMMAND_LINE, ...args],
     {
       cwd: FILLER_DIR,
       env: { ...process.env, NODE_ENV: "test" },

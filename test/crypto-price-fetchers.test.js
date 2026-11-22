@@ -1,6 +1,6 @@
 /**
- * Tests for crypto-price-fetchers.js, the Node version of
- * crypto-price-fetchers.gs.
+ * Tests for bin/crypto-price-fetchers.js, the Node version of
+ * src/crypto-price-fetchers.gs.
  * @module test/crypto-price-fetchers.test
  *
  * The real `.gs` runs under the real runner. Its requests go to a stand-in
@@ -25,7 +25,7 @@ import { saveEncryptedKey } from "../api-key-store/index.js";
 import {
   openCryptoPriceFetchers,
   runCommandLine,
-} from "../crypto-price-fetchers.js";
+} from "../bin/crypto-price-fetchers.js";
 import { capturedOutput } from "./helpers/captured-output.js";
 import { standInFetch } from "./helpers/stand-in-web.js";
 import { makeTempFolder, removeTempFolders } from "./helpers/temp-folders.js";
@@ -437,7 +437,7 @@ describe("crypto-price-fetchers.js, the command line", () => {
 
   it("runs as a program: node crypto-price-fetchers.js --help", () => {
     const file = fileURLToPath(
-      new URL("../crypto-price-fetchers.js", import.meta.url),
+      new URL("../bin/crypto-price-fetchers.js", import.meta.url),
     );
     const output = execFileSync(process.execPath, [file, "--help"], {
       encoding: "utf8",

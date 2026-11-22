@@ -31,7 +31,7 @@
  * - The program is written beside its final name and then renamed, so a
  *   run that stops halfway leaves nothing a later run would take.
  *
- * Fit: `run-actionlint.js` at the repo's top is the bin. Each repo's
+ * Fit: `bin/run-actionlint.js` is the bin. Each repo's
  * `npm run lint` runs it on `.github/workflows/*.yml`, and its
  * `npm run audit:deps` runs it with `--check`.
  */

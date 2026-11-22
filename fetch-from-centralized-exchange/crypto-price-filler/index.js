@@ -50,7 +50,7 @@
  * ignores. To save them, in the repo's top folder:
  *   npm run api-keys
  * Each run opens them before it prices anything, with the password in the
- * environment variable API_KEYS_PASSWORD, which `source ./unlock-api-keys.sh`
+ * environment variable API_KEYS_PASSWORD, which `source ./bin/unlock-api-keys.sh`
  * (in the repo's top folder) keeps for a terminal, or else with one it asks for,
  * and asks each service once whether it takes its key. Without a saved CoinGecko key,
  * the tool asks CoinGecko without one; without a CoinPaprika key, CoinPaprika's free
@@ -98,11 +98,11 @@
  * ADDING A NEW DATA SOURCE:
  *
  *   A source that prices a coin by its ticker or a service's coin id (e.g., CryptoCompare,
- *   Binance) belongs in the Sheets script, `../getCryptoPriceFromCentralizedExchange-sources.gs`,
+ *   Binance) belongs in the Sheets script, `src/getCryptoPriceFromCentralizedExchange-sources.gs`,
  *   so the sheet gets it too:
  *   1. Add its function there, and to the script's provider chain
  *   2. Add the function to those `openCentralizedExchangeSources` opens
- *      (`../getCryptoPriceFromCentralizedExchange.js`)
+ *      (`bin/getCryptoPriceFromCentralizedExchange.js`)
  *   3. Ask it in `sources/price.js` as MEXC, CoinGecko and CoinPaprika are asked
  *      (`tryExchangeSource`)
  *
@@ -332,9 +332,6 @@ import { unlockProjectKeys } from "../../api-key-store/index.js";
 import { DateTime } from "luxon";
 
 import { parseArgs } from "./commander.js";
-import { endQuietlyWhenOutputCloses } from "../../lib/closed-output.js";
-
-endQuietlyWhenOutputCloses();
 
 /**
  * Parses the command line, whose check of `--token` reads the token list,

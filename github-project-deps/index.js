@@ -34,7 +34,7 @@
  * - The run ends by naming the version and commit each dependency from
  *   GitHub is installed at, as the new lockfile holds them.
  *
- * Fit: `github-project-deps.js` at the repo's top runs
+ * Fit: `bin/github-project-deps.js` runs
  * `runGithubProjectDeps`, as this package's bin, `github-project-deps`.
  * The projects that install this repo from GitHub run it as
  * `npm run github-project-deps -- main` or `-- release`.

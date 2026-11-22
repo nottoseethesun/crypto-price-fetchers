@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Backfill Batch Job
  * ==================
@@ -26,13 +25,13 @@
  * -----------
  *
  * Basic usage (conservative tax estimates - use highest bracketing price):
- *   node backfill.js --input=output.csv --backfill-highest
+ *   node bin/backfill.js --input=output.csv --backfill-highest
  *
  * Budgeting (avoid over-estimating - use lowest bracketing price):
- *   node backfill.js --input=output.csv --backfill-lowest
+ *   node bin/backfill.js --input=output.csv --backfill-lowest
  *
  * Write to a different file:
- *   node backfill.js --input=output.csv --output=backfilled.csv --backfill-highest
+ *   node bin/backfill.js --input=output.csv --output=backfilled.csv --backfill-highest
  *
  * Command-Line Options
  * --------------------
@@ -60,13 +59,13 @@
  * --------
  *
  *   # Backfill in place with highest price (conservative for taxes)
- *   node backfill.js --input=mining-output.csv --backfill-highest
+ *   node bin/backfill.js --input=mining-output.csv --backfill-highest
  *
  *   # Backfill to new file with lowest price (for budgeting)
- *   node backfill.js --input=output.csv --output=budget.csv --backfill-lowest
+ *   node bin/backfill.js --input=output.csv --output=budget.csv --backfill-lowest
  *
  *   # Verbose mode to see which rows are being filled
- *   node backfill.js --input=output.csv --backfill-highest --verbose
+ *   node bin/backfill.js --input=output.csv --backfill-highest --verbose
  *
  * Exit Codes
  * ----------
@@ -92,8 +91,6 @@ import { parse as csvParse } from "csv-parse/sync";
 import { createObjectCsvWriter } from "csv-writer";
 
 import { loadConfig } from "./config.js";
-import { isEntryPoint } from "../../apps-script-runner/command-line.js";
-import { endQuietlyWhenOutputCloses } from "../../lib/closed-output.js";
 import {
   backfillChoice,
   backfillPrices,
@@ -251,13 +248,13 @@ export function setupBackfillCommander() {
       `
 Examples:
   Backfill in place (conservative tax estimates):
-    $ node backfill.js --input=output.csv --backfill-highest
+    $ node bin/backfill.js --input=output.csv --backfill-highest
 
   Backfill to new file (budgeting):
-    $ node backfill.js --input=output.csv --output=budget.csv --backfill-lowest
+    $ node bin/backfill.js --input=output.csv --output=budget.csv --backfill-lowest
 
   Verbose mode:
-    $ node backfill.js --input=output.csv --backfill-highest --verbose
+    $ node bin/backfill.js --input=output.csv --backfill-highest --verbose
 
 Exit codes:
   0  the output file was written
@@ -332,9 +329,14 @@ export async function runBackfill(options, config = loadConfig()) {
   return stats;
 }
 
-// Main entry point - only run if this is the program node was given
-if (isEntryPoint(import.meta.url)) {
-  endQuietlyWhenOutputCloses();
+/**
+ * Runs the command line: reads the options, backfills the file, and ends
+ * with exit code 1, the error printed, when it cannot. `bin/backfill.js`,
+ * at the repo's top, runs it.
+ *
+ * @returns {Promise<void>} Settles once the run has ended
+ */
+export async function backfillCommandLine() {
   try {
     const args = parseBackfillArgs();
     await runBackfill(args);

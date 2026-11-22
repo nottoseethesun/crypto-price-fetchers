@@ -28,7 +28,7 @@ import {
 /** The DexTools script, at the repo's top. */
 const DEXTOOLS_SCRIPT = path.resolve(
   __dirname,
-  "../../../crypto-price-fetchers.gs",
+  "../../../src/crypto-price-fetchers.gs",
 );
 
 describe("waits inside a custom function", () => {

@@ -14,7 +14,7 @@
  * `raw` as digits. Output goes to the streams a caller gives, so the tests
  * read what a run prints.
  *
- * Fit: `summ-csv.js` at the repo's top runs `runSummCsv`, as
+ * Fit: `bin/summ-csv.js` runs `runSummCsv`, as
  * `npm run summ-csv` and as the bin `summ-csv` of a project that installs
  * this repo.
  */

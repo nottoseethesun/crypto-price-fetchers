@@ -101,7 +101,10 @@ describe("Crypto Price Filler Helpers", () => {
     const { execSync } = require("child_process");
     const path = require("path");
 
-    const indexPath = path.resolve(__dirname, "../index.js");
+    const indexPath = path.resolve(
+      __dirname,
+      "../../../bin/crypto-price-filler.js",
+    );
 
     it("parses and runs --help without crashing (exit 0 expected)", () => {
       const output = execSync(`node ${indexPath} --help`, {

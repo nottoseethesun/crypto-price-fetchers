@@ -8,7 +8,7 @@
  * ping takes one key alone. The key files are in a temp folder, removed
  * afterwards, and `API_KEYS_FILE_PATH` names the one a run reads. The
  * password is typed on the child's stdin, as at a terminal, or kept in
- * `API_KEYS_PASSWORD`, as `unlock-api-keys.sh` keeps it.
+ * `API_KEYS_PASSWORD`, as `bin/unlock-api-keys.sh` keeps it.
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -21,6 +21,10 @@ import { saveEncryptedKey } from "../../../api-key-store/index.js";
 import { STAND_IN_GECKO_KEY } from "./helpers/stand-in-coingecko-key.js";
 
 const FILLER_DIR = path.resolve(__dirname, "..");
+const COMMAND_LINE = path.resolve(
+  __dirname,
+  "../../../bin/crypto-price-filler.js",
+);
 const PRELOAD_URL = pathToFileURL(
   path.resolve(__dirname, "helpers/stand-in-fetch-preload.js"),
 ).href;
@@ -79,7 +83,7 @@ function runReading(keyFile, typed, kept = "") {
     [
       "--import",
       PRELOAD_URL,
-      "index.js",
+      COMMAND_LINE,
       "--token=xtm",
       `--input=${input}`,
       `--output=${output}`,

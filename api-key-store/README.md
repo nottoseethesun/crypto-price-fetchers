@@ -45,12 +45,12 @@ each key, and saves it encrypted once its service takes it:
 
 Without help, each program asks for the password as it starts, which is
 slow when several programs run in turn. `unlock-api-keys.sh`, a copy of
-which is in each project's top folder, asks
+which is in each project's `bin/` folder, asks
 for the password once and keeps it for that terminal in the environment
 variable `API_KEYS_PASSWORD`:
 
 ```bash
-source ./unlock-api-keys.sh
+source ./bin/unlock-api-keys.sh
 ```
 
 It checks that the password opens the keys saved before it keeps it.
@@ -93,20 +93,22 @@ its own key manager and programs:
    `api-keys.json` and `api-keys.json.tmp` to its `.gitignore`. The
    services known are in `services.js`, each with the check that asks it
    whether it takes a key.
-3. Add the key manager, `manage-api-keys.js`, in the top folder, with an
-   npm script `"api-keys": "node manage-api-keys.js"`:
+3. Add the key manager, `manage-api-keys.js`, in the project's `bin/`
+   folder, with an npm script `"api-keys": "node bin/manage-api-keys.js"`:
 
    ```js
    import { fileURLToPath } from "node:url";
    import { runKeyManager } from "crypto-price-fetchers/api-key-store";
 
    process.exitCode = await runKeyManager(process.argv, {
-     projectTop: fileURLToPath(new URL(".", import.meta.url)),
+     projectTop: fileURLToPath(new URL("..", import.meta.url)),
    });
    ```
 
-4. Copy `unlock-api-keys.sh` from this repo's top folder into the
-   project's top folder, and test that the copy matches.
+4. Copy `bin/unlock-api-keys.sh` from this repo into the project's
+   `bin/` folder, and test that the copy matches. The script finds the
+   project's top folder as the one above its own, and runs
+   `bin/manage-api-keys.js` there.
 5. As a program starts, open the keys it uses:
 
    ```js

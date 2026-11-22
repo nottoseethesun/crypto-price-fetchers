@@ -1,12 +1,12 @@
 /**
- * The Node version of crypto-price-fetchers.gs: a token's price and fully
+ * The Node version of src/crypto-price-fetchers.gs: a token's price and fully
  * diluted value (FDV) in USD, from DexTools, or from x1.ninja for X1, for
  * Node programs and the command line.
- * @module crypto-price-fetchers
+ * @module bin/crypto-price-fetchers
  *
  * What: the same answers as the Sheets functions `dexToolsGetTokenPrice`
  * and `dexToolsGetTokenFDV`, worked out by the same code, because this
- * file runs `crypto-price-fetchers.gs` itself, unchanged, through the
+ * file runs `src/crypto-price-fetchers.gs` itself, unchanged, through the
  * shared runner (`apps-script-runner/`). The `.gs` file's header says what
  * the two functions take and return: a number, 0 when there is no data, or
  * a message for the cell.
@@ -18,18 +18,18 @@
  *   DexTools and x1.ninja keys passed to it go to the script as
  *   `DEXTOOLS_CONFIG.API_KEY` and `X1_CONFIG.API_KEY`, which it reads each
  *   time it sends a request.
- * - The command line, `node crypto-price-fetchers.js price <chain> <token>`
+ * - The command line, `node bin/crypto-price-fetchers.js price <chain> <token>`
  *   or `fdv <chain> <token>`, with `--pool <address>` for a pool, prints the
  *   number (`--help` gives the rest). A run on x1 with no `--pool` is
  *   refused before anything is asked, since x1.ninja answers only for a
  *   pool (`checkPoolForX1`). Before it asks for a price, it opens
  *   the key the call sends, from the project's encrypted key file: x1.ninja's
  *   for x1, DexTools' for any other chain (`api-key-store/`). It opens it
- *   with the password in `API_KEYS_PASSWORD`, which `unlock-api-keys.sh`
+ *   with the password in `API_KEYS_PASSWORD`, which `bin/unlock-api-keys.sh`
  *   keeps for a terminal, or asks for the password; with no key saved, the
  *   script sends the placeholder written in it, which the service refuses.
  *   `npm run api-keys` saves the keys.
- * - `config.json` beside this file lists the keys the project's programs
+ * - `config.json` at the repo's top lists the keys the project's programs
  *   use, for the key manager, and may set the fields of `DEXTOOLS_CONFIG`
  *   the script reads each time it is called, which `CONFIG_SCHEMAS` names,
  *   each with its kind of value: the runner checks the file against it
@@ -44,37 +44,37 @@
  * 30-second limit per call and no daily cap on requests. The cache and the
  * time of the last call, which spaces calls out, last while the script is
  * open: one run of the command line. The sheet's menu, which the build
- * step adds from `crypto-price-fetchers-menu.gs`, is not here.
+ * step adds from `src/crypto-price-fetchers-menu.gs`, is not here.
  *
- * Fit: beside `crypto-price-fetchers.gs`, which stays the one copy of the
- * logic, so a fix to it is a fix to both.
+ * Fit: in `bin/`, the programs' folder; `src/crypto-price-fetchers.gs` stays
+ * the one copy of the logic, so a fix to it is a fix to both.
  */
 
 import { fileURLToPath } from "node:url";
-import { unlockProjectKeys } from "./api-key-store/index.js";
-import { KINDS } from "./lib/settings-schema.js";
+import { unlockProjectKeys } from "../api-key-store/index.js";
+import { KINDS } from "../lib/settings-schema.js";
 import {
   CACHE_SECONDS_KIND,
   InvalidArgumentError,
   isEntryPoint,
   openScriptFunctions,
   runScriptCommandLine,
-} from "./apps-script-runner/index.js";
-import { endQuietlyWhenOutputCloses } from "./lib/closed-output.js";
+} from "../apps-script-runner/index.js";
+import { endQuietlyWhenOutputCloses } from "../lib/closed-output.js";
 
 /** The Sheets script this runs. */
 export const SHEETS_SCRIPT = new URL(
-  "./crypto-price-fetchers.gs",
+  "../src/crypto-price-fetchers.gs",
   import.meta.url,
 );
 
 /** The config file read when none is named. */
 export const DEFAULT_CONFIG_FILE = fileURLToPath(
-  new URL("./config.json", import.meta.url),
+  new URL("../config.json", import.meta.url),
 );
 
 /** The project's top folder, which holds its key file. */
-const PROJECT_TOP = fileURLToPath(new URL(".", import.meta.url));
+const PROJECT_TOP = fileURLToPath(new URL("..", import.meta.url));
 
 /** The script's Sheets functions. */
 const FUNCTION_NAMES = ["dexToolsGetTokenPrice", "dexToolsGetTokenFDV"];
@@ -133,7 +133,7 @@ export const APPS_SCRIPT_BUILD = Object.freeze({
  *
  * @param {Object} [options] - How to open it (`openScriptFunctions`)
  * @param {Object<string, Object>} [options.config] - Values for the script's config objects, in place of the config file
- * @param {string} [options.configFile] - A config file in place of `config.json` beside this file
+ * @param {string} [options.configFile] - A config file in place of `config.json` at the repo's top
  * @param {{dextools: (?string|undefined), x1ninja: (?string|undefined)}} [options.apiKeys={}] - The DexTools and x1.ninja keys the script sends, such as `unlockProjectKeys` opens; none when absent
  * @param {function(string, Object): Promise<Response>} [options.fetch] - Does the script's web requests, in place of Node's fetch
  * @param {?function({level: string, text: string}): void} [options.onLog] - Takes each line the script logs
@@ -155,7 +155,7 @@ Api keys:
   DexTools' key, for any chain but x1, and x1.ninja's, for x1, are kept
   encrypted in the project's api-keys.json (npm run api-keys saves them).
   The command opens the one it sends with the password in API_KEYS_PASSWORD,
-  which source ./unlock-api-keys.sh keeps for a terminal, or else asks for
+  which source ./bin/unlock-api-keys.sh keeps for a terminal, or else asks for
   the password on stderr.`;
 
 /** What the help says of the number printed, for the top command and each command. */
@@ -171,28 +171,28 @@ What it prints:
 const EXAMPLES_HELP = `
 Examples:
   USDC's price on Ethereum, from the pools DexTools picks:
-    $ node crypto-price-fetchers.js price ether 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48
+    $ node bin/crypto-price-fetchers.js price ether 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48
   Wrapped XNT's price on X1, in its pool with USDC.X, which x1 needs:
-    $ node crypto-price-fetchers.js price x1 So11111111111111111111111111111111111111112 --pool CAJeVEoSm1QQZccnCqYu9cnNF7TTD2fcUA3E5HQoxRvR
+    $ node bin/crypto-price-fetchers.js price x1 So11111111111111111111111111111111111111112 --pool CAJeVEoSm1QQZccnCqYu9cnNF7TTD2fcUA3E5HQoxRvR
   A token's fully diluted value on PulseChain:
-    $ node crypto-price-fetchers.js fdv pulse 0xF84b84dAAce6Ac00DbBAed26CA32Ff3570Aaf66C`;
+    $ node bin/crypto-price-fetchers.js fdv pulse 0xF84b84dAAce6Ac00DbBAed26CA32Ff3570Aaf66C`;
 
 /** The examples of each command's own help, by its name. */
 const COMMAND_EXAMPLES_HELP = Object.freeze({
   price: `
 Examples:
   USDC's price on Ethereum, from the pools DexTools picks:
-    $ node crypto-price-fetchers.js price ether 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48
+    $ node bin/crypto-price-fetchers.js price ether 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48
   HEX's price on Ethereum, in one of its pools:
-    $ node crypto-price-fetchers.js price ether 0x2b591e99afE9f32eAA6214f7B7629768c40Eeb39 --pool 0x69D91B94f0AaF8e8A2586909fA77A5c2c89818d5
+    $ node bin/crypto-price-fetchers.js price ether 0x2b591e99afE9f32eAA6214f7B7629768c40Eeb39 --pool 0x69D91B94f0AaF8e8A2586909fA77A5c2c89818d5
   Wrapped XNT's price on X1, in its pool with USDC.X, which x1 needs:
-    $ node crypto-price-fetchers.js price x1 So11111111111111111111111111111111111111112 --pool CAJeVEoSm1QQZccnCqYu9cnNF7TTD2fcUA3E5HQoxRvR`,
+    $ node bin/crypto-price-fetchers.js price x1 So11111111111111111111111111111111111111112 --pool CAJeVEoSm1QQZccnCqYu9cnNF7TTD2fcUA3E5HQoxRvR`,
   fdv: `
 Examples:
   A token's fully diluted value on PulseChain:
-    $ node crypto-price-fetchers.js fdv pulse 0xF84b84dAAce6Ac00DbBAed26CA32Ff3570Aaf66C
+    $ node bin/crypto-price-fetchers.js fdv pulse 0xF84b84dAAce6Ac00DbBAed26CA32Ff3570Aaf66C
   The same, with the script's log on stderr, to see what DexTools answered:
-    $ node crypto-price-fetchers.js --verbose fdv pulse 0xF84b84dAAce6Ac00DbBAed26CA32Ff3570Aaf66C`,
+    $ node bin/crypto-price-fetchers.js --verbose fdv pulse 0xF84b84dAAce6Ac00DbBAed26CA32Ff3570Aaf66C`,
 });
 
 /**

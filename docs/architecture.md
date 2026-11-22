@@ -51,19 +51,24 @@ keys encrypted, and the order in which the price clients ask the services
 that price pools follow LP Ranger, the owner's bot that manages his 9mm V3
 liquidity positions.
 
+The programs a reader runs from a terminal are in `bin/`, the Sheets
+scripts in `src/`, the build's tools in `build/tools/`, and the code the
+programs share in folders of its own; the file the build writes when
+there is no clipboard goes to `dist/apps-script/`, which git ignores.
+
 | Part | Where | What it is |
 | ---- | ----- | ---------- |
-| The Sheets scripts | `crypto-price-fetchers.gs`, `fetch-from-centralized-exchange/*.gs`, `crypto-price-fetchers-menu.gs` | Apps Script functions a sheet's cells call, and the menu that runs them again and shows their help. |
+| The Sheets scripts | `src/crypto-price-fetchers.gs`, `src/getCryptoPriceFromCentralizedExchange*.gs`, `src/crypto-price-fetchers-menu.gs` | Apps Script functions a sheet's cells call, and the menu that runs them again and shows their help. |
 | The runner | `apps-script-runner/` | Runs a Sheets script under Node, unchanged. |
-| The Node versions | `crypto-price-fetchers.js`, `fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.js` | Each Sheets script as a Node module and a command line, through the runner. |
-| The build step | `build.js`, `apps-script-build/`, `audit-dex-screener.js` | Joins the Sheets scripts, and DEX Screener's functions when asked, into one file with the saved api keys set at its end, on the clipboard, for one paste into Apps Script; and audits DEX Screener's files. |
-| crypto-price-filler | `fetch-from-centralized-exchange/crypto-price-filler/` | A Node tool that fills a CSV's price columns, row by row, from the pools' price services and the exchange script's sources. A package of its own. |
+| The Node versions | `bin/crypto-price-fetchers.js`, `bin/getCryptoPriceFromCentralizedExchange.js` | Each Sheets script as a Node module and a command line, through the runner. |
+| The build step | `build/tools/build.js`, `build/tools/apps-script-build/`, `build/tools/audit-dex-screener.js` | Joins the Sheets scripts, and DEX Screener's functions when asked, into one file with the saved api keys set at its end, on the clipboard, for one paste into Apps Script; and audits DEX Screener's files. |
+| crypto-price-filler | `fetch-from-centralized-exchange/crypto-price-filler/`, started by `bin/crypto-price-filler.js` and `bin/backfill.js` | A Node tool that fills a CSV's price columns, row by row, from the pools' price services and the exchange script's sources. A package of its own. |
 | The price clients | `dex-prices/` | Moralis, GeckoTerminal and DexTools, which price a token from a blockchain's pools, and the one loop that sends a refused request again. |
-| The key store | `api-key-store/`, `manage-api-keys.js`, `unlock-api-keys.sh` | Api keys kept encrypted with a password: LP Ranger's design, as a module. |
+| The key store | `api-key-store/`, `bin/manage-api-keys.js`, `bin/unlock-api-keys.sh` | Api keys kept encrypted with a password: LP Ranger's design, as a module. |
 | The lint rules | `eslint-rules/` | `no-secret-logging.js`, the security lint's, refuses printing a name that may hold a secret; `no-or-default.js`, the lint's, refuses a default made with `\|\|`. The other repos run both from here. |
-| The versions tool | `github-project-deps.js`, `github-project-deps/` | The bin `github-project-deps`, which sets a project's dependencies from GitHub to their projects' main branch or latest release. |
-| The actionlint runner | `run-actionlint.js`, `actionlint/` | The bin `run-actionlint`, which runs actionlint, the checker of GitHub Actions workflow files, from its official release, refused unless its SHA-256, and the program's in it, are the ones this repo pins: every repo's lint runs it. |
-| The Summ CSV writer | `summ-csv.js`, `summ-csv/` | Writes the CSV files the owner imports into Summ, once every row has passed its rules: `npm run summ-csv`, the bin `summ-csv`, and `writeSummCsv` for a program. |
+| The versions tool | `bin/github-project-deps.js`, `github-project-deps/` | The bin `github-project-deps`, which sets a project's dependencies from GitHub to their projects' main branch or latest release. |
+| The actionlint runner | `bin/run-actionlint.js`, `actionlint/` | The bin `run-actionlint`, which runs actionlint, the checker of GitHub Actions workflow files, from its official release, refused unless its SHA-256, and the program's in it, are the ones this repo pins: every repo's lint runs it. |
+| The Summ CSV writer | `bin/summ-csv.js`, `summ-csv/` | Writes the CSV files the owner imports into Summ, once every row has passed its rules: `npm run summ-csv`, the bin `summ-csv`, and `writeSummCsv` for a program. |
 | The shared helpers | `lib/` | Code more than one part, or more than one repo, uses, exported by the package's name for the projects that install this repo (`exports` in package.json): `messageOf`, which gives the message of something thrown (`crypto-price-fetchers/lib/message-of`); the checks of a command line's help, every option its examples use listed in it among them, and of its help into a closed pipe (`…/lib/command-line-help`); `endQuietlyWhenOutputCloses`, which ends a command line quietly when the program reading its output stops (`…/lib/closed-output`); `dayStartSeconds`, a day of the calendar written YYYY-MM-DD as the start of that day in UTC, refusing a day the calendar does not have (`…/lib/calendar-day`); `isHttpUrl` (`…/lib/http-url`); the checks of a repo's tracked files: EVM addresses in EIP-55's form, the npm targets and test files the docs must name, and the links and paths in the docs, which must point at files, folders and headings the repo keeps (`…/lib/repo-checks`); `fetchWithinTimeLimit`, which sends a request and reads its whole answer within a time limit, naming the service when the time runs out (`…/lib/time-limited-fetch`): the price clients, the runner, the key store's checks and the downloads of actionlint and of DEX Screener's files send their requests through it; the checks of a settings file against its JSON Schema, a description in JSON of the keys the file may hold and the kind of value each takes: the kinds of value, with the words of a refusal (`…/lib/settings-schema`), and `readSettingsFile`, which reads a settings file and checks it against its schema (`…/lib/settings-file`), as [Settings Files](#settings-files) describes; and `checkConflicts`, which refuses a typed option that conflicts with one a settings file sets (`…/lib/option-conflicts`). |
 
 ---
@@ -73,14 +78,14 @@ liquidity positions.
 A Sheets script is Google Apps Script: JavaScript that runs on Google's
 servers, inside a spreadsheet, where a cell calls one of its functions.
 
-`crypto-price-fetchers.gs` gives a token's current price and its fully
+`src/crypto-price-fetchers.gs` gives a token's current price and its fully
 diluted value, from DexTools, a service that prices tokens from the pools
 of decentralized exchanges, for the chains DexTools covers, and from
 x1.ninja, which does the same for X1, which DexTools does not list. A cell
 names the chain and the token, or a pool.
 
-`getCryptoPriceFromCentralizedExchange.gs` gives a token's price at a past
-minute: by default the average of the high and the low of the candle
+`src/getCryptoPriceFromCentralizedExchange.gs` gives a token's price at a
+past minute: by default the average of the high and the low of the candle
 that holds it, or else the candle's high, low or close, from MEXC, a
 centralized exchange, first, then CoinGecko, then CoinPaprika, two
 services that gather the exchanges' prices. MEXC keeps minute candles for
@@ -192,10 +197,10 @@ What differs from the sheet: there is no daily cap on requests, and no
 keeps to its 25 seconds a call (`CALL_BUDGET_MS`) under Node too; the
 cache lasts while the script is open; and the api keys come from the key
 store, not the script. Each Node version lays
-the keys it opens over the script's config: `crypto-price-fetchers.js`
+the keys it opens over the script's config: `bin/crypto-price-fetchers.js`
 opens only the key its call needs, DexTools' or x1.ninja's, for
 `DEXTOOLS_CONFIG.API_KEY` or `X1_CONFIG.API_KEY`;
-`getCryptoPriceFromCentralizedExchange.js` opens CoinGecko's and
+`bin/getCryptoPriceFromCentralizedExchange.js` opens CoinGecko's and
 CoinPaprika's, for `CONFIG.COINGECKO_API_KEY` and
 `CONFIG.COINPAPRIKA_API_KEY`. Its `openCentralizedExchangeSources` opens
 the script's three price sources rather than its Sheets function, for
@@ -209,14 +214,15 @@ A spreadsheet runs its scripts from its Apps Script project, where the
 owner pastes them. Apps Script cannot read the key file, so a key reaches
 a sheet only inside the script pasted there, and it runs every script file
 of a project in one global scope, so the scripts must work as one.
-`npm run build apps-script` (`build.js`, `apps-script-build/`) gives one
+`npm run build apps-script` (`build/tools/build.js`,
+`build/tools/apps-script-build/`) gives one
 file that holds them all, with the keys written in, for one paste.
 
 - **The parts**, in the order they run: the menu
-  (`crypto-price-fetchers-menu.gs`); then each script whose Node version
+  (`src/crypto-price-fetchers-menu.gs`); then each script whose Node version
   exports a build spec, `APPS_SCRIPT_BUILD`, which names the script's
   files in Apps Script's order, the services whose keys it sends, and the
-  function that lays the keys over its config: `crypto-price-fetchers.gs`,
+  function that lays the keys over its config: `src/crypto-price-fetchers.gs`,
   then the exchange script's three files, its in-editor tests included;
   then DEX Screener's functions, when the owner asks for them.
 - **DEX Screener's functions.** DEX Screener, a service that lists the pairs
@@ -239,7 +245,7 @@ file that holds them all, with the keys written in, for one paste.
   the build with the advice to run it again and answer n. npm audit, npm's
   check of the installed packages against known vulnerabilities, does not
   cover that code, so `npm run audit:dex-screener`
-  (`audit-dex-screener.js`), which `npm run audit:deps` runs after npm
+  (`build/tools/audit-dex-screener.js`), which `npm run audit:deps` runs after npm
   audit, runs the same audit on its own.
 - **The values.** The build opens the keys as the programs do
   (`unlockProjectKeys`), and sets, as the file's last statements, the
@@ -263,7 +269,7 @@ file that holds them all, with the keys written in, for one paste.
   and clears the clipboard. With no tool installed, it offers to install
   one with `sudo apt install`, the installer of Debian and Ubuntu Linux;
   declined, it warns that the keys go to disk in the clear, then writes the
-  file to `build/apps-script/`, which git, the version-control program that
+  file to `dist/apps-script/`, which git, the version-control program that
   keeps the repo's history, ignores, readable by the owner alone.
 
 No line it prints holds a key.
@@ -287,8 +293,9 @@ price, for as many rows as the file holds, asking its sources in turn
    price asked and closed at the end of the run.
 
 As it starts, it opens the CoinGecko, CoinPaprika and Moralis keys from the
-key store, each one saved. `backfill.js` fills the prices marked `Error`
-in a file already written.
+key store, each one saved. Its backfill, `backfill.js`, started by
+`bin/backfill.js`, fills the prices marked `Error` in a file already
+written.
 
 Its settings are `config-example.json`, committed, with its own
 `config.json`, which git ignores, laid over them, and its tokens are those
@@ -359,7 +366,7 @@ each opens a file the other wrote.
 - `npm run api-keys`, the key manager (`key-manager.js`), lists the keys,
   saved or not, never showing a key's characters, and saves each key typed
   once its service takes it (`services.js` holds each service's check).
-- `source ./unlock-api-keys.sh`, a script in the repo's top folder, asks
+- `source ./bin/unlock-api-keys.sh`, a script in the repo's `bin/`, asks
   for the password once, checks that it opens the keys saved, and keeps it
   for that terminal in `API_KEYS_PASSWORD`.
 - A program calls `unlockProjectKeys` as it starts. It opens the keys it
@@ -471,7 +478,7 @@ The settings files of this repo, and the schemas they are held to:
 | File | Schema | Read by |
 | --- | --- | --- |
 | `config.json`, its `apiKeys` | `apiKeysSchema` in `api-key-store/project-keys.js`: a list of services the key store knows, each once; it reads no other key, since every other key of the file is the project's | The key store, for any project |
-| A Node version's `config.json` | `CONFIG_SCHEMAS` in the Node version (`crypto-price-fetchers.js`, `fetch-from-centralized-exchange/getCryptoPriceFromCentralizedExchange.js`), which it passes to the runner and the build as `configSchemas`: for each config object it names, every field the script reads each time it is called, of its kind of value. An api key, which the key store sets, and a field the script reads as it loads, which a value laid after the load does not reach, are refused. The runner's `configSchemaProblems` (`apps-script-runner/config-schema-check.js`) holds each schema to its script: it loads the script with each config object watched, and names a field a schema names that the script reads as it loads, holds a key or lacks, a field read only when called that no schema names, and a value of the script's own that its schema refuses; `test/config-schemas.test.js` runs it on each Node version | The runner, before the script opens (`apps-script-runner/config-file.js`), and the build step, before its first question |
+| A Node version's `config.json` | `CONFIG_SCHEMAS` in the Node version (`bin/crypto-price-fetchers.js`, `bin/getCryptoPriceFromCentralizedExchange.js`), which it passes to the runner and the build as `configSchemas`: for each config object it names, every field the script reads each time it is called, of its kind of value. An api key, which the key store sets, and a field the script reads as it loads, which a value laid after the load does not reach, are refused. The runner's `configSchemaProblems` (`apps-script-runner/config-schema-check.js`) holds each schema to its script: it loads the script with each config object watched, and names a field a schema names that the script reads as it loads, holds a key or lacks, a field read only when called that no schema names, and a value of the script's own that its schema refuses; `test/config-schemas.test.js` runs it on each Node version | The runner, before the script opens (`apps-script-runner/config-file.js`), and the build step, before its first question |
 | `crypto-price-filler/config-example.json`, `crypto-price-filler/config.json` | `SETTINGS_SCHEMA` in `config.js` | crypto-price-filler |
 | `crypto-price-filler/supported-tokens.json` | `SUPPORTED_TOKENS_SCHEMA` in `supported-tokens.js` | crypto-price-filler |
 | `summ-csv/settings.json` | `SUMM_CSV_SETTINGS_SCHEMA` in `summ-csv/index.js` | The Summ CSV writer |
@@ -509,8 +516,8 @@ dependency their `npm install` installs:
   endpoint through `fetchWithinTimeLimit`.
 
 All three use the key store, run `no-secret-logging` in their security
-lint, keep a copy of `unlock-api-keys.sh`, which their tests hold to this
-one, run the versions tool, run actionlint on their workflow files
+lint, keep a copy of `bin/unlock-api-keys.sh` in their own `bin/`, which
+their tests hold to this one, run the versions tool, run actionlint on their workflow files
 through `run-actionlint`, run `no-or-default` in their lint, use helpers
 of `lib/` in their command lines, and run the shared checks of `lib/` in
 their tests.
@@ -525,7 +532,7 @@ that moment, and the lockfile keeps that commit, which `npm ci` installs
 until the lockfile is made again. So a change here reaches a project once
 its lockfile is made again at a commit that has the change.
 
-The bin `github-project-deps` (`github-project-deps.js`,
+The bin `github-project-deps` (`bin/github-project-deps.js`,
 `github-project-deps/`) makes it again: a project runs it as
 `npm run github-project-deps -- main` or `-- release`. It sets every
 dependency the project installs from GitHub to the mode's ref, in each

@@ -1,7 +1,7 @@
 /**
  * Tests for the key store's services, a project's key list, and the key
  * manager: `api-key-store/services.js`, `project-keys.js`,
- * `key-manager.js`, and this project's `manage-api-keys.js`.
+ * `key-manager.js`, and this project's `bin/manage-api-keys.js`.
  * @module test/key-manager.test
  *
  * The services answer through a stand-in fetch (`helpers/stand-in-web.js`)
@@ -341,7 +341,7 @@ describe("runKeyManager", () => {
     const stdout = capturedOutput();
     const stderr = capturedOutput();
     const exitCode = await runKeyManager(
-      ["node", "manage-api-keys.js", ...args],
+      ["node", "bin/manage-api-keys.js", ...args],
       { projectTop: top, known: standInServices() },
       { env, ...deps, stdout, stderr },
     );
@@ -444,7 +444,7 @@ describe("runKeyManager", () => {
       exitCode: 1,
       stdout: "",
       stderr:
-        "API_KEYS_PASSWORD is not set. source ./unlock-api-keys.sh asks for the password and sets it.\n",
+        "API_KEYS_PASSWORD is not set. source ./bin/unlock-api-keys.sh asks for the password and sets it.\n",
     });
     env.API_KEYS_PASSWORD = "pw";
     assert.deepEqual(await manage(["check-password"], {}), {
@@ -492,9 +492,9 @@ describe("runKeyManager", () => {
   });
 });
 
-describe("manage-api-keys.js, as a program", () => {
+describe("bin/manage-api-keys.js, as a program", () => {
   /**
-   * Runs `node manage-api-keys.js`, with a key file of its own and no
+   * Runs `node bin/manage-api-keys.js`, with a key file of its own and no
    * password kept, typing `typed` on its stdin.
    *
    * @param {string[]} args - The arguments
@@ -510,7 +510,7 @@ describe("manage-api-keys.js, as a program", () => {
     delete env.API_KEYS_PASSWORD;
     return spawnSync(
       process.execPath,
-      [path.join(REPO_TOP, "manage-api-keys.js"), ...args],
+      [path.join(REPO_TOP, "bin", "manage-api-keys.js"), ...args],
       {
         env,
         input: typed,
