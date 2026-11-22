@@ -20,8 +20,6 @@
 import { describe, it, expect } from "vitest";
 import path from "path";
 import { loadSheetsScript } from "./helpers/sheets-script.js";
-import { answerCoinGeckoForPastDay } from "./helpers/regression-runs.js";
-import { mexcKlines } from "../../../test/helpers/stand-in-mexc.js";
 
 /** How long Google lets a custom function run before it stops it. */
 const CUSTOM_FUNCTION_LIMIT_MS = 30000;
@@ -86,31 +84,6 @@ describe("waits inside a custom function", () => {
       const waited = [...waits, ...sleeps].reduce((sum, ms) => sum + ms, 0);
       expect(waits.length).toBeGreaterThan(0);
       expect(waited).toBeLessThanOrEqual(CUSTOM_FUNCTION_LIMIT_MS);
-    },
-  );
-});
-
-describe("the exchange script on the day MEXC lists a pair", () => {
-  it.fails(
-    "getCryptoPrice asks CoinGecko for a time before the first trade on the listing day, rather than pricing it from the later trades of the 4 hours that hold it",
-    () => {
-      const firstTrade = Date.UTC(2025, 8, 1, 14, 0);
-      const script = loadSheetsScript(EXCHANGE_SCRIPT, (url) => {
-        if (url.includes("/exchangeInfo"))
-          return {
-            symbols: [
-              { symbol: "XTMUSDT", baseAsset: "XTM", quoteAsset: "USDT" },
-            ],
-          };
-        if (url.includes("/klines"))
-          return mexcKlines(url, (open, end) =>
-            end >= firstTrade ? ["0.10", "0.30", "0.10", "0.20", "10"] : null,
-          );
-        return answerCoinGeckoForPastDay(url);
-      });
-      expect(
-        script.getCryptoPrice("xtm", "2025-09-01 13:30:00", "UTC", "close"),
-      ).toBe(1.23);
     },
   );
 });

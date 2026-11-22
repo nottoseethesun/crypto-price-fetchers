@@ -212,7 +212,8 @@
  *
  *   How it works:
  *   - Finds contiguous blocks of Error prices
- *   - Looks at the valid prices immediately before and after the block
+ *   - Looks at the nearest valid price before the block and after it, past
+ *     any row with no price
  *   - Fills with the higher (--backfill-highest) or lower (--backfill-lowest) of the two
  *   - If only one bracketing price exists (start/end of file), uses that price
  *   - Recalculates USD amounts and grand totals after backfilling
