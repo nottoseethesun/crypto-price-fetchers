@@ -16,6 +16,7 @@ import * as moralis from "../sources/moralis.js";
 import * as geckoterminal from "../sources/geckoterminal.js";
 import * as cacheModule from "../utils/cache.js";
 import fs from "fs";
+import { logLines } from "./helpers/log-lines.js";
 
 vi.mock("../sources/exchange.js", () => ({
   exchangeSources: vi.fn(),
@@ -326,26 +327,20 @@ describe("Price Fetching Orchestration", () => {
 
     describe("verbose logging", () => {
       it("logs which source answered when verbose is enabled", async () => {
-        const consoleSpy = vi
-          .spyOn(console, "log")
-          .mockImplementation(() => {});
+        const printed = logLines();
         sources.getPriceFromCoinPaprika.mockResolvedValueOnce(0.006);
         await priceOf("grc", "high", { verbose: true });
-        const lines = consoleSpy.mock.calls.map(([line]) => line);
+        const lines = printed.mock.calls.map(([line]) => line);
         expect(lines).toContain("[VERBOSE:1] MEXC skipped since set to null");
         expect(lines).toContain(
           "[VERBOSE:1] CoinPaprika success - price: 0.006",
         );
-        consoleSpy.mockRestore();
       });
 
       it("does not log when verbose is disabled", async () => {
-        const consoleSpy = vi
-          .spyOn(console, "log")
-          .mockImplementation(() => {});
+        const printed = logLines();
         await priceOf("btc");
-        expect(consoleSpy).not.toHaveBeenCalled();
-        consoleSpy.mockRestore();
+        expect(printed).not.toHaveBeenCalled();
       });
     });
 

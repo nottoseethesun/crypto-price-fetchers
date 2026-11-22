@@ -10,6 +10,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import fs from "fs";
 import { runBackfill, setupBackfillCommander } from "../backfill.js";
 import { loadConfig } from "../config.js";
+import { logLines } from "./helpers/log-lines.js";
 
 // Mock fs module
 vi.mock("fs", async (importOriginal) => {
@@ -100,7 +101,7 @@ describe("backfill.js CLI", () => {
 
   describe("runBackfill", () => {
     it("processes CSV file with backfill-highest", async () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      logLines();
 
       const stats = await runBackfill({
         input: "test.csv",
@@ -110,12 +111,10 @@ describe("backfill.js CLI", () => {
       expect(stats.totalRows).toBe(3);
       expect(stats.blocksFound).toBe(1);
       expect(stats.emptyRowsFilled).toBe(1);
-
-      consoleSpy.mockRestore();
     });
 
     it("processes CSV file with backfill-lowest", async () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      logLines();
 
       const stats = await runBackfill({
         input: "test.csv",
@@ -125,8 +124,6 @@ describe("backfill.js CLI", () => {
       expect(stats.totalRows).toBe(3);
       expect(stats.blocksFound).toBe(1);
       expect(stats.emptyRowsFilled).toBe(1);
-
-      consoleSpy.mockRestore();
     });
 
     it("throws error when neither backfill option is specified", async () => {
@@ -162,7 +159,7 @@ describe("backfill.js CLI", () => {
     it("takes its mode from the settings config.js reads when no flag is given", async () => {
       mockLoadConfig.mockReturnValue({ BACKFILL_HIGHEST: true });
 
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      logLines();
 
       // Should succeed without explicit backfill flag because config has it set
       const stats = await runBackfill({
@@ -171,12 +168,10 @@ describe("backfill.js CLI", () => {
 
       expect(stats.emptyRowsFilled).toBe(1);
       expect(mockLoadConfig).toHaveBeenCalledTimes(1);
-
-      consoleSpy.mockRestore();
     });
 
     it("expands ~ in input path", async () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      logLines();
 
       await runBackfill({
         input: "~/test.csv",
@@ -184,11 +179,10 @@ describe("backfill.js CLI", () => {
       });
 
       // Should not throw - the path expansion happens internally
-      consoleSpy.mockRestore();
     });
 
     it("defaults output to input file", async () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const printed = logLines();
 
       await runBackfill({
         input: "test.csv",
@@ -196,16 +190,14 @@ describe("backfill.js CLI", () => {
       });
 
       // Check that output message mentions the same file
-      const outputLog = consoleSpy.mock.calls.find((c) =>
+      const outputLog = printed.mock.calls.find((c) =>
         c[0].includes("Output written"),
       );
       expect(outputLog[0]).toContain("test.csv");
-
-      consoleSpy.mockRestore();
     });
 
     it("uses specified output file", async () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const printed = logLines();
 
       await runBackfill({
         input: "test.csv",
@@ -213,16 +205,14 @@ describe("backfill.js CLI", () => {
         backfillHighest: true,
       });
 
-      const outputLog = consoleSpy.mock.calls.find((c) =>
+      const outputLog = printed.mock.calls.find((c) =>
         c[0].includes("Output written"),
       );
       expect(outputLog[0]).toContain("backfilled.csv");
-
-      consoleSpy.mockRestore();
     });
 
     it("handles verbose mode", async () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const printed = logLines();
 
       await runBackfill({
         input: "test.csv",
@@ -230,12 +220,10 @@ describe("backfill.js CLI", () => {
         verbose: true,
       });
 
-      const verboseLogs = consoleSpy.mock.calls.filter(
+      const verboseLogs = printed.mock.calls.filter(
         (c) => c[0] && c[0].includes && c[0].includes("[VERBOSE"),
       );
       expect(verboseLogs.length).toBeGreaterThan(0);
-
-      consoleSpy.mockRestore();
     });
 
     it("stops, saying why, when the settings cannot be read, even with a flag given", async () => {
@@ -259,7 +247,7 @@ describe("backfill.js CLI", () => {
 
       mockReadFileSync.mockReturnValue(customCsv);
 
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      logLines();
 
       const stats = await runBackfill({
         input: "test.csv",
@@ -267,8 +255,6 @@ describe("backfill.js CLI", () => {
       });
 
       expect(stats.emptyRowsFilled).toBe(1);
-
-      consoleSpy.mockRestore();
     });
   });
 });

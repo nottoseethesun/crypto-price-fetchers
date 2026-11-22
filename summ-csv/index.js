@@ -29,7 +29,8 @@
  *
  * Fit: other repos install this one from GitHub and import
  * `crypto-price-fetchers/summ-csv` to write such a file from their own
- * code. `summ-csv/command-line.js` runs it for
+ * code, and its `decimalFromRaw` to write an amount held in a token's
+ * smallest units as decimal text, for decimals from 0 to 255. `summ-csv/command-line.js` runs it for
  * `npm run summ-csv`, and for the bin `summ-csv` of a project that
  * installs this repo.
  */
@@ -40,6 +41,7 @@ import { readSettingsFile } from "../lib/settings-file.js";
 import { KINDS } from "../lib/settings-schema.js";
 import { SUMM_COLUMNS, columnKeysOf } from "./columns.js";
 import { chainOf, gasProblems, rowProblems } from "./rules.js";
+export { decimalFromRaw } from "./values.js";
 import {
   ALPHABET_NAMES,
   amountText,

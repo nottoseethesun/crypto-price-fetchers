@@ -120,7 +120,10 @@ writeSummCsv({
 throws an error whose `problems` lists each problem with its row, counted
 from 1, and whose message lists them too. `summCsvText(rows, header)` gives
 the file's text without writing it, and `readTemplateHeader(path)` gives a
-template's header.
+template's header. `decimalFromRaw(raw, decimals)` writes an amount held
+as a whole number of a token's smallest units as decimal text, its
+trailing zeros dropped, for decimals from 0 to 255, as a row's amounts are
+written; no digit passes through a JavaScript number.
 
 ### From a project that installs this repo
 

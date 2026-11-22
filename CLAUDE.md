@@ -410,6 +410,8 @@ functions inside the scripts that the owner runs by hand. crypto-price-filler's
 - `regression-runs.js` holds the settings, stand-in answers and runs that
   `tests/regressions.test.js` and `tests/regressions-sheets.test.js`
   share.
+- `log-lines.js` reads the lines the tool prints through its log's seam
+  (`utils/log.js`), so no test replaces `console.log`.
 
 ## Known bugs
 

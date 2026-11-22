@@ -223,6 +223,10 @@ holds the stand-ins:
   CoinGecko and CoinPaprika give them, the command line run over one row
   in a child process, and a call run with the computer's time zone set to
   another.
+- `log-lines.js` reads the lines the tool prints through the seam of its
+  log, `utils/log.js`, a mock function in place of the console's log until
+  the test ends, so no test replaces `console.log`, as LP Ranger's rules
+  ask.
 
 ### Test Files
 
@@ -269,7 +273,7 @@ that this section, or `CLAUDE.md`, names every one.
 | `repo-checks.test.js` | `lib/repo-checks.js`, on repos made in temp folders, and this repo held to it: its EVM addresses in EIP-55's form, its npm targets and test files named in the docs, and its docs' links and paths pointing at the files, folders and headings it keeps. |
 | `run-apps-script.test.js` | `openAppsScript`: a Sheets script run in a worker thread, with its web requests done on the caller's thread. |
 | `settings-file.test.js` | `lib/settings-file.js`: a settings file's JSON object read whole; a missing file giving no settings unless it is required; a file it cannot read, one that is not JSON and JSON that is no object refused, naming the file; and a file its schema finds problems in refused, listing every problem. |
-| `settings-schema.test.js` | `lib/settings-schema.js`: a schema compiled strict, with the shared formats and a project's own; every problem in a file named at once, in the words of its kind; a value no shape of a choice fits refused in one line; a key another needs named missing; a key its object's `propertyNames` refuses named as the key; the kinds of a time limit, up to the longest Node's timers keep; and an option parser made from a kind. |
+| `settings-schema.test.js` | `lib/settings-schema.js`: a schema compiled strict, with the shared formats and a project's own; every problem in a file named at once, in the words of its kind; a value no shape of a choice fits refused in one line; a key another needs named missing; a key its object's `propertyNames` refuses named as the key; the kinds of a time limit and of a wait, up to the longest Node's timers keep; and an option parser made from a kind. |
 | `summ-csv.test.js` | The Summ CSV writer, part one: a header's columns, the rules a row must pass, and the text of a file. |
 | `summ-csv-values.test.js` | How the Summ CSV writer turns a row's values into the text of cells. |
 | `summ-csv-files.test.js` | The Summ CSV writer, part two: the template it reads, the settings it ships and their schema, the file it writes, its command line, and what the package ships for it. |
@@ -302,7 +306,7 @@ stand-ins of both suites answer as MEXC does.
 | `regressions.test.js` | The fixed bugs of the tool, its Sheets script and the menu. |
 | `regressions-command-line.test.js` | The fixed bugs of the two command lines: their checks of a value, the settings they fall back to, a settings file or token list they cannot take refused as one error, what `index.js` logs, `validate-parse` failing when node does not exit with code 0, and backfill leaving the rows that hold no data, such as a Total row, out of the fill and the grand total, and bracketing a block of `Error` prices with the nearest priced rows past them; `test:ci` and `test:debug` giving vitest their flags; and an input file not found, or with no rows, named. |
 | `regressions-lib.test.js` | The fixed bugs of the repo's shared helpers in `lib/`: a schema compiled once, the words for an empty text and an empty list, the search for command lines, and a time limit Node's timers cannot keep refused. |
-| `regressions-sheets.test.js` | Fixed bugs whose tests run a Sheets script in the test's thread: the exchange script's pairs quoted in `CONFIG.QUOTE_CURRENCY`; a cell's own cache seconds outside 1 to 21600 refused with a message before any request, an empty cell taking the config's; each token's own FDV when two cells name one pool, and an answer kept for one cell's seconds never given to a cell with others; and a time before MEXC listed a pair priced by CoinGecko, on an earlier day, before the first trade on the listing day, or, for a recent time, before it in the listing hour, while a time after it still climbs MEXC's windows, as does a recent time whose minute request fails or whose minute MEXC let go in the hour its minute candles begin in. |
+| `regressions-sheets.test.js` | Fixed bugs whose tests run a Sheets script in the test's thread: the exchange script's pairs quoted in `CONFIG.QUOTE_CURRENCY`; a cell's own cache seconds outside 1 to 21600 refused with a message before any request, an empty cell taking the config's; each token's own FDV when two cells name one pool, and an answer kept for one cell's seconds never given to a cell with others; and a time before MEXC listed a pair priced by CoinGecko, on an earlier day, before the first trade on the listing day, or, for a recent time, before it in the listing hour, while a time after it still climbs MEXC's windows, as does a recent time whose minute request fails or whose minute MEXC let go in the hour its minute candles begin in; and a failed request for the day before, or for the day, which the script goes on past rather than take for no candle. |
 | `settings-files.test.js` | `config.js` and `supported-tokens.js`: the committed settings and token list held to their schemas, the owner's `config.json` laid over the committed settings, and files with a key no schema names or a value of the wrong kind refused, listing every problem. |
 | `sheets-sources.test.js` | The exchange script's sources, MEXC, CoinGecko and CoinPaprika, which the sheet and the tool both price with. |
 | `token-validation.test.js` | A token with no sources refused, naming the tokens the tool supports. |

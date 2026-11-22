@@ -3,7 +3,7 @@
  * @module tests/backfill.test
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   backfillChoice,
   backfillPrices,
@@ -11,6 +11,7 @@ import {
   DEFAULT_COLUMNS,
 } from "../utils/backfill.js";
 import { logv } from "../utils/log.js";
+import { logLines } from "./helpers/log-lines.js";
 
 // Helper to create test rows
 function createRow(price, amount = "10") {
@@ -35,43 +36,39 @@ const defaultOptions = {
 describe("utils/backfill", () => {
   describe("logv", () => {
     it("logs when shouldLog is true and level >= 1", () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const printed = logLines();
 
       logv(true, 1, "Test message", "arg1", "arg2");
 
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(printed).toHaveBeenCalledWith(
         "[VERBOSE:1] Test message",
         "arg1",
         "arg2",
       );
-      consoleSpy.mockRestore();
     });
 
     it("does not log when shouldLog is false", () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const printed = logLines();
 
       logv(false, 1, "Test message");
 
-      expect(consoleSpy).not.toHaveBeenCalled();
-      consoleSpy.mockRestore();
+      expect(printed).not.toHaveBeenCalled();
     });
 
     it("does not log when level is 0", () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const printed = logLines();
 
       logv(true, 0, "Test message");
 
-      expect(consoleSpy).not.toHaveBeenCalled();
-      consoleSpy.mockRestore();
+      expect(printed).not.toHaveBeenCalled();
     });
 
     it("logs with correct level prefix", () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const printed = logLines();
 
       logv(true, 3, "Level 3 message");
 
-      expect(consoleSpy).toHaveBeenCalledWith("[VERBOSE:3] Level 3 message");
-      consoleSpy.mockRestore();
+      expect(printed).toHaveBeenCalledWith("[VERBOSE:3] Level 3 message");
     });
   });
 
@@ -375,9 +372,7 @@ describe("utils/backfill", () => {
 
     describe("verbose logging", () => {
       it("logs when verbose is enabled", () => {
-        const consoleSpy = vi
-          .spyOn(console, "log")
-          .mockImplementation(() => {});
+        const printed = logLines();
         const rows = [createRow(10), createRow("Error"), createRow(20)];
 
         backfillPrices(rows, {
@@ -386,13 +381,11 @@ describe("utils/backfill", () => {
           verbose: true,
         });
 
-        expect(consoleSpy).toHaveBeenCalled();
-        const logCalls = consoleSpy.mock.calls.map((c) => c[0]);
+        expect(printed).toHaveBeenCalled();
+        const logCalls = printed.mock.calls.map((c) => c[0]);
         expect(logCalls.some((msg) => msg.includes("Backfilling rows"))).toBe(
           true,
         );
-
-        consoleSpy.mockRestore();
       });
     });
   });
