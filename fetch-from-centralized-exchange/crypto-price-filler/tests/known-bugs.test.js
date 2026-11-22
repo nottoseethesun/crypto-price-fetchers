@@ -13,12 +13,14 @@
  *
  * The Sheets scripts run unchanged in the test's thread, through
  * `tests/helpers/sheets-script.js`, with a stand-in for the Apps Script
- * service each test is about: the script lock.
+ * service each test is about: the script lock, or MEXC's answers, given as
+ * MEXC gives them (`test/helpers/stand-in-mexc.js`).
  */
 
 import { describe, it, expect } from "vitest";
 import path from "path";
 import { loadSheetsScript } from "./helpers/sheets-script.js";
+import { mexcKlines } from "../../../test/helpers/stand-in-mexc.js";
 
 /** How long Google lets a custom function run before it stops it. */
 const CUSTOM_FUNCTION_LIMIT_MS = 30000;
@@ -83,6 +85,38 @@ describe("waits inside a custom function", () => {
       const waited = [...waits, ...sleeps].reduce((sum, ms) => sum + ms, 0);
       expect(waits.length).toBeGreaterThan(0);
       expect(waited).toBeLessThanOrEqual(CUSTOM_FUNCTION_LIMIT_MS);
+    },
+  );
+});
+
+describe("the exchange script's quote currency", () => {
+  it.fails(
+    "getPriceFromMEXC asks for the pairs quoted in CONFIG.QUOTE_CURRENCY, the token's and BTC's",
+    () => {
+      const symbols = [];
+      const script = loadSheetsScript(
+        EXCHANGE_SCRIPT,
+        (url) => {
+          if (url.includes("/exchangeInfo")) {
+            return {
+              symbols: [
+                { baseAsset: "ABC", quoteAsset: "USDT" },
+                { baseAsset: "ABC", quoteAsset: "USDC" },
+                { baseAsset: "XYZ", quoteAsset: "BTC" },
+                { baseAsset: "BTC", quoteAsset: "USDT" },
+                { baseAsset: "BTC", quoteAsset: "USDC" },
+              ],
+            };
+          }
+          symbols.push(new URL(url).searchParams.get("symbol"));
+          return mexcKlines(url, ["1.20", "1.60", "0.60", "1.20", "5"]);
+        },
+        { config: { CONFIG: { QUOTE_CURRENCY: "USDC" } } },
+      );
+      const time = Date.UTC(2025, 5, 15, 12, 30);
+      script.getPriceFromMEXC("abc", time, "close");
+      script.getPriceFromMEXC("xyz", time, "close");
+      expect([...new Set(symbols)]).toEqual(["ABCUSDC", "XYZBTC", "BTCUSDC"]);
     },
   );
 });
