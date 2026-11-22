@@ -19,8 +19,9 @@
  * limit, the answer's body included.
  *
  * Fit: pulsechain-analytics' ratio chart, which charts the ratio of two
- * tokens' prices, asks it for each token's current price when GeckoTerminal
- * has no candles, as `crypto-price-fetchers/dex-prices/dextools`. The key
+ * tokens' prices, asks it for each token's current price when the candles
+ * of the chart's source, Moralis or GeckoTerminal, cannot be had, as
+ * `crypto-price-fetchers/dex-prices/dextools`. The key
  * comes from the project's key store (`api-key-store/`), whose check of a
  * DexTools key (`api-key-store/services.js`) asks the same api, at
  * `DEXTOOLS_API_URL`.

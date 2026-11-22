@@ -40,6 +40,7 @@
 import { createHash } from "node:crypto";
 import { Command, CommanderError } from "commander";
 import { messageOf } from "../lib/message-of.js";
+import { fetchWithinTimeLimit } from "../lib/time-limited-fetch.js";
 
 /** How long one download may take, in milliseconds, before it is stopped. */
 export const DOWNLOAD_LIMIT_MS = 30_000;
@@ -142,20 +143,6 @@ export function urlOf(version, file) {
 }
 
 /**
- * Why a download failed, in words: the time limit when it stopped the
- * download, the error's own message otherwise.
- *
- * @param {Error} error - What the download threw
- * @param {number} limitMs - The download's time limit, in milliseconds
- * @returns {string} The reason
- */
-function downloadFailure(error, limitMs) {
-  return error.name === "TimeoutError"
-    ? `no answer within ${limitMs / 1000} seconds`
-    : error.message;
-}
-
-/**
  * Downloads one of the version's files, within a time limit, and checks
  * its SHA-256.
  *
@@ -176,15 +163,17 @@ async function downloadChecked(version, file, fetch, limitMs) {
   const url = urlOf(version, file);
   let text;
   try {
-    const signal = AbortSignal.timeout(limitMs);
-    const response = await fetch(url, { signal });
+    const response = await fetchWithinTimeLimit(
+      url,
+      {},
+      { timeoutMs: limitMs, name: "GitHub", fetch },
+    );
     if (!response.ok) throw new Error(`status ${response.status}`);
     text = await response.text();
   } catch (error) {
-    throw new Error(
-      `Could not download ${url}: ${downloadFailure(error, limitMs)}`,
-      { cause: error },
-    );
+    throw new Error(`Could not download ${url}: ${messageOf(error)}`, {
+      cause: error,
+    });
   }
   if (sha256(text) !== checksum) {
     throw new Error(

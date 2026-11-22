@@ -90,9 +90,11 @@ again after a 429, and gives each try its time limit, the answer's body
 included, through `lib/time-limited-fetch.js`. crypto-price-filler's pool
 sources use them, and other repos install them as
 `crypto-price-fetchers/dex-prices/...`: the projects that install this
-repo keep no client of their own for a service it has one for, and send
-their other requests, to a chain's endpoint or a beacon node, through
-`crypto-price-fetchers/lib/time-limited-fetch`. The exchange script keeps a
+repo keep no client of their own for a service it has one for.
+x1-validator-analytics and pulsechain-validator-analytics send their
+requests to a chain's endpoint or a beacon node through
+`crypto-price-fetchers/lib/time-limited-fetch`, and so do this repo's
+runner, key store checks and downloads. The exchange script keeps a
 loop of its own in its `-sources.gs`, since Apps Script cannot load a Node
 module.
 

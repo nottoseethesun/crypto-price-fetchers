@@ -268,7 +268,7 @@ describe("installedActionlint", () => {
         fetch: stalled,
         limitMs: 50,
       }),
-      /Could not download .*linux_amd64\.tar\.gz: no answer within 0\.05 seconds/,
+      /Could not download .*linux_amd64\.tar\.gz: GitHub gave no answer within 0\.05 seconds/,
     );
   });
 });

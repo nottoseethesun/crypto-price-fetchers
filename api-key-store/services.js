@@ -46,6 +46,7 @@ import {
   DEXTOOLS_KEY_HEADER,
 } from "../dex-prices/dextools.js";
 import { MORALIS_API_URL, MORALIS_KEY_HEADER } from "../dex-prices/moralis.js";
+import { fetchWithinTimeLimit } from "../lib/time-limited-fetch.js";
 
 /** How long a service has to answer a check, in milliseconds. */
 const CHECK_TIMEOUT_MS = 15000;
@@ -97,19 +98,22 @@ function wait(ms) {
  */
 
 /**
- * Asks a service, and gives the status it answers with.
+ * Asks a service, and gives the status it answers with, once its whole
+ * answer has come within CHECK_TIMEOUT_MS (`fetchWithinTimeLimit`).
  *
  * @param {CheckOptions} options - What a test replaces
  * @param {string} url - The url
  * @param {Object<string, string>} headers - The headers, the key's among them
+ * @param {string} name - The service's name, for the error of a check that runs out of time
  * @returns {Promise<number>} The status
+ * @throws {Error} When the service does not answer, or not within the time limit
  */
-async function statusOf(options, url, headers) {
-  const fetchFunction = options.fetch ?? globalThis.fetch;
-  const response = await fetchFunction(url, {
-    headers,
-    signal: AbortSignal.timeout(CHECK_TIMEOUT_MS),
-  });
+async function statusOf(options, url, headers, name) {
+  const response = await fetchWithinTimeLimit(
+    url,
+    { headers },
+    { timeoutMs: CHECK_TIMEOUT_MS, name, fetch: options.fetch },
+  );
   return response.status;
 }
 
@@ -122,9 +126,14 @@ async function statusOf(options, url, headers) {
  * @throws {Error} When CoinGecko does not answer, or answers with another status
  */
 async function checkCoinGecko(key, options = {}) {
-  const status = await statusOf(options, COINGECKO_PING, {
-    [COINGECKO_KEY_HEADER]: key,
-  });
+  const status = await statusOf(
+    options,
+    COINGECKO_PING,
+    {
+      [COINGECKO_KEY_HEADER]: key,
+    },
+    "CoinGecko",
+  );
   if (status === 200) return "valid";
   if (status === 400 || status === 401) return "invalid";
   throw new Error(`CoinGecko answered with status ${status}`);
@@ -139,10 +148,15 @@ async function checkCoinGecko(key, options = {}) {
  * @throws {Error} When CoinPaprika does not answer, or answers with another status
  */
 async function checkCoinPaprika(key, options = {}) {
-  const status = await statusOf(options, COINPAPRIKA_KEY_INFO, {
-    Authorization: key,
-    Accept: "application/json",
-  });
+  const status = await statusOf(
+    options,
+    COINPAPRIKA_KEY_INFO,
+    {
+      Authorization: key,
+      Accept: "application/json",
+    },
+    "CoinPaprika",
+  );
   if (status === 200) return "valid";
   if (status === 401 || status === 403) return "invalid";
   throw new Error(`CoinPaprika answered with status ${status}`);
@@ -161,10 +175,15 @@ async function checkDexTools(key, options = {}) {
   for (const [index, plan] of DEXTOOLS_PLANS.entries()) {
     if (index > 0) await sleep(DEXTOOLS_SPACING_MS);
     const url = `${DEXTOOLS_API_URL}/${plan}/v2/blockchain?sort=name&order=asc`;
-    const status = await statusOf(options, url, {
-      [DEXTOOLS_KEY_HEADER]: key,
-      Accept: "application/json",
-    });
+    const status = await statusOf(
+      options,
+      url,
+      {
+        [DEXTOOLS_KEY_HEADER]: key,
+        Accept: "application/json",
+      },
+      "DexTools",
+    );
     if (status === 200) return "valid";
     if (status !== 403)
       throw new Error(`DexTools answered with status ${status}`);
@@ -181,10 +200,15 @@ async function checkDexTools(key, options = {}) {
  * @throws {Error} When Moralis does not answer, or answers with another status
  */
 async function checkMoralis(key, options = {}) {
-  const status = await statusOf(options, MORALIS_PROBE, {
-    [MORALIS_KEY_HEADER]: key,
-    Accept: "application/json",
-  });
+  const status = await statusOf(
+    options,
+    MORALIS_PROBE,
+    {
+      [MORALIS_KEY_HEADER]: key,
+      Accept: "application/json",
+    },
+    "Moralis",
+  );
   if (status === 200) return "valid";
   if (status === 401) return "invalid";
   throw new Error(`Moralis answered with status ${status}`);
@@ -199,10 +223,15 @@ async function checkMoralis(key, options = {}) {
  * @throws {Error} When x1.ninja does not answer, or answers with another status
  */
 async function checkX1Ninja(key, options = {}) {
-  const status = await statusOf(options, X1_NINJA_POOL, {
-    Authorization: `Bearer ${key}`,
-    Accept: "application/json",
-  });
+  const status = await statusOf(
+    options,
+    X1_NINJA_POOL,
+    {
+      Authorization: `Bearer ${key}`,
+      Accept: "application/json",
+    },
+    "x1.ninja",
+  );
   if (status === 200) return "valid";
   if (status === 401) return "invalid";
   throw new Error(`x1.ninja answered with status ${status}`);
