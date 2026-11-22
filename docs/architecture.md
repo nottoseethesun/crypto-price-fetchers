@@ -63,7 +63,7 @@ liquidity positions.
 | The versions tool | `github-project-deps.js`, `github-project-deps/` | The bin `github-project-deps`, which sets a project's dependencies from GitHub to their projects' main branch or latest release. |
 | The actionlint runner | `run-actionlint.js`, `actionlint/` | The bin `run-actionlint`, which runs actionlint, the checker of GitHub Actions workflow files, from its official release, refused unless its SHA-256, and the program's in it, are the ones this repo pins: every repo's lint runs it. |
 | The Summ CSV writer | `summ-csv.js`, `summ-csv/` | Writes the CSV files the owner imports into Summ, once every row has passed its rules: `npm run summ-csv`, the bin `summ-csv`, and `writeSummCsv` for a program. |
-| The shared helpers | `lib/` | Code more than one part, or more than one repo, uses, exported by the package's name for the projects that install this repo (`exports` in package.json): `messageOf`, which gives the message of something thrown (`crypto-price-fetchers/lib/message-of`); the checks of a command line's help, every option its examples use listed in it among them, and of its help into a closed pipe (`…/lib/command-line-help`); `endQuietlyWhenOutputCloses`, which ends a command line quietly when the program reading its output stops (`…/lib/closed-output`); `dayStartSeconds`, a day of the calendar written YYYY-MM-DD as the start of that day in UTC, refusing a day the calendar does not have (`…/lib/calendar-day`); `isHttpUrl` (`…/lib/http-url`); the checks of a repo's tracked files: EVM addresses in EIP-55's form, the npm targets and test files the docs must name, and the links and paths in the docs, which must point at files, folders and headings the repo keeps (`…/lib/repo-checks`); and `fetchWithinTimeLimit`, which sends a request and reads its whole answer within a time limit, naming the service when the time runs out (`…/lib/time-limited-fetch`). |
+| The shared helpers | `lib/` | Code more than one part, or more than one repo, uses, exported by the package's name for the projects that install this repo (`exports` in package.json): `messageOf`, which gives the message of something thrown (`crypto-price-fetchers/lib/message-of`); the checks of a command line's help, every option its examples use listed in it among them, and of its help into a closed pipe (`…/lib/command-line-help`); `endQuietlyWhenOutputCloses`, which ends a command line quietly when the program reading its output stops (`…/lib/closed-output`); `dayStartSeconds`, a day of the calendar written YYYY-MM-DD as the start of that day in UTC, refusing a day the calendar does not have (`…/lib/calendar-day`); `isHttpUrl` (`…/lib/http-url`); the checks of a repo's tracked files: EVM addresses in EIP-55's form, the npm targets and test files the docs must name, and the links and paths in the docs, which must point at files, folders and headings the repo keeps (`…/lib/repo-checks`); and `fetchWithinTimeLimit`, which sends a request and reads its whole answer within a time limit, naming the service when the time runs out (`…/lib/time-limited-fetch`): the price clients, the runner, the key store's checks and the downloads of actionlint and of DEX Screener's files send their requests through it. |
 
 ---
 
@@ -300,8 +300,8 @@ their clients, asked in LP Ranger's order:
 crypto-price-filler's pool sources use these clients, and other repos
 install them from this one: pulsechain-analytics' ratio chart, which charts
 the ratio of two tokens' prices, asks GeckoTerminal, Moralis and DexTools
-through them. The projects that install this repo send their other
-requests, to a chain's endpoint or a beacon node, through
+through them. x1-validator-analytics and pulsechain-validator-analytics
+send their requests to a chain's endpoint or a beacon node through
 `fetchWithinTimeLimit` too.
 
 ---
@@ -384,19 +384,24 @@ dependency their `npm install` installs:
 - pulsechain-analytics, his tools for questions about PulseChain, runs a
   Sheets script of its own, `fetch-amount-of-token-transferred.gs`,
   through the runner, and calls nothing in this repo's Sheets scripts. Its
-  ratio chart asks GeckoTerminal through the GeckoTerminal client, and its
-  Summ sweep writes its CSV through the Summ CSV writer.
+  ratio chart asks GeckoTerminal, Moralis and DexTools through their
+  clients, and its Summ sweep writes its CSV through the Summ CSV writer.
+  Its other tools read the chain through ethers, a library for talking to
+  Ethereum-style chains.
 - pulsechain-validator-analytics, for his PulseChain validators'
   withdrawal addresses and payments, sends no key today, and keeps the key
-  store ready.
+  store ready. It sends its requests to a beacon node and an execution
+  layer endpoint through `fetchWithinTimeLimit`.
 - x1-validator-analytics, for his X1 validator's rewards, prices each
-  reward through the GeckoTerminal client.
+  reward through the GeckoTerminal client, and sends its requests to the X1
+  endpoint through `fetchWithinTimeLimit`.
 
 All three use the key store, run `no-secret-logging` in their security
 lint, keep a copy of `unlock-api-keys.sh`, which their tests hold to this
 one, run the versions tool, run actionlint on their workflow files
-through `run-actionlint`, and run `no-or-default` in their lint and the
-shared checks of `lib/` in their tests.
+through `run-actionlint`, run `no-or-default` in their lint, use helpers
+of `lib/` in their command lines, and run the shared checks of `lib/` in
+their tests.
 
 ### Which Version They Install
 

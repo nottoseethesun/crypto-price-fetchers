@@ -36,6 +36,7 @@
 import { fileURLToPath } from "node:url";
 import { MessageChannel, Worker } from "node:worker_threads";
 import { messageOf } from "../lib/message-of.js";
+import { fetchWithinTimeLimit } from "../lib/time-limited-fetch.js";
 
 /** The worker thread's entry point. */
 const SCRIPT_WORKER = new URL("./script-worker.js", import.meta.url);
@@ -45,7 +46,8 @@ export const DEFAULT_REQUEST_TIMEOUT_MS = 60000;
 
 /**
  * Does one request with the caller's fetch, and returns the answer the
- * script's `UrlFetchApp` takes.
+ * script's `UrlFetchApp` takes. The whole answer must come within the time
+ * limit (`fetchWithinTimeLimit`), or the request fails, naming its url.
  *
  * @param {{url: string, method: string, headers: Object<string, string>, body: (string|undefined), redirect: string}} request - The request (`toRequest`)
  * @param {function(string, Object): Promise<Response>} fetchFunction - The caller's fetch, shaped as Node's own
@@ -54,13 +56,16 @@ export const DEFAULT_REQUEST_TIMEOUT_MS = 60000;
  */
 export async function answerRequest(request, fetchFunction, timeoutMs) {
   try {
-    const response = await fetchFunction(request.url, {
-      method: request.method,
-      headers: request.headers,
-      body: request.body,
-      redirect: request.redirect,
-      signal: AbortSignal.timeout(timeoutMs),
-    });
+    const response = await fetchWithinTimeLimit(
+      request.url,
+      {
+        method: request.method,
+        headers: request.headers,
+        body: request.body,
+        redirect: request.redirect,
+      },
+      { timeoutMs, fetch: fetchFunction },
+    );
     return {
       status: response.status,
       headers: Object.fromEntries(response.headers),

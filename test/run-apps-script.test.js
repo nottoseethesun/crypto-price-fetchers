@@ -142,7 +142,7 @@ describe("openAppsScript, with a fetch of the caller's", () => {
     await withScript({ fetch, requestTimeoutMs: 100 }, async (script) => {
       assert.match(
         await script.call("getOrMessage", "/a"),
-        /^caught: The request for .* got no response: .*timeout/,
+        /^caught: The request for (\S+) got no response: \1 gave no answer within 0\.1 seconds$/,
       );
     });
   });

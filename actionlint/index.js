@@ -43,6 +43,7 @@ import path from "node:path";
 import { gunzipSync } from "node:zlib";
 import { Command, CommanderError } from "commander";
 import { messageOf } from "../lib/message-of.js";
+import { fetchWithinTimeLimit } from "../lib/time-limited-fetch.js";
 import { ACTIONLINT, archiveUrl } from "./release.js";
 
 /** How long one download may take, in milliseconds, before it is stopped. */
@@ -119,13 +120,15 @@ export async function downloadArchive(release, archive, fetch, limitMs) {
   const url = archiveUrl(release, archive.file);
   let response;
   try {
-    response = await fetch(url, { signal: AbortSignal.timeout(limitMs) });
+    response = await fetchWithinTimeLimit(
+      url,
+      {},
+      { timeoutMs: limitMs, name: "GitHub", fetch },
+    );
   } catch (error) {
-    const why =
-      error?.name === "TimeoutError"
-        ? `no answer within ${limitMs / 1000} seconds`
-        : messageOf(error);
-    throw new Error(`Could not download ${url}: ${why}`, { cause: error });
+    throw new Error(`Could not download ${url}: ${messageOf(error)}`, {
+      cause: error,
+    });
   }
   if (response.status !== 200) {
     throw new Error(`Could not download ${url}: status ${response.status}`);

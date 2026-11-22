@@ -452,7 +452,7 @@ describe("the audit of DEX Screener's files", () => {
         for (const line of lines.slice(1)) {
           assert.match(
             line,
-            /^Could not download https:\/\/raw\.githubusercontent\.com\/\S+\.ts: no answer within 0\.02 seconds$/,
+            /^Could not download https:\/\/raw\.githubusercontent\.com\/\S+\.ts: GitHub gave no answer within 0\.02 seconds$/,
           );
         }
         return true;
