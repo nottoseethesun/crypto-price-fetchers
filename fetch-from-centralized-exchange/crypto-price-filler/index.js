@@ -176,12 +176,12 @@
  *   - Required column: "amount" (quantity of tokens)
  *   - Optional columns are preserved in output
  *
- * Basic Command:
- *   node index.js --token=<symbol> --input=<file.csv> --output=<output.csv>
+ * Basic Command, from the repo's top folder:
+ *   node bin/crypto-price-filler.js --token=<symbol> --input=<file.csv> --output=<output.csv>
  *
- * More Typical Command with Options:
+ * More Typical Command with Options, from the repo's top folder:
  *
- *   node index.js --token=<symbol> --input=<file.csv> --output=<output.csv> --backfill-highest
+ *   node bin/crypto-price-filler.js --token=<symbol> --input=<file.csv> --output=<output.csv> --backfill-highest
  *
  * Command-Line Options:
  *   --token       {string}  Required. Token symbol (e.g. xtm, grc, btc). Case-insensitive.
@@ -244,30 +244,30 @@
  *   - Verbose mode (--verbose) - detailed logs shown instead
  *   - Test environments (NODE_ENV=test or VITEST)
  *
- * Examples:
+ * Examples, from the repo's top folder:
  *
  *   # Basic close-price fill (UTC)
- *   node index.js --token=grc --input=input/mining.csv --output=output/csv/filled.csv
+ *   node bin/crypto-price-filler.js --token=grc --input=fetch-from-centralized-exchange/crypto-price-filler/input/mining.csv --output=fetch-from-centralized-exchange/crypto-price-filler/output/csv/filled.csv
  *
  *   # High price, dates in US Central time, with verbose logging
- *   node index.js --token=xtm --input=input/input.csv --output=output/csv/prices.csv --mode=high --tz=America/Chicago --verbose
+ *   node bin/crypto-price-filler.js --token=xtm --input=fetch-from-centralized-exchange/crypto-price-filler/input/input.csv --output=fetch-from-centralized-exchange/crypto-price-filler/output/csv/prices.csv --mode=high --tz=America/Chicago --verbose
  *
  *   # Every time zone --tz takes
- *   node index.js --list-valid-timezones
+ *   node bin/crypto-price-filler.js --list-valid-timezones
  *
  *   # Backfill the Error prices with the highest bracketing price (conservative tax estimates)
- *   node index.js --token=grc --input=input/mining.csv --output=output/csv/filled.csv --backfill-highest
+ *   node bin/crypto-price-filler.js --token=grc --input=fetch-from-centralized-exchange/crypto-price-filler/input/mining.csv --output=fetch-from-centralized-exchange/crypto-price-filler/output/csv/filled.csv --backfill-highest
  *
  *   # Backfill the Error prices with the lowest bracketing price (budgeting)
- *   node index.js --token=grc --input=input/mining.csv --output=output/csv/filled.csv --backfill-lowest
+ *   node bin/crypto-price-filler.js --token=grc --input=fetch-from-centralized-exchange/crypto-price-filler/input/mining.csv --output=fetch-from-centralized-exchange/crypto-price-filler/output/csv/filled.csv --backfill-lowest
  *
  *   # Show help
- *   node index.js --help
+ *   node bin/crypto-price-filler.js --help
  *
  * Testing
  * -------
  *
- * Unit/Integration Tests (Vitest):
+ * Unit/Integration Tests (Vitest), in this folder:
  *   npm run test              # standard test run
  *   npm run test:strict       # includes import verification (recommended)
  *   npm run test:debug        # with full [VERBOSE] logs
@@ -277,8 +277,8 @@
  *   IMPORTANT: Use `test:strict` to catch import errors that `vitest` alone may miss.
  *   This ensures files will actually load into Node.js, preventing production breakage.
  *
- * Production-Style Test with Real Data:
- *   node index.js --token=grc --input=tests/mock-input.csv --output=output/csv/mock-filled.csv --verbose
+ * Production-Style Test with Real Data, from the repo's top folder:
+ *   node bin/crypto-price-filler.js --token=grc --input=fetch-from-centralized-exchange/crypto-price-filler/tests/mock-input.csv --output=fetch-from-centralized-exchange/crypto-price-filler/output/csv/mock-filled.csv --verbose
  *
  *   Expected behavior:
  *   - Fetches real prices from configured sources (Moralis → GeckoTerminal for a token
@@ -288,7 +288,7 @@
  *   - If no price available → writes 'Error'
  *   - Verbose logs show every fetch attempt, parse step, price result
  *
- * Saving Test Logs:
+ * Saving Test Logs, in this folder:
  *   npm run test:debug > test.log 2>&1
  *
  *   To view logs in HTML (requires `aha`: sudo apt install aha):

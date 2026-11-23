@@ -195,6 +195,7 @@ the lints of the projects that install this repo.
     - [Usage](#usage-9)
 - [Configure](#configure)
 - [Lint & Test](#lint--test)
+  - [Optional: the Clipboard Tool, by Hand](#optional-the-clipboard-tool-by-hand)
 - [Private Key Security](#private-key-security)
 - [Development](#development)
   - [Node Versions of the Sheets Scripts](#node-versions-of-the-sheets-scripts)
@@ -1000,6 +1001,29 @@ stand-ins on the computer. The Sheets scripts also hold tests that run
 only in Apps Script, by hand:
 [How the Sheets scripts are tested](docs/engineering.md#how-the-sheets-scripts-gs-are-tested)
 sets the two kinds apart.
+
+### Optional: the Clipboard Tool, by Hand
+
+The tests never run a real clipboard tool: the build's tests hand its
+copy to a stand-in, and the tests of the copy itself hand it a stand-in
+for Node's spawn or, in one, Node itself as the tool. Whether the build
+reaches your desktop's clipboard is checked by hand, on a desktop with
+the tool installed ([step 2](#2-operating-system-programs)):
+
+1. Run `npm run build apps-script` and answer its questions. It says
+   "The script, N lines, is on your clipboard."
+2. Paste into a text editor: the script's text appears. Back in the
+   terminal, press Enter: it says "The clipboard is cleared.", and a
+   paste gives nothing.
+3. On Linux with xclip or xsel installed, run it again with a display
+   that does not exist: `DISPLAY=:99 WAYLAND_DISPLAY= npm run build
+   apps-script`. With `WAYLAND_DISPLAY` empty, the build uses xclip or
+   xsel; the tool cannot open the display, and the build stops with
+   "xclip exited with code 1", or the same words with xsel's name and
+   exit code, with exit code 1 and no stack trace. Skip this step where
+   wl-copy is the only tool, as on a Wayland desktop with only
+   wl-clipboard installed: the build would find no tool, and offer to
+   install xclip.
 
 ---
 

@@ -208,8 +208,9 @@ Exit codes:
   0  nothing is missing: each program is installed, now or before, or
      of no use here, with no desktop session open
   1  a program is still missing: no Homebrew or apt to install it with,
-     the install with apt declined, or an install that failed; or an
-     argument this command does not take`;
+     the install with apt declined, an install that failed, or the tool
+     macOS or Windows comes with not on PATH; or an argument this command
+     does not take`;
 
 /**
  * Runs the command line.

@@ -1,14 +1,15 @@
 /**
- * Preload that lets a test run the Node tool's real command line, `index.js`,
- * in a child process with a settings file or a token list of the test's own.
+ * Preload that lets a test run the Node tool's real command line,
+ * `bin/crypto-price-filler.js`, which loads `index.js`, in a child process
+ * with a settings file or a token list of the test's own.
  * @module tests/helpers/stand-in-settings-preload
  *
  * The tool reads `config.json`, the owner's own settings, and
  * `supported-tokens.json` beside its own files, and the exchange script's
  * Node version reads the `config.json` beside its own, whichever folder it
  * runs in, so a test cannot hand any of them by writing a file. A test
- * starts `node --import <this file> index.js ...`, with the text of a file
- * in the environment variable `STAND_IN_FILLER_CONFIG`,
+ * starts `node --import <this file> bin/crypto-price-filler.js ...`, with
+ * the text of a file in the environment variable `STAND_IN_FILLER_CONFIG`,
  * `STAND_IN_FILLER_TOKENS` or `STAND_IN_EXCHANGE_CONFIG`; this file makes
  * the read of that file give the text, so a test never writes the owner's
  * settings.

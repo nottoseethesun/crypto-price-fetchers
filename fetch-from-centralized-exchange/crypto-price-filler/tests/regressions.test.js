@@ -1,12 +1,11 @@
 /**
  * Tests that guard fixed bugs in the Node tool, its Sheets script, the
- * Summ csv utility, and the menu the build step puts in the one file it
- * gives for a spreadsheet.
+ * Summ csv utility and the key store's password prompt.
  * @module tests/regressions.test
  *
  * Each block states what a fixed bug got wrong, as the behavior the tools
  * now have, and checks it everywhere the bug was: the Node tool's functions,
- * its command line, the Sheets script, and the menu. A bug found later gets its test
+ * its command line and the Sheets script. A bug found later gets its test
  * in `known-bugs.test.js`, declared with `it.fails` while the bug is there;
  * its fix declares the test with `it` and moves it here, or to the
  * regression file for its kind of bug (see the repo's CLAUDE.md).
@@ -18,9 +17,8 @@
  * command line, run in a child process, against a preloaded fetch; and the
  * Sheets script, run unchanged in the test's thread, against a stand-in
  * `UrlFetchApp`. The Node tool's functions run on the committed settings,
- * whatever a `config.json` on this computer holds. The menu runs with the
- * DexTools script beside it, as in the built file, against the spreadsheet
- * of `test/helpers/stand-in-spreadsheet.js` at the repo's top.
+ * whatever a `config.json` on this computer holds. The key store's password
+ * prompt runs in the test's thread, on an input the test ends.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -28,6 +26,7 @@ import { spawnSync } from "child_process";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { PassThrough } from "stream";
 import { ESLint } from "eslint";
 import { createAppsScriptServices } from "../../../apps-script-runner/apps-script-services.js";
 import {
@@ -40,8 +39,8 @@ import { closeExchangeSources, exchangeSources } from "../sources/exchange.js";
 import { canonicalTimeZone, parseInputToUtcMs } from "../utils/date.js";
 import { answerWith, asked as askedByTool } from "./helpers/stand-in-fetch.js";
 import { loadSheetsScript } from "./helpers/sheets-script.js";
-import { standInSpreadsheet } from "../../../test/helpers/stand-in-spreadsheet.js";
 import { summCsvText } from "../../../summ-csv/index.js";
+import { askPassword } from "../../../api-key-store/index.js";
 import { mexcCandleOpen } from "../../../test/helpers/stand-in-mexc.js";
 
 // The Sheets script, opened by its Node version with the stand-in fetch
@@ -72,7 +71,6 @@ import {
   FILLER_DIR,
   gitIgnores,
   inTimeZone,
-  MENU_AND_DEXTOOLS_SCRIPTS,
   PAST_UTC_MS,
   ROW_UTC_MS,
   runCommandLine,
@@ -418,50 +416,6 @@ describe("fixed bugs", () => {
       ).toBe(2.05);
     });
   });
-
-  describe("CoinGecko's hourly prices are kept for the time asked, not for its day", () => {
-    it("the Sheets script asks again for another time of the same day, and gives that time's price", () => {
-      const asked = [];
-      const script = loadSheetsScript(SHEETS_SCRIPT_PATH, (url) => {
-        asked.push(url);
-        const from = Number(new URL(url).searchParams.get("from")) * 1000;
-        const centre = from + 43200000;
-        return {
-          prices: [[centre, centre === ROW_UTC_MS ? 2.4 : 3.1]],
-        };
-      });
-      expect(script.getPriceFromCoinGecko("tezos", ROW_UTC_MS, "high")).toBe(
-        2.4,
-      );
-      expect(
-        script.getPriceFromCoinGecko("tezos", ROW_UTC_MS + 7200000, "high"),
-      ).toBe(3.1);
-      expect(asked).toHaveLength(2);
-    });
-  });
-  describe("the menu's Refresh", () => {
-    it("Refresh runs again the cells that call dexToolsGetTokenPrice", () => {
-      const sheet = standInSpreadsheet({
-        tabs: {
-          Prices: [
-            ["Token", "Price"],
-            [
-              "PLS",
-              '=dexToolsGetTokenPrice("pulse", "0xA1077a294dDE1B09bB078844df40758a5D0f9a27")',
-            ],
-          ],
-        },
-      });
-      const script = loadSheetsScript(MENU_AND_DEXTOOLS_SCRIPTS, () => null, {
-        services: {
-          SpreadsheetApp: sheet.SpreadsheetApp,
-          HtmlService: sheet.HtmlService,
-        },
-      });
-      script.refreshCurrentPrices();
-      expect(sheet.runsOf("Prices!B2")).toBe(1);
-    });
-  });
 });
 
 describe("the token list", () => {
@@ -569,5 +523,27 @@ describe("the Summ csv utility's times", () => {
       /Timestamp/,
     );
     expect(() => summCsvText([row(253402300800)], header)).toThrow(/Timestamp/);
+  });
+});
+
+describe("the key store's password prompt", () => {
+  it("askPassword rejects at once a question asked after its input has ended", async () => {
+    const input = new PassThrough();
+    const output = { write: () => true };
+    input.resume();
+    input.end();
+    await new Promise((resolve) => input.once("end", resolve));
+    let timer;
+    const waited = new Promise((resolve) => {
+      timer = setTimeout(resolve, 1000, "no answer after 1 second");
+    });
+    const answer = await Promise.race([
+      askPassword("Password: ", { input, output }).catch(
+        (error) => error.message,
+      ),
+      waited,
+    ]);
+    clearTimeout(timer);
+    expect(answer).toBe("The input ended before an answer was typed");
   });
 });

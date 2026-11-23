@@ -17,6 +17,7 @@
     "./lib/command-line-help": "./lib/command-line-help.js",
     "./lib/http-url": "./lib/http-url.js",
     "./lib/message-of": "./lib/message-of.js",
+    "./lib/new-file": "./lib/new-file.js",
     "./lib/option-conflicts": "./lib/option-conflicts.js",
     "./lib/repo-checks": "./lib/repo-checks.js",
     "./lib/settings-file": "./lib/settings-file.js",

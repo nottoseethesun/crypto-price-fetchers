@@ -330,7 +330,7 @@ examples use listed in it among them, and of a help into a closed pipe,
 are in `lib/command-line-help.js`, exported as
 `crypto-price-fetchers/lib/command-line-help`:
 `test/command-line-help.test.js` runs them on every command line here,
-and the repos that install this one run them in their own tests.
+and the repos that install this one run them in their own tests. `bin/unlock-api-keys.sh`, the script a terminal sources to keep the key store's password, is the one command line not in JavaScript: the help it answers is written in it, a reader of that help that stops reading ends it quietly, it ignores any argument but `-h` and `--help`, since a sourced script sees its caller's arguments, and that test runs it with bash.
 `docs/project-commands.md` lists every npm target, including those
 that run other tools, such as `lint` and `check`, and every command line
 run with `node`, each with its flags and an example. LP Ranger's rules do
@@ -428,7 +428,7 @@ them by the package's name, as `exports` in package.json names them:
 `crypto-price-fetchers/lib/message-of`, `…/lib/command-line-help`,
 `…/lib/closed-output`, `…/lib/calendar-day`, `…/lib/http-url`,
 `…/lib/repo-checks`, `…/lib/time-limited-fetch`, `…/lib/settings-file`,
-`…/lib/settings-schema` and `…/lib/option-conflicts`
+`…/lib/settings-schema`, `…/lib/option-conflicts` and `…/lib/new-file`
 (`test/package-exports.test.js` loads each by that name). The tests ask no
 outside service: the scripts' requests go to a stand-in fetch or a stand-in
 server on the computer (`test/helpers/stand-in-web.js`). The key store's
@@ -491,15 +491,8 @@ for any other, and removes the row. `tests/regressions.test.js` also
 holds older tests that run a Sheets script that way.
 
 Google stops a custom function, a function a cell calls, after 30 seconds,
-and the cell shows `#ERROR!`. The first bug below is a wait longer than that.
+and the cell shows `#ERROR!`. The bug below is a wait longer than that.
 
 | Bug | Test in `tests/known-bugs.test.js` |
 | --- | --- |
 | `dexToolsGetTokenPrice` and `dexToolsGetTokenFDV`, in `crypto-price-fetchers.gs`, wait up to `DEXTOOLS_CONFIG.LOCK_WAIT_MS`, 120 seconds, for the script lock, so a cell that waits more than 30 seconds shows `#ERROR!`, never the busy message the script returns when the wait ends. | dexToolsGetTokenPrice waits for the script lock no longer than Google lets a custom function run |
-| `copyToClipboard`, in `lib/clipboard.js`, handles no error on the tool's stdin, so a tool that exits without reading its input, as xclip does when it cannot open the display, ends the build with an unhandled `EPIPE`. | copyToClipboard rejects, naming the exit code, when the tool exits without reading its input |
-| `askLine`, in `lib/ask-line.js`, drops the lines that come after the first in one chunk, so answers piped to the build answer only its first question. | askLine gives each question its own line of the answers piped in together |
-| `askLine`, in `lib/ask-line.js`, never answers a question asked after its input has ended, so the build, run with no one to answer and the password in `API_KEYS_PASSWORD`, stops at "Press Enter once it is pasted" with exit code 13, and never clears the clipboard. | askLine gives null at once to a question asked after the input has ended |
-| `openSecretPrompt`, in `api-key-store/ask-password.js`, opened once its input has ended, neither answers nor refuses its question, so the build, run with no one to answer, a key saved and no password in `API_KEYS_PASSWORD`, stops at its password prompt with exit code 13, where its help gives 1. | askPassword rejects at once a question asked after its input has ended |
-| `bin/unlock-api-keys.sh`, sourced as `bin/unlock-api-keys.sh` in a bash whose `CDPATH` lists `.`, takes `cd`'s printed folder as part of the project's top folder, and keeps no password. | finds the project's top folder when CDPATH lists . and it is sourced as bin/unlock-api-keys.sh |
-| `bin/unlock-api-keys.sh` answers no `--help` or `-h`: sourced, it asks for the password, and run as a program, it says to source it, with exit code 1. | answers --help and -h with its help, run or sourced, asking nothing and keeping no password |
-| `bin/unlock-api-keys.sh`, sourced, returns 0 when it keeps no password. | ends with exit code 1 when it keeps no password |

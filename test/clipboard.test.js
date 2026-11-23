@@ -119,7 +119,7 @@ describe("copyToClipboard", () => {
     const got = [];
     const spawn = (command, args, options) => {
       const child = new EventEmitter();
-      child.stdin = {
+      child.stdin = Object.assign(new EventEmitter(), {
         end: (text) => {
           got.push({ command, args, stdio: options.stdio, text });
           setImmediate(() =>
@@ -128,7 +128,7 @@ describe("copyToClipboard", () => {
               : child.emit("exit", code),
           );
         },
-      };
+      });
       return child;
     };
     return { spawn, got };

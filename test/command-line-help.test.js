@@ -38,7 +38,8 @@ const REPO_TOP = fileURLToPath(new URL("..", import.meta.url));
 const FILLER = "fetch-from-centralized-exchange/crypto-price-filler";
 
 /**
- * Every command line: the file node runs, and the subcommand, if any, whose
+ * Every command line: the file it runs, the program that runs that file,
+ * node unless `program` names a shell, and the subcommand, if any, whose
  * help is asked for.
  */
 const COMMAND_LINES = Object.freeze([
@@ -58,6 +59,7 @@ const COMMAND_LINES = Object.freeze([
   { file: "bin/crypto-price-filler.js", command: [] },
   { file: "bin/backfill.js", command: [] },
   { file: "install/install-os-dependencies.js", command: [] },
+  { program: "bash", file: "bin/unlock-api-keys.sh", command: [] },
 ]);
 
 /**

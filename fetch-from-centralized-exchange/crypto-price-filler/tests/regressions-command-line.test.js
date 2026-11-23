@@ -4,7 +4,10 @@
  * checks of a value, the settings they fall back to, how a settings file
  * or token list they cannot take ends a run, and what `index.js` logs; and
  * the Sheets scripts' Node versions', with their checks of a value before
- * a key is opened, and the exchange script's settings. The other fixed bugs' tests are in
+ * a key is opened, and the exchange script's settings; and
+ * `bin/unlock-api-keys.sh`, which finds the project's folder whatever
+ * `CDPATH` lists, answers `--help`, and returns 1 when it keeps no
+ * password. The other fixed bugs' tests are in
  * `regressions.test.js`, `regressions-lib.test.js` and
  * `regressions-sheets.test.js`; a bug found later gets its test in
  * `known-bugs.test.js`, declared with `it.fails` while the bug is there,
@@ -12,14 +15,17 @@
  * CLAUDE.md).
  * @module tests/regressions-command-line.test
  *
- * `index.js` runs as its owner runs it, in a child process, given a
- * settings file or token list of the test's own through the preload
+ * The command line, `bin/crypto-price-filler.js`, which loads `index.js`,
+ * runs as its owner runs it, in a child process, given a settings file or
+ * token list of the test's own through the preload
  * `helpers/stand-in-settings-preload.js`, and a stand-in fetch through
  * `helpers/stand-in-fetch-preload.js`; its command, and `backfill.js`'s,
  * are also parsed here, in the test's thread, and `backfill.js` backfills
  * a CSV in a temp folder of the test's own, with the settings the test
  * gives it. The Node versions' command lines run in the test's thread,
  * with a stand-in fetch and a key file in a temp folder of the test's own.
+ * The tests of `bin/unlock-api-keys.sh` have bash run or source a copy of
+ * it in a temp folder of the test's own, beside a stand-in key manager.
  */
 
 import { afterAll, beforeAll, describe, it, expect, vi } from "vitest";
@@ -69,8 +75,9 @@ afterAll(() => {
 });
 
 /**
- * Runs index.js from the test's temp folder, with the settings file or
- * token list given in place of the tool's own.
+ * Runs the command line, `bin/crypto-price-filler.js`, from the test's temp
+ * folder, with the settings file or token list given in place of the tool's
+ * own.
  *
  * @param {string[]} args - Its arguments
  * @param {Object<string, string>} standIns - As the settings preload takes them
@@ -442,5 +449,72 @@ describe("the file the tool writes when no --output is given", () => {
       { cwd: repoTop },
     );
     expect(checked.status).toBe(0);
+  });
+});
+
+describe("bin/unlock-api-keys.sh", () => {
+  /**
+   * Runs a copy of the script in bash from the top folder of a temp
+   * project, whose bin/ holds it beside a stand-in manage-api-keys.js that
+   * takes or refuses any password, with the test's own empty password.
+   *
+   * @param {string[]} args - bash's arguments
+   * @param {{input?: string, takes?: boolean, env?: Object<string, string>}} [run] - What is typed, whether the stand-in takes the password, and more of the environment
+   * @returns {import("child_process").SpawnSyncReturns<string>} How it ended
+   */
+  function runUnlock(args, { input = "a password\n", takes = true, env } = {}) {
+    const top = fs.mkdtempSync(path.join(os.tmpdir(), "unlock-"));
+    try {
+      fs.mkdirSync(path.join(top, "bin"));
+      fs.copyFileSync(
+        path.resolve(__dirname, "../../../bin/unlock-api-keys.sh"),
+        path.join(top, "bin", "unlock-api-keys.sh"),
+      );
+      fs.writeFileSync(
+        path.join(top, "bin", "manage-api-keys.js"),
+        `process.exit(${takes ? 0 : 1});\n`,
+      );
+      return spawnSync("bash", args, {
+        cwd: top,
+        input,
+        encoding: "utf8",
+        env: { ...process.env, API_KEYS_PASSWORD: "", ...env },
+      });
+    } finally {
+      fs.rmSync(top, { recursive: true, force: true });
+    }
+  }
+
+  it("finds the project's top folder when CDPATH lists . and it is sourced as bin/unlock-api-keys.sh", () => {
+    const run = runUnlock(["-c", "source bin/unlock-api-keys.sh"], {
+      env: { CDPATH: `.:${os.tmpdir()}` },
+    });
+    expect(run.stderr).toContain("API_KEYS_PASSWORD is set for this terminal.");
+  });
+
+  it("answers --help and -h with its help, run or sourced, asking nothing and keeping no password", () => {
+    for (const flag of ["--help", "-h"]) {
+      for (const args of [
+        ["bin/unlock-api-keys.sh", flag],
+        ["-c", 'source bin/unlock-api-keys.sh "$1"', "bash", flag],
+      ]) {
+        const run = runUnlock(args);
+        expect(run.stdout).toMatch(
+          /^Usage: source \.\/bin\/unlock-api-keys\.sh \[options\]\n/,
+        );
+        expect(run.stderr).toBe("");
+        expect(run.status).toBe(0);
+      }
+    }
+  });
+
+  it("ends with exit code 1 when it keeps no password", () => {
+    for (const input of ["a wrong password\n", "\n"]) {
+      const run = runUnlock(["-c", "source bin/unlock-api-keys.sh"], {
+        input,
+        takes: false,
+      });
+      expect(run.status).toBe(1);
+    }
   });
 });

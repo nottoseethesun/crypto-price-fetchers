@@ -462,7 +462,7 @@ async function buildAppsScript(run) {
  * @param {function(string): boolean} [deps.onPath] - Whether a command is installed; looked up on `PATH` when absent
  * @param {function(string): Promise<?string>} [deps.ask] - Answers a question, in place of the terminal
  * @param {function(string): Promise<string>} [deps.askSecret] - Answers the password prompt, in place of the terminal
- * @param {import('../api-key-store/services.js').CheckOptions} [deps.checkOptions] - What the services' key checks are handed, such as a stand-in fetch
+ * @param {import('../../../api-key-store/services.js').CheckOptions} [deps.checkOptions] - What the services' key checks are handed, such as a stand-in fetch
  * @param {function(Object): Promise<{text: string, required: string[]}>} [deps.dexScreener=dexScreenerPart] - Gives DEX Screener's part, after the audit of its files
  * @param {import('./dex-screener-files.js').DexScreenerVersion} [deps.dexScreenerVersion=DEX_SCREENER] - The version of DEX Screener's functions it offers
  * @param {function(string): Promise<Response>} [deps.fetch=globalThis.fetch] - Downloads DEX Screener's files

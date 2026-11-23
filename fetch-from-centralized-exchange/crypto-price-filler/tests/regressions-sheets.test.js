@@ -6,8 +6,10 @@
  *
  * The Sheets scripts run unchanged in the test's thread, through
  * `tests/helpers/sheets-script.js`, against a stand-in MEXC, which answers
- * as MEXC does (`test/helpers/stand-in-mexc.js`), or a stand-in DexTools,
- * and, for the waits, a script lock that is never free.
+ * as MEXC does (`test/helpers/stand-in-mexc.js`), a stand-in CoinGecko or
+ * DexTools, and, for the waits, a script lock that is never free; the
+ * menu's Refresh runs against the spreadsheet of
+ * `test/helpers/stand-in-spreadsheet.js` at the repo's top.
  */
 
 import { describe, it, expect } from "vitest";
@@ -21,11 +23,13 @@ import {
 import {
   DAY_MS,
   MENU_AND_DEXTOOLS_SCRIPTS,
+  ROW_UTC_MS,
   SHEETS_SCRIPT_PATH,
   answerCoinGeckoForPastDay,
   cellTime,
 } from "./helpers/regression-runs.js";
 import { mexcKlines } from "../../../test/helpers/stand-in-mexc.js";
+import { standInSpreadsheet } from "../../../test/helpers/stand-in-spreadsheet.js";
 
 describe("the exchange script's quote currency", () => {
   it("getPriceFromMEXC asks for the pairs quoted in CONFIG.QUOTE_CURRENCY, the token's and BTC's", () => {
@@ -492,5 +496,47 @@ describe("a call cut short", () => {
     expect(coinGeckoAsked).toBe(1);
     expect(script.getCryptoPrice("xtm", time, "UTC", "average")).toBe(BUSY);
     expect(coinGeckoAsked).toBe(1);
+  });
+});
+
+describe("CoinGecko's hourly prices are kept for the time asked, not for its day", () => {
+  it("the Sheets script asks again for another time of the same day, and gives that time's price", () => {
+    const asked = [];
+    const script = loadSheetsScript(SHEETS_SCRIPT_PATH, (url) => {
+      asked.push(url);
+      const from = Number(new URL(url).searchParams.get("from")) * 1000;
+      const centre = from + 43200000;
+      return {
+        prices: [[centre, centre === ROW_UTC_MS ? 2.4 : 3.1]],
+      };
+    });
+    expect(script.getPriceFromCoinGecko("tezos", ROW_UTC_MS, "high")).toBe(2.4);
+    expect(
+      script.getPriceFromCoinGecko("tezos", ROW_UTC_MS + 7200000, "high"),
+    ).toBe(3.1);
+    expect(asked).toHaveLength(2);
+  });
+});
+describe("the menu's Refresh", () => {
+  it("Refresh runs again the cells that call dexToolsGetTokenPrice", () => {
+    const sheet = standInSpreadsheet({
+      tabs: {
+        Prices: [
+          ["Token", "Price"],
+          [
+            "PLS",
+            '=dexToolsGetTokenPrice("pulse", "0xA1077a294dDE1B09bB078844df40758a5D0f9a27")',
+          ],
+        ],
+      },
+    });
+    const script = loadSheetsScript(MENU_AND_DEXTOOLS_SCRIPTS, () => null, {
+      services: {
+        SpreadsheetApp: sheet.SpreadsheetApp,
+        HtmlService: sheet.HtmlService,
+      },
+    });
+    script.refreshCurrentPrices();
+    expect(sheet.runsOf("Prices!B2")).toBe(1);
   });
 });

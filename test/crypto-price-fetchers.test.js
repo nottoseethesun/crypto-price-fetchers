@@ -443,7 +443,7 @@ describe("crypto-price-fetchers.js, the command line", () => {
     assert.deepEqual(result.fetch.requests, []);
   });
 
-  it("runs as a program: node crypto-price-fetchers.js --help", () => {
+  it("runs as a program: node bin/crypto-price-fetchers.js --help", () => {
     const file = fileURLToPath(
       new URL("../bin/crypto-price-fetchers.js", import.meta.url),
     );

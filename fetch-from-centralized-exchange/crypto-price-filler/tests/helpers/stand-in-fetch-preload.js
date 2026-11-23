@@ -1,10 +1,12 @@
 /**
- * Preload that lets a test run the Node tool's real command line, `index.js`,
- * in a child process without asking any price service.
+ * Preload that lets a test run the Node tool's real command line,
+ * `bin/crypto-price-filler.js`, which loads `index.js`, in a child process
+ * without asking any price service.
  * @module tests/helpers/stand-in-fetch-preload
  *
- * A test starts `node --import <this file> index.js ...`. This file replaces
- * the global fetch with a stand-in MEXC that lists the XTMUSDT pair and
+ * A test starts `node --import <this file> bin/crypto-price-filler.js ...`.
+ * This file replaces the global fetch with a stand-in MEXC that lists the
+ * XTMUSDT pair and
  * answers every candle request with the candle of the period asked
  * (`test/helpers/stand-in-mexc.js`): open 1.00, high 1.50, low 0.80, close
  * 1.10. CoinGecko's ping, which checks a saved api key, takes the key of

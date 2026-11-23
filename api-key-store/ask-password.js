@@ -19,7 +19,9 @@
  *
  * One readline interface answers every question of a prompt, in order, so
  * answers piped in together are each kept for their question. Ctrl+C, or
- * the input ending before an answer, stops the question with an error.
+ * the input ending before an answer, stops the question with an error,
+ * at once for a prompt opened once the input has ended, whose interface
+ * would wait for an end that has passed.
  *
  * Fit: `key-prompts.js` asks for keys and passwords through this.
  */
@@ -54,7 +56,9 @@ export function openSecretPrompt(streams = {}) {
   const output = streams.output ?? process.stderr;
   const lines = [];
   const waiting = [];
-  let stopped = null;
+  let stopped = input.readableEnded
+    ? "The input ended before an answer was typed"
+    : null;
   const rl = readline.createInterface({
     input,
     output: showsNothing(),

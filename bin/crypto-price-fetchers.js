@@ -115,9 +115,9 @@ function keyConfig(keys) {
 
 /**
  * What `npm run build apps-script` puts of this script in the one file it
- * gives for the sheet (`apps-script-build/`): its one file, whose header
- * holds a help section, with the DexTools and x1.ninja keys set at the end
- * of the built file as `keyConfig` sets them here.
+ * gives for the sheet (`build/tools/apps-script-build/`): its one file,
+ * whose header holds a help section, with the DexTools and x1.ninja keys
+ * set at the end of the built file as `keyConfig` sets them here.
  */
 export const APPS_SCRIPT_BUILD = Object.freeze({
   name: "crypto-price-fetchers",
