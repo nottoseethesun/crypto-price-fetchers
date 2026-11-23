@@ -491,8 +491,29 @@ for any other, and removes the row. `tests/regressions.test.js` also
 holds older tests that run a Sheets script that way.
 
 Google stops a custom function, a function a cell calls, after 30 seconds,
-and the cell shows `#ERROR!`. The bug below is a wait longer than that.
+and the cell shows `#ERROR!`. The first bug below is a wait longer than that.
 
 | Bug | Test in `tests/known-bugs.test.js` |
 | --- | --- |
 | `dexToolsGetTokenPrice` and `dexToolsGetTokenFDV`, in `crypto-price-fetchers.gs`, wait up to `DEXTOOLS_CONFIG.LOCK_WAIT_MS`, 120 seconds, for the script lock, so a cell that waits more than 30 seconds shows `#ERROR!`, never the busy message the script returns when the wait ends. | dexToolsGetTokenPrice waits for the script lock no longer than Google lets a custom function run |
+| `writeSummCsv`, in `summ-csv/index.js`, told to replace a folder, writes the csv to a `.tmp` file beside it, fails to rename it, and leaves it; a write that fills the disk leaves a half-written file. | writeSummCsv, told to replace a folder, leaves nothing beside it |
+| `npm run summ-csv` takes a folder as `--out` and finds it only at the write. | npm run summ-csv refuses a folder as --out, naming --out, before it reads the rows |
+| crypto-price-filler ends with exit code 0, its file unwritten, when the program reading its log stops reading, though its help says 0 means the file was written. | is 1, not 0, when the program reading its log stops before the file is written |
+| crypto-price-filler takes an `--output` in a folder that does not exist, prices every row, and then ends with a stack trace. | refuses a file in a folder that does not exist, naming --output, before it asks anything |
+| crypto-price-filler's `--tz` refuses the current names of renamed zones, such as Asia/Kolkata, which its list spells as Asia/Calcutta. | takes a zone's current name, as the zone the list spells, and still refuses an abbreviation |
+| A Node version of a Sheets script, started without `.js`, as `node bin/crypto-price-fetchers`, does nothing and ends with exit code 0: `isEntryPoint`, in `apps-script-runner/command-line.js`, finds no file at `process.argv[1]`. | answer --help when node is started with the file's name without .js |
+| `askLine`, in `lib/ask-line.js`, drops a last answer piped in with no line end, so its question takes its default. | askLine gives a last answer that has no line end |
+| The key store's password prompt, `openSecretPrompt`, never takes the lines `askLine` kept from the same input, so a password piped in with the build's answers is lost. | the key store's password prompt takes the line askLine read past its answer |
+| The key manager, `api-key-store/key-manager.js`, takes a command it does not know, such as `chek-password` or `help`, as a word it ignores, and asks for every key not saved. | refuses a command it does not know, asking for no key |
+| crypto-price-filler's command line and `backfill.js` take a word they do not declare, such as `backfill-highest` typed without its dashes, and run without it. | crypto-price-filler and backfill refuse a word they do not take |
+| The Node versions of the Sheets scripts take a word past a command's arguments, and run. | a Node version refuses a word past its command's arguments, asking nothing |
+| `bin/unlock-api-keys.sh`, sourced in a bash whose `cd` is a function that prints, takes what it prints as part of the project's top folder, and keeps no password. | finds the project's top folder when the shell's cd prints |
+| The price clients in `dex-prices/` read a number in an answer with `Number`, which reads `null`, `""` and `false` as 0 and `true` as 1, so Moralis's block `null` gives block 0. | Moralis's blockAt gives null, not block 0, for an answer whose block is null |
+| `crypto-price-fetchers.gs`'s fetch functions give 0 when a request gets no answer, as when Apps Script's daily quota is used up, so the cell shows a false 0 and never the script's error message. | gives the script's error message, not 0 |
+| The `.gitignore` ignores the files in `output/csv/` and none directly in `output/`, so a file written there, such as `summ-csv/output/summ.csv`, is offered to git. | git ignores a file written directly in output/, as it does one in output/csv/ |
+| The exchange script prices a time less than 12 hours ago from the part of CoinGecko's 24 hours that is over, and keeps the price as final for 6 hours. | gives no CoinGecko price from a window that is not over, saying when to ask again |
+| The security lint's `no-secret-logging` passes a key printed through Apps Script's `Logger`, `tell` or `logv`, or held in a call, an object, an array, `??` or a secret's object. | refuses a key printed through Apps Script's Logger, tell or logv, or inside a call, an object or ?? |
+| `poolNamed`, in `crypto-price-fetchers.gs`, reads a pool only from `{{address, 0}}`, so a pool in a plain cell is dropped and the cell gives the token's price. | takes a pool named as text, not only as {{address, 0}} |
+| `openScriptFunctions`, in `apps-script-runner/`, checks a config file against the Node version's schemas but takes a `config` object unchecked. | checks a config object against the Node version's schemas, as it checks a file |
+| `requestSettings`, in `dex-prices/web-request.js`, lets a setting given as `undefined` replace its default. | keep a default for a setting given as undefined |
+| `waitForBudget`, in `dex-prices/geckoterminal.js`, counts a request without checking the budget again after a wait, so two calls that wait at once both send. | counts no more than 20 requests in 60 seconds when two calls wait at once |
