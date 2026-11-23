@@ -6,9 +6,9 @@
  * The answers stand in for the price services at the http layer: MEXC for
  * a pair it lists, CoinGecko for a coin MEXC does not list, and
  * CoinPaprika for a day its plan's candles do not reach. The runs start
- * the command line, `index.js`, in a child process with the stand-in MEXC
- * of `stand-in-fetch-preload.js`, or change the computer's time zone for
- * one call.
+ * the command line, `bin/crypto-price-filler.js`, in a child process with
+ * the stand-in MEXC of `stand-in-fetch-preload.js`, or change the
+ * computer's time zone for one call.
  */
 
 import { execFileSync, spawnSync } from "node:child_process";
@@ -183,15 +183,15 @@ export function runCommandLineForOneRow(options, cwd = FILLER_DIR) {
   }
 }
 
-/** The preload that hands a run of index.js settings of the test's own. */
+/** The preload that hands the command line settings of the test's own. */
 const SETTINGS_PRELOAD_URL = new URL(
   "./stand-in-settings-preload.js",
   import.meta.url,
 ).href;
 
 /**
- * Runs index.js in a folder, with the stand-in settings and the stand-in
- * fetch, as the owner runs it there.
+ * Runs the command line, `bin/crypto-price-filler.js`, in a folder, with
+ * the stand-in settings and the stand-in fetch, as the owner runs it there.
  *
  * @param {string} folder - The folder it runs in
  * @param {string[]} args - Its arguments

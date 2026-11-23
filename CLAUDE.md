@@ -330,7 +330,7 @@ examples use listed in it among them, and of a help into a closed pipe,
 are in `lib/command-line-help.js`, exported as
 `crypto-price-fetchers/lib/command-line-help`:
 `test/command-line-help.test.js` runs them on every command line here,
-and the repos that install this one run them in their own tests.
+and the repos that install this one run them in their own tests. `bin/unlock-api-keys.sh`, the script a terminal sources to keep the key store's password, is the one command line not in JavaScript: the help it answers is written in it, a reader of that help that stops reading ends it quietly, it ignores any argument but `-h` and `--help`, since a sourced script sees its caller's arguments, and that test runs it with bash.
 `docs/project-commands.md` lists every npm target, including those
 that run other tools, such as `lint` and `check`, and every command line
 run with `node`, each with its flags and an example. LP Ranger's rules do
@@ -428,7 +428,7 @@ them by the package's name, as `exports` in package.json names them:
 `crypto-price-fetchers/lib/message-of`, `…/lib/command-line-help`,
 `…/lib/closed-output`, `…/lib/calendar-day`, `…/lib/http-url`,
 `…/lib/repo-checks`, `…/lib/time-limited-fetch`, `…/lib/settings-file`,
-`…/lib/settings-schema` and `…/lib/option-conflicts`
+`…/lib/settings-schema`, `…/lib/option-conflicts` and `…/lib/new-file`
 (`test/package-exports.test.js` loads each by that name). The tests ask no
 outside service: the scripts' requests go to a stand-in fetch or a stand-in
 server on the computer (`test/helpers/stand-in-web.js`). The key store's

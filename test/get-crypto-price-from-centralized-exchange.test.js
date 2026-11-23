@@ -548,7 +548,7 @@ describe("getCryptoPriceFromCentralizedExchange.js, the command line", () => {
     assert.match(result.stdout, /Exit codes:/);
   });
 
-  it("runs as a program: node getCryptoPriceFromCentralizedExchange.js --help", () => {
+  it("runs as a program: node bin/getCryptoPriceFromCentralizedExchange.js --help", () => {
     const file = fileURLToPath(
       new URL(
         "../bin/getCryptoPriceFromCentralizedExchange.js",

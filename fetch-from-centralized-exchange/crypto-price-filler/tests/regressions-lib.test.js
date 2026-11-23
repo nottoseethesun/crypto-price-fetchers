@@ -1,6 +1,7 @@
 /**
  * Tests that guard fixed bugs in the repo's shared helpers, in `lib/`,
- * which crypto-price-filler and the projects that install this repo use.
+ * which the repo's own tools, crypto-price-filler and the projects that
+ * install this repo use.
  * The other fixed bugs' tests are in `regressions.test.js`,
  * `regressions-command-line.test.js` and `regressions-sheets.test.js`; a
  * bug found later gets its test in `known-bugs.test.js`, declared with
@@ -8,14 +9,20 @@
  * the four (see the repo's CLAUDE.md).
  * @module tests/regressions-lib.test
  *
- * The helpers run in the test's thread; the files the search for command
- * lines reads are written in a temp folder of the test's own.
+ * The helpers run in the test's thread, but for the copy to the clipboard,
+ * which runs in a child process, since its crash would fail the whole run;
+ * the files the search for command lines reads are written in a temp
+ * folder of the test's own.
  */
 
 import { afterAll, beforeAll, describe, it, expect } from "vitest";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { spawnSync } from "child_process";
+import { pathToFileURL } from "url";
+import { PassThrough } from "stream";
+import { askLine } from "../../../lib/ask-line.js";
 import { filesUsingCommander } from "../../../lib/command-line-help.js";
 import { fetchWithinTimeLimit } from "../../../lib/time-limited-fetch.js";
 import {
@@ -110,5 +117,65 @@ describe("the time-limited fetch", () => {
         ),
       ).rejects.toThrow(/a whole number of milliseconds from 1 to 2147483647/);
     }
+  });
+});
+
+describe("the copy to the clipboard (lib/clipboard.js)", () => {
+  it("copyToClipboard rejects, naming the exit code, when the tool exits without reading its input", () => {
+    const clipboard = pathToFileURL(
+      path.resolve(__dirname, "../../../lib/clipboard.js"),
+    ).href;
+    const code = [
+      `import { copyToClipboard } from ${JSON.stringify(clipboard)};`,
+      "const tool = { command: process.execPath, args: ['-e', 'process.exit(1)'] };",
+      "try {",
+      "  await copyToClipboard(tool, 'x'.repeat(10000000));",
+      "  console.log('resolved');",
+      "} catch (error) {",
+      "  console.log(`rejected: ${error.message}`);",
+      "}",
+    ].join("\n");
+    const run = spawnSync(
+      process.execPath,
+      ["--input-type=module", "-e", code],
+      {
+        encoding: "utf8",
+      },
+    );
+    expect(run.stdout.trim()).toBe(
+      `rejected: ${process.execPath} exited with code 1`,
+    );
+    expect(run.status).toBe(0);
+  });
+});
+
+describe("the questions at the terminal (lib/ask-line.js)", () => {
+  it("askLine gives each question its own line of the answers piped in together", async () => {
+    const input = new PassThrough();
+    const output = { write: () => true };
+    input.write("n\ny\n");
+    const first = await askLine("First? ", { input, output });
+    const asked = askLine("Second? ", { input, output });
+    input.end();
+    const second = await asked;
+    expect([first, second]).toEqual(["n", "y"]);
+  });
+
+  it("askLine gives null at once to a question asked after the input has ended", async () => {
+    const input = new PassThrough();
+    const output = { write: () => true };
+    const first = askLine("First? ", { input, output });
+    input.end();
+    expect(await first).toBe(null);
+    let timer;
+    const waited = new Promise((resolve) => {
+      timer = setTimeout(resolve, 1000, "no answer after 1 second");
+    });
+    const second = await Promise.race([
+      askLine("Second? ", { input, output }),
+      waited,
+    ]);
+    clearTimeout(timer);
+    expect(second).toBe(null);
   });
 });

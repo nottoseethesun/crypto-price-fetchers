@@ -1,9 +1,9 @@
 /**
- * Tests that the command line, `index.js`, opens the CoinGecko api key
- * saved in the repo's key file before it prices anything.
+ * Tests that the command line, `bin/crypto-price-filler.js`, opens the
+ * CoinGecko api key saved in the repo's key file before it prices anything.
  * @module tests/coingecko-api-key.test
  *
- * Each test runs `index.js` in a child process over one XTM row, with the
+ * Each test runs the tool in a child process over one XTM row, with the
  * stand-in MEXC and CoinGecko of `helpers/stand-in-fetch-preload.js`, whose
  * ping takes one key alone. The key files are in a temp folder, removed
  * afterwards, and `API_KEYS_FILE_PATH` names the one a run reads. The

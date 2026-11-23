@@ -243,8 +243,9 @@ export function keyConfig(apiKeys) {
 
 /**
  * What `npm run build apps-script` puts of this script in the one file it
- * gives for the sheet (`apps-script-build/`): its three files, the in-editor
- * tests included, the first one's header holding a help section, with the
+ * gives for the sheet (`build/tools/apps-script-build/`): its three
+ * files, the in-editor tests included, the first one's header holding a
+ * help section, with the
  * CoinGecko and CoinPaprika keys set at the end of the built file as
  * `keyConfig` sets them here.
  */

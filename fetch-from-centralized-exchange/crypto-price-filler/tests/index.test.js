@@ -96,8 +96,8 @@ describe("Crypto Price Filler Helpers", () => {
     });
   });
 
-  // Smoke/integration test for the CLI entry point (index.js)
-  describe("CLI entry point (index.js) smoke/integration test", () => {
+  // Smoke/integration test for the CLI entry point (bin/crypto-price-filler.js)
+  describe("CLI entry point (bin/crypto-price-filler.js) smoke/integration test", () => {
     const { execSync } = require("child_process");
     const path = require("path");
 

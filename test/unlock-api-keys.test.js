@@ -4,7 +4,8 @@
  * @module test/unlock-api-keys.test
  *
  * Each test sources the real script in bash, with the password typed on
- * its stdin, then has bash say whether `API_KEYS_PASSWORD` holds it. The
+ * its stdin, then has bash say whether `API_KEYS_PASSWORD` holds it, and
+ * end with the status the script returned. The
  * script checks the password with the real `bin/manage-api-keys.js`, against a
  * key file in a temp folder of the test's own, which `API_KEYS_FILE_PATH`
  * names, removed afterwards. The same tests run in zsh where zsh is
@@ -26,10 +27,11 @@ const SCRIPT = fileURLToPath(
 
 /**
  * What a shell runs: source the script, then say whether
- * `API_KEYS_PASSWORD` holds the password expected, without printing it.
+ * `API_KEYS_PASSWORD` holds the password expected, without printing it,
+ * and end with the status the script returned.
  */
 const SOURCE_AND_TELL =
-  'source "$1"; if [ "${API_KEYS_PASSWORD+set}" = set ] && [ "$API_KEYS_PASSWORD" = "$2" ]; then echo kept; else echo "not kept"; fi';
+  'source "$1"; returned=$?; if [ "${API_KEYS_PASSWORD+set}" = set ] && [ "$API_KEYS_PASSWORD" = "$2" ]; then echo kept; else echo "not kept"; fi; exit "$returned"';
 
 /**
  * Says whether a shell is installed.
@@ -88,6 +90,7 @@ for (const shell of ["bash", "zsh"]) {
 
       it("keeps a password that opens the keys saved, saying so, and shows nothing of it", () => {
         const run = source("right-password\n", "right-password");
+        assert.equal(run.status, 0);
         assert.equal(
           run.stdout,
           "The password opens the api key saved in " + keyFile + ".\nkept\n",
@@ -104,6 +107,7 @@ for (const shell of ["bash", "zsh"]) {
 
       it("keeps no password that does not open them", () => {
         const run = source("wrong-password\n", "wrong-password");
+        assert.equal(run.status, 1);
         assert.equal(run.stdout, "not kept\n");
         assert.match(
           run.stderr,
@@ -113,6 +117,7 @@ for (const shell of ["bash", "zsh"]) {
 
       it("keeps no empty password", () => {
         const run = source("\n", "");
+        assert.equal(run.status, 1);
         assert.equal(run.stdout, "not kept\n");
         assert.match(run.stderr, /No password was typed, so none is kept\.\n$/);
       });
@@ -123,10 +128,39 @@ for (const shell of ["bash", "zsh"]) {
           "first-password",
           path.join(folder, "no-keys-yet.json"),
         );
+        assert.equal(run.status, 0);
         assert.match(
           run.stdout,
           /^No api key is saved in .* yet; npm run api-keys saves them with this password\.\nkept\n$/,
         );
+      });
+
+      it("answers --help and -h, sourced, with its help, asking nothing and keeping no password", () => {
+        const env = { ...process.env, API_KEYS_FILE_PATH: keyFile };
+        delete env.API_KEYS_PASSWORD;
+        for (const flag of ["--help", "-h"]) {
+          const run = spawnSync(
+            shell,
+            [
+              "-c",
+              'source "$1" "$2"; echo "returned $? ${API_KEYS_PASSWORD+kept}"',
+              shell,
+              SCRIPT,
+              flag,
+            ],
+            {
+              env,
+              input: "right-password\n",
+              encoding: "utf8",
+              timeout: 30000,
+            },
+          );
+          assert.match(
+            run.stdout,
+            /^Usage: source \.\/bin\/unlock-api-keys\.sh \[options\]\n[^]*\nreturned 0 \n$/,
+          );
+          assert.equal(run.stderr, "");
+        }
       });
 
       it("run as a program, says to source it, and stops with exit code 1", () => {
