@@ -97,13 +97,16 @@ const PRICE_INDEX = Object.freeze({ open: 1, high: 2, low: 3, close: 4 });
  * @returns {Promise<void>} Settles once the request may be sent
  */
 async function waitForBudget(settings) {
-  const now = settings.now();
-  const log = settings.requestLog;
-  while (log.length > 0 && log[0] <= now - WINDOW_MS) log.shift();
-  if (log.length >= REQUESTS_PER_WINDOW) {
+  for (;;) {
+    const now = settings.now();
+    const log = settings.requestLog;
+    while (log.length > 0 && log[0] <= now - WINDOW_MS) log.shift();
+    if (log.length < REQUESTS_PER_WINDOW) {
+      log.push(now);
+      return;
+    }
     await settings.sleep(log[0] + WINDOW_MS - now);
   }
-  log.push(settings.now());
 }
 
 /**

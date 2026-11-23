@@ -6,10 +6,11 @@
  * Each test sources the real script in bash, with the password typed on
  * its stdin, then has bash say whether `API_KEYS_PASSWORD` holds it, and
  * end with the status the script returned. The
- * script checks the password with the real `bin/manage-api-keys.js`, against a
+ * script checks the password with the real `bin/end-user/manage-api-keys.js`, against a
  * key file in a temp folder of the test's own, which `API_KEYS_FILE_PATH`
  * names, removed afterwards. The same tests run in zsh where zsh is
- * installed.
+ * installed, which none of the computers that run the automated tests
+ * is: the README's test section lists their run by hand.
  */
 
 import { after, before, describe, it } from "node:test";

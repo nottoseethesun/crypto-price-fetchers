@@ -4,8 +4,9 @@
 #
 # A `check` job for each Node version the repo supports runs
 # `npm run check`, the single gate:
-# lint (ESLint, markdownlint, Prettier, actionlint, knip) → the tests of
-# the runner, the Node versions and the key store, with 80% line coverage
+# lint (ESLint, markdownlint, Prettier, actionlint, knip) → the top
+# folder's tests, of every part but crypto-price-filler, with 80% line
+# coverage
 # → crypto-price-filler's tests, with its coverage floor → the security
 # audits (npm audit, the security lint, secretlint). It installs the
 # repo's packages and crypto-price-filler's, which has its own.
@@ -54,12 +55,12 @@ jobs:
           cache: "npm"
           cache-dependency-path: |
             package-lock.json
-            fetch-from-centralized-exchange/crypto-price-filler/package-lock.json
+            fetch-from-any-exchange/crypto-price-filler/package-lock.json
 
       - name: Install dependencies
         run: |
           npm ci
-          npm ci --prefix fetch-from-centralized-exchange/crypto-price-filler
+          npm ci --prefix fetch-from-any-exchange/crypto-price-filler
 
       - name: Run npm run check (lint + tests + coverage + security audits)
         run: npm run check

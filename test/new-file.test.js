@@ -25,6 +25,8 @@ describe("newFileRefusal", () => {
     { skip: !fs.existsSync("/proc") && "this system has no /proc" },
     () => {
       assert.match(newFileRefusal("/proc"), /^E[A-Z]+$/);
+      if (process.getuid?.() === 0)
+        assert.doesNotThrow(() => fs.accessSync("/proc", fs.constants.W_OK));
     },
   );
 });

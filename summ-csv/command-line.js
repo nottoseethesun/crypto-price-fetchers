@@ -22,6 +22,7 @@
 import fs from "node:fs";
 import { Command, CommanderError } from "commander";
 import { messageOf } from "../lib/message-of.js";
+import { fileToWriteArgument } from "../lib/file-to-write.js";
 import { writeSummCsv } from "./index.js";
 
 /** The end of the help: the rows file, and what is refused. */
@@ -83,8 +84,13 @@ export function runSummCsv(argv, deps = {}) {
       "--template <file>",
       "the template, whose first line is Summ's header",
     )
-    .requiredOption("--out <file>", "the csv file to write")
+    .requiredOption(
+      "--out <file>",
+      "the csv file to write, in a folder that exists",
+      fileToWriteArgument,
+    )
     .option("--replace", "write over a file already at --out")
+    .allowExcessArguments(false)
     .addHelpText("after", HELP_AFTER)
     .exitOverride()
     .configureOutput({

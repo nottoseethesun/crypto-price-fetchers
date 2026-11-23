@@ -22,38 +22,45 @@ commands `package.json` names. The build joins the menu,
 `src/crypto-price-fetchers-menu.gs`, which runs a spreadsheet's price
 cells again; then `crypto-price-fetchers/src/crypto-price-fetchers.gs`,
 a token's price now; then the exchange script, a token's price at a past
-time, in three files in `fetch-from-centralized-exchange/src/`:
+time, in three files in `fetch-from-any-exchange/src/`:
 `getCryptoPriceFromCentralizedExchange.gs`, its `-sources.gs` and its
 `-tests.gs`. A name one file uses from another is declared in a
 `/* global */` comment, and no two files declare one top-level name.
 
 ## Where things are
 
-The programs a reader runs from a terminal are in `bin/`: the Node
-versions of the two price scripts, crypto-price-filler's two start files,
-the Summ csv utility, the key manager, the versions tool,
-`run-actionlint` and `unlock-api-keys.sh`. Each of the two price tools
+The programs a reader runs from a terminal are in `bin/`. Those an end
+user runs are in `bin/end-user/`: the Node versions of the two price
+scripts, crypto-price-filler's start file and the key manager. The rest
+are in `bin/` itself: crypto-price-filler's `backfill.js`, the Summ csv
+utility, which writes the csv files the owner imports into Summ, his
+crypto tax calculator, the versions tool, `run-actionlint` and
+`unlock-api-keys.sh`. Each of the two price tools
 has a folder of its own at the repo's top, which holds its Sheets
 scripts, in its `src/`, its README and its settings:
 `crypto-price-fetchers/`, a token's price now, and
-`fetch-from-centralized-exchange/`, a token's price at a past time, which
-also holds crypto-price-filler's package. The top `src/` holds the menu,
+`fetch-from-any-exchange/`, a token's price at a past time, from
+centralized exchanges, and, through crypto-price-filler, whose package it
+also holds, from the pools of decentralized exchanges too. The top `src/` holds the menu,
 which the build joins with both tools' scripts. The build's tools are in
 `build/tools/`: `build.js`, the build's modules in `apps-script-build/`,
 and `audit-dex-screener.js`. The file the build writes when there is no
-clipboard goes to `dist/apps-script/`, which git ignores. The install of
+clipboard goes to `dist/apps-script/`, which git, the version-control
+program, ignores. The install of
 the programs of the computer's operating system that the tools use and
 npm does not install, today the build's clipboard tool, is in
 `install/`: `npm run os-dependencies` runs
 `install/install-os-dependencies.js`, the README's second step of
-Install, which installs with Homebrew, or, without it, recommends it and
-offers apt, and the build offers the same install
+Install, which installs with Homebrew, a package manager of macOS and
+Linux, or, without it, recommends it and offers apt, the package manager
+of Debian and Ubuntu, and the build offers the same install
 (`install/os-dependencies.js`) when it finds no clipboard tool. The code the
 programs share stays in folders of its own (`lib/`, `dex-prices/`,
 `summ-csv/`, `api-key-store/`, `apps-script-runner/`, `actionlint/`,
 `github-project-deps/`), and crypto-price-filler's in its package,
-`fetch-from-centralized-exchange/crypto-price-filler/`, whose start
-files in `bin/` load it.
+`fetch-from-any-exchange/crypto-price-filler/`, whose start
+files, `bin/end-user/crypto-price-filler.js` and `bin/backfill.js`, load
+it.
 
 A tool that reads the owner's own files takes them from its `input/`
 folder, and writes its results in its `output/` folder, in a folder for
@@ -69,16 +76,16 @@ folders.
 
 ## Node versions of the Sheets scripts
 
-Each `.gs` that gives a price has a Node version in `bin/`, which runs it
-on Node, under the same name ending in `.js`: `bin/crypto-price-fetchers.js`
-and `bin/getCryptoPriceFromCentralizedExchange.js`.
+Each `.gs` that gives a price has a Node version in `bin/end-user/`, which runs it
+on Node, under the same name ending in `.js`: `bin/end-user/crypto-price-fetchers.js`
+and `bin/end-user/getCryptoPriceFromCentralizedExchange.js`.
 The menu gives none and has none; its tests run it with a stand-in
 spreadsheet.
 A Node version runs its `.gs` unchanged, through the runner in
 `apps-script-runner/`, and never copies the script's logic, since LP
 Ranger's rules forbid a second copy. A fix belongs in the `.gs`, where it
 fixes both. crypto-price-filler, the Node tool in
-`fetch-from-centralized-exchange/crypto-price-filler/` that fills a CSV's
+`fetch-from-any-exchange/crypto-price-filler/` that fills a CSV's
 price columns, keeps no price source of its own for MEXC, a centralized
 exchange, or CoinGecko or CoinPaprika, two services that gather the
 exchanges' prices: it asks the exchange script's, through its Node
@@ -168,7 +175,7 @@ are kept in `api-keys.json` at
 the repo's top, which git, the version-control program, ignores,
 encrypted with one password the owner types: LP Ranger's design, built as a
 module any project can use, `api-key-store/` (its README shows how).
-`npm run api-keys` runs the key manager, `bin/manage-api-keys.js`. A
+`npm run api-keys` runs the key manager, `bin/end-user/manage-api-keys.js`. A
 program opens its keys with the password in `API_KEYS_PASSWORD`, which
 `source ./bin/unlock-api-keys.sh`, a script in `bin/`, keeps for a
 terminal, or else asks for it, and keeps the keys only in memory.
@@ -286,8 +293,9 @@ checks, never as development packages, which it skips.
 ## Docs
 
 `docs/architecture.md` says how the parts fit, `docs/engineering.md`
-covers the files, the gates, the tests and CI (the gates, run by GitHub
-Actions at each push), and
+covers the files, the programs in `bin/` the README leaves out, the gates,
+the tests and CI (the gates, run at each push by GitHub Actions, GitHub's
+service that runs a repo's workflows), and
 `docs/project-commands.md` lists every command, those npm runs and those
 run with `node` or `source`, as LP Ranger's `docs/` does. A change keeps
 them true.
@@ -362,8 +370,9 @@ and no branch is deleted. LP Ranger's eight steps in
 `docs/claude/CLAUDE-CI.md` take a change to `main`.
 
 The security lint runs `eslint-rules/no-secret-logging.js`, which refuses
-printing a name that may hold a secret, through `console`, a stream's
-`write` or `say`. A name that sounds like a secret but holds none is
+printing a name that may hold a secret, through `console` or Apps
+Script's `Logger`, a stream's `write`, or `say`, `tell` or `logv`. A name
+that sounds like a secret but holds none is
 renamed, never excused. pulsechain-analytics,
 pulsechain-validator-analytics and x1-validator-analytics run the rule
 from this repo (`crypto-price-fetchers/eslint-rules/no-secret-logging`).
@@ -415,8 +424,10 @@ tracked files (`test/repo-checks.test.js`) are tested from the repo's top
 folder, on Node's own test runner. The tracked files are held to the
 checks of `lib/repo-checks.js`: every EVM address in EIP-55's form, every
 npm target named in `docs/project-commands.md`, every test file and
-helper named in `docs/engineering.md` or here, every link and path in a
-doc pointing at a file, folder or heading the repo keeps, and a
+helper named in `docs/engineering.md` or here, every link in a doc, and
+every path in a code span that starts at the doc's own folder, with `.`
+or `..` as its first part, pointing at a file, folder or heading the repo
+keeps, and a
 `config-example.json` beside every `config.json`. The menu runs against a
 spreadsheet held in memory
 (`test/helpers/stand-in-spreadsheet.js`), and DEX Screener's part is
@@ -428,7 +439,8 @@ them by the package's name, as `exports` in package.json names them:
 `crypto-price-fetchers/lib/message-of`, `…/lib/command-line-help`,
 `…/lib/closed-output`, `…/lib/calendar-day`, `…/lib/http-url`,
 `…/lib/repo-checks`, `…/lib/time-limited-fetch`, `…/lib/settings-file`,
-`…/lib/settings-schema`, `…/lib/option-conflicts` and `…/lib/new-file`
+`…/lib/settings-schema`, `…/lib/option-conflicts`, `…/lib/new-file`
+and `…/lib/file-to-write`
 (`test/package-exports.test.js` loads each by that name). The tests ask no
 outside service: the scripts' requests go to a stand-in fetch or a stand-in
 server on the computer (`test/helpers/stand-in-web.js`). The key store's
@@ -437,14 +449,21 @@ tests save keys in temp folders of their own
 written by LP Ranger's own code, checks that the store opens LP Ranger's
 files.
 
+`test/unlock-api-keys.test.js` runs `bin/unlock-api-keys.sh` in bash.
+Its tests in zsh, the default shell of macOS, run only where zsh is
+installed, which no computer that runs the automated tests is: zsh is
+one of the computer's own programs, which the owner's rule keeps out of
+the automated tests, so the README's test section lists their run by
+hand.
+
 ```bash
 npm ci
-npm ci --prefix fetch-from-centralized-exchange/crypto-price-filler
+npm ci --prefix fetch-from-any-exchange/crypto-price-filler
 npm run check
 ```
 
 crypto-price-filler's tests are in
-`fetch-from-centralized-exchange/crypto-price-filler/tests/`, on vitest,
+`fetch-from-any-exchange/crypto-price-filler/tests/`, on vitest,
 and `npm run test:filler` runs them from the top folder. They ask no
 outside service either. The top folder's lint covers the filler.
 
@@ -463,17 +482,18 @@ functions inside the scripts that the owner runs by hand. crypto-price-filler's
   the exchange sources, whose Sheets script then runs for real in its
   worker, and the pool sources, whose shared clients then ask it.
 - `stand-in-fetch-preload.js` runs the real command line,
-  `bin/crypto-price-filler.js`, in a
+  `bin/end-user/crypto-price-filler.js`, in a
   child process against a stand-in MEXC, and a stand-in CoinGecko ping that
   takes the one key in `stand-in-coingecko-key.js`.
 - `stand-in-settings-preload.js` hands the command line, run in a child
   process, a settings file, a token list or a `config.json` of the
   exchange script of the test's own, from an environment variable, since
   the tool reads its two beside its own files, and the exchange script's
-  Node version its own in `fetch-from-centralized-exchange/`, and a test
+  Node version its own in `fetch-from-any-exchange/`, and a test
   never writes the owner's settings.
 - `regression-runs.js` holds the settings, stand-in answers, times and
-  runs that the regression tests and the known-bug tests share.
+  runs that the regression tests share, and a known-bug test that needs
+  them.
 - `log-lines.js` reads the lines the tool prints through its log's seam
   (`utils/log.js`), so no test replaces `console.log`.
 
@@ -483,37 +503,27 @@ A bug found gets a test in crypto-price-filler's
 `tests/known-bugs.test.js`, declared with `it.fails`, so it passes while the
 bug is present, and a row in the table below. Its fix makes the test fail;
 the same change declares the test with `it`, moves it to the tests that
-guard the fixed bugs, `tests/regressions-command-line.test.js` for the
-repo's command lines, `tests/regressions-lib.test.js` for the shared
-helpers in `lib/`, `tests/regressions-sheets.test.js` for a test that
-runs a Sheets script in the test's thread, and `tests/regressions.test.js`
-for any other, and removes the row. `tests/regressions.test.js` also
-holds older tests that run a Sheets script that way.
+guard the fixed bugs of its area, and removes the row:
+
+- `tests/regressions-command-line.test.js`: crypto-price-filler's two
+  command lines;
+- `tests/regressions-other-command-lines.test.js`: the repo's other
+  command lines, the Node versions', summ-csv's, the key manager's and
+  `bin/unlock-api-keys.sh`;
+- `tests/regressions-lib.test.js`: the shared helpers in `lib/`;
+- `tests/regressions-shared-code.test.js`: the other code the projects
+  that install this repo use: the runner, summ-csv, the key store, the
+  clients in `dex-prices/` and the lint rules;
+- `tests/regressions-sheets.test.js`: a test that runs the exchange
+  script in the test's thread;
+- `tests/regressions-sheets-price-now.test.js`: a test that runs the
+  current-price script, or the menu with it, in the test's thread;
+- `tests/regressions.test.js`: any other; it also holds older tests that
+  run the exchange script in the test's thread.
 
 Google stops a custom function, a function a cell calls, after 30 seconds,
-and the cell shows `#ERROR!`. The first bug below is a wait longer than that.
+and the cell shows `#ERROR!`. The bug below is a wait longer than that.
 
 | Bug | Test in `tests/known-bugs.test.js` |
 | --- | --- |
 | `dexToolsGetTokenPrice` and `dexToolsGetTokenFDV`, in `crypto-price-fetchers.gs`, wait up to `DEXTOOLS_CONFIG.LOCK_WAIT_MS`, 120 seconds, for the script lock, so a cell that waits more than 30 seconds shows `#ERROR!`, never the busy message the script returns when the wait ends. | dexToolsGetTokenPrice waits for the script lock no longer than Google lets a custom function run |
-| `writeSummCsv`, in `summ-csv/index.js`, told to replace a folder, writes the csv to a `.tmp` file beside it, fails to rename it, and leaves it; a write that fills the disk leaves a half-written file. | writeSummCsv, told to replace a folder, leaves nothing beside it |
-| `npm run summ-csv` takes a folder as `--out` and finds it only at the write. | npm run summ-csv refuses a folder as --out, naming --out, before it reads the rows |
-| crypto-price-filler ends with exit code 0, its file unwritten, when the program reading its log stops reading, though its help says 0 means the file was written. | is 1, not 0, when the program reading its log stops before the file is written |
-| crypto-price-filler takes an `--output` in a folder that does not exist, prices every row, and then ends with a stack trace. | refuses a file in a folder that does not exist, naming --output, before it asks anything |
-| crypto-price-filler's `--tz` refuses the current names of renamed zones, such as Asia/Kolkata, which its list spells as Asia/Calcutta. | takes a zone's current name, as the zone the list spells, and still refuses an abbreviation |
-| A Node version of a Sheets script, started without `.js`, as `node bin/crypto-price-fetchers`, does nothing and ends with exit code 0: `isEntryPoint`, in `apps-script-runner/command-line.js`, finds no file at `process.argv[1]`. | answer --help when node is started with the file's name without .js |
-| `askLine`, in `lib/ask-line.js`, drops a last answer piped in with no line end, so its question takes its default. | askLine gives a last answer that has no line end |
-| The key store's password prompt, `openSecretPrompt`, never takes the lines `askLine` kept from the same input, so a password piped in with the build's answers is lost. | the key store's password prompt takes the line askLine read past its answer |
-| The key manager, `api-key-store/key-manager.js`, takes a command it does not know, such as `chek-password` or `help`, as a word it ignores, and asks for every key not saved. | refuses a command it does not know, asking for no key |
-| crypto-price-filler's command line and `backfill.js` take a word they do not declare, such as `backfill-highest` typed without its dashes, and run without it. | crypto-price-filler and backfill refuse a word they do not take |
-| The Node versions of the Sheets scripts take a word past a command's arguments, and run. | a Node version refuses a word past its command's arguments, asking nothing |
-| `bin/unlock-api-keys.sh`, sourced in a bash whose `cd` is a function that prints, takes what it prints as part of the project's top folder, and keeps no password. | finds the project's top folder when the shell's cd prints |
-| The price clients in `dex-prices/` read a number in an answer with `Number`, which reads `null`, `""` and `false` as 0 and `true` as 1, so Moralis's block `null` gives block 0. | Moralis's blockAt gives null, not block 0, for an answer whose block is null |
-| `crypto-price-fetchers.gs`'s fetch functions give 0 when a request gets no answer, as when Apps Script's daily quota is used up, so the cell shows a false 0 and never the script's error message. | gives the script's error message, not 0 |
-| The `.gitignore` ignores the files in `output/csv/` and none directly in `output/`, so a file written there, such as `summ-csv/output/summ.csv`, is offered to git. | git ignores a file written directly in output/, as it does one in output/csv/ |
-| The exchange script prices a time less than 12 hours ago from the part of CoinGecko's 24 hours that is over, and keeps the price as final for 6 hours. | gives no CoinGecko price from a window that is not over, saying when to ask again |
-| The security lint's `no-secret-logging` passes a key printed through Apps Script's `Logger`, `tell` or `logv`, or held in a call, an object, an array, `??` or a secret's object. | refuses a key printed through Apps Script's Logger, tell or logv, or inside a call, an object or ?? |
-| `poolNamed`, in `crypto-price-fetchers.gs`, reads a pool only from `{{address, 0}}`, so a pool in a plain cell is dropped and the cell gives the token's price. | takes a pool named as text, not only as {{address, 0}} |
-| `openScriptFunctions`, in `apps-script-runner/`, checks a config file against the Node version's schemas but takes a `config` object unchecked. | checks a config object against the Node version's schemas, as it checks a file |
-| `requestSettings`, in `dex-prices/web-request.js`, lets a setting given as `undefined` replace its default. | keep a default for a setting given as undefined |
-| `waitForBudget`, in `dex-prices/geckoterminal.js`, counts a request without checking the budget again after a wait, so two calls that wait at once both send. | counts no more than 20 requests in 60 seconds when two calls wait at once |

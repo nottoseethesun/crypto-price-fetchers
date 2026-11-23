@@ -12,7 +12,7 @@
  */
 
 import { endQuietlyWhenOutputCloses } from "../lib/closed-output.js";
-import { backfillCommandLine } from "../fetch-from-centralized-exchange/crypto-price-filler/backfill.js";
+import { backfillCommandLine } from "../fetch-from-any-exchange/crypto-price-filler/backfill.js";
 
 endQuietlyWhenOutputCloses();
 await backfillCommandLine();

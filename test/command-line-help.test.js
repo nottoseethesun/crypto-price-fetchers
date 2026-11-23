@@ -35,7 +35,7 @@ after(removeTempFolders);
 const REPO_TOP = fileURLToPath(new URL("..", import.meta.url));
 
 /** The folder of crypto-price-filler, a package of its own. */
-const FILLER = "fetch-from-centralized-exchange/crypto-price-filler";
+const FILLER = "fetch-from-any-exchange/crypto-price-filler";
 
 /**
  * Every command line: the file it runs, the program that runs that file,
@@ -45,18 +45,21 @@ const FILLER = "fetch-from-centralized-exchange/crypto-price-filler";
 const COMMAND_LINES = Object.freeze([
   { file: "build/tools/build.js", command: [] },
   { file: "build/tools/build.js", command: ["apps-script"] },
-  { file: "bin/manage-api-keys.js", command: [] },
-  { file: "bin/manage-api-keys.js", command: ["set"] },
-  { file: "bin/manage-api-keys.js", command: ["check-password"] },
+  { file: "bin/end-user/manage-api-keys.js", command: [] },
+  { file: "bin/end-user/manage-api-keys.js", command: ["set"] },
+  { file: "bin/end-user/manage-api-keys.js", command: ["check-password"] },
   { file: "bin/summ-csv.js", command: [] },
   { file: "bin/github-project-deps.js", command: [] },
   { file: "build/tools/audit-dex-screener.js", command: [] },
   { file: "bin/run-actionlint.js", command: [] },
-  { file: "bin/crypto-price-fetchers.js", command: [] },
-  { file: "bin/crypto-price-fetchers.js", command: ["price"] },
-  { file: "bin/crypto-price-fetchers.js", command: ["fdv"] },
-  { file: "bin/getCryptoPriceFromCentralizedExchange.js", command: [] },
-  { file: "bin/crypto-price-filler.js", command: [] },
+  { file: "bin/end-user/crypto-price-fetchers.js", command: [] },
+  { file: "bin/end-user/crypto-price-fetchers.js", command: ["price"] },
+  { file: "bin/end-user/crypto-price-fetchers.js", command: ["fdv"] },
+  {
+    file: "bin/end-user/getCryptoPriceFromCentralizedExchange.js",
+    command: [],
+  },
+  { file: "bin/end-user/crypto-price-filler.js", command: [] },
   { file: "bin/backfill.js", command: [] },
   { file: "install/install-os-dependencies.js", command: [] },
   { program: "bash", file: "bin/unlock-api-keys.sh", command: [] },
@@ -70,12 +73,12 @@ const COMMAND_MODULES = Object.freeze({
   "build/tools/apps-script-build/index.js": "build/tools/build.js",
   "build/tools/apps-script-build/dex-screener-files.js":
     "build/tools/audit-dex-screener.js",
-  "api-key-store/key-manager.js": "bin/manage-api-keys.js",
+  "api-key-store/key-manager.js": "bin/end-user/manage-api-keys.js",
   "summ-csv/command-line.js": "bin/summ-csv.js",
   "github-project-deps/index.js": "bin/github-project-deps.js",
   "actionlint/index.js": "bin/run-actionlint.js",
-  "apps-script-runner/command-line.js": "bin/crypto-price-fetchers.js",
-  [`${FILLER}/commander.js`]: "bin/crypto-price-filler.js",
+  "apps-script-runner/command-line.js": "bin/end-user/crypto-price-fetchers.js",
+  [`${FILLER}/commander.js`]: "bin/end-user/crypto-price-filler.js",
   [`${FILLER}/backfill.js`]: "bin/backfill.js",
   "install/os-dependencies.js": "install/install-os-dependencies.js",
 });

@@ -1,6 +1,6 @@
 /**
- * Tests for bin/getCryptoPriceFromCentralizedExchange.js,
- * the Node version of fetch-from-centralized-exchange/src/getCryptoPriceFromCentralizedExchange.gs.
+ * Tests for bin/end-user/getCryptoPriceFromCentralizedExchange.js,
+ * the Node version of fetch-from-any-exchange/src/getCryptoPriceFromCentralizedExchange.gs.
  * @module test/get-crypto-price-from-centralized-exchange.test
  *
  * The real `.gs` runs under the real runner. Its requests go to a stand-in
@@ -26,7 +26,7 @@ import {
   openCentralizedExchangePrices,
   openCentralizedExchangeSources,
   runCommandLine,
-} from "../bin/getCryptoPriceFromCentralizedExchange.js";
+} from "../bin/end-user/getCryptoPriceFromCentralizedExchange.js";
 import { capturedOutput } from "./helpers/captured-output.js";
 import { mexcKlines } from "./helpers/stand-in-mexc.js";
 import { standInFetch } from "./helpers/stand-in-web.js";
@@ -235,19 +235,14 @@ describe("openCentralizedExchangePrices", () => {
     );
   });
 
-  it("lays the keys it is given over the config's values", async () => {
-    await withPrices(
-      answerCoinGeckoRange,
-      async (prices, fetch) => {
-        await prices.getCryptoPrice("xtm", ROW_TIME, "UTC", "high");
-        assert.deepEqual(coinGeckoKeysSent(fetch), [
-          ["/api/v3/coins/minotari/market_chart/range", "gecko-key"],
-        ]);
-      },
-      {
+  it("refuses a config object that sets an api key, as it refuses a file that does", async () => {
+    await assert.rejects(
+      openCentralizedExchangePrices({
         config: { CONFIG: { COINGECKO_API_KEY: "" } },
         apiKeys: { coingecko: "gecko-key" },
-      },
+        fetch: standInFetch(answerCoinGeckoRange),
+      }),
+      /the config given → CONFIG\.COINGECKO_API_KEY is not a setting this tool reads/,
     );
   });
 
@@ -548,10 +543,10 @@ describe("getCryptoPriceFromCentralizedExchange.js, the command line", () => {
     assert.match(result.stdout, /Exit codes:/);
   });
 
-  it("runs as a program: node bin/getCryptoPriceFromCentralizedExchange.js --help", () => {
+  it("runs as a program: node bin/end-user/getCryptoPriceFromCentralizedExchange.js --help", () => {
     const file = fileURLToPath(
       new URL(
-        "../bin/getCryptoPriceFromCentralizedExchange.js",
+        "../bin/end-user/getCryptoPriceFromCentralizedExchange.js",
         import.meta.url,
       ),
     );

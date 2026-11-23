@@ -12,8 +12,9 @@
  * How: the values for the script's config objects come from `config` when
  * the caller passes them, or else from a config file: `configFile` when
  * named, which must then exist, or the Node version's default file, which
- * may be missing (`readConfigFile`), checked against the Node version's
- * schemas of its config objects (`configSchemas`). Api keys the Node
+ * may be missing (`readConfigFile`). The values, from `config` or from the
+ * file, are checked against the Node version's schemas of its config
+ * objects (`configSchemas`). Api keys the Node
  * version opened are laid over those values (`configOverlay`,
  * `layConfig`), or handed to the script as Script Properties. The script opens once (`openAppsScript`),
  * and each function calls into it.
@@ -21,8 +22,12 @@
  * Fit: the Node versions' open functions call this.
  */
 
-import { layConfig, readConfigFile } from "./config-file.js";
+import { configFileSchema, layConfig, readConfigFile } from "./config-file.js";
 import { openAppsScript } from "./run-apps-script.js";
+import {
+  compileSettingsSchema,
+  settingsProblems,
+} from "../lib/settings-schema.js";
 
 /**
  * Opens a Sheets script and returns the named functions as async calls.
@@ -33,13 +38,13 @@ import { openAppsScript } from "./run-apps-script.js";
  * @param {string} options.defaultConfigFile - The Node version's config file, used when neither `config` nor `configFile` is given; it may be missing
  * @param {Object<string, Object>} [options.config] - Values for the script's config objects, in place of a file
  * @param {string} [options.configFile] - A config file to read in place of the default; it must exist
- * @param {Object<string, Object>} [options.configSchemas] - Each config object's JSON Schema, by its name in the script, which the file is checked against
+ * @param {Object<string, Object>} [options.configSchemas] - Each config object's JSON Schema, by its name in the script, which the file, or the `config` given, is checked against
  * @param {function(string, Object): Promise<Response>} [options.fetch] - Does the script's web requests, in place of Node's fetch
  * @param {?function({level: string, text: string}): void} [options.onLog] - Takes each line the script logs
  * @param {Object<string, Object>} [options.configOverlay={}] - Values laid over the config's, such as api keys opened from the key file
  * @param {Object<string, string>} [options.scriptProperties] - The script's Script Properties as it opens, such as an api key it reads
  * @returns {Promise<Object<string, function(...*): Promise<*>>>} The functions by name, and `close`
- * @throws {Error} When the config file cannot be read, or the script cannot be opened (`openAppsScript`)
+ * @throws {Error} When the `config` given or the config file breaks the schemas, the file cannot be read, or the script cannot be opened (`openAppsScript`)
  */
 export async function openScriptFunctions(scriptPath, names, options) {
   const {
@@ -52,6 +57,15 @@ export async function openScriptFunctions(scriptPath, names, options) {
     onLog,
     scriptProperties,
   } = options;
+  if (config !== undefined && configSchemas !== undefined) {
+    const problems = settingsProblems(
+      "the config given",
+      compileSettingsSchema(configFileSchema(configSchemas)),
+      config,
+    );
+    if (problems.length > 0)
+      throw Object.assign(new Error(problems.join("\n")), { problems });
+  }
   const values =
     config ??
     readConfigFile(configFile ?? defaultConfigFile, {

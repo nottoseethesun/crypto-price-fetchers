@@ -85,12 +85,16 @@ Examples:
   In a project that installs crypto-price-fetchers, move it to the newest
   commit of its main branch, after a change there:
     $ npm run github-project-deps -- main
-  Move every such dependency to its project's latest release instead:
+  Move every such dependency to its project's latest release instead,
+  once a release of it has a package.json (no release of
+  crypto-price-fetchers has one yet, so this fails today and puts the
+  files back):
     $ npm run github-project-deps -- release
 
 Exit codes: 0 when each lockfile was made again, or no package.json here
-installs a dependency from GitHub; 1 when npm install failed, which puts
-every package.json and lockfile back as it was, or the mode is not main or
+installs a dependency from GitHub; 1 when git cannot list the package.json
+files, as outside a git project, when npm install failed, which puts every
+package.json and lockfile back as it was, or when the mode is not main or
 release.`;
 
 /**
@@ -399,6 +403,7 @@ export async function runGithubProjectDeps(argv, project, deps = {}) {
       new Argument("<mode>", "main or release").choices(Object.keys(MODE_REFS)),
     )
     .addHelpText("after", HELP_AFTER)
+    .allowExcessArguments(false)
     .exitOverride()
     .configureOutput({
       writeOut: (text) => io.stdout.write(text),

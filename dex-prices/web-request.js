@@ -29,7 +29,7 @@
  * crypto-price-filler's pool sources, tries again the same way. A Sheets
  * script runs in Apps Script, which cannot load a Node module, so the
  * centralized-exchange script keeps a loop of its own, `fetchWithRetries`
- * in `fetch-from-centralized-exchange/src/getCryptoPriceFromCentralizedExchange-sources.gs`, which the filler
+ * in `fetch-from-any-exchange/src/getCryptoPriceFromCentralizedExchange-sources.gs`, which the filler
  * also runs for MEXC, CoinGecko and CoinPaprika.
  */
 
@@ -68,7 +68,7 @@ function wait(ms) {
 /**
  * Completes a caller's settings with Node's fetch, real waits, the waits
  * after a 429 above, the request timeout above, and no wait before a try,
- * wherever the caller gives none.
+ * wherever the caller gives none, or gives `undefined`.
  *
  * @param {Partial<RequestSettings>} [settings={}] - The caller's settings
  * @returns {RequestSettings} The completed settings
@@ -81,7 +81,9 @@ export function requestSettings(settings = {}) {
     timeoutMs: REQUEST_TIMEOUT_MS,
     beforeTry: async () => {},
     onRetry: () => {},
-    ...settings,
+    ...Object.fromEntries(
+      Object.entries(settings).filter(([, value]) => value !== undefined),
+    ),
   };
 }
 

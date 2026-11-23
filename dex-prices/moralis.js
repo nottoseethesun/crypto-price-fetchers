@@ -34,6 +34,7 @@
  */
 
 import { fetchWithRetries, requestSettings } from "./web-request.js";
+import { answerNumber } from "./answer-number.js";
 
 /** Moralis's api. */
 export const MORALIS_API_URL = "https://deep-index.moralis.io/api/v2.2";
@@ -103,7 +104,7 @@ export async function blockAt({ chain, seconds }, apiKey, settings) {
     apiKey,
     settings,
   );
-  const block = Number(body?.block);
+  const block = answerNumber(body?.block);
   return Number.isInteger(block) && block >= 0 ? block : null;
 }
 
@@ -122,7 +123,7 @@ export async function priceAtBlock({ chain, token, block }, apiKey, settings) {
     apiKey,
     settings,
   );
-  const price = Number(body?.usdPrice);
+  const price = answerNumber(body?.usdPrice);
   return Number.isFinite(price) && price > 0 ? price : null;
 }
 
@@ -184,7 +185,7 @@ function textOf(value) {
 function pairOf(row) {
   const address = lowerCaseAddress(row?.pair_address);
   if (address === null) return null;
-  const liquidity = Number(row?.liquidity_usd);
+  const liquidity = answerNumber(row?.liquidity_usd);
   return {
     address,
     label: textOf(row?.pair_label),
@@ -272,11 +273,11 @@ function candleOf(row) {
   const seconds = Date.parse(row?.timestamp) / 1000;
   const candle = {
     seconds,
-    open: Number(row?.open),
-    high: Number(row?.high),
-    low: Number(row?.low),
-    close: Number(row?.close),
-    volume: Number(row?.volume),
+    open: answerNumber(row?.open),
+    high: answerNumber(row?.high),
+    low: answerNumber(row?.low),
+    close: answerNumber(row?.close),
+    volume: answerNumber(row?.volume),
   };
   const readable = Object.values(candle).every(Number.isFinite);
   return readable && candle.close > 0 ? candle : null;

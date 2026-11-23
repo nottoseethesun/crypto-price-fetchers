@@ -16,7 +16,7 @@ dist/
 
 # Each tool's input/ and output/ folders: the owner's own files, which git
 # ignores.
-fetch-from-centralized-exchange/crypto-price-filler/input/
-fetch-from-centralized-exchange/crypto-price-filler/output/
+fetch-from-any-exchange/crypto-price-filler/input/
+fetch-from-any-exchange/crypto-price-filler/output/
 summ-csv/input/
 summ-csv/output/

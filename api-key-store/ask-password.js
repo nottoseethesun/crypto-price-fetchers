@@ -18,7 +18,9 @@
  * stderr itself, and the line break after the answer appear.
  *
  * One readline interface answers every question of a prompt, in order, so
- * answers piped in together are each kept for their question. Ctrl+C, or
+ * answers piped in together are each kept for their question, after the
+ * lines `askLine` (`lib/ask-line.js`) read past its answers on the same
+ * input, which the prompt takes first. Ctrl+C, or
  * the input ending before an answer, stops the question with an error,
  * at once for a prompt opened once the input has ended, whose interface
  * would wait for an end that has passed.
@@ -28,6 +30,7 @@
 
 import readline from "node:readline";
 import { Writable } from "node:stream";
+import { takeLinesRead } from "../lib/ask-line.js";
 
 /**
  * A stream that takes whatever is written to it and shows none of it.
@@ -54,7 +57,7 @@ function showsNothing() {
 export function openSecretPrompt(streams = {}) {
   const input = streams.input ?? process.stdin;
   const output = streams.output ?? process.stderr;
-  const lines = [];
+  const lines = takeLinesRead(input);
   const waiting = [];
   let stopped = input.readableEnded
     ? "The input ended before an answer was typed"

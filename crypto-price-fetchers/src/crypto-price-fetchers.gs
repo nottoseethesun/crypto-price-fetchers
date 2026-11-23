@@ -32,13 +32,16 @@
  * Each function gives one of these:
  *
  * - a number, in USD;
- * - 0, when the service has no data for the token or pool, or answered
- *   with an error; a 0 keeps the sums of the sheet working, and you can
- *   type a number over it;
+ * - 0, when the service has no data for the token or pool, or refused
+ *   the request, with a status below 500; a 0 keeps the sums of the
+ *   sheet working, and you can type a number over it;
  * - `⌛ Rate limit / busy – retry soon`, when other cells kept the script
  *   busy for longer than it waits for them;
- * - `⚠️ API error – check logs`, when the request failed in a way the
- *   script does not handle;
+ * - `⚠️ API error – check logs`, when the request got no answer, as when
+ *   Apps Script's daily quota of requests is used up or the network
+ *   fails, when the service failed, with a status of 500 or above, or
+ *   when its answer cannot be read; the cell asks again the next time it
+ *   runs;
  * - `Cache seconds must be a whole number from 1 to 21600, not …`, when
  *   the fourth argument is another value; the script then asks nothing.
  *
@@ -58,10 +61,9 @@
  *
  * ### The pool argument
  *
- * The third argument names one pool, written as the pool's address and a
- * 0 in double braces: `{{"<pool-address>", 0}}`. Sheets hands a function
- * one value as that value and two or more values as an array, and the script
- * reads the pool from an array, so the 0 is needed. With a pool, the price
+ * The third argument names one pool: its address, in quotes or in a cell,
+ * or written with a 0 in double braces, `{{"<pool-address>", 0}}`, as
+ * earlier sheets write it. With a pool, the price
  * is that pool's; without one, it is from the pools DexTools picks.
  * DexTools' FDV belongs to the token, so `dexToolsGetTokenFDV` sends
  * DexTools no pool. x1.ninja answers only for a pool, so on X1 both
@@ -186,7 +188,7 @@
  *   for a token or pool DexTools has no data for.
  *
  * NODE
- *   bin/crypto-price-fetchers.js, in the repo, runs it
+ *   bin/end-user/crypto-price-fetchers.js, in the repo, runs it
  *   unchanged under Node, for Node programs and the command line.
  *
  * PROJECT & LICENSE INFORMATION
@@ -294,16 +296,16 @@ const CACHE = CacheService.getScriptCache();
    ───────────────────────────────────────────────────────────────────────────── */
 
 /**
- * The pool a cell names in the third argument of a DexTools function,
- * `[[poolAddress, unused]]`: a range of one row, whose first cell holds the
- * pool's address.
+ * The pool a cell names in the third argument of a DexTools function: its
+ * address, as text or a cell that holds it, or `[[poolAddress, unused]]`, a
+ * range of one row whose first cell holds it.
  *
  * @param {*} poolAddresses - The argument, or anything else when the cell names no pool
  * @returns {?string} The pool's address, or null when the cell names none
  */
 function poolNamed(poolAddresses) {
   const firstRow = Array.isArray(poolAddresses) ? poolAddresses[0] : undefined;
-  const pool = Array.isArray(firstRow) ? firstRow[0] : undefined;
+  const pool = Array.isArray(firstRow) ? firstRow[0] : poolAddresses;
   return typeof pool === "string" && pool !== "" ? pool : null;
 }
 
@@ -339,7 +341,7 @@ function dexToolsAddress(address) {
  *
  * For X1, the call pattern is as in example E: pass the token mint as
  * `tokenAddress`, which shows in the cell what is priced, and the pool
- * address as the third argument: `[[poolAddress, 0]]`. The fetcher
+ * address as the third argument, as text, a cell or `[[poolAddress, 0]]`. The fetcher
  * uses the pool address to query `/v1/pools/{poolAddress}`.
  *
  * The answer is kept under what was asked: the provider, the chain, the
@@ -349,7 +351,7 @@ function dexToolsAddress(address) {
  *
  * @param {string} blockchain - Chain identifier (e.g. "pulse", "ether", "bsc", "x1")
  * @param {string} tokenAddress - Token contract address, or on X1 the token's mint, which shows in the cell what is priced; the script sends it to x1.ninja in place of a pool only when the cell names none, and x1.ninja answers only for a pool
- * @param {Array<Array<string>>} [poolAddresses=[]] - Optional [[poolAddress, unused]]
+ * @param {string|Array<Array<string>>} [poolAddresses=[]] - Optional: a pool's address, as text or a cell, or [[poolAddress, unused]]
  *                                 Use when you want price from specific pool
  * @param {number} [cacheSeconds=DEXTOOLS_CONFIG.CACHE_SECONDS] - The seconds to keep the answer, a whole number from 1 to 21600; the config's when absent or empty
  * @return {number|string} Price in USD, or 0 (for math) / friendly string on timeout
@@ -407,7 +409,7 @@ function dexToolsGetTokenPrice(
  *
  * @param {string} blockchain - Chain identifier (e.g. "pulse", "ether", "x1")
  * @param {string} tokenAddress - Token contract address, or on X1 the token's mint, which shows in the cell what is priced; the script sends it to x1.ninja in place of a pool only when the cell names none, and x1.ninja answers only for a pool
- * @param {Array<Array<string>>} [poolAddresses=[]] - Optional [[poolAddress, unused]].
+ * @param {string|Array<Array<string>>} [poolAddresses=[]] - Optional: a pool's address, as text or a cell, or [[poolAddress, unused]].
  *                                 Required for X1 (x1.ninja keys on
  *                                 pool address). Ignored by the
  *                                 DexTools path (FDV is per-token).
@@ -495,11 +497,11 @@ function withRateLimitProtection(callback) {
       Utilities.sleep(sleepMs);
     }
 
-    const result = callback();
-
-    props.setProperty("lastDexToolsCall", Date.now().toString());
-
-    return result;
+    try {
+      return callback();
+    } finally {
+      props.setProperty("lastDexToolsCall", Date.now().toString());
+    }
   } catch (err) {
     console.error("Rate limit protection error:", err);
     return "⚠️ API error – check logs";
@@ -531,6 +533,7 @@ function fetchDexToolsPrice(blockchain, address, isPool) {
     const code = response.getResponseCode();
     console.log(`[PRICE] HTTP: ${code}`);
 
+    if (code >= 500) throw new Error(`DexTools failed with HTTP ${code}`);
     if (code !== 200) {
       console.error(
         `[PRICE] HTTP Error ${code}: ${response.getContentText().substring(0, 300)}`,
@@ -546,7 +549,7 @@ function fetchDexToolsPrice(blockchain, address, isPool) {
     return Number(price);
   } catch (err) {
     console.error(`[PRICE] Exception: ${err.message}`);
-    return 0;
+    throw err;
   }
 }
 
@@ -567,6 +570,7 @@ function fetchDexToolsTokenInfo(blockchain, tokenAddress) {
     const code = response.getResponseCode();
     console.log(`[INFO] HTTP: ${code}`);
 
+    if (code >= 500) throw new Error(`DexTools failed with HTTP ${code}`);
     if (code !== 200) {
       console.error(
         `[INFO] HTTP Error ${code}: ${response.getContentText().substring(0, 300)}`,
@@ -580,7 +584,7 @@ function fetchDexToolsTokenInfo(blockchain, tokenAddress) {
     return json?.data ?? {};
   } catch (err) {
     console.error(`[INFO] Exception: ${err.message}`);
-    return {};
+    throw err;
   }
 }
 
@@ -623,6 +627,7 @@ function fetchX1NinjaPrice(poolAddress) {
     const code = response.getResponseCode();
     console.log(`[X1 PRICE] HTTP: ${code}`);
 
+    if (code >= 500) throw new Error(`x1.ninja failed with HTTP ${code}`);
     if (code !== 200) {
       console.error(
         `[X1 PRICE] HTTP Error ${code}: ${response.getContentText().substring(0, 300)}`,
@@ -637,7 +642,7 @@ function fetchX1NinjaPrice(poolAddress) {
     return price;
   } catch (err) {
     console.error(`[X1 PRICE] Exception: ${err.message}`);
-    return 0;
+    throw err;
   }
 }
 
@@ -667,6 +672,7 @@ function fetchX1NinjaFDV(poolAddress) {
     const code = response.getResponseCode();
     console.log(`[X1 FDV] HTTP: ${code}`);
 
+    if (code >= 500) throw new Error(`x1.ninja failed with HTTP ${code}`);
     if (code !== 200) {
       console.error(
         `[X1 FDV] HTTP Error ${code}: ${response.getContentText().substring(0, 300)}`,
@@ -681,7 +687,7 @@ function fetchX1NinjaFDV(poolAddress) {
     return fdv;
   } catch (err) {
     console.error(`[X1 FDV] Exception: ${err.message}`);
-    return 0;
+    throw err;
   }
 }
 
@@ -710,9 +716,10 @@ function getX1Options() {
  * logs what each gives: run it from the script editor to check the
  * script's api key, its calls and its cache.
  *
- * @param {boolean} verbose - When true, logs maximum detail (lock attempts,
- *                            raw JSON responses, full data keys, cache status, etc.)
- *                            Default: false (clean summary only)
+ * @param {boolean} verbose - When true, also logs, for each case, its start,
+ *                            the time, the lock it is about to take, the
+ *                            result's type and numeric value, and its end.
+ *                            Default: false (a summary only)
  */
 function testDexToolsFunctions(verbose = false) {
   console.log("=== DexTools Full Test Started ===");
@@ -819,15 +826,6 @@ function testDexToolsFunctions(verbose = false) {
       if (isNumber) {
         console.log("[VERBOSE] Numeric value:", result);
       }
-      const cachePrefix = test.name.toUpperCase().startsWith("X1")
-        ? "x1"
-        : "dt";
-      console.log(
-        "[VERBOSE] Cache key likely used:",
-        test.name.includes("FDV")
-          ? `${cachePrefix}_fdv_${test.name.split(" ")[0].toLowerCase()}_...`
-          : `${cachePrefix}_price_${test.name.split(" ")[0].toLowerCase()}_...`,
-      );
       console.log("[VERBOSE] Finished this test case");
     }
 

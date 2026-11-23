@@ -65,8 +65,8 @@ import {
   layConfig,
   readConfigFile,
 } from "../../../apps-script-runner/config-file.js";
-import { APPS_SCRIPT_BUILD as DEXTOOLS_SCRIPT } from "../../../bin/crypto-price-fetchers.js";
-import { APPS_SCRIPT_BUILD as EXCHANGE_SCRIPT } from "../../../bin/getCryptoPriceFromCentralizedExchange.js";
+import { APPS_SCRIPT_BUILD as DEXTOOLS_SCRIPT } from "../../../bin/end-user/crypto-price-fetchers.js";
+import { APPS_SCRIPT_BUILD as EXCHANGE_SCRIPT } from "../../../bin/end-user/getCryptoPriceFromCentralizedExchange.js";
 import { messageOf } from "../../../lib/message-of.js";
 import { BUILT_FILE_NAME, combinedScript } from "./built-script.js";
 import { askLine } from "../../../lib/ask-line.js";
@@ -166,7 +166,8 @@ Examples:
 Exit codes: 0 once the file is on the clipboard or written; 1 when a
 config.json is refused, DEX Screener's functions cannot be downloaded,
 checked or compiled, the keys cannot be opened, a service refuses its key,
-the parts do not make one Apps Script project, or the arguments are wrong.`;
+the parts do not make one Apps Script project, the clipboard tool fails or
+the file cannot be written, or the arguments are wrong.`;
 
 /** What the help of the build's own command says after its commands. */
 const BUILD_HELP_AFTER = `
