@@ -41,23 +41,72 @@ each key, and saves it encrypted once its service takes it:
 - Every key in one file is saved with one password. The password is kept
   nowhere on disk, and the plain keys only in memory, for one run.
 
-## The password in a terminal
+## Run
 
-Without help, each program asks for the password as it starts, which is
-slow when several programs run in turn. `unlock-api-keys.sh`, a copy of
-which is in each project's `bin/` folder, asks
-for the password once and keeps it for that terminal in the environment
-variable `API_KEYS_PASSWORD`:
+A project that uses the store has two programs of it, which run from the
+project's top folder: the key manager, which saves the keys, and
+`unlock-api-keys.sh`, which keeps the password for a terminal
+([Using it in another project](#using-it-in-another-project) adds them).
+Each sub-section below covers one: first an example of how to run it, then
+what it does, and, under its Usage, more examples.
+
+### manage-api-keys.js
+
+```bash
+npm run api-keys
+```
+
+This runs the project's key manager, which lists the keys and asks for
+each one not saved, as [How it keeps a key](#how-it-keeps-a-key) says.
+
+#### Usage of manage-api-keys.js
+
+A service's saved key replaced, as after the service issues a new one,
+here DexTools':
+
+```bash
+npm run api-keys -- set dextools
+```
+
+Whether the password kept for the terminal opens every saved key, by its
+exit code, 0 when it does:
+
+```bash
+npm run api-keys -- check-password
+```
+
+### unlock-api-keys.sh
 
 ```bash
 source ./bin/unlock-api-keys.sh
 ```
 
-It checks that the password opens the keys saved before it keeps it.
-The project's programs then open their keys with it, without asking, and
-the key manager saves new keys with it. Closing the terminal forgets the password, as
-does `unset API_KEYS_PASSWORD`. With one password for every project, one
-unlock serves them all.
+This asks for the password once, and keeps it for the terminal in the
+environment variable `API_KEYS_PASSWORD`. Without it, each program asks
+for the password as it starts, which is slow when several programs run in
+turn. A copy of `unlock-api-keys.sh` is in each project's `bin/` folder.
+It checks that the password opens the keys saved before it keeps it;
+while no key is saved, any password passes, and the first key saved is
+saved with it. The project's programs then open their keys with it,
+without asking, and the key manager saves new keys with it. Closing the
+terminal forgets the password, as does `unset API_KEYS_PASSWORD`. With one
+password for every project, one unlock serves them all.
+
+#### Usage of unlock-api-keys.sh
+
+The same from any other folder, by the script's path:
+
+```bash
+source /path/to/the/project/bin/unlock-api-keys.sh
+```
+
+The password kept, then checked by the key manager, which asks for
+nothing:
+
+```bash
+source ./bin/unlock-api-keys.sh
+npm run api-keys -- check-password
+```
 
 ## The file
 
@@ -82,23 +131,36 @@ Another project installs this repo from GitHub, the website that hosts
 it, then calls the store from
 its own key manager and programs:
 
-1. Install this repo from GitHub, pinned to a commit, as a dependency, so
-   `npm install` installs it:
+1. Install this repo from GitHub as a dependency, following its main
+   branch, so `npm install` installs its newest commit and the
+   project's lockfile keeps the commit installed:
 
    ```bash
-   npm install github:nottoseethesun/crypto-price-fetchers#<commit>
+   npm install github:nottoseethesun/crypto-price-fetchers#main
    ```
 
-2. List the services in the project's top `config.json`, as above, and add
-   `api-keys.json` and `api-keys.json.tmp` to its `.gitignore`. The
-   services known are in `services.js`, each with the check that asks it
-   whether it takes a key.
+   This repo's versions tool moves it later: add the npm script
+   `"github-project-deps": "github-project-deps"`, which runs the bin
+   of that name this repo installs, then run
+   `npm run github-project-deps -- main`
+   ([github-project-deps.js](../docs/engineering.md#github-project-depsjs)
+   says when `-- release` works).
+
+2. List the services in the project's top `config.json`, as above, with
+   a `config-example.json` beside it that holds the same, which the
+   repo checks (`configExampleProblems`, `lib/repo-checks.js`) hold to
+   it, and add `api-keys.json` and `api-keys.json.tmp` to its
+   `.gitignore`. The services known are in `services.js`, each with the
+   check that asks it whether it takes a key.
 3. Add the key manager, `manage-api-keys.js`, in the project's `bin/`
    folder, with an npm script `"api-keys": "node bin/manage-api-keys.js"`:
 
    ```js
    import { fileURLToPath } from "node:url";
    import { runKeyManager } from "crypto-price-fetchers/api-key-store";
+   import { endQuietlyWhenOutputCloses } from "crypto-price-fetchers/lib/closed-output";
+
+   endQuietlyWhenOutputCloses();
 
    process.exitCode = await runKeyManager(process.argv, {
      projectTop: fileURLToPath(new URL("..", import.meta.url)),
@@ -107,8 +169,9 @@ its own key manager and programs:
 
 4. Copy `bin/unlock-api-keys.sh` from this repo into the project's
    `bin/` folder, and test that the copy matches. The script finds the
-   project's top folder as the one above its own, and runs
-   `bin/manage-api-keys.js` there.
+   project's top folder as the one above its own, and runs the key
+   manager there: `bin/end-user/manage-api-keys.js`, where this repo keeps
+   its own, or else `bin/manage-api-keys.js`.
 5. As a program starts, open the keys it uses:
 
    ```js

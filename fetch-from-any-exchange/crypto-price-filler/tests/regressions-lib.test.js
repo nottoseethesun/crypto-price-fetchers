@@ -1,0 +1,208 @@
+/**
+ * Tests that guard fixed bugs in the repo's shared helpers, in `lib/`,
+ * which the repo's own tools, crypto-price-filler and the projects that
+ * install this repo use.
+ * The repo's CLAUDE.md lists the other files of fixed bugs' tests; a bug
+ * found later gets its test in `known-bugs.test.js`, declared with
+ * `it.fails` while the bug is there, and its fix moves the test to one of
+ * them.
+ * @module tests/regressions-lib.test
+ *
+ * The helpers run in the test's thread, but for the copy to the clipboard,
+ * which runs in a child process, since its crash would fail the whole run;
+ * the files the search for command lines reads are written in a temp
+ * folder of the test's own.
+ */
+
+import { afterAll, beforeAll, describe, it, expect } from "vitest";
+import fs from "fs";
+import os from "os";
+import path from "path";
+import { spawnSync } from "child_process";
+import { pathToFileURL } from "url";
+import { PassThrough } from "stream";
+import { askLine } from "../../../lib/ask-line.js";
+import { askPassword } from "../../../api-key-store/index.js";
+import { filesUsingCommander } from "../../../lib/command-line-help.js";
+import { fetchWithinTimeLimit } from "../../../lib/time-limited-fetch.js";
+import {
+  compileSettingsSchema,
+  KINDS,
+  settingsProblems,
+} from "../../../lib/settings-schema.js";
+import {
+  readSummCsvSettings,
+  SUMM_CSV_SETTINGS_SCHEMA,
+} from "../../../summ-csv/index.js";
+import { SETTINGS_SCHEMA } from "../config.js";
+
+let folder;
+
+beforeAll(() => {
+  folder = fs.mkdtempSync(path.join(os.tmpdir(), "crypto-price-filler-lib-"));
+});
+
+afterAll(() => {
+  fs.rmSync(folder, { recursive: true, force: true });
+});
+
+describe("the settings files' checks (lib/settings-schema.js)", () => {
+  it("compiles a settings file's schema once, however often a file is read against it", () => {
+    expect(compileSettingsSchema(SETTINGS_SCHEMA)).toBe(
+      compileSettingsSchema(SETTINGS_SCHEMA),
+    );
+  });
+
+  it("describes an empty text and an empty list by what each lacks", () => {
+    const validate = compileSettingsSchema({
+      type: "object",
+      additionalProperties: false,
+      properties: { name: KINDS.text, id: KINDS.textOrNone },
+    });
+    expect(
+      settingsProblems("config.json", validate, { name: "", id: "" }),
+    ).toEqual([
+      'config.json → name must be text that is not empty; it is ""',
+      'config.json → id must be text that is not empty, or null for none; it is ""',
+    ]);
+    const settings = readSummCsvSettings();
+    settings.referencePriceCurrencies = [];
+    expect(
+      settingsProblems(
+        "summ-csv/settings.json",
+        compileSettingsSchema(SUMM_CSV_SETTINGS_SCHEMA),
+        settings,
+      ),
+    ).toEqual([
+      "summ-csv/settings.json → referencePriceCurrencies must be a list of one or more currencies, each once; it is []",
+    ]);
+  });
+});
+
+describe("the search for command lines (lib/command-line-help.js)", () => {
+  it("counts a file that brings in Command or the whole of commander in each form that loads", () => {
+    const top = fs.mkdtempSync(path.join(folder, "commander-forms-"));
+    const files = {
+      "re-export.js": 'export * from "commander";\n',
+      "commented.js":
+        'import { Command } from "commander"; // the command line\n',
+      "indented.js": '  import { Command } from "commander";\n',
+      "dynamic.js": 'const { Command } = await import("commander");\n',
+      "parser.js":
+        'import { InvalidArgumentError } from "commander"; // a parser\n',
+      "in-a-comment.js":
+        '/**\n * import { Command } from "commander";\n */\nexport const x = 1;\n',
+    };
+    for (const [name, text] of Object.entries(files)) {
+      fs.writeFileSync(path.join(top, name), text);
+    }
+    expect(filesUsingCommander(top).sort()).toEqual([
+      "commented.js",
+      "dynamic.js",
+      "indented.js",
+      "re-export.js",
+    ]);
+  });
+});
+
+describe("the time-limited fetch", () => {
+  it("fetchWithinTimeLimit refuses a limit Node's timers cannot keep, a fraction of a millisecond or more than 2147483647, saying so", async () => {
+    const answers = async () => new Response("{}");
+    for (const timeoutMs of [2009.9999999999998, 3e9]) {
+      await expect(
+        fetchWithinTimeLimit(
+          "http://localhost/",
+          {},
+          { timeoutMs, fetch: answers },
+        ),
+      ).rejects.toThrow(/a whole number of milliseconds from 1 to 2147483647/);
+    }
+  });
+});
+
+describe("the copy to the clipboard (lib/clipboard.js)", () => {
+  it("copyToClipboard rejects, naming the exit code, when the tool exits without reading its input", () => {
+    const clipboard = pathToFileURL(
+      path.resolve(__dirname, "../../../lib/clipboard.js"),
+    ).href;
+    const code = [
+      `import { copyToClipboard } from ${JSON.stringify(clipboard)};`,
+      "const tool = { command: process.execPath, args: ['-e', 'process.exit(1)'] };",
+      "try {",
+      "  await copyToClipboard(tool, 'x'.repeat(10000000));",
+      "  console.log('resolved');",
+      "} catch (error) {",
+      "  console.log(`rejected: ${error.message}`);",
+      "}",
+    ].join("\n");
+    const run = spawnSync(
+      process.execPath,
+      ["--input-type=module", "-e", code],
+      {
+        encoding: "utf8",
+      },
+    );
+    expect(run.stdout.trim()).toBe(
+      `rejected: ${process.execPath} exited with code 1`,
+    );
+    expect(run.status).toBe(0);
+  });
+});
+
+describe("the questions at the terminal (lib/ask-line.js)", () => {
+  it("askLine gives each question its own line of the answers piped in together", async () => {
+    const input = new PassThrough();
+    const output = { write: () => true };
+    input.write("n\ny\n");
+    const first = await askLine("First? ", { input, output });
+    const asked = askLine("Second? ", { input, output });
+    input.end();
+    const second = await asked;
+    expect([first, second]).toEqual(["n", "y"]);
+  });
+
+  it("askLine gives null at once to a question asked after the input has ended", async () => {
+    const input = new PassThrough();
+    const output = { write: () => true };
+    const first = askLine("First? ", { input, output });
+    input.end();
+    expect(await first).toBe(null);
+    let timer;
+    const waited = new Promise((resolve) => {
+      timer = setTimeout(resolve, 1000, "no answer after 1 second");
+    });
+    const second = await Promise.race([
+      askLine("Second? ", { input, output }),
+      waited,
+    ]);
+    clearTimeout(timer);
+    expect(second).toBe(null);
+  });
+});
+
+describe("answers piped in together", () => {
+  /** An input that has given `text` and ended, and an output that drops what it is given. */
+  const piped = (text) => {
+    const input = new PassThrough();
+    input.end(text);
+    return { input, output: { write: () => true } };
+  };
+
+  it("askLine gives a last answer that has no line end", async () => {
+    const streams = piped("n\ny");
+    const answers = [
+      await askLine("First? ", streams),
+      await askLine("Second? ", streams),
+    ];
+    expect(answers).toEqual(["n", "y"]);
+  });
+
+  it("the key store's password prompt takes the line askLine read past its answer", async () => {
+    const streams = piped("n\npw\n");
+    expect(await askLine("Include? ", streams)).toBe("n");
+    const password = await askPassword("Password: ", streams).catch(
+      (error) => error.message,
+    );
+    expect(password).toBe("pw");
+  });
+});

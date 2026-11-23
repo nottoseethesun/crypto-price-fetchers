@@ -18,6 +18,7 @@
     "./lib/http-url": "./lib/http-url.js",
     "./lib/message-of": "./lib/message-of.js",
     "./lib/new-file": "./lib/new-file.js",
+    "./lib/file-to-write": "./lib/file-to-write.js",
     "./lib/option-conflicts": "./lib/option-conflicts.js",
     "./lib/repo-checks": "./lib/repo-checks.js",
     "./lib/settings-file": "./lib/settings-file.js",
@@ -45,7 +46,7 @@
     "summ-csv/"
   ],
   "scripts": {
-    "api-keys": "node bin/manage-api-keys.js",
+    "api-keys": "node bin/end-user/manage-api-keys.js",
     "os-dependencies": "node install/install-os-dependencies.js",
     "build": "node build/tools/build.js",
     "summ-csv": "node bin/summ-csv.js",
@@ -57,8 +58,8 @@
     "knip:files": "knip --include files",
     "test": "node --test \"test/*.test.js\"",
     "test:coverage": "node --test --experimental-test-coverage --test-coverage-lines=80 \"test/*.test.js\"",
-    "test:filler": "npm run test:strict --prefix fetch-from-centralized-exchange/crypto-price-filler",
-    "audit:deps": "npm audit --audit-level=high --omit=dev && npm audit --audit-level=high --omit=dev --prefix fetch-from-centralized-exchange/crypto-price-filler && npm run audit:dex-screener && npm run audit:actionlint",
+    "test:filler": "npm run test:strict --prefix fetch-from-any-exchange/crypto-price-filler",
+    "audit:deps": "npm audit --audit-level=high --omit=dev && npm audit --audit-level=high --omit=dev --prefix fetch-from-any-exchange/crypto-price-filler && npm run audit:dex-screener && npm run audit:actionlint",
     "audit:dex-screener": "node build/tools/audit-dex-screener.js",
     "audit:actionlint": "node bin/run-actionlint.js --check",
     "audit:security": "eslint -c eslint-security.config.js . --max-warnings 0",

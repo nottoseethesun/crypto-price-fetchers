@@ -13,16 +13,21 @@ api-keys.json.tmp
 # values. The top config.json is committed: it lists the services whose
 # keys the project keeps, and holds no key.
 /crypto-price-fetchers/config.json
-/fetch-from-centralized-exchange/config.json
-/fetch-from-centralized-exchange/crypto-price-filler/config.json
+/fetch-from-any-exchange/config.json
+/fetch-from-any-exchange/crypto-price-filler/config.json
 
 # The owner's own files: those a tool reads from its input/ folder, and
 # those it writes in its output/ folder, by kind (output/csv/). Git keeps
-# each folder by its .gitkeep, an empty file, and nothing else in it.
-/fetch-from-centralized-exchange/crypto-price-filler/input/*
-/fetch-from-centralized-exchange/crypto-price-filler/output/*/*
+# each folder by its .gitkeep, an empty file, and nothing else in it: the
+# first rule of an output/ folder ignores all it holds, at any depth; the
+# second takes its folders back, so git looks inside them; and !.gitkeep
+# keeps each .gitkeep.
+/fetch-from-any-exchange/crypto-price-filler/input/*
+/fetch-from-any-exchange/crypto-price-filler/output/**
+!/fetch-from-any-exchange/crypto-price-filler/output/**/
 /summ-csv/input/*
-/summ-csv/output/*/*
+/summ-csv/output/**
+!/summ-csv/output/**/
 !.gitkeep
 
 # The Sheets file as `npm run build apps-script` writes it when there is

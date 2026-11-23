@@ -21,6 +21,8 @@ new RuleTester({
 }).run("no-secret-logging", noSecretLogging, {
   valid: [
     'console.log("Loading the api key...")',
+    'Logger.log("Loading the api key...")',
+    "run.tell(`Saved the ${service.name} key.`)",
     "console.error(error.message)",
     "say(`The ${service.name} api key is saved, encrypted, in ${file}.`)",
     "io.stdout.write(`  ${service.name}  ${state}\\n`)",

@@ -163,7 +163,7 @@ describe("the key file", () => {
     assert.equal(await loadEncryptedKey(file, "coingecko", ""), null);
   });
 
-  it("saves a key, readable by its owner alone, written whole through a temp file", async () => {
+  it("saves a key, readable by its owner alone, leaving no other file beside it", async () => {
     await saveEncryptedKey(file, "coingecko", "gecko-key", "pw");
     assert.equal(hasEncryptedKey(file, "coingecko"), true);
     assert.deepEqual(savedServices(file), ["coingecko"]);

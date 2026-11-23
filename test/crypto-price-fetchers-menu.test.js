@@ -25,8 +25,8 @@ import { standInSpreadsheet } from "./helpers/stand-in-spreadsheet.js";
 const SCRIPT_FILES = [
   "../src/crypto-price-fetchers-menu.gs",
   "../crypto-price-fetchers/src/crypto-price-fetchers.gs",
-  "../fetch-from-centralized-exchange/src/getCryptoPriceFromCentralizedExchange.gs",
-  "../fetch-from-centralized-exchange/src/getCryptoPriceFromCentralizedExchange-sources.gs",
+  "../fetch-from-any-exchange/src/getCryptoPriceFromCentralizedExchange.gs",
+  "../fetch-from-any-exchange/src/getCryptoPriceFromCentralizedExchange-sources.gs",
 ].map((file) => ({
   source: fs.readFileSync(new URL(file, import.meta.url), "utf8"),
   filename: file.slice(3),

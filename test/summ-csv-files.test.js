@@ -201,7 +201,7 @@ describe("writeSummCsv", () => {
       fs.readFileSync(outPath, "utf8"),
       summCsvText(file.rows, summHeader()),
     );
-    assert.equal(fs.existsSync(`${outPath}.tmp`), false);
+    assert.deepEqual(fs.readdirSync(path.dirname(outPath)), ["out.csv"]);
   });
 
   it("writes nothing when a row breaks a rule", () => {

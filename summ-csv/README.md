@@ -15,10 +15,10 @@ written for the occasion, so every file passes the same checks.
 
 - [The file it writes](#the-file-it-writes)
 - [The rules](#the-rules)
-- [Running it](#running-it)
-  - [From the command line](#from-the-command-line)
-  - [From Node](#from-node)
-  - [From a project that installs this repo](#from-a-project-that-installs-this-repo)
+- [Run](#run)
+  - [Usage of summ-csv](#usage-of-summ-csv)
+    - [From Node](#from-node)
+    - [From a project that installs this repo](#from-a-project-that-installs-this-repo)
 - [The rows](#the-rows)
 - [The settings](#the-settings)
   - [Adding a chain](#adding-a-chain)
@@ -87,29 +87,39 @@ owner's rules for his files. A row breaks a rule when:
     transaction, on the same blockchain, already does, so the gas would be
     counted twice.
 
-## Running it
-
-The utility runs from the command line, with the rows in a JSON file, or
-from a Node program, with the rows as objects. Either way it writes the
-file only when every row passes, and leaves a file already at the path as
-it is unless told to replace it.
-
-### From the command line
-
-From this repo's top folder, with the rows and your copy of the template
-in this folder's `input/`, and the csv written in its `output/csv/`: the
-files hold your own data, and the repo is public, so git keeps nothing in
-either folder but the folder.
+## Run
 
 ```sh
 npm run summ-csv -- --rows summ-csv/input/rows.json --template summ-csv/input/advanced-template-reference.csv --out summ-csv/output/csv/missing-transactions.csv
 ```
 
-It prints `Wrote 2 rows to summ-csv/output/csv/missing-transactions.csv.`, with exit code 0, or
-every problem, with exit code 1. `--replace` writes over a file already at
-`--out`; `--help` gives the keys of a row.
+Run from this repo's top folder, this writes the rows of `rows.json`
+under the header of your copy of the template, in
+`missing-transactions.csv`. It prints
+`Wrote 2 rows to summ-csv/output/csv/missing-transactions.csv.`, with
+exit code 0, or every problem, with exit code 1. The utility runs from the
+command line, with the rows in a JSON file, as here, or from a Node
+program, with the rows as objects. Either way it writes the file only when
+every row passes, and leaves a file already at the path as it is unless
+told to replace it.
 
-### From Node
+### Usage of summ-csv
+
+The rows and your copy of the template go in this folder's `input/`, and
+the csv is written in its `output/csv/`: the files hold your own data, and
+the repo is public, so git, the version-control program, keeps nothing in
+either folder but the folder. `--out` names a file in a folder that exists
+and takes a new file; a folder, or a file in a missing folder, is refused
+before the rows are read. `--help` gives the keys of a row.
+
+The same file written again, over the one the last run wrote, after
+fixing a row:
+
+```sh
+npm run summ-csv -- --rows summ-csv/input/rows.json --template summ-csv/input/advanced-template-reference.csv --out summ-csv/output/csv/missing-transactions.csv --replace
+```
+
+#### From Node
 
 ```js
 import { writeSummCsv } from "crypto-price-fetchers/summ-csv";
@@ -130,7 +140,7 @@ as a whole number of a token's smallest units as decimal text, its
 trailing zeros dropped, for decimals from 0 to 255, as a row's amounts are
 written; no digit passes through a JavaScript number.
 
-### From a project that installs this repo
+#### From a project that installs this repo
 
 A project that installs this repo from GitHub, the website that hosts
 it, imports

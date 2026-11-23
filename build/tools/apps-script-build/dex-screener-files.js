@@ -13,8 +13,8 @@
  * this repo installs from npm, does not cover it. So `DEX_SCREENER` names
  * one commit of that repo and the SHA-256 of each file the build takes from
  * it, and one audit downloads those files and checks each checksum:
- * `npm run audit:dex-screener` (`audit-dex-screener.js` at the repo's
- * top, whose command line `runDexScreenerAudit` declares), which
+ * `npm run audit:dex-screener` (`build/tools/audit-dex-screener.js`,
+ * whose command line `runDexScreenerAudit` declares), which
  * `npm run audit:deps` runs after npm audit, runs it, and so does the build
  * (`dex-screener.js`) before it compiles the files.
  *

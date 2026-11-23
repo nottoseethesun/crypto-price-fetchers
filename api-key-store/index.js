@@ -9,7 +9,8 @@
  * with one password its owner types. Three parts serve it:
  *
  * - The manager, `runKeyManager` (`key-manager.js`), which the project's
- *   `bin/manage-api-keys.js` runs as `npm run api-keys`: it lists the keys,
+ *   `bin/manage-api-keys.js` runs as `npm run api-keys` (in this repo,
+ *   `bin/end-user/manage-api-keys.js`): it lists the keys,
  *   saved or not, never showing their characters, and asks for those not
  *   saved, each saved once its service takes it.
  * - `bin/unlock-api-keys.sh`, a copy of which is in each project's `bin/`:
@@ -28,9 +29,9 @@
  * from the password by PBKDF2-SHA512 at 600,000 rounds; and
  * `ask-password.js` the prompt that shows nothing of what is typed.
  *
- * How another project uses it: install this repo from GitHub, pinned to a
- * commit, and import `crypto-price-fetchers/api-key-store`. `README.md`
- * beside this file shows the calls.
+ * How another project uses it: install this repo from GitHub, following
+ * its main branch, and import `crypto-price-fetchers/api-key-store`.
+ * `README.md` beside this file shows the calls.
  */
 
 export { askPassword, openSecretPrompt } from "./ask-password.js";

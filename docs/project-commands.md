@@ -158,7 +158,7 @@ npm runs this command itself, before another one.
 ## crypto-price-filler's Commands
 
 crypto-price-filler is a package of its own, with its own commands. They
-run in `fetch-from-centralized-exchange/crypto-price-filler/`, after
+run in `fetch-from-any-exchange/crypto-price-filler/`, after
 `npm ci` there. Its lint is the top folder's.
 
 | Command | Flags | Description | Example |
@@ -170,28 +170,30 @@ run in `fetch-from-centralized-exchange/crypto-price-filler/`, after
 | `test:debug` | — | vitest with `VERBOSE=1`, the verbose reporter, coverage and no cache. | `npm run test:debug` |
 | `test:strict` | — | `validate-parse`, then the tests with coverage, failing below 80% of lines covered. What `npm run check` runs. | `npm run test:strict` |
 | `test:watch` | — | vitest in watch mode, with coverage. | `npm run test:watch` |
-| `validate-parse` | — | Runs the command line, `bin/crypto-price-filler.js`, with `--help`, so a broken import fails before the tests run. | `npm run validate-parse` |
+| `validate-parse` | — | Runs the command line, `bin/end-user/crypto-price-filler.js`, with `--help`, so a broken import fails before the tests run. | `npm run validate-parse` |
 
 ---
 
 ## Commands Run Without npm
 
-These command lines, the programs in `bin/`, run with `node`, or, for
+These command lines, the programs in `bin/end-user/` and `bin/`, run with `node`, or, for
 the password script, `source`, at a terminal, from the repo's top folder:
 the Node version of each Sheets script, which prints the number the
 script gives a cell, crypto-price-filler's command line and its
 backfill, and the script that keeps the key store's password for a
 terminal. Each Node command line answers `--help` with its options,
-examples and exit codes; [the README's Run](../README.md#run) shows each
-at work.
+examples and exit codes; [the README's Run](../README.md#run) shows
+those an end user runs at work, and
+[The Programs in `bin/`](engineering.md#the-programs-in-bin) the
+backfill and the password script.
 
 | Command | Flags | Description | Example |
 | ------- | ----- | ----------- | ------- |
-| `node bin/crypto-price-fetchers.js` | `price <chain> <token>`, `fdv <chain> <token>`, `--pool <address>` (after `price` or `fdv`), `--config <file>`, `--verbose`, `--help` | The Node version of `crypto-price-fetchers/src/crypto-price-fetchers.gs`: a token's price, or fully diluted value (FDV), in USD now, from DexTools, or from x1.ninja for X1, which needs `--pool`. `--config` names a settings file in place of `crypto-price-fetchers/config.json`. | `node bin/crypto-price-fetchers.js price ether 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48` |
-| `node bin/getCryptoPriceFromCentralizedExchange.js` | `<token> <date>`, `--tz <abbreviation>`, `--mode <mode>`, `--config <file>`, `--verbose`, `--help` | The Node version of the exchange script: a coin's USD price at a past time, from MEXC, then CoinGecko, then CoinPaprika. `--config` names a settings file in place of `fetch-from-centralized-exchange/config.json`. | `node bin/getCryptoPriceFromCentralizedExchange.js btc "2026-01-15 14:30:00"` |
-| `node bin/crypto-price-filler.js` | `--token <symbol>`, `--input <path>`, `--output <path>`, `--mode <mode>`, `--tz <zone>`, `--list-valid-timezones`, `--backfill-highest`, `--backfill-lowest`, `--verbose`, `--version`, `--help` | crypto-price-filler's command line: fills the price columns of a CSV file of dated rows with the token's USD price at each row's time, from the pools a token trades in, then MEXC, CoinGecko and CoinPaprika; a row no service priced gets `Error`. It loads the package in `fetch-from-centralized-exchange/crypto-price-filler/`, whose `npm start` runs it too; `--input` and `--output` are read from the folder it runs in, and with no `--output` it writes `output.csv` in its package's `output/csv/`. Your files go in its package's `input/`; git keeps nothing in either folder but the folder. | `node bin/crypto-price-filler.js --token=grc --input=fetch-from-centralized-exchange/crypto-price-filler/input/mining.csv` |
-| `node bin/backfill.js` | `--input <path>`, `--output <path>`, `--backfill-highest`, `--backfill-lowest`, `--verbose`, `--version`, `--help` | crypto-price-filler's backfill: fills each price the filler marked `Error`, in a CSV it wrote, with the price of the nearest priced row before or after it, the higher of the two or the lower, asking no service. `--input` and `--output` are read from the folder it runs in, and with no `--output` it writes over the input. | `node bin/backfill.js --input=fetch-from-centralized-exchange/crypto-price-filler/output/csv/output.csv --backfill-highest` |
-| `source ./bin/unlock-api-keys.sh` | `--help` | Asks for the key store's password, showing nothing typed, checks that it opens every key saved, and keeps it in `API_KEYS_PASSWORD` for the terminal, so the programs open their keys without asking. Runs in bash or zsh, and returns 0 when it keeps the password, 1 when it keeps none. `--help`, or `-h`, prints its help, asks nothing and returns 0. | `source ./bin/unlock-api-keys.sh` |
+| `node bin/end-user/crypto-price-fetchers.js` | `price <chain> <token>`, `fdv <chain> <token>`, `--pool <address>` (after `price` or `fdv`), `--config <file>`, `--verbose`, `--help` | The Node version of `crypto-price-fetchers/src/crypto-price-fetchers.gs`: a token's price, or fully diluted value (FDV), in USD now, from DexTools, or from x1.ninja for X1, which needs `--pool`. `--config` names a settings file in place of `crypto-price-fetchers/config.json`. | `node bin/end-user/crypto-price-fetchers.js price ether 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48` |
+| `node bin/end-user/getCryptoPriceFromCentralizedExchange.js` | `<token> <date>`, `--tz <abbreviation>`, `--mode <mode>`, `--config <file>`, `--verbose`, `--help` | The Node version of the exchange script: a coin's USD price at a past time, from MEXC, then CoinGecko, then CoinPaprika. `--config` names a settings file in place of `fetch-from-any-exchange/config.json`. | `node bin/end-user/getCryptoPriceFromCentralizedExchange.js btc "2026-01-15 14:30:00"` |
+| `node bin/end-user/crypto-price-filler.js` | `--token <symbol>`, `--input <path>`, `--output <path>`, `--mode <mode>`, `--tz <zone>`, `--list-valid-timezones`, `--backfill-highest`, `--backfill-lowest`, `--verbose`, `--version`, `--help` | crypto-price-filler's command line: fills the price columns of a CSV file of dated rows with the token's USD price at each row's time, from the pools a token trades in, then MEXC, CoinGecko and CoinPaprika; a row no service priced gets `Error`. It loads the package in `fetch-from-any-exchange/crypto-price-filler/`, whose `npm start` runs it too; `--input` and `--output` are read from the folder it runs in, and with no `--output` it writes `output.csv` in its package's `output/csv/`. Your files go in its package's `input/`; git keeps nothing in either folder but the folder. | `node bin/end-user/crypto-price-filler.js --token=grc --input=fetch-from-any-exchange/crypto-price-filler/input/mining.csv` |
+| `node bin/backfill.js` | `--input <path>`, `--output <path>`, `--backfill-highest`, `--backfill-lowest`, `--verbose`, `--version`, `--help` | crypto-price-filler's backfill: fills each price the filler marked `Error`, in a CSV it wrote, with the price of the nearest priced row before or after it, the higher of the two or the lower, asking no service. `--input` and `--output` are read from the folder it runs in, and with no `--output` it writes over the input. | `node bin/backfill.js --input=fetch-from-any-exchange/crypto-price-filler/output/csv/output.csv --backfill-highest` |
+| `source ./bin/unlock-api-keys.sh` | `--help` | Asks for the key store's password, showing nothing typed, checks that it opens every key saved, which any password does while no key is saved, and keeps it in `API_KEYS_PASSWORD` for the terminal, so the programs open their keys without asking. Runs in bash or zsh, and returns 0 when it keeps the password, 1 when it keeps none. `--help`, or `-h`, prints its help, asks nothing and returns 0. | `source ./bin/unlock-api-keys.sh` |
 
 ---
 

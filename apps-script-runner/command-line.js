@@ -155,7 +155,7 @@ export async function runScriptCommandLine(
   };
   describe(program, runCall);
   for (const command of [program, ...program.commands]) {
-    command.addHelpText("after", EXIT_CODES_HELP);
+    command.addHelpText("after", EXIT_CODES_HELP).allowExcessArguments(false);
   }
   try {
     await program.parseAsync(argv);
@@ -168,7 +168,10 @@ export async function runScriptCommandLine(
 }
 
 /**
- * Tells whether a module is the file node was started with.
+ * Tells whether a module is the file node was started with, named with
+ * or without its `.js`: node starts `bin/x` as the file `bin/x`, or,
+ * when there is none, as `bin/x.js`, and leaves `process.argv[1]` as
+ * it was typed, made absolute.
  *
  * @param {string} moduleUrl - The module's `import.meta.url`
  * @returns {boolean} True when node was started with that file
@@ -176,9 +179,9 @@ export async function runScriptCommandLine(
 export function isEntryPoint(moduleUrl) {
   const started = process.argv[1];
   if (typeof started !== "string") return false;
-  try {
-    return pathToFileURL(fs.realpathSync(started)).href === moduleUrl;
-  } catch {
-    return false;
-  }
+  const file = [started, `${started}.js`].find((name) =>
+    fs.statSync(name, { throwIfNoEntry: false })?.isFile(),
+  );
+  if (file === undefined) return false;
+  return pathToFileURL(fs.realpathSync(file)).href === moduleUrl;
 }

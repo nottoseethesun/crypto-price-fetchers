@@ -1,13 +1,14 @@
 /**
- * Tests for bin/crypto-price-fetchers.js, the Node version of
+ * Tests for bin/end-user/crypto-price-fetchers.js, the Node version of
  * crypto-price-fetchers/src/crypto-price-fetchers.gs.
  * @module test/crypto-price-fetchers.test
  *
  * The real `.gs` runs under the real runner. Its requests go to a stand-in
  * fetch (`helpers/stand-in-web.js`) that answers as DexTools and x1.ninja
  * answer, so the tests ask nothing outside the computer. Each test opens
- * the script afresh, so the script's spacing of calls, 0.7 seconds after
- * the last one, never waits.
+ * the script afresh, so its first request never waits for the script's
+ * spacing of calls, 0.7 seconds after the last one; a test that makes
+ * several requests waits that long between them.
  *
  * The command line's keys are in a key file in a temp folder, removed
  * afterwards, and every environment a test passes names that file and
@@ -26,7 +27,7 @@ import {
   DEFAULT_CONFIG_FILE,
   openCryptoPriceFetchers,
   runCommandLine,
-} from "../bin/crypto-price-fetchers.js";
+} from "../bin/end-user/crypto-price-fetchers.js";
 import { capturedOutput } from "./helpers/captured-output.js";
 import { standInFetch } from "./helpers/stand-in-web.js";
 import { makeTempFolder, removeTempFolders } from "./helpers/temp-folders.js";
@@ -385,7 +386,7 @@ describe("crypto-price-fetchers.js, the command line", () => {
       });
       assert.match(
         result.stdout,
-        /What it prints:\n {2}The number the script would give a cell: the price, or the FDV, in USD\.\n {2}A 0 means that DexTools, or x1\.ninja for x1, has no data for the token or\n {2}pool, or answered with an error/,
+        /What it prints:\n {2}The number the script would give a cell: the price, or the FDV, in USD\.\n {2}A 0 means that DexTools, or x1\.ninja for x1, has no data for the token or\n {2}pool, or refused the request/,
       );
       if (command.length > 0) {
         const globalOptions = result.stdout.indexOf("\nGlobal Options:\n");
@@ -443,9 +444,9 @@ describe("crypto-price-fetchers.js, the command line", () => {
     assert.deepEqual(result.fetch.requests, []);
   });
 
-  it("runs as a program: node bin/crypto-price-fetchers.js --help", () => {
+  it("runs as a program: node bin/end-user/crypto-price-fetchers.js --help", () => {
     const file = fileURLToPath(
-      new URL("../bin/crypto-price-fetchers.js", import.meta.url),
+      new URL("../bin/end-user/crypto-price-fetchers.js", import.meta.url),
     );
     const output = execFileSync(process.execPath, [file, "--help"], {
       encoding: "utf8",

@@ -261,7 +261,7 @@ describe("npm run build apps-script, on a desktop with a clipboard tool", () => 
     for (const name of [
       "src/crypto-price-fetchers-menu.gs",
       "crypto-price-fetchers/src/crypto-price-fetchers.gs",
-      "fetch-from-centralized-exchange/src/getCryptoPriceFromCentralizedExchange-tests.gs",
+      "fetch-from-any-exchange/src/getCryptoPriceFromCentralizedExchange-tests.gs",
     ]) {
       assert.ok(file.includes(`\n// ${name}\n`), name);
     }

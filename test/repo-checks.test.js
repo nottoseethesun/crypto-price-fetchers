@@ -8,8 +8,9 @@
  * those its tests write otherwise on purpose (this file's own among them,
  * the forms it tests the check with), its npm targets named in
  * `docs/project-commands.md`, its test files and helpers named in
- * `docs/engineering.md` or `CLAUDE.md`, its docs' links and paths
- * pointing at what it keeps, and a config-example.json beside each of its
+ * `docs/engineering.md` or `CLAUDE.md`, its docs' links, and the paths in
+ * their code spans that start at the doc's own folder, pointing at what it
+ * keeps, and a config-example.json beside each of its
  * config.json files.
  */
 
@@ -45,12 +46,12 @@ const THIS_FILE = "test/repo-checks.test.js";
  */
 const ADDRESSES_WRITTEN_OTHERWISE = Object.freeze([
   {
-    file: "fetch-from-centralized-exchange/crypto-price-filler/tests/geckoterminal-source.test.js",
+    file: "fetch-from-any-exchange/crypto-price-filler/tests/geckoterminal-source.test.js",
     address: "0xa1077a294dde1b09bb078844df40758a5d0f9a27",
     why: "GeckoTerminal names a token in lower case, in its ids",
   },
   {
-    file: "fetch-from-centralized-exchange/crypto-price-filler/tests/settings-files.test.js",
+    file: "fetch-from-any-exchange/crypto-price-filler/tests/settings-files.test.js",
     address: "0x2b591e99afe9f32eaa6214f7b7629768c40eeb39",
     why: "a contract in lower case, to show supported-tokens.json's schema refuses an address not in EIP-55's form",
   },
@@ -313,7 +314,7 @@ describe("this repo", () => {
     );
   });
 
-  it("points its docs' links and paths only at files, folders and headings it keeps", () => {
+  it("points its docs' links, and the paths that start at a doc's own folder, only at files, folders and headings it keeps", () => {
     assert.deepEqual(localReferencesMissing(REPO_TOP), []);
   });
 

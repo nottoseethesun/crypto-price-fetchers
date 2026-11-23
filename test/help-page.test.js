@@ -86,7 +86,7 @@ describe("helpSection", () => {
       "src/crypto-price-fetchers-menu.gs": "## The Crypto Price Fetchers menu",
       "crypto-price-fetchers/src/crypto-price-fetchers.gs":
         "## Current prices: dexToolsGetTokenPrice and dexToolsGetTokenFDV",
-      "fetch-from-centralized-exchange/src/getCryptoPriceFromCentralizedExchange.gs":
+      "fetch-from-any-exchange/src/getCryptoPriceFromCentralizedExchange.gs":
         "## Past prices: getCryptoPrice",
       "build/tools/apps-script-build/dex-screener-help.md":
         "## DEX Screener's functions",

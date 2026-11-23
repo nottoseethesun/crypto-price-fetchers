@@ -24,8 +24,10 @@
  * chain's facts, by the name Summ gives the chain, and the fiat
  * currencies a reference price may be in; a call may pass its own. An
  * existing file is written over only when the call says so, through a
- * file beside it that is then renamed, so the file is never left half
- * written.
+ * file beside it, under a name no other file has, that is then renamed
+ * over it. A write or a rename that fails removes that file, and a new
+ * file whose write fails part way is removed too, so no half-written
+ * file is left.
  *
  * Fit: other repos install this one from GitHub and import
  * `crypto-price-fetchers/summ-csv` to write such a file from their own
@@ -36,6 +38,7 @@
  */
 
 import fs from "node:fs";
+import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { readSettingsFile } from "../lib/settings-file.js";
 import { KINDS } from "../lib/settings-schema.js";
@@ -251,8 +254,9 @@ function csvLine(cells, keys) {
  *   `summ-csv/settings.json`'s
  * @returns {string} The file's text
  * @throws {Error} When there are no rows, when the header is not Summ's,
- *   or when any row breaks a rule: the error's `problems` names each
- *   problem with its row, and its message lists them
+ *   or when any row breaks a rule: for the rows, the error's `problems`
+ *   names each problem with its row, and its message lists them; for the
+ *   header, its message says what is wrong
  */
 export function summCsvText(rows, header, settings = readSummCsvSettings()) {
   if (!Array.isArray(rows) || rows.length === 0)
@@ -296,13 +300,21 @@ export function writeSummCsv({
 }) {
   const text = summCsvText(rows, readTemplateHeader(templatePath), settings);
   if (replace === true) {
-    fs.writeFileSync(`${outPath}.tmp`, text);
-    fs.renameSync(`${outPath}.tmp`, outPath);
+    const besideIt = `${outPath}.${randomUUID()}.tmp`;
+    try {
+      fs.writeFileSync(besideIt, text, { flag: "wx" });
+      fs.renameSync(besideIt, outPath);
+    } finally {
+      fs.rmSync(besideIt, { force: true });
+    }
   } else {
     try {
       fs.writeFileSync(outPath, text, { flag: "wx" });
     } catch (thrown) {
-      if (thrown.code !== "EEXIST") throw thrown;
+      if (thrown.code !== "EEXIST") {
+        fs.rmSync(outPath, { force: true });
+        throw thrown;
+      }
       throw new Error(
         `${outPath} exists already, and is written over only when the call says to replace it`,
         { cause: thrown },

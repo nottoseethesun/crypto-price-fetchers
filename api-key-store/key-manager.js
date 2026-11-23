@@ -28,7 +28,8 @@
  *   prompts and messages to stderr. A key not saved, a password that opens
  *   nothing, or a mistake in the arguments ends with exit code 1.
  *
- * Fit: a project's `bin/manage-api-keys.js` runs `runKeyManager` with its top
+ * Fit: a project's `bin/manage-api-keys.js`, in this repo
+ * `bin/end-user/manage-api-keys.js`, runs `runKeyManager` with its top
  * folder.
  */
 
@@ -80,7 +81,8 @@ Examples:
     $ npm run api-keys -- set moralis
 
 Exit codes:
-  0  the key is saved
+  0  the key is saved, or Enter alone was typed, which saves nothing and
+     leaves a key already saved as it was
   1  the key was not saved, as when its service refuses it, or the project names no such service`;
 
 /** What the help of `check-password` says after its usage. */
@@ -92,7 +94,8 @@ Examples:
     $ npm run api-keys -- check-password
 
 Exit codes:
-  0  the password opens every saved key
+  0  the password opens every saved key, or no key is saved yet, so any
+     password does
   1  it does not, or no password is set`;
 
 /**
@@ -275,6 +278,7 @@ export async function runKeyManager(argv, project, deps = {}) {
       writeErr: (text) => io.stderr.write(text),
     })
     .addHelpText("after", HELP_AFTER)
+    .allowExcessArguments(false)
     .action(async () => {
       exitCode = await listAndAsk(run);
     });
@@ -286,6 +290,7 @@ export async function runKeyManager(argv, project, deps = {}) {
       `the service, as ${PROJECT_CONFIG_FILE} names it under apiKeys`,
     )
     .addHelpText("after", SET_HELP_AFTER)
+    .allowExcessArguments(false)
     .action(async (name) => {
       exitCode = await setOne(run, name);
     });
@@ -295,6 +300,7 @@ export async function runKeyManager(argv, project, deps = {}) {
       `says whether the password in ${UNLOCK_VARIABLE} opens every key saved`,
     )
     .addHelpText("after", CHECK_PASSWORD_HELP_AFTER)
+    .allowExcessArguments(false)
     .action(async () => {
       exitCode = await checkPassword(run);
     });

@@ -28,6 +28,7 @@
  */
 
 import { fetchWithRetries, requestSettings } from "./web-request.js";
+import { answerNumber } from "./answer-number.js";
 
 /** DexTools' api, which serves each plan at its own path. */
 export const DEXTOOLS_API_URL = "https://public-api.dextools.io";
@@ -90,7 +91,7 @@ export async function currentUsdPrice({ chain, token }, apiKey, settings) {
   } catch {
     throw new Error(`DexTools gave an answer that is not json for ${url}`);
   }
-  const price = Number(body?.data?.price);
+  const price = answerNumber(body?.data?.price);
   if (!Number.isFinite(price) || !(price > 0)) {
     throw new Error(`DexTools gave no price for ${token} on ${chain}`);
   }

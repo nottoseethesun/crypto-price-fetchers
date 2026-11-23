@@ -93,9 +93,10 @@
  *   - Refresh & freeze historical prices freezes each block's numbers as
  *     soon as the block has run again, so the freeze, too, falls inside the
  *     run's time.
- *   - Every item starts and ends by putting back any formula of these
+ *   - Every item starts and ends by putting back each formula of these
  *     functions that a stopped run left with a `!` at its end
- *     (`restoreLeftovers_`), so no formula stays broken.
+ *     (`restoreLeftovers_`), on the tabs it runs on: every tab, but for
+ *     the freeze, which runs on the tab that is open.
  *   - No item starts a new block after `MENU_CONFIG.RUN_BUDGET_MS`, inside
  *     Google's six minutes for one run; the message counts the cells left,
  *     for another run.
