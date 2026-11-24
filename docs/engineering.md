@@ -401,7 +401,7 @@ holds the stand-ins:
 - `regression-runs.js` holds the settings, stand-in answers, times and
   runs that the regression tests share, and a known-bug test that needs
   them: answers as MEXC, CoinGecko and CoinPaprika, a service like
-  CoinGecko, give them, a time as a cell writes it (`cellTime`), the header of Summ's template and a row summ-csv takes (`SUMM_TEMPLATE`, `SUMM_ROW`), the command line run over one row in a child process, or
+  CoinGecko, give them, a time as a cell writes it (`cellTime`), a stand-in for the script's clock (`dateAt`), the header of Summ's template and a row summ-csv takes (`SUMM_TEMPLATE`, `SUMM_ROW`), the command line run over one row in a child process, or
   in a folder of the test's own with the stand-in settings (`runIndexIn`,
   for `tests/regressions-command-line.test.js`), and a call run with the
   computer's time zone set to another.

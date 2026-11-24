@@ -522,8 +522,13 @@ guard the fixed bugs of its area, and removes the row:
   run the exchange script in the test's thread.
 
 Google stops a custom function, a function a cell calls, after 30 seconds,
-and the cell shows `#ERROR!`. The bug below is a wait longer than that.
+and the cell shows `#ERROR!`. The first bug below is a wait longer than that.
 
 | Bug | Test in `tests/known-bugs.test.js` |
 | --- | --- |
 | `dexToolsGetTokenPrice` and `dexToolsGetTokenFDV`, in `crypto-price-fetchers.gs`, wait up to `DEXTOOLS_CONFIG.LOCK_WAIT_MS`, 120 seconds, for the script lock, so a cell that waits more than 30 seconds shows `#ERROR!`, never the busy message the script returns when the wait ends. | dexToolsGetTokenPrice waits for the script lock no longer than Google lets a custom function run |
+| The filler and its backfill turn on both backfill modes when a flag is typed against config.json's other backfill setting, and fill with the higher price without a word; the two flags typed together, or the two settings both true, do the same. | is refused by backfill's command line, naming both, with the file left as it was; is refused by the filler's command line, naming both, writing no file |
+| `getCryptoPrice`, for a time less than 12 hours ago with no MEXC price, says to ask again after the time's CoinGecko window ends before it asks CoinGecko anything, so a ticker no coin has is told to wait. | gives no data, not when to ask again, for a ticker CoinGecko has no prices of |
+| `no-secret-logging` passes a key printed inside a `new` call, a tagged template, a key written as a string, an assignment or a sequence, so the security lint lets such a print of a secret through. | refuses a key printed inside a new, a tagged template, a key written as a string, an assignment or a sequence |
+| `getPriceFromCoinPaprika`, in the exchange script's `-sources.gs`, takes the candle of a UTC day not yet over, whose prices can still change until the day ends, so the sheet and crypto-price-filler can give a price for a time earlier that day that is not final. | gives no price from the day's candle, which can still change |
+| `getPriceFromCoinPaprika`, in the exchange script's `-sources.gs`, answers close, for a day older than the plan's candles reach, as the free server's always is once over, with the price at 00:00 UTC that opens the day, not the price at 00:00 UTC the next day, which closes it. | is its price at 00:00 UTC the next day, which ends the day |
