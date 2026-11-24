@@ -56,10 +56,14 @@ holds programs that serve the repo's own work and those projects, which
 
 ### The Scripts
 
-The programs you run from a terminal are in `bin/end-user/`, and the one file you
-paste into a spreadsheet, `crypto-price-fetchers.gs`, is made by the build
-step, which puts it on the clipboard, or in `dist/apps-script/` when no
-clipboard tool is installed. Each has a sub-section below;
+The programs you run from a terminal are in `bin/end-user/`, save two
+that npm runs: `install/install-os-dependencies.js`, which
+`npm run os-dependencies` runs once, at install, to install the
+clipboard tool, and the build step, `build/tools/build.js`, which
+`npm run build apps-script` runs to make the one file you paste into a
+spreadsheet, `crypto-price-fetchers.gs`, and puts it on the clipboard, or
+in `dist/apps-script/` when no clipboard tool is installed. The programs
+in `bin/end-user/`, and that file, each have a sub-section below;
 [Run](#run) shows each at work.
 
 #### crypto-price-fetchers.gs
@@ -125,6 +129,14 @@ pools ([Tokens That Trade in Pools](#tokens-that-trade-in-pools)). Its
 code is the package in `fetch-from-any-exchange/crypto-price-filler/`,
 which this start file loads.
 
+#### backfill.js
+
+crypto-price-filler's backfill fills each price the filler marked
+`Error`, in a CSV file the filler wrote, with the price of the nearest
+priced row before or after it, the higher of the two or the lower,
+asking no service. Its code is the package's `backfill.js`, which this
+start file loads.
+
 #### manage-api-keys.js
 
 The key manager: it lists the api keys the top `config.json` names, saved
@@ -139,6 +151,7 @@ encrypted with your password, once its service takes it.
     - [crypto-price-fetchers.js](#crypto-price-fetchersjs)
     - [getCryptoPriceFromCentralizedExchange.js](#getcryptopricefromcentralizedexchangejs)
     - [crypto-price-filler.js](#crypto-price-fillerjs)
+    - [backfill.js](#backfilljs)
     - [manage-api-keys.js](#manage-api-keysjs)
 - [Disclaimer](#disclaimer)
 - [Screenshot](#screenshot)
@@ -160,12 +173,13 @@ encrypted with your password, once its service takes it.
     - [Usage of getCryptoPriceFromCentralizedExchange.js](#usage-of-getcryptopricefromcentralizedexchangejs)
   - [crypto-price-filler.js](#crypto-price-fillerjs-1)
     - [Usage of crypto-price-filler.js](#usage-of-crypto-price-fillerjs)
+  - [backfill.js](#backfilljs-1)
+    - [Usage of backfill.js](#usage-of-backfilljs)
   - [manage-api-keys.js](#manage-api-keysjs-1)
     - [Usage of manage-api-keys.js](#usage-of-manage-api-keysjs)
 - [Configure](#configure)
 - [Lint & Test](#lint--test)
   - [Optional: the Clipboard Tool, by Hand](#optional-the-clipboard-tool-by-hand)
-  - [Optional: the Unlock Script in zsh, by Hand](#optional-the-unlock-script-in-zsh-by-hand)
 - [Private Key Security](#private-key-security)
 - [Development](#development)
   - [Node Versions of the Sheets Scripts](#node-versions-of-the-sheets-scripts)
@@ -175,7 +189,6 @@ encrypted with your password, once its service takes it.
   - [Architecture and Engineering References](#architecture-and-engineering-references)
 - [License](#license)
 - [Road Map](#road-map)
-  - [Known Bugs](#known-bugs)
 - [Donations](#donations)
 - [Contributing](#contributing)
 
@@ -206,8 +219,7 @@ bar; it is now Crypto Price Fetchers.
 
 ## Prerequisites
 
-- A terminal. `bin/unlock-api-keys.sh`, the script that keeps the key store's
-  password for a terminal, runs in bash or zsh.
+- A terminal, in which the programs and npm run.
 - Node 24 or later, from [nodejs.org](https://nodejs.org/), with npm, the
   package manager that comes with it, which installs a project's packages
   and runs the commands its `package.json` names. The repo is tested on
@@ -287,7 +299,7 @@ that manages his 9mm V3 liquidity positions, keeps its own. The top
 | Service     | What it prices                                                          | Without a key                      |
 | ----------- | ----------------------------------------------------------------------- | ---------------------------------- |
 | CoinGecko   | Past prices, for the exchange script and crypto-price-filler            | Asked without one, at a lower rate |
-| CoinPaprika | Past prices, the same; a key is for one of its paid plans               | Its free server, with less history |
+| CoinPaprika | Past prices, the same; a key is for one of its paid plans               | Its free server: close prices only |
 | Moralis     | Past prices of tokens that trade in pools, for crypto-price-filler      | Not asked                          |
 | DexTools    | Current prices and fully diluted values, for `crypto-price-fetchers.gs` | No price: DexTools needs a key     |
 | x1.ninja    | The same, on X1                                                         | No price: x1.ninja needs a key     |
@@ -301,12 +313,10 @@ npm run api-keys
 
 It lists each key, saved or not, never showing its characters, and asks for
 each one not saved: the key, then the password, showing nothing of what is
-typed. The password is typed twice while no key is saved, once after
-that, and not at all when `bin/unlock-api-keys.sh` kept it. Each key is saved only once its service
-takes it; Enter alone skips one.
-[manage-api-keys.js](#manage-api-keysjs-1), under [Run](#run), shows its
-other uses, and [unlock-api-keys.sh](docs/engineering.md#unlock-api-keyssh) how to type the
-password once per terminal. The store itself is a module
+typed. The password is typed twice while no key is saved, and once
+after that. Each key is saved only once its service takes it; Enter
+alone skips one. [manage-api-keys.js](#manage-api-keysjs-1), under
+[Run](#run), shows its other uses. The store itself is a module
 any Node project can use: see [its README](./api-key-store/README.md).
 
 ### 4. Install in Google Sheets
@@ -344,7 +354,7 @@ the script does not take or a value of the wrong kind
    step is optional: Enter, or y, includes them, and n leaves them out. If
    the build fails, run it again and answer n.
 2. **The password.** The build opens the saved keys as the tools do, with
-   the password `bin/unlock-api-keys.sh` keeps, or else one it asks for.
+   the password, which it asks for.
 3. **The clipboard.** The build puts the file on the clipboard and says how
    to paste it.
 4. **Paste.** In the spreadsheet, open Extensions > Apps Script. Open the
@@ -451,7 +461,7 @@ installs this repo takes its newest commit with
    gone. The script also kept the time of its last DexTools call as a
    script property, `lastDexToolsCall`, which Project Settings > Script
    Properties lists and can delete.
-2. In each terminal where `bin/unlock-api-keys.sh` kept the password, run
+2. In each terminal where `API_KEYS_PASSWORD` holds the password, run
    `unset API_KEYS_PASSWORD`, or close the terminal.
 3. From the folder that holds it, delete the repo's folder, which holds
    `api-keys.json`:
@@ -563,8 +573,9 @@ no candle of a recent time's minute, or of the hour, or the request for it
 fails, the script asks for the day before, whose candle shows the coin
 traded before that day: with none, or when that request fails too,
 CoinGecko answers. CoinGecko's is the 24 hours from 12 hours before the
-time to 12 after, which it is asked for once they are over, and
-CoinPaprika's the day, in UTC.
+time to 12 after, whose price the script takes only once they are over,
+and CoinPaprika's the day, in UTC, whose price it takes only once the day
+is over.
 
 - `token` is the coin's ticker symbol, such as `"btc"` or `"xmr"`.
 - `dateStr` is the time, written `"YYYY-MM-DD HH:MM:SS"` on a 24-hour
@@ -600,8 +611,12 @@ Bitcoin's highest price in the period around 14:30, US Central time, on
 
 A cell shows a message instead of a price when no source has one for that
 coin at that time, when the time is in the future, when MEXC has no price
-for a time less than 12 hours ago, whose CoinGecko window is not over,
-when other cells kept the script busy, when no source gave a price and a
+and a later source's period that holds the time is not over (CoinGecko's
+24 hours around a time less than 12 hours ago, while CoinGecko prices the
+coin, or CoinPaprika's day, in UTC, for a time today), when no source has
+a price for an average, a high or a low and no CoinPaprika key is set,
+which CoinPaprika needs for those, when other cells
+kept the script busy, when no source gave a price and a
 request got no answer
 (refused as too many on its last try or past the 25 seconds the script
 allows a call, answered with a server error or a request timeout, or given
@@ -649,14 +664,6 @@ file, built with the password typed when the build asks for it:
 npm run build apps-script
 ```
 
-The same, with the password kept for the terminal first, so the build
-does not ask for it:
-
-```bash
-source ./bin/unlock-api-keys.sh
-npm run build apps-script
-```
-
 ### crypto-price-fetchers.js
 
 ```bash
@@ -670,8 +677,8 @@ a token's price in USD now, and `fdv` its fully diluted value.
 
 #### Usage of crypto-price-fetchers.js
 
-It sends DexTools' key, or x1.ninja's for X1, opened with the password
-`unlock-api-keys.sh` keeps, or else one it asks for. `--pool` names the
+It sends DexTools' key, or x1.ninja's for X1, opened with the password,
+which it asks for. `--pool` names the
 pool to price the token in, which X1 needs.
 
 Wrapped XNT's price on X1, in its pool with USDC.X:
@@ -736,9 +743,11 @@ node bin/end-user/crypto-price-filler.js --token=grc --input=fetch-from-any-exch
 
 This writes Gridcoin's close at each row's time, read in UTC, to
 `fetch-from-any-exchange/crypto-price-filler/output/csv/output.csv`.
-`bin/end-user/crypto-price-filler.js` prices each row of a CSV file whose
-`date (UTC)` column holds times written `yyyy-MM-dd HH:mm:ss`, and writes
-the file again with three columns added: `$usd price`, by default the
+`bin/end-user/crypto-price-filler.js` prices each row of a CSV file at the
+time in its column of dates, written `yyyy-MM-dd HH:mm:ss` and read in
+the time zone `--tz` names, UTC by default: the first column whose name
+holds `date` and `UTC`, or else the first whose name holds `date`. It
+writes the file again with three columns added: `$usd price`, by default the
 close of the period that holds the row's time, or CoinGecko's hourly
 price nearest it, or, when MEXC must widen the period to find a trade,
 that period's average; `$usd amount`, the row's
@@ -752,10 +761,9 @@ the folder.
 `--token` must be one of the tokens its `supported-tokens.json` lists. A
 row no service priced gets `Error` in `$usd price`: `--backfill-highest`
 or `--backfill-lowest` fills it in the same run, or, afterwards,
-`bin/backfill.js`, which fills it in the file the filler wrote, asking no
-service ([backfill.js](docs/engineering.md#backfilljs)). With api keys
-saved, a run asks for the key store's password,
-unless `unlock-api-keys.sh` kept it. It reads its own files from its
+`bin/end-user/backfill.js`, which fills it in the file the filler wrote, asking no
+service ([backfill.js](#backfilljs-1)). With api keys
+saved, a run asks for the key store's password. It reads its own files from its
 package's folder, and writes its default output there, so it runs from
 any folder, and takes the paths `--input` and `--output` name from the
 folder it runs in.
@@ -769,6 +777,10 @@ to `prices.csv` in its `output/csv/`, with each step logged:
 node bin/end-user/crypto-price-filler.js --token=xtm --input=fetch-from-any-exchange/crypto-price-filler/input/input.csv --output=fetch-from-any-exchange/crypto-price-filler/output/csv/prices.csv --mode=high --tz=America/Chicago --verbose
 ```
 
+With no CoinPaprika key saved, it first asks whether to go on without
+CoinPaprika's prices, since CoinPaprika gives no high without one: y goes
+on.
+
 Gridcoin's close at each row's time, then, for each row no service
 priced, the higher of the prices of the nearest priced rows before and
 after it:
@@ -779,6 +791,33 @@ node bin/end-user/crypto-price-filler.js --token=grc --input=fetch-from-any-exch
 
 `npm start -- <options>`, in `fetch-from-any-exchange/crypto-price-filler/`,
 runs the same command line.
+
+### backfill.js
+
+```bash
+node bin/end-user/backfill.js --input=fetch-from-any-exchange/crypto-price-filler/output/csv/output.csv --backfill-highest
+```
+
+This fills, in place, each price marked `Error` in the `output.csv` the
+filler wrote in its `output/csv/` with the higher of the prices of the
+nearest priced rows before and after it, a figure that does not
+understate a value for taxes. `bin/end-user/backfill.js` fills the
+prices crypto-price-filler could not give, in a file it wrote, asking no
+service: `--backfill-highest` takes the higher of the two prices, and
+`--backfill-lowest` the lower.
+
+#### Usage of backfill.js
+
+The rows that hold no data, a "Total" row, a row with no date and the
+rows after the last date, have a blank price, which backfill leaves as it
+is, so they stay out of the grand total.
+
+`budget.csv` written beside it with the lower price, a figure that does
+not overstate income:
+
+```bash
+node bin/end-user/backfill.js --input=fetch-from-any-exchange/crypto-price-filler/output/csv/output.csv --output=fetch-from-any-exchange/crypto-price-filler/output/csv/budget.csv --backfill-lowest
+```
 
 ### manage-api-keys.js
 
@@ -819,7 +858,7 @@ stops the run, with every problem listed, one line each.
 | File | Read by | Holds |
 | ---- | ------- | ----- |
 | `config.json`, at the repo's top | the key store and the build | `apiKeys`, the services whose keys the project keeps |
-| `crypto-price-fetchers/config.json`, which git ignores | `bin/end-user/crypto-price-fetchers.js` and the build | `DEXTOOLS_CONFIG`, with `CACHE_SECONDS`, how long a price above 0 is kept, from 1 to 21600 seconds, and `LOCK_WAIT_MS`, how long a call waits for the script's lock, in milliseconds |
+| `crypto-price-fetchers/config.json`, which git ignores | `bin/end-user/crypto-price-fetchers.js` and the build | `DEXTOOLS_CONFIG`, with `CACHE_SECONDS`, how long a price above 0 is kept, from 1 to 21600 seconds, and `LOCK_WAIT_MS`, how long a call waits for the script's lock, from 0 to 20000 milliseconds, which keeps 10 of the 30 seconds Google gives a cell's call for the request |
 | `fetch-from-any-exchange/config.json`, which git ignores | `bin/end-user/getCryptoPriceFromCentralizedExchange.js` and the build | fields of the exchange script's `CONFIG`, such as `QUOTE_CURRENCY`, `USDT` or `USDC`, the stablecoin of the MEXC pairs it asks |
 | `fetch-from-any-exchange/crypto-price-filler/config.json`, which git ignores | crypto-price-filler | the settings that differ from its committed `config-example.json` |
 | `fetch-from-any-exchange/crypto-price-filler/supported-tokens.json` | crypto-price-filler | the tokens `--token` takes, each with its ids at CoinGecko and CoinPaprika and its symbol at MEXC and, for a token that trades in pools, its contract and its chain's ids at GeckoTerminal and Moralis |
@@ -881,24 +920,6 @@ the tool installed ([step 2](#2-operating-system-programs)):
    wl-clipboard installed: the build would find no tool, and offer to
    install xclip.
 
-### Optional: the Unlock Script in zsh, by Hand
-
-`bin/unlock-api-keys.sh`, the script a terminal sources to keep the key
-store's password, runs in bash or zsh, the default shell of macOS, and
-finds its own folder by a different line in each. The automated tests run
-it in bash: none of the computers they run on has zsh, and there they
-skip its tests in zsh, which Node's test runner leaves out of its count
-of skipped tests. On a computer with zsh, such as a Mac, run from the
-repo's top folder, after install step 1:
-
-```bash
-node --test test/unlock-api-keys.test.js
-```
-
-It lists the suite "unlock-api-keys.sh in zsh" with each of its tests
-passed. Where zsh is missing, it lists that suite as skipped, with "zsh
-is not installed".
-
 ---
 
 ## Private Key Security
@@ -909,9 +930,8 @@ prices and write files.
 The api keys are kept in `api-keys.json`, which git ignores, each
 encrypted by AES-256-GCM with a key made from your password by
 PBKDF2-SHA512 at 600,000 rounds, as LP Ranger keeps its keys. The password
-is kept nowhere on disk: `bin/unlock-api-keys.sh` keeps it in the terminal's
-environment, and each tool holds the keys only in memory, for one run. No
-tool prints a key's characters.
+is kept nowhere on disk, and each tool holds the keys only in memory, for
+one run. No tool prints a key's characters.
 
 The one copy of the keys outside that file is the one the build sets in
 the Sheets file, in the clear, since Apps Script cannot read the key file.
@@ -1052,17 +1072,7 @@ the full text.
 
 ## Road Map
 
-Have no expectation that these items will be done. They are listed for
-future focus.
-
-### Known Bugs
-
-Google stops a cell's call after 30 seconds, and the cell shows
-`#ERROR!`. The script's lock makes the calls of many cells take turns, and
-`dexToolsGetTokenPrice` and `dexToolsGetTokenFDV` can wait for it up to
-120 seconds (`DEXTOOLS_CONFIG.LOCK_WAIT_MS`), so a busy sheet can show
-`#ERROR!` where the script would have given its busy message. The menu's
-Clean up errors runs such a cell again.
+The repo lists no planned work yet, and no bug is known.
 
 ---
 

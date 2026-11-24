@@ -129,15 +129,16 @@
  *   x1.ninja's, hold placeholders as committed, which the services refuse.
  *   The build step sets both at the end of the file it gives, from the keys
  *   saved in the repo (`npm run api-keys`), with the fields of
- *   DEXTOOLS_CONFIG that the repo's top config.json sets. The build sets
- *   its values after this file's top-level code has run, so a field that
- *   code reads keeps the value written here: SUBSCRIPTION_PLAN, API_HOST
- *   and API_VERSION, which make the urls, MIN_SECONDS_BETWEEN_CALLS, and
- *   X1_CONFIG's API_HOST and API_VERSION. config.json may set only the
- *   other two, CACHE_SECONDS and LOCK_WAIT_MS, as the Node version's
- *   CONFIG_SCHEMAS says, and the build refuses a file that sets more. To
- *   change a field the top-level code reads, change it here and build
- *   again.
+ *   DEXTOOLS_CONFIG that crypto-price-fetchers/config.json, in the repo,
+ *   sets. The build sets its values after this file's top-level code has
+ *   run, so a field that code reads keeps the value written here:
+ *   SUBSCRIPTION_PLAN, API_HOST and API_VERSION, which make the urls,
+ *   MIN_SECONDS_BETWEEN_CALLS, and X1_CONFIG's API_HOST and API_VERSION.
+ *   config.json may set only the other two, CACHE_SECONDS, from 1 to 21600
+ *   seconds, and LOCK_WAIT_MS, from 0 to 20000 milliseconds (RATE
+ *   LIMITING), as the Node version's CONFIG_SCHEMAS says, and the build
+ *   refuses a file that sets another field or another value. To change a
+ *   field the top-level code reads, change it here and build again.
  *
  * SUBSCRIPTION PLAN
  *   DexTools' url names the plan of the key:
@@ -172,11 +173,12 @@
  *   request, records the time, and gives the lock back. A call that gets
  *   no lock within LOCK_WAIT_MS gives the busy message,
  *   DEXTOOLS_BUSY_MESSAGE, which the menu's Clean up errors looks for in the
- *   cells it runs again. LOCK_WAIT_MS, 120
- *   seconds, is longer than the 30 seconds Google gives a custom function,
- *   so a cell that waits that long shows #ERROR! instead: a known bug, in
- *   the repo's CLAUDE.md. Only a number above 0 is cached, so a failed
- *   request is sent again the next time its cell runs.
+ *   cells it runs again. Google stops a custom function after 30 seconds,
+ *   and its cell then shows #ERROR!, so LOCK_WAIT_MS, 20 seconds, keeps 10
+ *   of them for the wait of MIN_SECONDS_BETWEEN_CALLS and the request;
+ *   config.json may set it lower, never higher (API KEYS AND SETTINGS).
+ *   Only a number above 0 is cached, so a failed request is sent again the
+ *   next time its cell runs.
  *
  * TESTING
  *   The repo's tests run this file unchanged under Node. In the Apps Script
@@ -220,7 +222,7 @@ const DEXTOOLS_CONFIG = {
   API_HOST: "https://public-api.dextools.io",
   API_VERSION: "v2",
   CACHE_SECONDS: 300, // 5 minutes
-  LOCK_WAIT_MS: 120000, // 120 seconds: longer than Google's 30 seconds for a custom function (a known bug)
+  LOCK_WAIT_MS: 20000, // 20 seconds: keeps 10 of Google's 30 seconds for a cell's call for the request (RATE LIMITING)
 };
 
 /**

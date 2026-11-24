@@ -21,7 +21,14 @@ It prices two kinds of token, each where it trades:
   that run inside its apps:
   `fetch-from-any-exchange/src/getCryptoPriceFromCentralizedExchange-sources.gs`,
   which it runs unchanged under Node (`sources/exchange.js`), so the sheet
-  and the tool price alike.
+  and the tool take a price from the same sources, and neither from
+  CoinGecko's 24 hours around a time, or CoinPaprika's UTC day, before
+  they are over. Where a cell then says when to ask again, the tool writes
+  `Error` in the row's price, unless a later source gives a final one; a
+  run once the period is over fills it, when a source then has a price,
+  or this package's backfill, which fills each `Error` from the priced
+  rows around it
+  ([Current Roster of Utilities](#current-roster-of-utilities)).
 - A token that trades in a blockchain's pools, such as HEX on PulseChain,
   is asked of Moralis first, when a Moralis key is saved, then of
   GeckoTerminal, two services that price a token from its chain's pools,
@@ -36,6 +43,11 @@ The order of the sources, and what each gives, is in the file header of
 
 - `index.js` - Main CLI tool for fetching prices and filling CSV files,
   started by the repo's `bin/end-user/crypto-price-filler.js`
+- `backfill.js` - Fills each price the main tool marked `Error`, in a CSV
+  it wrote, with the price of the nearest priced row before or after it,
+  the higher of the two or the lower, asking no service; started by the
+  repo's `bin/end-user/backfill.js`, which
+  [the repo's README](../../README.md#backfilljs-1) covers
 
 ## Prerequisites
 
@@ -84,12 +96,15 @@ To save them, from the repo's top folder:
 npm run api-keys
 ```
 
-Each run then opens them before it prices anything, with the password
-`source ./bin/unlock-api-keys.sh`, run in the repo's top folder, keeps for
-the terminal, or else one it asks
-for, and asks each service once whether it takes its key. Without a saved
+Each run then opens them before it prices anything, with the password,
+which it asks for, and asks each service once whether it takes its key. Without a saved
 key, the tool asks CoinGecko without one, at its lower rate limits, asks
-CoinPaprika's free server, and does not ask Moralis. See
+CoinPaprika's free server, and does not ask Moralis. The free server keeps
+no candle of a day already over, so it gives a past day's close, but no
+high or low: a run with `--mode high` or `--mode low`, for a token
+CoinPaprika lists, says so and asks whether to go on without CoinPaprika's
+prices. y goes on, and a row no other source prices gets `Error`; Enter or
+n stops the run, with exit code 1, before any price is asked for. See
 [The api keys](../../README.md#3-the-api-keys) in the repo's README.
 
 ## Run
@@ -139,6 +154,9 @@ Central time, with each step logged:
 ```bash
 node bin/end-user/crypto-price-filler.js --token=xtm --input=fetch-from-any-exchange/crypto-price-filler/input/input.csv --mode=high --tz=America/Chicago --verbose
 ```
+
+With no CoinPaprika key saved, it first asks whether to go on without
+CoinPaprika's prices (see the api keys, above): y goes on.
 
 A row no service priced gets `Error` in its price. `--backfill-highest`
 fills it with the higher of the prices of the nearest priced rows before
@@ -228,7 +246,7 @@ Fork the repo on GitHub, the website that hosts it. Contributions are welcome, a
 
 To be accepted for pull request:
 
-- **ESLint, which checks JavaScript against rules, must pass** (`npm run lint`): it allows a cyclomatic complexity of at most 17
+- **ESLint, which checks JavaScript against rules, must pass** (`npm run lint`, from the repo's top folder, two folders up): it allows a cyclomatic complexity of at most 17
 - **All tests must pass** (`npm run test:strict`)
 - Any major new functionality must have a test runnable from the current approach
 - Line coverage must remain at or above 80%

@@ -82,14 +82,14 @@ scan. A file a tool writes when no option names one goes in its own
 | The Node versions | `bin/end-user/crypto-price-fetchers.js`, `bin/end-user/getCryptoPriceFromCentralizedExchange.js` | Each Sheets script as a Node module and a command line, through the runner. |
 | The build step | `build/tools/build.js`, `build/tools/apps-script-build/`, `build/tools/audit-dex-screener.js` | Joins the Sheets scripts, and, when asked, the Google Sheets functions that DEX Screener, a service that lists the pairs of decentralized exchanges, publishes, into one file with the saved api keys set at its end, on the clipboard, for one paste into Apps Script; and audits DEX Screener's files. |
 | The install of the operating system's programs | `install/install-os-dependencies.js`, `install/os-dependencies.js` | `npm run os-dependencies`: says which of the programs the tools use from the computer's operating system, rather than from npm, is installed, today the build's clipboard tool, and installs what is missing: with Homebrew, the package manager for macOS and Linux, or, without it, it recommends Homebrew and offers apt, the package manager of Debian and Ubuntu. The build offers the same install when it finds no clipboard tool. |
-| crypto-price-filler | `fetch-from-any-exchange/crypto-price-filler/`, started by `bin/end-user/crypto-price-filler.js` and `bin/backfill.js` | A Node tool that fills a CSV's price columns, row by row, from the pools' price services and the exchange script's sources. A package of its own. |
+| crypto-price-filler | `fetch-from-any-exchange/crypto-price-filler/`, started by `bin/end-user/crypto-price-filler.js` and `bin/end-user/backfill.js` | A Node tool that fills a CSV's price columns, row by row, from the pools' price services and the exchange script's sources. A package of its own. |
 | The price clients | `dex-prices/` | Moralis, GeckoTerminal and DexTools, which price a token from a blockchain's pools, and the one loop that sends a refused request again. |
 | The key store | `api-key-store/`, `bin/end-user/manage-api-keys.js`, `bin/unlock-api-keys.sh` | Api keys kept encrypted with a password: LP Ranger's design, as a module. |
 | The lint rules | `eslint-rules/` | `no-secret-logging.js`, the security lint's, refuses printing a name that may hold a secret; `no-or-default.js`, the lint's, refuses a default made with `\|\|`. The other repos run both from here. |
 | The versions tool | `bin/github-project-deps.js`, `github-project-deps/` | The bin `github-project-deps`, which sets a project's dependencies from GitHub to their projects' main branch or latest release. |
 | The actionlint runner | `bin/run-actionlint.js`, `actionlint/` | The bin `run-actionlint`, which runs actionlint, the checker of the workflow files of GitHub Actions, GitHub's service that runs a repo's checks at each push, from its official release, refused unless its SHA-256, and the program's in it, are the ones this repo pins: every repo's lint runs it. |
 | The Summ CSV writer | `bin/summ-csv.js`, `summ-csv/` | Writes the CSV files the owner imports into Summ, once every row has passed its rules: `npm run summ-csv`, the bin `summ-csv`, and `writeSummCsv` for a program. |
-| The shared helpers | `lib/` | Code more than one part, or more than one repo, uses, exported by the package's name for the projects that install this repo (`exports` in package.json): `messageOf`, which gives the message of something thrown (`crypto-price-fetchers/lib/message-of`); the checks of a command line's help, every option its examples use listed in it among them, and of its help into a closed pipe (`…/lib/command-line-help`); `endQuietlyWhenOutputCloses`, which ends a command line quietly when the program reading its output stops (`…/lib/closed-output`); `dayStartSeconds`, a day of the calendar written YYYY-MM-DD as the start of that day in UTC, refusing a day the calendar does not have (`…/lib/calendar-day`); `isHttpUrl` (`…/lib/http-url`); the checks of a repo's tracked files: EVM addresses in EIP-55's form, the npm targets and test files the docs must name, the links in the docs, and the paths in their code spans that start at the doc's own folder, which must point at files, folders and headings the repo keeps, and the `config-example.json` beside every `config.json` (`…/lib/repo-checks`); `fetchWithinTimeLimit`, which sends a request and reads its whole answer within a time limit, naming the service when the time runs out (`…/lib/time-limited-fetch`): the price clients, the runner, the key store's checks and the downloads of actionlint and of DEX Screener's files send their requests through it; the checks of a settings file against its JSON Schema, a description in JSON of the keys the file may hold and the kind of value each takes: the kinds of value, with the words of a refusal (`…/lib/settings-schema`), and `readSettingsFile`, which reads a settings file and checks it against its schema (`…/lib/settings-file`), as [Settings Files](#settings-files) describes; `checkConflicts`, which refuses a typed option that conflicts with one a settings file sets (`…/lib/option-conflicts`); `newFileRefusal`, which says why a folder refuses a new file, by making one there and removing it, for a command line that checks the folders of the files it writes before it asks a service anything (`…/lib/new-file`); and `fileToWriteArgument`, which refuses, as commander, the package that parses command lines, parses the option that names a file a command line will write, an empty name, a missing folder, a folder, and a folder that takes no new file (`…/lib/file-to-write`). Two more serve this repo's parts alone, and are not exported: `askLine`, which asks a question at the terminal and gives the line typed (`lib/ask-line.js`), and the desktop's clipboard tool, found, handed text, and the package that holds one named (`lib/clipboard.js`). |
+| The shared helpers | `lib/` | Code more than one part, or more than one repo, uses, exported by the package's name for the projects that install this repo (`exports` in package.json): `messageOf`, which gives the message of something thrown (`crypto-price-fetchers/lib/message-of`); the checks of a command line's help, every option its examples use listed in it among them, and of its help into a closed pipe (`…/lib/command-line-help`); `endQuietlyWhenOutputCloses`, which ends a command line quietly when the program reading its output stops (`…/lib/closed-output`); `dayStartSeconds`, a day of the calendar written YYYY-MM-DD as the start of that day in UTC, refusing a day the calendar does not have (`…/lib/calendar-day`); `isHttpUrl` (`…/lib/http-url`); the checks of a repo's tracked files: EVM addresses in EIP-55's form, the npm targets and test files the docs must name, the links in the docs, and the paths in their code spans that start at the doc's own folder, which must point at files, folders and headings the repo keeps, and the `config-example.json` beside every `config.json` (`…/lib/repo-checks`); `fetchWithinTimeLimit`, which sends a request and reads its whole answer within a time limit, naming the service when the time runs out (`…/lib/time-limited-fetch`): the price clients, the runner, the key store's checks and the downloads of actionlint and of DEX Screener's files send their requests through it; the checks of a settings file against its JSON Schema, a description in JSON of the keys the file may hold and the kind of value each takes: the kinds of value, with the words of a refusal (`…/lib/settings-schema`), and `readSettingsFile`, which reads a settings file and checks it against its schema (`…/lib/settings-file`), as [Settings Files](#settings-files) describes; `checkConflicts`, which refuses a typed option that conflicts with one a settings file sets (`…/lib/option-conflicts`); `newFileRefusal`, which says why a folder refuses a new file, by making one there and removing it, for a command line that checks the folders of the files it writes before it asks a service anything (`…/lib/new-file`); `fileToWriteArgument`, which refuses, as commander, the package that parses command lines, parses the option that names a file a command line will write, an empty name, a missing folder, a folder, and a folder that takes no new file (`…/lib/file-to-write`); and `fileToReadArgument`, which refuses in the same way, for the option that names a file a command line will read, an empty name and a path at which no file is, a folder among them (`…/lib/file-to-read`). Two more serve this repo's parts alone, and are not exported: `askLine`, which asks a question at the terminal and gives the line typed (`lib/ask-line.js`), and the desktop's clipboard tool, found, handed text, and the package that holds one named (`lib/clipboard.js`). |
 
 ---
 
@@ -117,7 +117,37 @@ before the coin's first trade on MEXC, which comes on the day MEXC listed
 it, and a candle of the day before shows the coin traded before that day.
 So when MEXC gives no candle of a recent time's minute, or of the hour, or
 the request for it fails, the script asks for the day before: with none,
-or when that request fails too, the next source answers. Apps Script runs
+or when that request fails too, the next source answers. CoinGecko's
+price for a time comes from its hourly prices of the 24 hours from 12
+hours before the time to 12 after, and CoinPaprika's from its candle of
+the time's UTC day, and each can still change until those hours, or that
+day, are over. Until then the script takes no price from that source.
+For CoinGecko's hours, when CoinGecko prices the coin, the cell says when
+to ask again and the script asks no later source; when it does not, as
+for a ticker no coin has, the script goes on to CoinPaprika. For
+CoinPaprika's day, the script asks CoinPaprika nothing, and the cell says,
+for close or with a CoinPaprika key, to ask again once the day is over
+(for an average, a high or a low without a key, see below), whether or
+not CoinPaprika has the coin, save for GridCoin, which CoinPaprika lists
+as inactive and the script never asks it about: no timer asks for it
+later. A
+person seldom wants a day's price on that day, so the cell says no more.
+crypto-price-filler asks each source itself (`sources/exchange.js`), and
+the sources give it no price from hours or a day not over, so it writes
+`Error` in such a row's price, unless a later source gives a final one:
+for a time less than 12 hours ago in a UTC day already over, it takes
+CoinPaprika's price of that day, where a cell waits for CoinGecko's hours
+to end. CoinPaprika's free server, which the script asks without a key,
+keeps a candle only for the 24 hours after it begins, and so none of a day
+already over, but keeps each day's price at 00:00 UTC for 365 days. A
+day's close is its price at its end, 24:00 UTC, which is 00:00 UTC of the
+next day, so for close the script asks for the price at 00:00 UTC of the
+day after the time's: a date one day later than the time's, on purpose.
+Without a key, CoinPaprika so gives no average, high or low: the script
+asks it for none, and a cell no earlier source prices says CoinPaprika
+needs a key; crypto-price-filler, run for a high or a low with no
+CoinPaprika key saved, says so and asks whether to go on without
+CoinPaprika's prices (`utils/coinpaprika-key.js`). Apps Script runs
 the calls of many cells at the same time. The script's lock makes those
 calls take turns at the services, and its cache answers a question
 already asked without asking again. So a sheet full of cells keeps within
@@ -316,8 +346,9 @@ price, for as many rows as the file holds, asking its sources in turn
    price asked and closed at the end of the run.
 
 As it starts, it opens the CoinGecko, CoinPaprika and Moralis keys from the
-key store, each one saved. Its backfill, `backfill.js`, started by
-`bin/backfill.js`, fills the prices marked `Error` in a file already
+key store, each one saved, and, run for a high or a low with no CoinPaprika
+key saved, asks whether to go on without CoinPaprika's prices. Its backfill, `backfill.js`, started by
+`bin/end-user/backfill.js`, fills the prices marked `Error` in a file already
 written.
 
 Its settings are `config-example.json`, committed, with its own

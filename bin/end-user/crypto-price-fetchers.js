@@ -54,7 +54,6 @@
 
 import { fileURLToPath } from "node:url";
 import { unlockProjectKeys } from "../../api-key-store/index.js";
-import { KINDS } from "../../lib/settings-schema.js";
 import {
   CACHE_SECONDS_KIND,
   InvalidArgumentError,
@@ -82,6 +81,14 @@ const PROJECT_TOP = fileURLToPath(new URL("../..", import.meta.url));
 const FUNCTION_NAMES = ["dexToolsGetTokenPrice", "dexToolsGetTokenFDV"];
 
 /**
+ * The longest `DEXTOOLS_CONFIG.LOCK_WAIT_MS` may be. Google stops a cell's
+ * call after 30 seconds; a call that gets the script lock then waits out
+ * `MIN_SECONDS_BETWEEN_CALLS` and sends its request, which the other 10
+ * seconds are kept for.
+ */
+const LONGEST_LOCK_WAIT_MS = 20000;
+
+/**
  * The JSON Schema of each config object `config.json` may set, by its name
  * in the script: the fields the script reads each time it is called, each
  * of its kind of value, and no other.
@@ -92,7 +99,12 @@ export const CONFIG_SCHEMAS = Object.freeze({
     additionalProperties: false,
     properties: {
       CACHE_SECONDS: CACHE_SECONDS_KIND,
-      LOCK_WAIT_MS: KINDS.wholeAtLeast0,
+      LOCK_WAIT_MS: Object.freeze({
+        type: "integer",
+        minimum: 0,
+        maximum: LONGEST_LOCK_WAIT_MS,
+        description: `a whole number of milliseconds from 0 to ${LONGEST_LOCK_WAIT_MS}`,
+      }),
     },
     description: "fields of DEXTOOLS_CONFIG",
   }),

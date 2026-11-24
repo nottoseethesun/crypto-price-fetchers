@@ -5,7 +5,8 @@
  * settings, a start without `.js`, and the words they do not take; the
  * Summ csv utility's; the key manager's; and `bin/unlock-api-keys.sh`,
  * which finds the project's folder whatever `CDPATH` lists or the shell's
- * `cd` prints, answers `--help`, and returns 1 when it keeps no password.
+ * `cd` or `pwd` prints, answers `--help`, and returns 1 when it keeps no
+ * password.
  * crypto-price-filler's are in `regressions-command-line.test.js`, and
  * the repo's CLAUDE.md lists the other files of fixed bugs' tests; a bug
  * found later gets its test in `known-bugs.test.js`, declared with
@@ -17,8 +18,9 @@
  * utility's run in the test's thread, with a stand-in fetch, stand-in
  * streams and files in a temp folder of the test's own; a Node version
  * started without `.js` runs in a child process. The tests of
- * `bin/unlock-api-keys.sh` have bash run or source a copy of it in a temp
- * folder of the test's own, beside a stand-in key manager.
+ * `bin/unlock-api-keys.sh` have bash run or source a copy of it in the
+ * `bin/` of a temp folder of the test's own, whose `bin/end-user/` holds a
+ * stand-in key manager.
  */
 
 import { describe, it, expect } from "vitest";
@@ -141,13 +143,14 @@ describe("npm run summ-csv", () => {
     const top = fs.mkdtempSync(path.join(os.tmpdir(), "summ-csv-"));
     try {
       fs.mkdirSync(path.join(top, "csv"));
+      fs.writeFileSync(path.join(top, "rows.json"), "not json");
       let stderr = "";
       const exitCode = runSummCsv(
         [
           "node",
           "bin/summ-csv.js",
           "--rows",
-          path.join(top, "no-such-rows.json"),
+          path.join(top, "rows.json"),
           "--template",
           SUMM_TEMPLATE,
           "--out",
@@ -163,7 +166,37 @@ describe("npm run summ-csv", () => {
       expect(stderr).toBe(
         `error: option '--out <file>' argument '${path.join(top, "csv")}' is invalid. It is a folder, not a file.\n`,
       );
-      expect(fs.readdirSync(top)).toEqual(["csv"]);
+      expect(fs.readdirSync(top).sort()).toEqual(["csv", "rows.json"]);
+    } finally {
+      fs.rmSync(top, { recursive: true, force: true });
+    }
+  });
+
+  it("npm run summ-csv refuses a word it does not take, writing nothing", () => {
+    const top = fs.mkdtempSync(path.join(os.tmpdir(), "summ-csv-"));
+    try {
+      fs.writeFileSync(path.join(top, "rows.json"), "[]");
+      let stderr = "";
+      const exitCode = runSummCsv(
+        [
+          "node",
+          "bin/summ-csv.js",
+          "--rows",
+          path.join(top, "rows.json"),
+          "--template",
+          SUMM_TEMPLATE,
+          "--out",
+          path.join(top, "out.csv"),
+          "extra",
+        ],
+        {
+          stdout: { write: () => true },
+          stderr: { write: (text) => (stderr += text) },
+        },
+      );
+      expect(exitCode).toBe(1);
+      expect(stderr).toMatch(/^error: too many arguments/);
+      expect(fs.readdirSync(top)).toEqual(["rows.json"]);
     } finally {
       fs.rmSync(top, { recursive: true, force: true });
     }
@@ -233,13 +266,44 @@ describe("the Node versions' stray words", () => {
     expect(exitCode).toBe(1);
     expect(stderr).toMatch(/^error: too many arguments\./);
   });
+
+  it("the current-price script's Node version refuses a word past price's or fdv's arguments, asking nothing", async () => {
+    for (const command of ["price", "fdv"]) {
+      let stderr = "";
+      let asked = 0;
+      const exitCode = await runPriceNowCommandLine(
+        [
+          "node",
+          "x",
+          command,
+          "ether",
+          "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+          "extra",
+        ],
+        {
+          fetch: async () => {
+            asked += 1;
+            return new Response("{}", { status: 404 });
+          },
+          stdout: { write: () => true },
+          stderr: { write: (text) => (stderr += text) },
+        },
+      );
+      expect(asked, command).toBe(0);
+      expect(exitCode, command).toBe(1);
+      expect(stderr, command).toMatch(
+        `error: too many arguments for '${command}'.`,
+      );
+    }
+  });
 });
 
 describe("bin/unlock-api-keys.sh", () => {
   /**
    * Runs a copy of the script in bash from the top folder of a temp
-   * project, whose bin/ holds it beside a stand-in manage-api-keys.js that
-   * takes or refuses any password, with the test's own empty password.
+   * project, whose bin/ holds it, and whose bin/end-user/ a stand-in
+   * manage-api-keys.js that takes or refuses any password, with the
+   * test's own empty password.
    *
    * @param {string[]} args - bash's arguments
    * @param {{input?: string, takes?: boolean, env?: Object<string, string>}} [run] - What is typed, whether the stand-in takes the password, and more of the environment
@@ -248,13 +312,13 @@ describe("bin/unlock-api-keys.sh", () => {
   function runUnlock(args, { input = "a password\n", takes = true, env } = {}) {
     const top = fs.mkdtempSync(path.join(os.tmpdir(), "unlock-"));
     try {
-      fs.mkdirSync(path.join(top, "bin"));
+      fs.mkdirSync(path.join(top, "bin", "end-user"), { recursive: true });
       fs.copyFileSync(
         path.resolve(__dirname, "../../../bin/unlock-api-keys.sh"),
         path.join(top, "bin", "unlock-api-keys.sh"),
       );
       fs.writeFileSync(
-        path.join(top, "bin", "manage-api-keys.js"),
+        path.join(top, "bin", "end-user", "manage-api-keys.js"),
         `process.exit(${takes ? 0 : 1});\n`,
       );
       return spawnSync("bash", args, {
@@ -303,16 +367,51 @@ describe("bin/unlock-api-keys.sh", () => {
 });
 
 describe("bin/unlock-api-keys.sh in bash", () => {
-  it("finds the project's top folder when the shell's cd prints", () => {
+  it("finds the project's top folder when the shell's pwd prints more than the folder", () => {
     const top = fs.mkdtempSync(path.join(os.tmpdir(), "unlock-"));
     try {
-      fs.mkdirSync(path.join(top, "bin"));
+      fs.mkdirSync(path.join(top, "bin", "end-user"), { recursive: true });
       fs.copyFileSync(
         path.resolve(__dirname, "../../../bin/unlock-api-keys.sh"),
         path.join(top, "bin", "unlock-api-keys.sh"),
       );
       fs.writeFileSync(
-        path.join(top, "bin", "manage-api-keys.js"),
+        path.join(top, "bin", "end-user", "manage-api-keys.js"),
+        "process.exit(0);\n",
+      );
+      const run = spawnSync(
+        "bash",
+        [
+          "-c",
+          'pwd() { echo "now in"; builtin pwd; }; source bin/unlock-api-keys.sh',
+        ],
+        {
+          cwd: top,
+          input: "a password\n",
+          encoding: "utf8",
+        },
+      );
+      expect(run.stderr).toContain(
+        `Password for the api keys of ${path.basename(top)}: `,
+      );
+      expect(run.stderr).toContain(
+        "API_KEYS_PASSWORD is set for this terminal.",
+      );
+    } finally {
+      fs.rmSync(top, { recursive: true, force: true });
+    }
+  });
+
+  it("finds the project's top folder when the shell's cd prints", () => {
+    const top = fs.mkdtempSync(path.join(os.tmpdir(), "unlock-"));
+    try {
+      fs.mkdirSync(path.join(top, "bin", "end-user"), { recursive: true });
+      fs.copyFileSync(
+        path.resolve(__dirname, "../../../bin/unlock-api-keys.sh"),
+        path.join(top, "bin", "unlock-api-keys.sh"),
+      );
+      fs.writeFileSync(
+        path.join(top, "bin", "end-user", "manage-api-keys.js"),
         "process.exit(0);\n",
       );
       const run = spawnSync(

@@ -31,16 +31,15 @@ manages his 9mm V3 liquidity positions: its `CLAUDE.md` and
 - [Quick Start](#quick-start)
 - [Files on Disk](#files-on-disk)
 - [The Programs in `bin/`](#the-programs-in-bin)
-  - [backfill.js](#backfilljs)
-    - [Usage](#usage)
   - [summ-csv.js](#summ-csvjs)
-    - [Usage](#usage-1)
+    - [Usage](#usage)
   - [unlock-api-keys.sh](#unlock-api-keyssh)
-    - [Usage](#usage-2)
+    - [Usage](#usage-1)
+    - [In zsh, by Hand](#in-zsh-by-hand)
   - [github-project-deps.js](#github-project-depsjs)
-    - [Usage](#usage-3)
+    - [Usage](#usage-2)
   - [run-actionlint.js](#run-actionlintjs)
-    - [Usage](#usage-4)
+    - [Usage](#usage-3)
 - [The Gate: `npm run check`](#the-gate-npm-run-check)
 - [Lint](#lint)
 - [Tests](#tests)
@@ -111,44 +110,17 @@ in the repo, and the format check and the secret scan pass over it.
 
 ## The Programs in `bin/`
 
-The repo's README covers the programs an end user runs, which are in
-`bin/end-user/`. The others, in `bin/` itself, serve the repo's own work
-and the projects that install it: crypto-price-filler's backfill, the
-command line of the Summ CSV writer, the script that keeps the key
-store's password for a terminal, the versions tool, and the runner of
-actionlint, the checker of GitHub Actions workflow files. Each sub-section
+The repo's README covers the programs only an end user runs, which are
+in `bin/end-user/`. The others, in `bin/` itself, are run by npm, by the
+lint or by the projects that install this repo, or, the script that keeps
+the key store's password for a terminal, sourced rather than run: the
+command line of the Summ CSV writer, that script, the versions tool, and
+the runner of actionlint, the checker of GitHub Actions workflow files. Each sub-section
 below covers one: how to run it, with an example, and, under its Usage,
 the cases that take more. Run them from the repo's top folder; each
 answers `--help` with its options, more examples and its exit codes, and
 [`project-commands.md`](project-commands.md) lists every command with its
 flags.
-
-### backfill.js
-
-`bin/backfill.js` fills the prices crypto-price-filler could not give, in
-a file it wrote, asking no service: each row with `Error` takes the price
-of the nearest priced row before or after it, the higher of the two with
-`--backfill-highest` and the lower with `--backfill-lowest`.
-The `output.csv` the filler wrote in its `output/csv/` filled in place
-with the higher price, a figure that does not understate a value for
-taxes:
-
-```bash
-node bin/backfill.js --input=fetch-from-any-exchange/crypto-price-filler/output/csv/output.csv --backfill-highest
-```
-
-#### Usage
-
-The rows that hold no data, a "Total" row, a row with no date and the
-rows after the last date, have a blank price, which backfill leaves as it
-is, so they stay out of the grand total.
-
-`budget.csv` written beside it with the lower price, a figure that does
-not overstate income:
-
-```bash
-node bin/backfill.js --input=fetch-from-any-exchange/crypto-price-filler/output/csv/output.csv --output=fetch-from-any-exchange/crypto-price-filler/output/csv/budget.csv --backfill-lowest
-```
 
 ### summ-csv.js
 
@@ -181,12 +153,17 @@ a row.
 
 ### unlock-api-keys.sh
 
-`bin/unlock-api-keys.sh` asks for the key store's password, showing
-nothing of what is typed, checks that it opens the keys saved, and keeps
-it for the terminal in `API_KEYS_PASSWORD`, so the tools open their keys
-without asking. It runs with `source`, since a script run as a program
-cannot set anything in the terminal that started it. From the repo's top
-folder:
+`bin/unlock-api-keys.sh` asks for the key store's password once,
+showing nothing of what is typed, checks that it opens the keys saved,
+and keeps it for the terminal in `API_KEYS_PASSWORD`. Without it, each
+program asks for the password as it starts, which is slow when several
+run in turn; with it, the programs, the build and the key manager open
+the keys with that password without asking, and the key manager saves
+new keys with it. While no key is saved, any password passes, and the
+first key saved is saved with it. It runs in bash or zsh, the default
+shell of macOS, and with `source`, since a script run as a program
+cannot set anything in the terminal that started it; no program runs
+it. From the repo's top folder:
 
 ```bash
 source ./bin/unlock-api-keys.sh
@@ -200,11 +177,52 @@ From any other folder, by the script's path:
 source /path/to/crypto-price-fetchers/bin/unlock-api-keys.sh
 ```
 
+The password kept, then checked by the key manager, which asks for
+nothing:
+
+```bash
+source ./bin/unlock-api-keys.sh
+npm run api-keys -- check-password
+```
+
+The file for a spreadsheet built with the password kept first, so the
+build does not ask for it:
+
+```bash
+source ./bin/unlock-api-keys.sh
+npm run build apps-script
+```
+
 Closing the terminal forgets the password, as does:
 
 ```bash
 unset API_KEYS_PASSWORD
 ```
+
+Each project that installs this repo keeps a copy of the script in its
+own `bin/`, which its tests hold to this one, so a change to the script
+is made here; a project that takes up the key store copies it and tests
+that the copy matches. The script finds the project's top folder as the
+one above its own, and runs the key manager there, at
+`bin/end-user/manage-api-keys.js`. With one password for every project,
+one unlock serves them all.
+
+#### In zsh, by Hand
+
+The script finds its own folder by a different line in bash and in zsh.
+The automated tests run it in bash alone, since zsh is one of the
+computer's own programs, which they never run: they skip its tests in
+zsh, which Node's test runner leaves out of its count of skipped tests.
+On a computer with zsh, such as a Mac, run them by hand, from the repo's
+top folder, after `npm ci`:
+
+```bash
+UNLOCK_SCRIPT_IN_ZSH=1 node --test --test-timeout=60000 test/unlock-api-keys.test.js
+```
+
+It lists the suite "unlock-api-keys.sh in zsh" with each of its tests
+passed. Where zsh is missing, it lists that suite as skipped, with "zsh
+is not installed".
 
 ### github-project-deps.js
 
@@ -280,7 +298,7 @@ row explains:
 | markdownlint | `.markdownlint-cli2.jsonc` | Checks the form of Markdown files: LP Ranger's settings, over every Markdown file, such as one top heading first and no HTML. |
 | Prettier | `.prettierrc`, `.prettierignore` | Formats code; in check mode, it fails on any JavaScript, Sheets script, JSON or YAML file the repo keeps whose layout its formatting would change. |
 | actionlint | `actionlint/release.js` | Checks the GitHub Actions workflow files, in `.github/workflows/`, for mistakes in their syntax, their expressions and the shell scripts their steps run. The lint runs the official release of actionlint, rhysd's program, through this repo's bin `run-actionlint` (`bin/run-actionlint.js`, `actionlint/`): the first run downloads the archive for its system, refuses it unless its SHA-256 is the one `actionlint/release.js` pins, refuses the program in it unless its own SHA-256 is the one pinned beside it, and keeps the program in `node_modules/.cache/actionlint/`; each later run checks the kept program's SHA-256 again, and downloads the archive again when the program has changed. |
-| knip | `knip.json` | Finds files nothing imports or runs, and fails on any. See [Dead Code Detection](#dead-code-detection). |
+| knip | `knip.json` | Finds files outside the top folder's `test/` that nothing imports or runs, and fails on any. See [Dead Code Detection](#dead-code-detection). |
 
 The Sheets scripts are plain scripts, not modules: Apps Script loads them
 without imports, with its services as globals. ESLint reads them the same
@@ -359,12 +377,27 @@ own code, checks that the store opens LP Ranger's files. A test that starts
 a program gives it an environment without `API_KEYS_PASSWORD`, and a key
 file of its own in `API_KEYS_FILE_PATH`. `bin/unlock-api-keys.sh`, the script
 that keeps the password for a terminal, is tested in bash; its tests in
-zsh, the default shell of macOS, run only where zsh is installed, which
-none of the computers that run the automated tests is, so the README's
-test section lists their run by hand
-([Optional: the Unlock Script in zsh, by Hand](../README.md#optional-the-unlock-script-in-zsh-by-hand)).
+zsh, the default shell of macOS, run only when the environment variable
+`UNLOCK_SCRIPT_IN_ZSH` is 1, since zsh is one of the computer's own
+programs, which the automated tests never run, and
+[In zsh, by Hand](#in-zsh-by-hand) sets it for their run by hand.
 `npm run test:coverage` fails below
 80% of lines covered.
+
+`npm test` and `npm run test:coverage` pass `--test-timeout=60000` to
+Node's test runner, so a test or hook still running after a minute fails,
+by name, and the rest of its file runs: on Node 24 and 26, a test whose
+promise never settles would otherwise keep its file running until the
+run is stopped. The limit is per test, a minute, as in LP Ranger; the
+slowest test today takes up to about 9 seconds, on a computer and
+on CI. It cannot end a test that
+waits for a child process synchronously, as `spawnSync` does, which holds
+its file's thread, nor a test file that leaves a timer running, whose
+process never exits: [CI and Branch Protection](#ci-and-branch-protection)
+says how CI ends those, and a run on a computer waits until it is
+stopped. `--test-force-exit`, which would end such a file, is left out,
+since it would hide the timer left running. crypto-price-filler's tests run on vitest, which fails a test
+after 5 seconds, its default.
 
 **crypto-price-filler's tests** (`tests/`, vitest) cover the tool, its
 sources and its command line, and run the exchange script unchanged under
@@ -391,20 +424,28 @@ holds the stand-ins:
   child process against a stand-in MEXC, a centralized exchange, and a
   stand-in ping of CoinGecko, a service that gathers the exchanges' prices,
   that takes the one key in `stand-in-coingecko-key.js`.
-- `stand-in-settings-preload.js` hands the command line, run in a child
-  process, a settings file, a token list or a `config.json` of the
+- `stand-in-settings-preload.js` hands crypto-price-filler's command line,
+  or backfill's, run in a child process, a settings file, a token list or
+  a `config.json` of the
   exchange script of the test's own, from the environment variable
   `STAND_IN_FILLER_CONFIG`, `STAND_IN_FILLER_TOKENS` or
   `STAND_IN_EXCHANGE_CONFIG`, since the tool reads its two beside its own
   files, and the exchange script's Node version its own beside the
   script, and a test never writes the owner's settings.
+- `full-disk-preload.js` makes every file a command line, run in a
+  child process, writes fail as on a full disk: the file is opened as the
+  write asks, which empties a file written over, and the write then fails
+  with ENOSPC.
 - `regression-runs.js` holds the settings, stand-in answers, times and
-  runs that the regression tests share, and a known-bug test that needs
-  them: answers as MEXC, CoinGecko and CoinPaprika, a service like
-  CoinGecko, give them, a time as a cell writes it (`cellTime`), a stand-in for the script's clock (`dateAt`), the header of Summ's template and a row summ-csv takes (`SUMM_TEMPLATE`, `SUMM_ROW`), the command line run over one row in a child process, or
+  runs that the regression tests share, as do the tests of what
+  CoinPaprika gives without a key (`tests/coinpaprika-key.test.js`):
+  answers as MEXC, CoinGecko and
+  CoinPaprika, a service like CoinGecko, give them, a time as a cell writes it (`cellTime`), a stand-in for the script's clock (`dateAt`), the header of Summ's template and a row summ-csv takes (`SUMM_TEMPLATE`, `SUMM_ROW`), the command line run over one row in a child process, or
   in a folder of the test's own with the stand-in settings (`runIndexIn`,
-  for `tests/regressions-command-line.test.js`), and a call run with the
-  computer's time zone set to another.
+  for `tests/regressions-command-line.test.js`), backfill's command line
+  run on a CSV with a gap, with settings of the test's own (`backfillIn`,
+  `CSV_WITH_A_GAP`), and a call run with the computer's time zone set to
+  another.
 - `log-lines.js` reads the lines the tool prints through the seam of its
   log, `utils/log.js`, a mock function in place of the console's log until
   the test ends, so no test replaces `console.log`, as LP Ranger's rules
@@ -439,6 +480,7 @@ that this section, or `CLAUDE.md`, names every one.
 | `dex-prices-moralis.test.js` | The Moralis client: the block a chain had at a time, a token's price at a block, the pairs that trade a token, read page by page up to 10 pages, the pick of the deepest active pair that lists a token first, and a pool's candles, read page by page and given oldest first, with the token Moralis priced. |
 | `dex-prices-web-request.test.js` | `dex-prices/web-request.js`: a request sent again after each wait while the service answers 429, each try with its time limit. |
 | `dex-screener.test.js` | DEX Screener's part of the build: its files downloaded at one commit, checked against their SHA-256, and compiled, from stand-in sources. |
+| `file-to-read.test.js` | `lib/file-to-read.js`: a path at which a file is given back; an empty name, a path at which no file is and a folder each refused, in the words commander prints after the option's name. |
 | `file-to-write.test.js` | `lib/file-to-write.js`: a good path given back, its folder left as it was; an empty name, a missing folder and a folder refused, each with its words; and a file in `/proc`, refused with the system's code, a test skipped on a system without `/proc`. |
 | `format-date.test.js` | `Utilities.formatDate` under Node. |
 | `get-crypto-price-from-centralized-exchange.test.js` | The exchange script's Node version, and its command line. |
@@ -464,7 +506,7 @@ that this section, or `CLAUDE.md`, names every one.
 | `summ-csv-values.test.js` | How the Summ CSV writer turns a row's values into the text of cells. |
 | `summ-csv-files.test.js` | The Summ CSV writer, part two: the template it reads, the settings it ships and their schema, the file it writes, its command line, and what the package ships for it. |
 | `time-limited-fetch.test.js` | `lib/time-limited-fetch.js`: an answer read in full, a server that never answers and one that stops in its body, each given up on at the limit with an error naming the service, a caller's own signal that aborts the request, an answer with no body, and a limit that is not a whole number of milliseconds from 1 to 2147483647, as Node's timers keep, refused. |
-| `unlock-api-keys.test.js` | `bin/unlock-api-keys.sh`, in bash, and in zsh where zsh is installed, which the README's test section runs by hand: sourced, the password it keeps or refuses, the status it returns, which says which, and its help, which asks nothing; run as a program, that it says to source it and stops with exit code 1. |
+| `unlock-api-keys.test.js` | `bin/unlock-api-keys.sh`, in bash, and in zsh when `UNLOCK_SCRIPT_IN_ZSH` is 1, as [In zsh, by Hand](#in-zsh-by-hand) runs them: sourced, the password it keeps or refuses, the status it returns, which says which, and its help, which asks nothing; run as a program, that it says to source it and stops with exit code 1. |
 
 Its helpers (`test/helpers/`), besides those the paragraphs above name:
 `captured-output.js`, a stream stand-in that keeps what is written to it,
@@ -477,25 +519,25 @@ stand-ins of both suites answer as MEXC does.
 
 | File | What it covers |
 | ---- | -------------- |
-| `backfill-cli.test.js` | `backfill.js`'s command and run, which `bin/backfill.js` starts, with stand-ins for `fs`, csv-writer and `loadConfig`. |
-| `backfill.test.js` | `utils/backfill.js`: the bracketing prices of a run of rows marked `Error`, the fill, the totals, a blank price left as it is, and `backfillChoice`. |
+| `backfill-cli.test.js` | `backfill.js`'s command and run, which `bin/end-user/backfill.js` starts, with stand-ins for `fs`, csv-writer and `loadConfig`. |
+| `backfill.test.js` | `utils/backfill.js`: the bracketing prices of a run of rows marked `Error`, the fill, the totals, a blank price left as it is, and `backfillChoice`; `takeBackfillSettings`'s refusals are in `regressions-command-line.test.js`. |
 | `cache.test.js` | `utils/cache.js`, the cache held in memory, with each entry's expiry, aged through the cache's clock (`setCacheClockForTests`). |
 | `coingecko-api-key.test.js` | The command line, `bin/end-user/crypto-price-filler.js`, opening the saved CoinGecko key before it prices anything. |
+| `coinpaprika-key.test.js` | What CoinPaprika gives without a key: the exchange script's CoinPaprika source, which gives no average, high or low and asks nothing for one, and the cell, which says CoinPaprika needs a key, for a past day or today, or no source has a price for GridCoin, which CoinPaprika lists as inactive; and `utils/coinpaprika-key.js`, the question a run for a high or a low asks when no CoinPaprika key is saved: not asked for close, for GridCoin, whose entry names no CoinPaprika id, for another token with none, or with a key saved; the run going on at y, and stopping at Enter, at n and at an input that ends; the question asked again after an answer it does not take; and the command line, which says why and stops with exit code 1 before any price is asked for, or goes on and writes its file. |
 | `exchange.test.js` | `sources/exchange.js`: the exchange script's price sources, opened once per run with the run's keys and closed at its end. |
 | `geckoterminal-source.test.js` | `sources/geckoterminal.js`: a token that trades in pools, priced from the GeckoTerminal candle that holds a row's time. |
 | `index.test.js` | The command line's helpers, the time zones and the reading of a date, and the command line, `bin/end-user/crypto-price-filler.js`, run as a program. |
-| `known-bugs.test.js` | The known bugs, each declared with `it.fails`. |
 | `mexc-windows.test.js` | The windows the exchange script asks MEXC for: the minute, or for an older time the hour, and, when nothing traded in it, each window up to the year, whose average of high and low then answers; and, when MEXC keeps no candle of the hour, the climb when it keeps one of the day before, or no price when it does not. |
 | `moralis-source.test.js` | `sources/moralis.js`: a token that trades in pools, priced by Moralis at the block its chain had at a row's time. |
 | `price.test.js` | `sources/price.js`: the order the sources are asked in, and the cache. |
 | `progress.test.js` | `utils/progress.js`, the progress bar. |
 | `regressions.test.js` | The fixed bugs of the tool and its Sheets script; and a file written directly in a tool's `output/` folder, which git ignores, as it does one in `output/csv/`. |
-| `regressions-command-line.test.js` | The fixed bugs of crypto-price-filler's two command lines: their checks of a value, the settings they fall back to, a settings file or token list they cannot take refused as one error, a `config.json` of the exchange script its Node version's schemas refuse ending the run before its first row, what `index.js` logs, `validate-parse` failing when node does not exit with code 0, the file the filler writes when no `--output` is given being one git ignores, run from the repo's top folder, and backfill leaving the rows that hold no data, such as a Total row, out of the fill and the grand total, and bracketing a block of `Error` prices with the nearest priced rows past them; `test:ci` and `test:debug` giving vitest their flags; an input file not found, or with no rows, named; exit code 1 when the program reading the log stops before the file is written; a file in a folder that does not exist refused as `--output` before anything is asked; a zone's current name, such as Asia/Kolkata, taken by `--tz`; and a word neither command line takes refused. |
-| `regressions-other-command-lines.test.js` | The fixed bugs of the repo's other command lines: the Sheets scripts' Node versions', which name a time zone or a date the exchange script refuses, and a run on x1 with no `--pool`, before a key is opened or anything is asked, answer `--help` when node is started with the file's name without `.js`, and refuse a word past a command's arguments, asking nothing; the exchange script's settings, which refuse a `GENERAL_DELAY_MS` of 0; `npm run summ-csv`, which refuses a folder as `--out`, naming the option, before it reads the rows; the key manager, which refuses a command it does not know, asking for no key; and `bin/unlock-api-keys.sh`, which finds the project's top folder when the shell's `CDPATH` lists `.` or its `cd` prints, answers `--help` and `-h`, run or sourced, and returns 1 when it keeps no password. |
+| `regressions-command-line.test.js` | The fixed bugs of crypto-price-filler's two command lines: their checks of a value, the settings they fall back to, a settings file or token list they cannot take refused as one error, a `config.json` of the exchange script its Node version's schemas refuse ending the run before its first row, what `index.js` logs, `validate-parse` failing when node does not exit with code 0, the file the filler writes when no `--output` is given being one git ignores, run from the repo's top folder, and backfill leaving the rows that hold no data, such as a Total row, out of the fill and the grand total, and bracketing a block of `Error` prices with the nearest priced rows past them; a backfill flag typed against the other backfill setting, the two flags typed together, or the two settings both true, refused, naming both, by backfill's command line, which leaves the file as it was, and a flag typed against the other's setting refused by the filler's, which writes no file; backfill's runs with a flag beside its own setting, or with a setting alone; `test:ci` and `test:debug` giving vitest their flags; an input file not found, or with no rows, named; exit code 1 when the program reading the log stops before the file is written; an output file the filler cannot write named, with the error, and exit code 1, with no stack trace; a file in a folder that does not exist refused as `--output`, by either command line, before it reads its input; a zone's current name, such as Asia/Kolkata, taken by `--tz`; and a word neither command line takes refused. |
+| `regressions-other-command-lines.test.js` | The fixed bugs of the repo's other command lines: the Sheets scripts' Node versions', which name a time zone or a date the exchange script refuses, and a run on x1 with no `--pool`, before a key is opened or anything is asked, answer `--help` when node is started with the file's name without `.js`, and refuse a word past a command's arguments, asking nothing; the exchange script's settings, which refuse a `GENERAL_DELAY_MS` of 0; `npm run summ-csv`, which refuses a folder as `--out`, naming the option, before it reads the rows, and a word it does not take, writing nothing; the key manager, which refuses a command it does not know, asking for no key; and `bin/unlock-api-keys.sh`, which finds the project's top folder when the shell's `CDPATH` lists `.`, its `cd` prints, or its `pwd` prints more than the folder, answers `--help` and `-h`, run or sourced, and returns 1 when it keeps no password. |
 | `regressions-lib.test.js` | The fixed bugs of the repo's shared helpers in `lib/`: a schema compiled once, the words for an empty text and an empty list, the search for command lines, a time limit Node's timers cannot keep refused, the copy to the clipboard, which rejects, naming the exit code, when the tool exits without reading its input, and the questions at the terminal, which give each question its own line of the answers piped in together, null at once to a question asked after the input has ended, and a last answer with no line end, and give the key store's password prompt the line read past an answer. |
-| `regressions-shared-code.test.js` | The fixed bugs of the code the projects that install this repo use: the runner's cache, which has `getAll`, `putAll` and `removeAll`, and its check of a config object against a Node version's schemas, as of a config file; the Summ csv utility, which refuses a time past the year 9999, as a time in milliseconds given for seconds is, and, told to replace a folder, leaves no file beside it; the key store's password prompt, which refuses at once a question asked after its input has ended; Moralis's block `null` read as no block; a request setting given as `undefined` keeping its default; GeckoTerminal's budget, kept when two calls wait at once; and the security lint's `no-secret-logging`, which refuses a key printed through Apps Script's `Logger`, `tell` or `logv`, or inside a call, an object or `??`. |
-| `regressions-sheets.test.js` | Fixed bugs whose tests run the exchange script in the test's thread: its pairs quoted in `CONFIG.QUOTE_CURRENCY`; and a time before MEXC listed a pair priced by CoinGecko, on an earlier day, before the first trade on the listing day, or, for a recent time, before it in the listing hour, while a time after it still climbs MEXC's windows, as does a recent time whose minute request fails or whose minute MEXC let go in the hour its minute candles begin in; a failed request for the day, which the script goes on past rather than take for no candle; a failed request for the day before, after a minute or an hour with no candle, for which CoinGecko answers, as it does for such a time on the listing day; a request with no response at all, which the next source answers; a call's waits for the lock and for requests refused as too many, within the time Google lets a custom function run, with the busy message, kept nowhere, when no source gave a price; and a call cut short by refusals, by answers with a server error or a request timeout, or by requests with no response, Apps Script's spent quota among them, after which CoinGecko is asked again, while its own lack of an answer is kept when only another source's request was cut short. Also CoinGecko's hourly prices kept for the time asked, not for its day, and no CoinGecko price for a time whose 24 hours are not over, the cell saying when to ask again, or, when MEXC's request was cut short, giving the busy message. |
-| `regressions-sheets-price-now.test.js` | Fixed bugs whose tests run the current-price script, with the menu, in the test's thread: a cell's own cache seconds outside 1 to 21600 refused with a message before any request, an empty cell taking the config's; each token's own FDV when two cells name one pool, and an answer kept for one cell's seconds never given to a cell with others; a pool named as text; the script's error message, not 0, for a request with no answer, whose time is still kept for the next call's wait; and the menu's Refresh, which runs again the cells that call `dexToolsGetTokenPrice`. |
+| `regressions-shared-code.test.js` | The fixed bugs of the code the projects that install this repo use: the runner's cache, which has `getAll`, `putAll` and `removeAll`, and its check of a config object against a Node version's schemas, as of a config file; the Summ csv utility, which refuses a time past the year 9999, as a time in milliseconds given for seconds is, and, told to replace a folder, leaves no file beside it, and removes a new file it could not write whole; the key store's password prompt, which refuses at once a question asked after its input has ended; Moralis's block `null` read as no block, and a candle with a field Moralis gives as `null` dropped rather than read as 0; a request setting given as `undefined` keeping its default; GeckoTerminal's budget, kept when two calls wait at once; and the security lint's `no-secret-logging`, which refuses a key printed through Apps Script's `Logger`, `tell` or `logv`, or inside a call, an object, `??`, `?:`, an array, a spread or `await`, or read through `?.`, and one inside a `new`, a tagged template, a key written as a string, an assignment or a sequence, while it passes a print in those forms of a value that holds no secret. |
+| `regressions-sheets.test.js` | Fixed bugs whose tests run the exchange script in the test's thread: its pairs quoted in `CONFIG.QUOTE_CURRENCY`; and a time before MEXC listed a pair priced by CoinGecko, on an earlier day, before the first trade on the listing day, or, for a recent time, before it in the listing hour, while a time after it still climbs MEXC's windows, as does a recent time whose minute request fails or whose minute MEXC let go in the hour its minute candles begin in; a failed request for the day, which the script goes on past rather than take for no candle; a failed request for the day before, after a minute or an hour with no candle, for which CoinGecko answers, as it does for such a time on the listing day; a request with no response at all, which the next source answers; a call's waits for the lock and for requests refused as too many, within the time Google lets a custom function run, with the busy message, kept nowhere, when no source gave a price; and a call cut short by refusals, by answers with a server error or a request timeout, or by requests with no response, Apps Script's spent quota among them, after which CoinGecko is asked again, while its own lack of an answer is kept when only another source's request was cut short. Also CoinGecko's hourly prices kept for the time asked, not for its day, and no CoinGecko price for a time whose 24 hours are not over, the cell saying when to ask again once CoinGecko shows it prices the coin, and going on to CoinPaprika when it does not, or, when MEXC's request was cut short, giving the busy message; and no CoinPaprika price from a UTC day not over, the cell saying when to ask again without asking CoinPaprika, no data for GridCoin, which CoinPaprika lists as inactive, or the busy message when an earlier request of the call was cut short. |
+| `regressions-sheets-price-now.test.js` | Fixed bugs whose tests run the current-price script, with the menu, in the test's thread: a cell's own cache seconds outside 1 to 21600 refused with a message before any request, an empty cell taking the config's; each token's own FDV when two cells name one pool, and an answer kept for one cell's seconds never given to a cell with others; a pool named as text; the script's error message, not 0, for a request with no answer, whose time is still kept for the next call's wait, or for an answer with a status of 500 or above, from any of the script's four requests; a wait for the script lock of at most 20 seconds, after which a cell gives the busy message; and the menu's Refresh, which runs again the cells that call `dexToolsGetTokenPrice`. |
 | `settings-files.test.js` | `config.js` and `supported-tokens.js`: the committed settings and token list held to their schemas, the owner's `config.json` laid over the committed settings, and files with a key no schema names or a value of the wrong kind refused, listing every problem. |
 | `sheets-sources.test.js` | The exchange script's sources, MEXC, CoinGecko and CoinPaprika, which the sheet and the tool both price with. |
 | `token-validation.test.js` | A token with no sources refused, naming the tokens the tool supports. |
@@ -569,10 +611,10 @@ answered at once.
 | ----- | ------------------- | --------------- |
 | `test/crypto-price-fetchers.test.js`, `test/get-crypto-price-from-centralized-exchange.test.js` | Through its Node version, in the worker thread. Each request goes to `standInFetch` (`test/helpers/stand-in-web.js`), which answers as DexTools or x1.ninja, the services that give current prices, or MEXC or CoinGecko, which give past ones, does. | What each Sheets function returns, as its cell would show it, and the Node versions' command lines. |
 | `test/run-apps-script.test.js` | A small script, `test/fixtures/runner-check.gs`, in the worker thread. Its requests go through Node's own `fetch` to a web server on this computer. | The hand-off between the threads: the worker waits, the main thread does the request, and each response reaches the request it answers. |
-| crypto-price-filler's `tests/sheets-sources.test.js`, `tests/mexc-windows.test.js`, `tests/regressions.test.js`, `tests/regressions-sheets.test.js`, `tests/regressions-sheets-price-now.test.js`, `tests/xtm-coingecko-id.test.js` | In the test's own thread (`tests/helpers/sheets-script.js`). `UrlFetchApp.fetch` answers at once from a function the test gives, so nothing waits. | What each price source gives, the cases the regression tests cover, and that no file of the exchange script holds a CoinGecko api key. |
+| crypto-price-filler's `tests/sheets-sources.test.js`, `tests/mexc-windows.test.js`, `tests/regressions.test.js`, `tests/regressions-sheets.test.js`, `tests/regressions-sheets-price-now.test.js`, `tests/xtm-coingecko-id.test.js`, `tests/coinpaprika-key.test.js` | In the test's own thread (`tests/helpers/sheets-script.js`). `UrlFetchApp.fetch` answers at once from a function the test gives, so nothing waits. | What each price source gives, the cases the regression tests cover, what CoinPaprika gives without a key, and that no file of the exchange script holds a CoinGecko api key. |
 | crypto-price-filler's `tests/regressions.test.js`, `tests/xtm-coingecko-id.test.js`, through the tool | Through the exchange script's Node version, in the worker thread, as the tool runs it (`tests/helpers/stand-in-fetch.js`). | The same cases, reached through the tool's provider chain. |
 | `test/load-apps-script.test.js`, `test/apps-script-services.test.js` | Small scripts in `test/fixtures/`, in the test's own thread, with requests answered at once. | That a script's files load into one scope, in order, and that each Node service acts as Apps Script's does. |
-| `test/crypto-price-fetchers-menu.test.js`; crypto-price-filler's `tests/regressions-sheets-price-now.test.js`, `tests/regressions-sheets.test.js` and `tests/known-bugs.test.js` | In the test's own thread, with a spreadsheet held in memory (`test/helpers/stand-in-spreadsheet.js`) or a stand-in lock in place of Apps Script's. | What each menu item writes, in which order, and what it reports; and the price functions' waits for the lock. |
+| `test/crypto-price-fetchers-menu.test.js`; crypto-price-filler's `tests/regressions-sheets-price-now.test.js` and `tests/regressions-sheets.test.js` | In the test's own thread, with a spreadsheet held in memory (`test/helpers/stand-in-spreadsheet.js`) or a stand-in lock in place of Apps Script's. | What each menu item writes, in which order, and what it reports; and the price functions' waits for the lock. |
 
 The Node tests run Node's versions of the services, one call at a time,
 against stand-ins for the price services. So three things lie outside
@@ -581,8 +623,9 @@ them:
 - **Apps Script's own services.** Google's `UrlFetchApp`, cache and lock
   never run under Node.
 - **The lock.** The runner answers one call at a time, so under Node the
-  `LockService` lock is always free. A script that asks for a lock it
-  already holds is not caught.
+  `LockService` lock is always free. A script that releases the lock a
+  second time, which in Apps Script ends its hold while it still asks a
+  service, is not caught.
 - **The price services' real answers.** Each stand-in answers as its
   service answered when the test was written.
 
@@ -693,9 +736,11 @@ follows the imports from each entry point, a file that a program or a test
 starts from, and reports any file it never reaches. `npm run knip:files`
 fails on one, as in LP Ranger. Some files are started by their path rather
 than imported, so `knip.json` names them as entry points: the command
-lines, the worker the runner starts, the two preloads that
+lines, the worker the runner starts, the three preloads that
 crypto-price-filler's tests start and its `vitest.config.js`, the security
-config and the tests. Unused exports are not
+config and the tests. knip's plugin for Node's test runner, which
+`npm test` runs, also takes every file under the top folder's `test/` as
+an entry point, so knip reports no file there. Unused exports are not
 gated.
 
 ---
@@ -712,7 +757,9 @@ request to `main`, and by hand:
 | `security-audit.yml` | Dependency Audit, Security Lint, Secret Scan | Each audit as a job of its own; Dependency Audit runs `npm run audit:deps`, so the checks of DEX Screener's files and of actionlint's archives with it. |
 
 The two checks of `ci.yml` are named for their roles, not their Node
-versions, so moving to newer versions renames no check.
+versions, so moving to newer versions renames no check. Each stops at 20
+minutes (`timeout-minutes`), where it takes under two, which ends a hang
+no test's time limit can ([Tests](#tests)).
 
 `main` is protected: a change reaches it only by a pull request whose five
 checks, those five jobs, have passed. Force pushes and deletion are
@@ -725,9 +772,10 @@ deleted. The steps from a branch to `main` are LP Ranger's eight, in its
 ## Known Bugs
 
 A bug found but not yet fixed is recorded as a test, which fails once the
-bug is gone, so the record cannot go stale. crypto-price-filler's
-`tests/known-bugs.test.js` declares each with `it.fails`: the test passes
-while the bug is present. The fix makes it fail. The same change declares
+bug is gone, so the record cannot go stale. None is known today. A bug
+found gets its test in crypto-price-filler's `tests/known-bugs.test.js`,
+declared with `it.fails`: the test passes while the bug is present. The
+fix makes it fail. The same change declares
 it with `it` and moves it to the regression tests of its area, where it
 keeps the fixed behavior from coming back:
 `tests/regressions-command-line.test.js`,
@@ -737,5 +785,6 @@ keeps the fixed behavior from coming back:
 `tests/regressions-sheets-price-now.test.js` and
 `tests/regressions.test.js`, whose rows in the table of
 crypto-price-filler's tests say what each guards. The repo's `CLAUDE.md`
-gives each file's area, and lists the bugs known today, each with its
-test.
+gives each file's area, and lists the bugs known, each with its test.
+The known-bug file goes with its last test, since vitest fails a test
+file that holds none.

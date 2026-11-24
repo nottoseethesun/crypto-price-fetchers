@@ -286,10 +286,9 @@ describe("fixed bugs", () => {
     });
 
     it("the command line, with --tz=America/Chicago, asks for the candle at 17:30 UTC", () => {
-      expect(
-        runCommandLineForOneRow(["--mode=high", "--tz=America/Chicago"])
-          .candleUtc,
-      ).toBe("2025-06-15T17:30:00.000Z");
+      expect(runCommandLineForOneRow(["--tz=America/Chicago"]).candleUtc).toBe(
+        "2025-06-15T17:30:00.000Z",
+      );
     });
 
     it("the command line refuses an abbreviation, pointing to the list of valid zones", () => {
@@ -356,7 +355,7 @@ describe("fixed bugs", () => {
     it("the Node tool asks /coins/{id}/ohlcv/historical, through the Sheets script", async () => {
       answerWith((url) => (url.includes("/ohlcv/") ? [] : null));
       const sources = await exchangeSources();
-      await sources.getPriceFromCoinPaprika("xtm-tari", ROW_UTC_MS, "high");
+      await sources.getPriceFromCoinPaprika("xtm-tari", ROW_UTC_MS, "close");
       expect(askedByTool[0]).toBe(
         "https://api.coinpaprika.com/v1/coins/xtm-tari/ohlcv/historical?start=2025-06-15&end=2025-06-15&quote=usd",
       );
@@ -382,31 +381,31 @@ describe("fixed bugs", () => {
         return null;
       });
       expect(
-        script.getCryptoPrice("xtm", "2025-06-15 12:30:00", "UTC", "high", 0),
-      ).toBe(2.5);
+        script.getCryptoPrice("xtm", "2025-06-15 12:30:00", "UTC", "close", 0),
+      ).toBe(2.2);
       expect(asked.find((url) => url.includes("/ohlcv/"))).toBe(
         "https://api.coinpaprika.com/v1/coins/xtm-tari/ohlcv/historical?start=2025-06-15&end=2025-06-15&quote=usd",
       );
     });
   });
 
-  describe("CoinPaprika prices a day its free plan's candles do not reach", () => {
-    it("the Sheets script gives the day's 00:00 UTC price for close when the candle is beyond the plan", () => {
+  describe("CoinPaprika's close of a day older than its plan's candles reach", () => {
+    it("is its price at 00:00 UTC the next day, which ends the day", () => {
       const script = loadSheetsScript(
         SHEETS_SCRIPT_PATH,
         answerPaprikaBeyondCandles,
       );
       expect(
         script.getPriceFromCoinPaprika("xtm-tari", ROW_UTC_MS, "close"),
-      ).toBe(2.05);
+      ).toBe(2.15);
     });
 
-    it("the Node tool gives the same, through the Sheets script", async () => {
+    it("is the same in the Node tool, through the Sheets script", async () => {
       answerWith(answerPaprikaBeyondCandles);
       const sources = await exchangeSources();
       expect(
         await sources.getPriceFromCoinPaprika("xtm-tari", ROW_UTC_MS, "close"),
-      ).toBe(2.05);
+      ).toBe(2.15);
     });
   });
 });

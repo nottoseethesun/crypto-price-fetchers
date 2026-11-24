@@ -382,9 +382,12 @@ function paprikaAnswering(candles, ticks) {
   };
 }
 
-/** The day price CoinPaprika records for 2025-06-15, at 00:00 UTC. */
+/**
+ * The price CoinPaprika records at 00:00 UTC on 2025-06-16, the end of
+ * 2025-06-15: the close of 2025-06-15.
+ */
 const PAPRIKA_DAY_TICK = [
-  { timestamp: "2025-06-15T00:00:00Z", price: 2.05, volume_24h: 1 },
+  { timestamp: "2025-06-16T00:00:00Z", price: 2.05, volume_24h: 1 },
 ];
 
 /** CoinPaprika's answer for a candle beyond the plan's reach. */
@@ -393,9 +396,10 @@ const BEYOND_PLAN = reply(402, {
 });
 
 describe("CoinPaprika (getPriceFromCoinPaprika)", () => {
-  it("asks the free server for the day's candle and gives the average of its high and low, or its high, low or close", () => {
+  it("gives the average of the day candle's high and low, or its high, low or close, asked of the paid server with a key", () => {
     const { script, asked } = scriptAnswering(
       paprikaAnswering([PAPRIKA_CANDLE], PAPRIKA_DAY_TICK),
+      { config: { CONFIG: { COINPAPRIKA_API_KEY: "paprika-key" } } },
     );
     expect(
       script.getPriceFromCoinPaprika("xtm-tari", TIME_MS, "average"),
@@ -408,21 +412,21 @@ describe("CoinPaprika (getPriceFromCoinPaprika)", () => {
       2.2,
     );
     expect(asked[0].url).toBe(
-      "https://api.coinpaprika.com/v1/coins/xtm-tari/ohlcv/historical?start=2025-06-15&end=2025-06-15&quote=usd",
+      "https://api-pro.coinpaprika.com/v1/coins/xtm-tari/ohlcv/historical?start=2025-06-15&end=2025-06-15&quote=usd",
     );
-    expect(asked[0].headers).toEqual({});
   });
 
   it("reads prices CoinPaprika sends as text", () => {
     const { script } = scriptAnswering(
       paprikaAnswering([{ ...PAPRIKA_CANDLE, high: "2.75" }], null),
+      { config: { CONFIG: { COINPAPRIKA_API_KEY: "paprika-key" } } },
     );
     expect(script.getPriceFromCoinPaprika("xtm-tari", TIME_MS, "high")).toBe(
       2.75,
     );
   });
 
-  it("gives the day's 00:00 UTC price for close when the plan does not reach the day's candle", () => {
+  it("gives the day's close, its price at 00:00 UTC the next day, when the plan does not reach the day's candle", () => {
     const { script, asked } = scriptAnswering(
       paprikaAnswering(BEYOND_PLAN, PAPRIKA_DAY_TICK),
     );
@@ -430,13 +434,14 @@ describe("CoinPaprika (getPriceFromCoinPaprika)", () => {
       2.05,
     );
     expect(asked[1].url).toBe(
-      "https://api.coinpaprika.com/v1/tickers/xtm-tari/historical?start=2025-06-15&interval=1d&limit=1&quote=usd",
+      "https://api.coinpaprika.com/v1/tickers/xtm-tari/historical?start=2025-06-16&interval=1d&limit=1&quote=usd",
     );
   });
 
-  it("gives no average, high or low from the day's single price, asking for none", () => {
+  it("with a key whose plan does not reach the day's candle, gives no average, high or low from the day's single price, asking for none", () => {
     const { script, asked } = scriptAnswering(
       paprikaAnswering(BEYOND_PLAN, PAPRIKA_DAY_TICK),
+      { config: { CONFIG: { COINPAPRIKA_API_KEY: "paprika-key" } } },
     );
     expect(
       script.getPriceFromCoinPaprika("xtm-tari", TIME_MS, "average"),
@@ -452,7 +457,7 @@ describe("CoinPaprika (getPriceFromCoinPaprika)", () => {
     );
   });
 
-  it("asks for the day's price when the day has no candle with the price", () => {
+  it("asks for the price at 00:00 UTC the next day when the day has no candle with the price", () => {
     for (const candles of [
       [],
       [{ ...PAPRIKA_CANDLE, time_open: "2025-06-16T00:00:00Z" }],
@@ -477,13 +482,13 @@ describe("CoinPaprika (getPriceFromCoinPaprika)", () => {
     expect(asked).toHaveLength(1);
   });
 
-  it("gives null when the day's price is missing, of another day, beyond the plan, or not above zero", () => {
+  it("gives null when the next day's price at 00:00 UTC is missing, of another day, beyond the plan, or not above zero", () => {
     for (const ticks of [
       [],
-      [{ timestamp: "2025-06-16T00:00:00Z", price: 2.05 }],
+      [{ timestamp: "2025-06-15T00:00:00Z", price: 2.05 }],
       reply(402, { error: "not allowed in this plan" }),
-      [{ timestamp: "2025-06-15T00:00:00Z", price: 0 }],
-      [{ timestamp: "2025-06-15T00:00:00Z", price: "n/a" }],
+      [{ timestamp: "2025-06-16T00:00:00Z", price: 0 }],
+      [{ timestamp: "2025-06-16T00:00:00Z", price: "n/a" }],
     ]) {
       const { script } = scriptAnswering(paprikaAnswering(BEYOND_PLAN, ticks));
       expect(

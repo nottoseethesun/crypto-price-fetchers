@@ -35,6 +35,7 @@
 import fs from "node:fs";
 import { pathToFileURL } from "node:url";
 import { Command, CommanderError } from "commander";
+import { fileToReadArgument } from "../lib/file-to-read.js";
 import { messageOf } from "../lib/message-of.js";
 import { layConfig, readConfigFile } from "./config-file.js";
 import { openAppsScript } from "./run-apps-script.js";
@@ -138,6 +139,7 @@ export async function runScriptCommandLine(
     .option(
       "-c, --config <file>",
       "JSON file of values for the script's config objects",
+      fileToReadArgument,
       defaultConfigFile,
     )
     .option("-v, --verbose", "show the script's log on stderr");

@@ -17,8 +17,8 @@
  *   offers every key a program asks for.
  *
  * Fit: each project's programs call `unlockProjectKeys`; its
- * `bin/manage-api-keys.js`, in this repo `bin/end-user/manage-api-keys.js`,
- * runs the manager (`key-manager.js`), which reads the same `config.json`.
+ * `bin/end-user/manage-api-keys.js` runs the manager (`key-manager.js`),
+ * which reads the same `config.json`.
  */
 
 import path from "node:path";

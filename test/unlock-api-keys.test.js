@@ -8,9 +8,11 @@
  * end with the status the script returned. The
  * script checks the password with the real `bin/end-user/manage-api-keys.js`, against a
  * key file in a temp folder of the test's own, which `API_KEYS_FILE_PATH`
- * names, removed afterwards. The same tests run in zsh where zsh is
- * installed, which none of the computers that run the automated tests
- * is: the README's test section lists their run by hand.
+ * names, removed afterwards. The same tests run in zsh only when the
+ * environment variable `UNLOCK_SCRIPT_IN_ZSH` is 1, as docs/engineering.md's
+ * "In zsh, by Hand" sets it for their run by hand, on a computer with zsh: zsh is
+ * one of the computer's own programs, which the automated tests never
+ * run, wherever they run.
  */
 
 import { after, before, describe, it } from "node:test";
@@ -44,10 +46,24 @@ function installed(shell) {
   return spawnSync(shell, ["-c", "exit 0"]).status === 0;
 }
 
+/**
+ * Says why a shell's tests are skipped, or that they run: bash's always
+ * run, and zsh's only when `UNLOCK_SCRIPT_IN_ZSH` is 1; each only where
+ * its shell is installed.
+ *
+ * @param {string} shell - Its name
+ * @returns {string|false} The reason, or false when they run
+ */
+function skipReason(shell) {
+  if (shell === "zsh" && process.env.UNLOCK_SCRIPT_IN_ZSH !== "1")
+    return "run by hand, with UNLOCK_SCRIPT_IN_ZSH=1, as docs/engineering.md's In zsh, by Hand says";
+  return installed(shell) ? false : `${shell} is not installed`;
+}
+
 for (const shell of ["bash", "zsh"]) {
   describe(
     `unlock-api-keys.sh in ${shell}`,
-    { skip: installed(shell) ? false : `${shell} is not installed` },
+    { skip: skipReason(shell) },
     () => {
       let folder;
       let keyFile;

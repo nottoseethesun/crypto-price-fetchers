@@ -29,13 +29,16 @@ time, in three files in `fetch-from-any-exchange/src/`:
 
 ## Where things are
 
-The programs a reader runs from a terminal are in `bin/`. Those an end
-user runs are in `bin/end-user/`: the Node versions of the two price
-scripts, crypto-price-filler's start file and the key manager. The rest
-are in `bin/` itself: crypto-price-filler's `backfill.js`, the Summ csv
-utility, which writes the csv files the owner imports into Summ, his
-crypto tax calculator, the versions tool, `run-actionlint` and
-`unlock-api-keys.sh`. Each of the two price tools
+The programs a reader runs from a terminal are in `bin/`. Those only an
+end user normally runs are in `bin/end-user/`, the owner's rule: the Node
+versions of the two price scripts, crypto-price-filler's start file and
+its `backfill.js`, and the key manager. The rest go anywhere under
+`bin/` but there, today in `bin/` itself: the Summ csv utility, which
+writes the csv files the owner imports into Summ, his crypto tax
+calculator, the versions tool and `run-actionlint`, which npm, the lint
+and the projects run, and `unlock-api-keys.sh`, which a terminal sources
+rather than runs. No README names `unlock-api-keys.sh`, the owner's rule
+too: `docs/engineering.md` describes it, once. Each of the two price tools
 has a folder of its own at the repo's top, which holds its Sheets
 scripts, in its `src/`, its README and its settings:
 `crypto-price-fetchers/`, a token's price now, and
@@ -59,7 +62,7 @@ programs share stays in folders of its own (`lib/`, `dex-prices/`,
 `summ-csv/`, `api-key-store/`, `apps-script-runner/`, `actionlint/`,
 `github-project-deps/`), and crypto-price-filler's in its package,
 `fetch-from-any-exchange/crypto-price-filler/`, whose start
-files, `bin/end-user/crypto-price-filler.js` and `bin/backfill.js`, load
+files, `bin/end-user/crypto-price-filler.js` and `bin/end-user/backfill.js`, load
 it.
 
 A tool that reads the owner's own files takes them from its `input/`
@@ -351,7 +354,7 @@ checks JavaScript against rules, here LP Ranger's and `no-or-default`,
 this repo's rule against a default made with `||`; markdownlint, which
 checks the form of Markdown files; Prettier, which formats code; actionlint,
 which checks the GitHub Actions workflow files; and knip, which finds files
-nothing uses), the tests with at least 80% of lines covered,
+nothing uses), the tests with at least 80% of lines covered and a minute's time limit on each (`--test-timeout=60000`),
 crypto-price-filler's tests with the same floor, and the security audits
 (npm audit, npm's check of the installed packages against known
 vulnerabilities, with the checks of DEX Screener's files and of
@@ -364,7 +367,7 @@ dependency's `prepare` in every project that installs it: `prelint`
 installs the hooks.
 
 CI runs `npm run check` on both supported versions of Node (below), in
-`ci.yml`, and each audit as a job of its own (`security-audit.yml`). `main`
+`ci.yml`, each run stopped at 20 minutes (`timeout-minutes`), and each audit as a job of its own (`security-audit.yml`). `main`
 is protected: those five checks must pass on a pull request, never squashed,
 and no branch is deleted. LP Ranger's eight steps in
 `docs/claude/CLAUDE-CI.md` take a change to `main`.
@@ -439,8 +442,8 @@ them by the package's name, as `exports` in package.json names them:
 `crypto-price-fetchers/lib/message-of`, `…/lib/command-line-help`,
 `…/lib/closed-output`, `…/lib/calendar-day`, `…/lib/http-url`,
 `…/lib/repo-checks`, `…/lib/time-limited-fetch`, `…/lib/settings-file`,
-`…/lib/settings-schema`, `…/lib/option-conflicts`, `…/lib/new-file`
-and `…/lib/file-to-write`
+`…/lib/settings-schema`, `…/lib/option-conflicts`, `…/lib/new-file`,
+`…/lib/file-to-read` and `…/lib/file-to-write`
 (`test/package-exports.test.js` loads each by that name). The tests ask no
 outside service: the scripts' requests go to a stand-in fetch or a stand-in
 server on the computer (`test/helpers/stand-in-web.js`). The key store's
@@ -450,11 +453,11 @@ written by LP Ranger's own code, checks that the store opens LP Ranger's
 files.
 
 `test/unlock-api-keys.test.js` runs `bin/unlock-api-keys.sh` in bash.
-Its tests in zsh, the default shell of macOS, run only where zsh is
-installed, which no computer that runs the automated tests is: zsh is
-one of the computer's own programs, which the owner's rule keeps out of
-the automated tests, so the README's test section lists their run by
-hand.
+Its tests in zsh, the default shell of macOS, run only when the
+environment variable `UNLOCK_SCRIPT_IN_ZSH` is 1, which
+`docs/engineering.md` ("In zsh, by Hand") sets for their run by hand: zsh is one of the computer's own
+programs, which the owner's rule keeps out of the automated tests on
+every computer, one with zsh among them.
 
 ```bash
 npm ci
@@ -485,25 +488,32 @@ functions inside the scripts that the owner runs by hand. crypto-price-filler's
   `bin/end-user/crypto-price-filler.js`, in a
   child process against a stand-in MEXC, and a stand-in CoinGecko ping that
   takes the one key in `stand-in-coingecko-key.js`.
-- `stand-in-settings-preload.js` hands the command line, run in a child
-  process, a settings file, a token list or a `config.json` of the
+- `stand-in-settings-preload.js` hands crypto-price-filler's command line,
+  or backfill's, run in a child process, a settings file, a token list or
+  a `config.json` of the
   exchange script of the test's own, from an environment variable, since
   the tool reads its two beside its own files, and the exchange script's
   Node version its own in `fetch-from-any-exchange/`, and a test
   never writes the owner's settings.
+- `full-disk-preload.js` makes every file a command line, run in a
+  child process, writes fail as on a full disk: the file is opened as the
+  write asks, which empties a file written over, and the write then fails
+  with ENOSPC.
 - `regression-runs.js` holds the settings, stand-in answers, times and
-  runs that the regression tests share, and a known-bug test that needs
-  them.
+  runs that the regression tests share, as do the tests of what
+  CoinPaprika gives without a key (`tests/coinpaprika-key.test.js`).
 - `log-lines.js` reads the lines the tool prints through its log's seam
   (`utils/log.js`), so no test replaces `console.log`.
 
 ## Known bugs
 
-A bug found gets a test in crypto-price-filler's
+None is known. A bug found gets a test in crypto-price-filler's
 `tests/known-bugs.test.js`, declared with `it.fails`, so it passes while the
-bug is present, and a row in the table below. Its fix makes the test fail;
-the same change declares the test with `it`, moves it to the tests that
-guard the fixed bugs of its area, and removes the row:
+bug is present, and a row here, in a table of the bug and its test's name;
+the file and the table go with the last test and row, since vitest fails a
+test file that holds no test. A bug's fix makes its test fail; the same
+change declares the test with `it`, moves it to the tests that guard the
+fixed bugs of its area, and removes the row:
 
 - `tests/regressions-command-line.test.js`: crypto-price-filler's two
   command lines;
@@ -520,15 +530,3 @@ guard the fixed bugs of its area, and removes the row:
   current-price script, or the menu with it, in the test's thread;
 - `tests/regressions.test.js`: any other; it also holds older tests that
   run the exchange script in the test's thread.
-
-Google stops a custom function, a function a cell calls, after 30 seconds,
-and the cell shows `#ERROR!`. The first bug below is a wait longer than that.
-
-| Bug | Test in `tests/known-bugs.test.js` |
-| --- | --- |
-| `dexToolsGetTokenPrice` and `dexToolsGetTokenFDV`, in `crypto-price-fetchers.gs`, wait up to `DEXTOOLS_CONFIG.LOCK_WAIT_MS`, 120 seconds, for the script lock, so a cell that waits more than 30 seconds shows `#ERROR!`, never the busy message the script returns when the wait ends. | dexToolsGetTokenPrice waits for the script lock no longer than Google lets a custom function run |
-| The filler and its backfill turn on both backfill modes when a flag is typed against config.json's other backfill setting, and fill with the higher price without a word; the two flags typed together, or the two settings both true, do the same. | is refused by backfill's command line, naming both, with the file left as it was; is refused by the filler's command line, naming both, writing no file |
-| `getCryptoPrice`, for a time less than 12 hours ago with no MEXC price, says to ask again after the time's CoinGecko window ends before it asks CoinGecko anything, so a ticker no coin has is told to wait. | gives no data, not when to ask again, for a ticker CoinGecko has no prices of |
-| `no-secret-logging` passes a key printed inside a `new` call, a tagged template, a key written as a string, an assignment or a sequence, so the security lint lets such a print of a secret through. | refuses a key printed inside a new, a tagged template, a key written as a string, an assignment or a sequence |
-| `getPriceFromCoinPaprika`, in the exchange script's `-sources.gs`, takes the candle of a UTC day not yet over, whose prices can still change until the day ends, so the sheet and crypto-price-filler can give a price for a time earlier that day that is not final. | gives no price from the day's candle, which can still change |
-| `getPriceFromCoinPaprika`, in the exchange script's `-sources.gs`, answers close, for a day older than the plan's candles reach, as the free server's always is once over, with the price at 00:00 UTC that opens the day, not the price at 00:00 UTC the next day, which closes it. | is its price at 00:00 UTC the next day, which ends the day |

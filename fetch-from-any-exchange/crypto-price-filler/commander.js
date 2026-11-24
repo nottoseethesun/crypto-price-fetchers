@@ -10,11 +10,14 @@
  * ones it does), a mode other than high, low or close, or a time zone not
  * named in full. `--list-valid-timezones` prints every zone `--tz` takes,
  * each by the name Node's list of time zones spells, and exits, as
- * `--help` does. The backfill flags take no default, so a flag
- * not given leaves config.json's setting to decide (`backfillChoice`, in
- * `utils/backfill.js`). With no `--output`, the tool writes `output.csv`
- * in its own folder's `output/csv/` (`DEFAULT_OUTPUT`), wherever it runs,
- * where git keeps nothing but the folder. `parseArgs` parses the process's
+ * `--help` does. The two backfill flags conflict, so commander refuses
+ * them typed together; they take no default here, since config.json is
+ * read after the parse, so that `--help` answers whatever it holds, and
+ * `takeBackfillSettings`, in `utils/backfill.js`, then lays its two
+ * settings under them and refuses a flag typed against the other's
+ * setting. With no `--output`, the tool writes `output.csv` in its own
+ * folder's `output/csv/` (`DEFAULT_OUTPUT`), wherever it runs, where git
+ * keeps nothing but the folder. `parseCommandLine` parses the process's
  * arguments.
  */
 
@@ -114,13 +117,13 @@ export function setupCommander() {
     // Required options
     .requiredOption(
       "--token <symbol>",
-      "Crypto token symbol (e.g. grc, xtm, btc)",
+      "Crypto token symbol (required), e.g. grc, xtm or btc",
       tokenSymbol,
     )
     .requiredOption(
       "--input <path>",
       "Path to input CSV file, with a column of dates written yyyy-MM-dd HH:mm:ss and read in --tz: " +
-        'the first whose name holds "date" and "UTC", or else the first whose name holds "date"',
+        'the first whose name holds "date" and "UTC", or else the first whose name holds "date" (required)',
     )
 
     // Optional options with defaults
@@ -158,13 +161,17 @@ export function setupCommander() {
       "--verbose",
       "Enable detailed logging during processing; VERBOSE=1 in the environment does the same",
     )
-    .option(
-      "--backfill-highest",
-      "Fill each Error price with the highest bracketing price (conservative tax estimates); config.json's BACKFILL_HIGHEST when not given",
+    .addOption(
+      new Option(
+        "--backfill-highest",
+        "Fill each Error price with the highest bracketing price (conservative tax estimates); config.json's BACKFILL_HIGHEST when not given",
+      ).conflicts("backfillLowest"),
     )
-    .option(
-      "--backfill-lowest",
-      "Fill each Error price with the lowest bracketing price (budgeting: avoid over-estimating income); config.json's BACKFILL_LOWEST when not given",
+    .addOption(
+      new Option(
+        "--backfill-lowest",
+        "Fill each Error price with the lowest bracketing price (budgeting: avoid over-estimating income); config.json's BACKFILL_LOWEST when not given",
+      ).conflicts("backfillHighest"),
     )
 
     // Custom help formatting
@@ -179,9 +186,11 @@ Settings and tokens:
   config.json, in crypto-price-filler's folder,
   fetch-from-any-exchange/crypto-price-filler/, laid over the
   committed config-example.json beside it, holds BACKFILL_HIGHEST and
-  BACKFILL_LOWEST, which a --backfill flag overrides, and
-  GECKOTERMINAL_TOP_POOLS_CONSIDERED, how many of the pools GeckoTerminal
-  lists for a pool token are weighed when the tool picks the one it reads.
+  BACKFILL_LOWEST, the backfill a run makes when no --backfill flag is
+  typed, and GECKOTERMINAL_TOP_POOLS_CONSIDERED, how many of the pools
+  GeckoTerminal lists for a pool token are weighed when the tool picks the
+  one it reads. A --backfill flag typed against the other's setting, the
+  two flags typed together, or the two settings both true stop the run.
   supported-tokens.json, in the same folder, lists each symbol --token
   takes; a token is added there.
 
@@ -192,7 +201,11 @@ Api keys:
   source ./bin/unlock-api-keys.sh keeps for a terminal, or else asks for
   the password on stderr. Without a Moralis key it prices pool tokens
   from GeckoTerminal alone; without the others it asks CoinGecko and
-  CoinPaprika without one.
+  CoinPaprika without one. Without a CoinPaprika key, CoinPaprika gives no
+  high or low, so a run with --mode high or --mode low, for a token
+  CoinPaprika lists, says so and asks whether to go on without its
+  prices: y goes on; Enter, n or an input that ends stops the run, with
+  exit code 1, before any price is asked for.
 
 Examples:
   Basic usage, writing output/csv/output.csv in crypto-price-filler's folder:
@@ -215,8 +228,9 @@ Exit codes:
      its $usd price, unless a --backfill flag or config.json filled it
   1  it was not: an option was wrong or missing, a word it does not take
      was given, the input file was not found, or has no rows or no date
-     column, the api keys could not be opened, a step failed, or the
-     program reading the log stopped reading before the file was written
+     column, the api keys could not be opened, the run was not to go on
+     without CoinPaprika's prices, a step failed, or the program reading
+     the log stopped reading before the file was written
 `,
     )
 
@@ -239,8 +253,8 @@ Exit codes:
  * message and exits with 1.
  *
  * @param {string[]} [argv=process.argv] - The arguments, as process.argv holds them
- * @returns {Object} The options, such as { token: 'grc', input: '...', output: DEFAULT_OUTPUT }
+ * @returns {import('commander').Command} The command, parsed, whose `opts()` gives the options, such as { token: 'grc', input: '...', output: DEFAULT_OUTPUT }
  */
-export function parseArgs(argv = process.argv) {
-  return setupCommander().parse(argv).opts();
+export function parseCommandLine(argv = process.argv) {
+  return setupCommander().parse(argv);
 }

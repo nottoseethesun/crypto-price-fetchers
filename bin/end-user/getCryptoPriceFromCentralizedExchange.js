@@ -38,7 +38,9 @@
  *   them to the script (`../../api-key-store/`): with the password in
  *   `API_KEYS_PASSWORD`, which `bin/unlock-api-keys.sh` keeps for a terminal,
  *   or else one it asks for. With no key saved, the script asks without
- *   one. `npm run api-keys`, in the repo's top folder, saves a key.
+ *   one, and CoinPaprika gives a close alone: for an average, a high or a
+ *   low no other source prices, the script's message says CoinPaprika needs
+ *   a key. `npm run api-keys`, in the repo's top folder, saves a key.
  * - `fetch-from-any-exchange/config.json`, which git ignores, may
  *   set other fields of the script's `CONFIG`; without it, the script runs
  *   on the values written in it, which `config-example.json`, beside it,
@@ -336,7 +338,10 @@ Api keys:
   when either is saved (npm run api-keys, in the repo's top folder). It
   opens them with the password in API_KEYS_PASSWORD, which
   source ./bin/unlock-api-keys.sh keeps for a terminal, or else asks for the
-  password on stderr. Without a key, it asks that service without one.`;
+  password on stderr. Without a key, it asks that service without one;
+  CoinPaprika then gives a close alone, so for an average, the default, a
+  high or a low that no other source prices, it prints that CoinPaprika
+  needs a key.`;
 
 /** The examples of the help: one of each common use. */
 const EXAMPLES_HELP = `

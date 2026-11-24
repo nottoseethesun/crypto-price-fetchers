@@ -3,9 +3,9 @@
     "grc": {
       "name": "GridCoin",
       "coingecko_id": "gridcoin-research",
-      "coinpaprika_id": "grc-gridcoin",
+      "coinpaprika_id": null,
       "mexc_symbol": null,
-      "note": "Not on MEXC; CoinGecko + CoinPaprika fallbacks"
+      "note": "Not on MEXC; CoinPaprika lists GridCoin (grc-gridcoin) as inactive, with no price, so CoinGecko alone"
     },
     "xtm": {
       "name": "Tari",

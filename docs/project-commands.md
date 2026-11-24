@@ -49,7 +49,7 @@ spreadsheet app, as one file, with their keys ([Build](#build)):
 
 ```sh
 npm run api-keys -- set dextools
-node --test --test-name-pattern="unlockApiKeys" "test/*.test.js"
+node --test --test-timeout=60000 --test-name-pattern="unlockApiKeys" "test/*.test.js"
 npm run build apps-script
 ```
 
@@ -139,9 +139,15 @@ them, after the lint, and must pass before a commit and a push.
 | `audit:security` | — | The security lint, ESLint with `eslint-security.config.js`: the rules of eslint-plugin-security, against code open to attack, of eslint-plugin-no-secrets, against strings that look like keys, and `no-secret-logging`, this repo's rule against printing a name that may hold a secret. | `npm run audit:security` |
 | `check` | — | The full gate: `lint`, `test:coverage`, `test:filler`, `audit:deps` (with `audit:dex-screener` and `audit:actionlint`), `audit:security` and `audit:secrets`, in that order, stopping at the first that fails. | `npm run check` |
 | `format:check` | — | Prettier in check mode; fails rather than rewriting. | `npm run format:check` |
-| `test` | — | The tests of the runner, which runs a Sheets script under Node; the Node versions; the build step; the menu the built file adds to a spreadsheet; the price clients of the services that price pools; the key store; the two lint rules; the versions tool; the Summ CSV writer; the actionlint runner; the shared helpers; every command line's help, and its help into a closed pipe; the package's exports; and the repo's tracked files, held to the checks of `lib/repo-checks.js`; on Node's test runner. Node reads a flag of its test runner only before the file pattern, and npm puts the arguments after `--` after it, so the tests whose names hold some words run as `node --test --test-name-pattern="openAppsScript" "test/*.test.js"`. | `npm test` |
+| `test` | — | The tests of the runner, which runs a Sheets script under Node; the Node versions; the build step; the menu the built file adds to a spreadsheet; the price clients of the services that price pools; the key store; the two lint rules; the versions tool; the Summ CSV writer; the actionlint runner; the shared helpers; every command line's help, and its help into a closed pipe; the package's exports; and the repo's tracked files, held to the checks of `lib/repo-checks.js`; on Node's test runner. Node reads a flag of its test runner only before the file pattern, and npm puts the arguments after `--` after it, so the tests whose names hold some words run as `node --test --test-timeout=60000 --test-name-pattern="openAppsScript" "test/*.test.js"`. | `npm test` |
 | `test:coverage` | — | The same tests with coverage, failing below 80% of lines covered. | `npm run test:coverage` |
 | `test:filler` | — | crypto-price-filler's `test:strict`, from the top folder. | `npm run test:filler` |
+
+`test` and `test:coverage`, and so `check`, pass `--test-timeout=60000`
+to Node's test runner: a test or hook still running after a minute
+fails, by name, and the rest of its file runs
+([Tests](engineering.md#tests)). crypto-price-filler's tests run on vitest, which fails a
+test after 5 seconds.
 
 ---
 
@@ -164,7 +170,7 @@ run in `fetch-from-any-exchange/crypto-price-filler/`, after
 | Command | Flags | Description | Example |
 | ------- | ----- | ----------- | ------- |
 | `clean` | — | Remove the files a test run can leave: `output/csv/mock-filled*.csv`, which the run with real data in `index.js`'s header writes, and `test.log` and `test.html`, which the header's commands that save the tests' logs write. | `npm run clean` |
-| `start` | the tool's options; `--help` | Run the tool: read a CSV, fill its price columns, write the output. See its README. | `npm start -- --token=xtm --input=in.csv --output=out.csv` |
+| `start` | the tool's options; `--help` | Run the tool: read a CSV, fill its price columns, write the output. See its README. | `npm start -- --token=xtm --input=input/in.csv --output=output/csv/out.csv` |
 | `test` | — | vitest, a test runner for JavaScript, with coverage, quietly. | `npm test` |
 | `test:ci` | — | vitest with coverage and no cache. | `npm run test:ci` |
 | `test:debug` | — | vitest with `VERBOSE=1`, the verbose reporter, coverage and no cache. | `npm run test:debug` |
@@ -176,23 +182,29 @@ run in `fetch-from-any-exchange/crypto-price-filler/`, after
 
 ## Commands Run Without npm
 
-These command lines, the programs in `bin/end-user/` and `bin/`, run with `node`, or, for
-the password script, `source`, at a terminal, from the repo's top folder:
-the Node version of each Sheets script, which prints the number the
-script gives a cell, crypto-price-filler's command line and its
-backfill, and the script that keeps the key store's password for a
-terminal. Each Node command line answers `--help` with its options,
-examples and exit codes; [the README's Run](../README.md#run) shows
-those an end user runs at work, and
+These command lines run with `node`, or, for the password script,
+`source`, at a terminal, from the repo's top folder: the Node version of
+each Sheets script, which prints the number the script gives a cell,
+crypto-price-filler's command line and its backfill, the script that
+keeps the key store's password for a terminal, and the runner of
+actionlint, the checker of GitHub Actions workflow files, which `lint`
+and `audit:actionlint` run. The other programs in `bin/end-user/` and
+`bin/` run through the npm targets above, the key manager as `api-keys`
+and the Summ CSV writer as `summ-csv`, or, the versions tool, in the
+projects that install this repo (See Also, below). Each Node command
+line answers `--help` with its options, examples and exit codes;
+[the README's Run](../README.md#run) shows those an end user runs at
+work, the backfill among them, and
 [The Programs in `bin/`](engineering.md#the-programs-in-bin) the
-backfill and the password script.
+password script and the runner of actionlint.
 
 | Command | Flags | Description | Example |
 | ------- | ----- | ----------- | ------- |
 | `node bin/end-user/crypto-price-fetchers.js` | `price <chain> <token>`, `fdv <chain> <token>`, `--pool <address>` (after `price` or `fdv`), `--config <file>`, `--verbose`, `--help` | The Node version of `crypto-price-fetchers/src/crypto-price-fetchers.gs`: a token's price, or fully diluted value (FDV), in USD now, from DexTools, or from x1.ninja for X1, which needs `--pool`. `--config` names a settings file in place of `crypto-price-fetchers/config.json`. | `node bin/end-user/crypto-price-fetchers.js price ether 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48` |
 | `node bin/end-user/getCryptoPriceFromCentralizedExchange.js` | `<token> <date>`, `--tz <abbreviation>`, `--mode <mode>`, `--config <file>`, `--verbose`, `--help` | The Node version of the exchange script: a coin's USD price at a past time, from MEXC, then CoinGecko, then CoinPaprika. `--config` names a settings file in place of `fetch-from-any-exchange/config.json`. | `node bin/end-user/getCryptoPriceFromCentralizedExchange.js btc "2026-01-15 14:30:00"` |
 | `node bin/end-user/crypto-price-filler.js` | `--token <symbol>`, `--input <path>`, `--output <path>`, `--mode <mode>`, `--tz <zone>`, `--list-valid-timezones`, `--backfill-highest`, `--backfill-lowest`, `--verbose`, `--version`, `--help` | crypto-price-filler's command line: fills the price columns of a CSV file of dated rows with the token's USD price at each row's time, from the pools a token trades in, then MEXC, CoinGecko and CoinPaprika; a row no service priced gets `Error`. It loads the package in `fetch-from-any-exchange/crypto-price-filler/`, whose `npm start` runs it too; `--input` and `--output` are read from the folder it runs in, and with no `--output` it writes `output.csv` in its package's `output/csv/`. Your files go in its package's `input/`; git keeps nothing in either folder but the folder. | `node bin/end-user/crypto-price-filler.js --token=grc --input=fetch-from-any-exchange/crypto-price-filler/input/mining.csv` |
-| `node bin/backfill.js` | `--input <path>`, `--output <path>`, `--backfill-highest`, `--backfill-lowest`, `--verbose`, `--version`, `--help` | crypto-price-filler's backfill: fills each price the filler marked `Error`, in a CSV it wrote, with the price of the nearest priced row before or after it, the higher of the two or the lower, asking no service. `--input` and `--output` are read from the folder it runs in, and with no `--output` it writes over the input. | `node bin/backfill.js --input=fetch-from-any-exchange/crypto-price-filler/output/csv/output.csv --backfill-highest` |
+| `node bin/end-user/backfill.js` | `--input <path>`, `--output <path>`, `--backfill-highest`, `--backfill-lowest`, `--verbose`, `--version`, `--help` | crypto-price-filler's backfill: fills each price the filler marked `Error`, in a CSV it wrote, with the price of the nearest priced row before or after it, the higher of the two or the lower, asking no service. `--input` and `--output` are read from the folder it runs in, and with no `--output` it writes over the input. | `node bin/end-user/backfill.js --input=fetch-from-any-exchange/crypto-price-filler/output/csv/output.csv --backfill-highest` |
+| `node bin/run-actionlint.js` | `[files...]`, `--check`, `--help` | Runs actionlint, the checker of GitHub Actions workflow files, from its official release: on its first run it downloads the archive for this system, refuses it unless its SHA-256, and its program's, are those `actionlint/release.js` pins, keeps the program in `node_modules/.cache/actionlint/`, and runs it on the files named; later runs check the kept program's SHA-256 again. `--check` downloads every archive of the release and checks each, and its program, running nothing. `lint` runs it on `.github/workflows/*.yml`, and `audit:actionlint` with `--check`. | `node bin/run-actionlint.js .github/workflows/*.yml` |
 | `source ./bin/unlock-api-keys.sh` | `--help` | Asks for the key store's password, showing nothing typed, checks that it opens every key saved, which any password does while no key is saved, and keeps it in `API_KEYS_PASSWORD` for the terminal, so the programs open their keys without asking. Runs in bash or zsh, and returns 0 when it keeps the password, 1 when it keeps none. `--help`, or `-h`, prints its help, asks nothing and returns 0. | `source ./bin/unlock-api-keys.sh` |
 
 ---

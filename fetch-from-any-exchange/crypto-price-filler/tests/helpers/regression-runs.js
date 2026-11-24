@@ -1,6 +1,7 @@
 /**
- * The settings, stand-in answers and runs the regression tests share,
- * and a known-bug test that needs them.
+ * The settings, stand-in answers and runs the regression tests share, as
+ * do the tests of what CoinPaprika gives without a key
+ * (`tests/coinpaprika-key.test.js`).
  * @module tests/helpers/regression-runs
  *
  * The answers stand in for the price services at the http layer: MEXC for
@@ -10,8 +11,9 @@
  * stand-in for the script's clock, for a time in a day not yet over. The
  * runs start
  * the command line, `bin/end-user/crypto-price-filler.js`, in a child process with
- * the stand-in MEXC of `stand-in-fetch-preload.js`, or change the
- * computer's time zone for one call.
+ * the stand-in MEXC of `stand-in-fetch-preload.js`, start backfill's
+ * command line in one with a settings file of the test's own, or change
+ * the computer's time zone for one call.
  */
 
 import { execFileSync, spawnSync } from "node:child_process";
@@ -286,6 +288,49 @@ export function runIndexIn(folder, args, standIns = {}) {
       timeout: 30000,
     },
   );
+}
+
+/** A CSV of three rows, the second with no price, for backfill to fill. */
+export const CSV_WITH_A_GAP = `"date (UTC)","amount","$usd price","$usd amount","grand total ($usd)"
+"2024-01-01 12:00:00","10","100","1000","1000"
+"2024-01-02 12:00:00","20","Error","","1000"
+"2024-01-03 12:00:00","15","200","3000","4000"
+`;
+
+/** backfill's command line, as its owner runs it: the start file in the repo's bin/end-user/. */
+export const BACKFILL_COMMAND_LINE = fileURLToPath(
+  new URL("../../../../bin/end-user/backfill.js", import.meta.url),
+);
+
+/**
+ * Runs backfill's command line on a copy of `CSV_WITH_A_GAP` it writes in
+ * the folder given, with the arguments given after `--input` and a
+ * settings file of the test's own, through `stand-in-settings-preload.js`.
+ *
+ * @param {string} folder - A temp folder of the test's own
+ * @param {string[]} args - The arguments after `--input`
+ * @param {string} settings - The text of the settings file
+ * @returns {{run: {status: number, stderr: string}, left: string}} How the run ended, and what the copy holds after it
+ */
+export function backfillIn(folder, args, settings) {
+  const input = path.join(folder, "prices.csv");
+  fs.writeFileSync(input, CSV_WITH_A_GAP);
+  const run = spawnSync(
+    process.execPath,
+    [
+      "--import",
+      SETTINGS_PRELOAD_URL,
+      BACKFILL_COMMAND_LINE,
+      `--input=${input}`,
+      ...args,
+    ],
+    {
+      env: { ...process.env, STAND_IN_FILLER_CONFIG: settings },
+      encoding: "utf8",
+      timeout: 30000,
+    },
+  );
+  return { run, left: fs.readFileSync(input, "utf8") };
 }
 
 /**

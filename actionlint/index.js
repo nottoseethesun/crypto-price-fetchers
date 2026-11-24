@@ -63,13 +63,17 @@ changed. A download with no answer within ${DOWNLOAD_LIMIT_MS / 1000} seconds is
 counted as failed.
 
 Examples:
-  Check the repo's workflow files, as npm run lint does:
-    $ run-actionlint .github/workflows/*.yml
+  From crypto-price-fetchers' top folder, check its workflow files, as npm
+  run lint does:
+    $ node bin/run-actionlint.js .github/workflows/*.yml
   Check one workflow file:
-    $ run-actionlint .github/workflows/ci.yml
-  Check every archive of the release, and its program, against their SHA-256,
-  running nothing:
-    $ run-actionlint --check
+    $ node bin/run-actionlint.js .github/workflows/ci.yml
+  Check every archive of the release, and its program, against their
+  SHA-256, running nothing, as npm run audit:actionlint does:
+    $ node bin/run-actionlint.js --check
+  From the top folder of a project that installs crypto-price-fetchers,
+  check its workflow files, as its npm run lint does:
+    $ node_modules/.bin/run-actionlint .github/workflows/*.yml
 
 Exit codes: actionlint's own: 0 when it finds no problem, 1 when it finds
 one or more, 2 when its arguments are wrong, 3 when it fails. 1 also when

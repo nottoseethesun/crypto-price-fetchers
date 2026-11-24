@@ -9,10 +9,9 @@
  * with one password its owner types. Three parts serve it:
  *
  * - The manager, `runKeyManager` (`key-manager.js`), which the project's
- *   `bin/manage-api-keys.js` runs as `npm run api-keys` (in this repo,
- *   `bin/end-user/manage-api-keys.js`): it lists the keys,
- *   saved or not, never showing their characters, and asks for those not
- *   saved, each saved once its service takes it.
+ *   `bin/end-user/manage-api-keys.js` runs as `npm run api-keys`: it
+ *   lists the keys, saved or not, never showing their characters, and
+ *   asks for those not saved, each saved once its service takes it.
  * - `bin/unlock-api-keys.sh`, a copy of which is in each project's `bin/`:
  *   sourced in a terminal, it asks for the password once and keeps it in
  *   the environment variable `API_KEYS_PASSWORD` for that terminal.

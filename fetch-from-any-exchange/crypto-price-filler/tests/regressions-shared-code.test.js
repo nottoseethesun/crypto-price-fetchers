@@ -18,7 +18,7 @@
  * thread, and closes the version only if it opens.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -29,7 +29,11 @@ import { askPassword } from "../../../api-key-store/index.js";
 import { createAppsScriptServices } from "../../../apps-script-runner/apps-script-services.js";
 import { loadAppsScript } from "../../../apps-script-runner/load-apps-script.js";
 import { openCryptoPriceFetchers } from "../../../bin/end-user/crypto-price-fetchers.js";
-import { blockAt, moralisSettings } from "../../../dex-prices/moralis.js";
+import {
+  blockAt,
+  moralisSettings,
+  pairCandles,
+} from "../../../dex-prices/moralis.js";
 import {
   geckoTerminalSettings,
   tokenInfo,
@@ -95,6 +99,79 @@ describe("the Summ csv utility's file", () => {
   });
 });
 
+describe("the Summ csv utility's new file", () => {
+  it("removes a new file it could not write whole, and throws", () => {
+    const folder = fs.mkdtempSync(path.join(os.tmpdir(), "summ-csv-half-"));
+    const outPath = path.join(folder, "out.csv");
+    const write = vi
+      .spyOn(fs, "writeFileSync")
+      .mockImplementationOnce((file) => {
+        fs.closeSync(fs.openSync(file, "wx"));
+        throw Object.assign(
+          new Error("ENOSPC: no space left on device, write"),
+          { code: "ENOSPC" },
+        );
+      });
+    try {
+      expect(() =>
+        writeSummCsv({
+          rows: [SUMM_ROW],
+          templatePath: SUMM_TEMPLATE,
+          outPath,
+        }),
+      ).toThrow(/ENOSPC/);
+      expect(fs.existsSync(outPath)).toBe(false);
+    } finally {
+      write.mockRestore();
+      fs.rmSync(folder, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("Moralis's candles", () => {
+  it("drops a candle with a field Moralis gives as null, rather than read it as 0", async () => {
+    const settings = moralisSettings({
+      fetch: async () =>
+        new Response(
+          JSON.stringify({
+            tokenAddress: "0xabc",
+            result: [
+              {
+                timestamp: "2026-11-01T00:00:00.000Z",
+                open: "1",
+                high: null,
+                low: "0.9",
+                close: "1.1",
+                volume: "5",
+              },
+              {
+                timestamp: "2026-11-02T00:00:00.000Z",
+                open: "1.1",
+                high: "1.3",
+                low: "1",
+                close: "1.2",
+                volume: "4",
+              },
+            ],
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+    });
+    const answer = await pairCandles(
+      {
+        chain: "0x171",
+        pair: "0xpair",
+        timeframe: "1d",
+        fromSeconds: 1761955200,
+        toSeconds: 1762128000,
+      },
+      "stand-in-key",
+      settings,
+    );
+    expect(answer.candles.map((candle) => candle.close)).toEqual([1.2]);
+  });
+});
+
 describe("the key store's password prompt", () => {
   it("askPassword rejects at once a question asked after its input has ended", async () => {
     const input = new PassThrough();
@@ -152,8 +229,49 @@ describe("the security lint's no-secret-logging", () => {
       "console.log(JSON.stringify(apiKey))",
       "console.log(apiKeys.dextools)",
       'console.log(password ?? "none")',
+      "console.log(shown ? apiKey : 0)",
+      "console.log([apiKey])",
+      "console.log(...[apiKey])",
+      "console.log(await apiKey)",
+      "console.log(keys?.apiKey)",
     ])
       expect(refused(code), code).toBe(1);
+  });
+});
+
+describe("the security lint's no-secret-logging, on the forms a print can take", () => {
+  /**
+   * How many prints of a code the rule refuses.
+   *
+   * @param {string} code - The code
+   * @returns {number} The refusals
+   */
+  function refused(code) {
+    return new Linter().verify(code, {
+      languageOptions: { ecmaVersion: "latest", sourceType: "module" },
+      plugins: { local: { rules: { "no-secret-logging": noSecretLogging } } },
+      rules: { "local/no-secret-logging": "error" },
+    }).length;
+  }
+
+  it("refuses a key printed inside a new, a tagged template, a key written as a string, an assignment or a sequence", () => {
+    for (const code of [
+      "console.error(new Error(`key ${apiKey} refused`))",
+      'console.log(keys["apiKey"])',
+      "console.log(String.raw`${apiKey}`)",
+      "console.log((note = apiKey))",
+      "console.log((0, apiKey))",
+    ])
+      expect(refused(code), code).toBe(1);
+  });
+
+  it("passes a print of a name that holds no secret, written in those forms", () => {
+    for (const code of [
+      'console.log(keys["name"])',
+      "console.log((apiKey, 0))",
+      'console.log(new Error("refused"))',
+    ])
+      expect(refused(code), code).toBe(0);
   });
 });
 

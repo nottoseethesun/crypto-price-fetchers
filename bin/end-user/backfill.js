@@ -1,6 +1,6 @@
 /**
- * crypto-price-filler's backfill: `node bin/backfill.js`.
- * @module bin/backfill
+ * crypto-price-filler's backfill: `node bin/end-user/backfill.js`.
+ * @module bin/end-user/backfill
  *
  * What: fills the prices crypto-price-filler marked `Error` in a CSV file
  * it wrote, from the nearest priced rows, asking no service; `--help`
@@ -11,8 +11,8 @@
  * reading.
  */
 
-import { endQuietlyWhenOutputCloses } from "../lib/closed-output.js";
-import { backfillCommandLine } from "../fetch-from-any-exchange/crypto-price-filler/backfill.js";
+import { endQuietlyWhenOutputCloses } from "../../lib/closed-output.js";
+import { backfillCommandLine } from "../../fetch-from-any-exchange/crypto-price-filler/backfill.js";
 
 endQuietlyWhenOutputCloses();
 await backfillCommandLine();
