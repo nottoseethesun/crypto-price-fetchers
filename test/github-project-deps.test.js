@@ -416,6 +416,22 @@ describe("a run", () => {
     assert.deepEqual(npm.calls, []);
   });
 
+  it("refuses a word past the mode, asking npm nothing", async () => {
+    const npm = standInNpm();
+    const { exitCode, stderr } = await runOn(
+      makeTempFolder("stray"),
+      ["main", "extra"],
+      {
+        runNpm: npm.runNpm,
+        listPackageFiles: () => [],
+      },
+    );
+
+    assert.equal(exitCode, 1);
+    assert.match(stderr, /too many arguments/);
+    assert.deepEqual(npm.calls, []);
+  });
+
   it("prints what a step throws, as lib/message-of.js gives it, and ends with exit code 1", async () => {
     const npm = standInNpm();
     const { exitCode, stderr } = await runOn(

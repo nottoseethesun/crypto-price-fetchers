@@ -85,7 +85,11 @@ A command-line tool for batch processing CSV files with thousands of
 timestamps. For a token that trades in pools, it asks Moralis and
 GeckoTerminal first; for every token, it then asks MEXC, CoinGecko and
 CoinPaprika through the Apps Script's own price sources, run unchanged
-under Node, so the sheet and the tool price alike.
+under Node, so the sheet and the tool take a price from the same sources,
+and neither from CoinGecko's 24 hours around a time, or CoinPaprika's UTC
+day, before they are over. Where a cell then says when to ask again, the
+tool writes `Error` in the row's price, unless a later source gives a
+final one.
 
 The repo's `bin/end-user/crypto-price-filler.js` starts it. For detailed
 documentation, see the file header in
@@ -170,6 +174,10 @@ to `prices.csv` in its `output/csv/`, with each step logged:
 ```bash
 node bin/end-user/crypto-price-filler.js --token=xtm --input=fetch-from-any-exchange/crypto-price-filler/input/input.csv --output=fetch-from-any-exchange/crypto-price-filler/output/csv/prices.csv --mode=high --tz=America/Chicago --verbose
 ```
+
+With no CoinPaprika key saved, it first asks whether to go on without
+CoinPaprika's prices, since CoinPaprika gives no high without one: y goes
+on.
 
 Gridcoin's close at each row's time, then, for each row no service
 priced, the higher of the prices of the nearest priced rows before and

@@ -50,7 +50,9 @@ git, the version-control program, ignores and which may set the fields of
 the script's
 `DEXTOOLS_CONFIG` it reads each time it is called: `CACHE_SECONDS`, how
 long a price above 0 is kept, and `LOCK_WAIT_MS`, how long a call waits
-for the script's lock. Without the file, the script runs on the values
+for the script's lock, at most 20000 milliseconds, which keeps 10 of the
+30 seconds Google gives a cell's call for the request. Without the file,
+the script runs on the values
 written in it, which `config-example.json`, beside it, shows. The rest is
 in the repo's README, under
 [crypto-price-fetchers.js](../README.md#crypto-price-fetchersjs-1).

@@ -94,8 +94,8 @@ Examples:
 Exit codes: 0 when each lockfile was made again, or no package.json here
 installs a dependency from GitHub; 1 when git cannot list the package.json
 files, as outside a git project, when npm install failed, which puts every
-package.json and lockfile back as it was, or when the mode is not main or
-release.`;
+package.json and lockfile back as it was, when the mode is not main or
+release, or when a word follows the mode.`;
 
 /**
  * The spec a dependency installed from GitHub has in a mode: its project,

@@ -13,11 +13,14 @@
  * The command line, `bin/end-user/crypto-price-filler.js`, which loads `index.js`,
  * runs as its owner runs it, in a child process, given a settings file or
  * token list of the test's own through the preload
- * `helpers/stand-in-settings-preload.js`, and a stand-in fetch through
- * `helpers/stand-in-fetch-preload.js`; its command, and `backfill.js`'s,
+ * `helpers/stand-in-settings-preload.js`, a stand-in fetch through
+ * `helpers/stand-in-fetch-preload.js`, and, for one test, a full disk
+ * through `helpers/full-disk-preload.js`; its command, and `backfill.js`'s,
  * are also parsed here, in the test's thread, and `backfill.js` backfills
  * a CSV in a temp folder of the test's own, with the settings the test
- * gives it.
+ * gives it, in the test's thread or, through `backfillIn`
+ * (`helpers/regression-runs.js`), as backfill's command line, in a child
+ * process.
  */
 
 import { afterAll, beforeAll, describe, it, expect, vi } from "vitest";
@@ -28,7 +31,12 @@ import path from "path";
 import { runBackfill, setupBackfillCommander } from "../backfill.js";
 import { parseTimeZone, setupCommander } from "../commander.js";
 import { backfillChoice, backfillPrices } from "../utils/backfill.js";
-import { runCommandLine, runIndexIn } from "./helpers/regression-runs.js";
+import {
+  backfillIn,
+  CSV_WITH_A_GAP,
+  runCommandLine,
+  runIndexIn,
+} from "./helpers/regression-runs.js";
 import { logLines } from "./helpers/log-lines.js";
 
 /** crypto-price-filler's folder. */
@@ -72,13 +80,6 @@ afterAll(() => {
 function runIndex(args, standIns) {
   return runIndexIn(folder, args, standIns);
 }
-
-/** A CSV of three rows, the second with no price, for backfill to fill. */
-const CSV_WITH_A_GAP = `"date (UTC)","amount","$usd price","$usd amount","grand total ($usd)"
-"2024-01-01 12:00:00","10","100","1000","1000"
-"2024-01-02 12:00:00","20","Error","","1000"
-"2024-01-03 12:00:00","15","200","3000","4000"
-`;
 
 describe("crypto-price-filler's command line", () => {
   it("answers --help whatever its settings, and prints a settings file's or token list's problems as one error, with exit code 1 and no stack trace", () => {
@@ -372,26 +373,80 @@ describe("crypto-price-filler's exit code", () => {
   });
 });
 
-describe("crypto-price-filler's --output", () => {
-  it("refuses a file in a folder that does not exist, naming --output, before it asks anything", () => {
-    const folder = fs.mkdtempSync(path.join(os.tmpdir(), "filler-output-"));
+describe("crypto-price-filler's output file", () => {
+  it("names the file and the error, with exit code 1 and no stack trace, when it cannot write it", () => {
+    const folder = fs.mkdtempSync(path.join(os.tmpdir(), "filler-full-disk-"));
     try {
-      const input = path.join(folder, "in.csv");
-      fs.writeFileSync(input, "date (UTC),amount\n2025-06-15 10:30:00,1\n");
-      const missing = path.join(folder, "no-such-folder");
-      const run = runCommandLine([
-        "--token=xtm",
-        `--input=${input}`,
-        `--output=${path.join(missing, "out.csv")}`,
-      ]);
-      expect(run.status).toBe(1);
-      expect(run.stderr).toBe(
-        `error: option '--output <path>' argument '${path.join(missing, "out.csv")}' is invalid. Its folder, ${missing}, does not exist.\n`,
+      fs.writeFileSync(
+        path.join(folder, "in.csv"),
+        "date (UTC),amount,description\n2025-06-15 12:30:00,10,one XTM reward\n",
       );
+      const output = path.join(folder, "out.csv");
+      const run = spawnSync(
+        process.execPath,
+        [
+          "--import",
+          path.join(__dirname, "helpers/stand-in-settings-preload.js"),
+          "--import",
+          path.join(__dirname, "helpers/stand-in-fetch-preload.js"),
+          "--import",
+          path.join(__dirname, "helpers/full-disk-preload.js"),
+          path.resolve(
+            __dirname,
+            "../../../bin/end-user/crypto-price-filler.js",
+          ),
+          "--token=xtm",
+          "--input=in.csv",
+          `--output=${output}`,
+        ],
+        {
+          cwd: folder,
+          env: {
+            ...process.env,
+            STAND_IN_FILLER_TOKENS: XTM_WITHOUT_COINGECKO,
+          },
+          encoding: "utf8",
+          timeout: 30000,
+        },
+      );
+      expect(run.status).toBe(1);
+      expect(run.stderr).toContain(
+        `Error: ${output} could not be written: ENOSPC: no space left on device, write '${output}'`,
+      );
+      expect(run.stderr).not.toMatch(/\n\s+at /);
     } finally {
       fs.rmSync(folder, { recursive: true, force: true });
     }
   });
+});
+
+describe("the --output of crypto-price-filler and of backfill", () => {
+  it.each(["crypto-price-filler", "backfill"])(
+    "%s refuses a file in a folder that does not exist, naming --output, before it reads its input",
+    (tool) => {
+      const folder = fs.mkdtempSync(path.join(os.tmpdir(), "filler-output-"));
+      try {
+        const input = path.join(folder, "in.csv");
+        fs.writeFileSync(input, "date (UTC),amount\n2025-06-15 10:30:00,1\n");
+        const missing = path.join(folder, "no-such-folder");
+        const output = path.join(missing, "out.csv");
+        const run =
+          tool === "backfill"
+            ? backfillIn(folder, [`--output=${output}`], "{}").run
+            : runCommandLine([
+                "--token=xtm",
+                `--input=${input}`,
+                `--output=${output}`,
+              ]);
+        expect(run.status).toBe(1);
+        expect(run.stderr).toBe(
+          `error: option '--output <path>' argument '${output}' is invalid. Its folder, ${missing}, does not exist.\n`,
+        );
+      } finally {
+        fs.rmSync(folder, { recursive: true, force: true });
+      }
+    },
+  );
 });
 
 describe("crypto-price-filler's --tz", () => {
@@ -418,4 +473,88 @@ describe("crypto-price-filler's stray words", () => {
       }),
     ).toThrow(/too many arguments/);
   });
+});
+
+describe("backfill flags set against each other", () => {
+  it.each([
+    [
+      "a flag typed against the other's setting",
+      ["--backfill-lowest"],
+      '{"BACKFILL_HIGHEST": true}',
+      "option '--backfill-highest' (set in config.json) cannot be used with option '--backfill-lowest'",
+    ],
+    [
+      "the two flags typed together",
+      ["--backfill-highest", "--backfill-lowest"],
+      "{}",
+      "option '--backfill-highest' cannot be used with option '--backfill-lowest'",
+    ],
+    [
+      "the two settings both true",
+      [],
+      '{"BACKFILL_HIGHEST": true, "BACKFILL_LOWEST": true}',
+      "option '--backfill-highest' (set in config.json) cannot be used with option '--backfill-lowest' (set in config.json)",
+    ],
+  ])(
+    "backfill's command line refuses %s, naming both, with the file left as it was",
+    (_, args, settings, refusal) => {
+      const folder = fs.mkdtempSync(path.join(os.tmpdir(), "backfill-flags-"));
+      try {
+        const { run, left } = backfillIn(folder, args, settings);
+        expect(run.stderr).toContain(refusal);
+        expect(run.status).toBe(1);
+        expect(left).toBe(CSV_WITH_A_GAP);
+      } finally {
+        fs.rmSync(folder, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it("the filler's command line refuses a flag typed against the other's setting, naming both, writing no file", () => {
+    const folder = fs.mkdtempSync(path.join(os.tmpdir(), "filler-flags-"));
+    try {
+      fs.writeFileSync(
+        path.join(folder, "in.csv"),
+        "date (UTC),amount\n2025-06-15 12:30:00,10\n",
+      );
+      const output = path.join(folder, "out.csv");
+      const run = runIndexIn(
+        folder,
+        [
+          "--token",
+          "xtm",
+          "--input",
+          "in.csv",
+          "--output",
+          output,
+          "--backfill-lowest",
+        ],
+        { STAND_IN_FILLER_CONFIG: '{"BACKFILL_HIGHEST": true}' },
+      );
+      expect(run.stderr).toContain(
+        "option '--backfill-highest' (set in config.json) cannot be used with option '--backfill-lowest'",
+      );
+      expect(run.status).toBe(1);
+      expect(fs.existsSync(output)).toBe(false);
+    } finally {
+      fs.rmSync(folder, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    [["--backfill-lowest"], '{"BACKFILL_LOWEST": true}', "100"],
+    [[], '{"BACKFILL_HIGHEST": true}', "200"],
+  ])(
+    "backfill's command line takes the flags %j with the settings %s, filling the gap with %s",
+    (args, settings, price) => {
+      const folder = fs.mkdtempSync(path.join(os.tmpdir(), "backfill-flags-"));
+      try {
+        const { run, left } = backfillIn(folder, args, settings);
+        expect(run.status).toBe(0);
+        expect(left).toContain(`2024-01-02 12:00:00,20,${price},`);
+      } finally {
+        fs.rmSync(folder, { recursive: true, force: true });
+      }
+    },
+  );
 });

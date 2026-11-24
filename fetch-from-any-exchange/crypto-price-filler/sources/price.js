@@ -42,7 +42,7 @@ function poolTokenOf(tokenConfig) {
  * @param {string} token - Token symbol
  * @returns {Object} Token configuration with coingeckoId, coinpaprikaId, mexcSymbol, and poolToken for a token that trades in pools
  */
-function loadTokenConfig(token) {
+export function loadTokenConfig(token) {
   const supportedTokens = readSupportedTokens();
   const tokenConfig = supportedTokens.tokens?.[token.toLowerCase()] ?? {};
 

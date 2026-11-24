@@ -9,11 +9,15 @@
  *
  * A string literal passes, since it holds no secret's value. The rule
  * looks at the names, of variables and of a member's object and
- * property, in an argument and in these parts of it: the expressions of
- * a template literal, either side of `+`, `??`, `||` and `&&`, either
- * result of `?:`, a call and its arguments, an object's values, an
- * array's elements, a spread, an `await` and an optional chain. The
- * security pass, `eslint-security.config.js`, runs it.
+ * property, a property written as a string, as in `keys["apiKey"]`,
+ * among them, in an argument and in these parts of it: the expressions
+ * of a template literal, a tagged template and its tag, either side of
+ * `+`, `??`, `||` and `&&`, either result of `?:`, a call and its
+ * arguments, a `new` and its arguments, an object's values, an array's
+ * elements, a spread, an `await`, an optional chain, the value an
+ * assignment gives and the last expression of a sequence, which is the
+ * sequence's value. The security pass, `eslint-security.config.js`, runs
+ * it.
  *
  * pulsechain-analytics, pulsechain-validator-analytics and
  * x1-validator-analytics run it too, from this repo:
@@ -25,16 +29,32 @@ const SENSITIVE =
   /api.?key|private.?key|mnemonic|seed.?phrase|password|secret|signing.?key/i;
 
 /**
+ * A member's property as a name: the property itself, or, for one
+ * written as a string, as in `keys["apiKey"]`, a name of that text.
+ *
+ * @param {Object} member - The member's syntax node
+ * @returns {Object} The property's syntax node, or a name made of it
+ */
+function propertyName(member) {
+  const { property } = member;
+  if (member.computed && typeof property.value === "string")
+    return { type: "Identifier", name: property.value };
+  return property;
+}
+
+/**
  * The parts of a syntax node in which a name that may hold a secret is
  * looked for, by the node's type.
  */
 const PARTS = {
-  MemberExpression: (node) => [node.property, node.object],
+  MemberExpression: (node) => [propertyName(node), node.object],
   TemplateLiteral: (node) => node.expressions,
+  TaggedTemplateExpression: (node) => [node.tag, node.quasi],
   BinaryExpression: (node) => [node.left, node.right],
   LogicalExpression: (node) => [node.left, node.right],
   ConditionalExpression: (node) => [node.consequent, node.alternate],
   CallExpression: (node) => [node.callee, ...node.arguments],
+  NewExpression: (node) => [node.callee, ...node.arguments],
   ObjectExpression: (node) =>
     node.properties.map((part) =>
       part.type === "SpreadElement" ? part : part.value,
@@ -43,6 +63,8 @@ const PARTS = {
   SpreadElement: (node) => [node.argument],
   AwaitExpression: (node) => [node.argument],
   ChainExpression: (node) => [node.expression],
+  AssignmentExpression: (node) => [node.right],
+  SequenceExpression: (node) => [node.expressions.at(-1)],
 };
 
 /**

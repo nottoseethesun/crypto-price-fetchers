@@ -11,24 +11,59 @@
  * @author Christopher M. Balz with Claude.ai
  */
 
+import { checkConflicts } from "../../../lib/option-conflicts.js";
 import { logv } from "./log.js";
 
 /**
- * Whether to backfill with the higher or the lower bracketing price: a
- * flag given on the command line, else config.json's setting. The flags
- * only turn backfill on, so each is true when its flag is given or its
- * setting is true; when both are, the higher price is used.
+ * Whether to backfill with the higher or the lower bracketing price: the
+ * flags given, when either is; else config.json's settings. A flag only
+ * turns its backfill on, and only true counts as on. When both are on,
+ * the higher price is used.
  *
  * @param {{backfillHighest?: boolean, backfillLowest?: boolean}} options - The options, as commander parsed them
  * @param {{BACKFILL_HIGHEST?: boolean, BACKFILL_LOWEST?: boolean}} config - The settings, as `loadConfig` read them
  * @returns {{highest: boolean, lowest: boolean}} Whether each is on
  */
 export function backfillChoice(options, config) {
+  if (options.backfillHighest === true || options.backfillLowest === true)
+    return {
+      highest: options.backfillHighest === true,
+      lowest: options.backfillLowest === true,
+    };
   return {
-    highest:
-      options.backfillHighest === true || config.BACKFILL_HIGHEST === true,
-    lowest: options.backfillLowest === true || config.BACKFILL_LOWEST === true,
+    highest: config.BACKFILL_HIGHEST === true,
+    lowest: config.BACKFILL_LOWEST === true,
   };
+}
+
+/** Each backfill flag's name in a parsed command, with its setting's. */
+const BACKFILL_SETTINGS = [
+  ["backfillHighest", "BACKFILL_HIGHEST"],
+  ["backfillLowest", "BACKFILL_LOWEST"],
+];
+
+/**
+ * Lays config.json's two backfill settings under a parsed command line's
+ * backfill flags, as the defaults of the flags not typed, and refuses,
+ * with `checkConflicts`, a flag typed against the other's setting, or the
+ * two settings both true, as commander refuses the two flags typed
+ * together. Each command line calls it once its settings are read, so
+ * `--help` answers whatever config.json holds.
+ *
+ * @param {import('commander').Command} command - The command, parsed
+ * @param {{BACKFILL_HIGHEST?: boolean, BACKFILL_LOWEST?: boolean}} config - The settings, as `loadConfig` read them
+ * @returns {void}
+ */
+export function takeBackfillSettings(command, config) {
+  for (const [flag, setting] of BACKFILL_SETTINGS) {
+    if (command.getOptionValueSource(flag) === undefined)
+      command.setOptionValueWithSource(
+        flag,
+        config[setting] === true,
+        "default",
+      );
+  }
+  checkConflicts(command, "config.json");
 }
 
 /**

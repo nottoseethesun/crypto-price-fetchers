@@ -28,13 +28,13 @@
  * `output/csv/`, where git keeps nothing but the folder.
  *
  * Basic usage (conservative tax estimates - use highest bracketing price):
- *   node bin/backfill.js --input=fetch-from-any-exchange/crypto-price-filler/output/csv/output.csv --backfill-highest
+ *   node bin/end-user/backfill.js --input=fetch-from-any-exchange/crypto-price-filler/output/csv/output.csv --backfill-highest
  *
  * Budgeting (avoid over-estimating - use lowest bracketing price):
- *   node bin/backfill.js --input=fetch-from-any-exchange/crypto-price-filler/output/csv/output.csv --backfill-lowest
+ *   node bin/end-user/backfill.js --input=fetch-from-any-exchange/crypto-price-filler/output/csv/output.csv --backfill-lowest
  *
  * Write to a different file:
- *   node bin/backfill.js --input=fetch-from-any-exchange/crypto-price-filler/output/csv/output.csv --output=fetch-from-any-exchange/crypto-price-filler/output/csv/backfilled.csv --backfill-highest
+ *   node bin/end-user/backfill.js --input=fetch-from-any-exchange/crypto-price-filler/output/csv/output.csv --output=fetch-from-any-exchange/crypto-price-filler/output/csv/backfilled.csv --backfill-highest
  *
  * Command-Line Options
  * --------------------
@@ -54,21 +54,23 @@
  *   "BACKFILL_HIGHEST": true   // Enable --backfill-highest by default
  *   "BACKFILL_LOWEST": true    // Enable --backfill-lowest by default
  *
- * A flag given on the command line turns its mode on whatever config.json
- * says; a flag not given leaves the setting to decide (`backfillChoice`, in
- * utils/backfill.js). A config.json that cannot be read stops the run.
+ * With neither flag typed, the settings decide. A flag typed against the
+ * other's setting, the two flags typed together, or the two settings both
+ * true stop the run with exit code 1, naming the two
+ * (`takeBackfillSettings`, in utils/backfill.js). A config.json that
+ * cannot be read stops the run.
  *
  * Examples
  * --------
  *
  *   # Backfill in place with highest price (conservative for taxes)
- *   node bin/backfill.js --input=fetch-from-any-exchange/crypto-price-filler/output/csv/mining-output.csv --backfill-highest
+ *   node bin/end-user/backfill.js --input=fetch-from-any-exchange/crypto-price-filler/output/csv/mining-output.csv --backfill-highest
  *
  *   # Backfill to new file with lowest price (for budgeting)
- *   node bin/backfill.js --input=fetch-from-any-exchange/crypto-price-filler/output/csv/output.csv --output=fetch-from-any-exchange/crypto-price-filler/output/csv/budget.csv --backfill-lowest
+ *   node bin/end-user/backfill.js --input=fetch-from-any-exchange/crypto-price-filler/output/csv/output.csv --output=fetch-from-any-exchange/crypto-price-filler/output/csv/budget.csv --backfill-lowest
  *
  *   # Verbose mode to see which rows are being filled
- *   node bin/backfill.js --input=fetch-from-any-exchange/crypto-price-filler/output/csv/output.csv --backfill-highest --verbose
+ *   node bin/end-user/backfill.js --input=fetch-from-any-exchange/crypto-price-filler/output/csv/output.csv --backfill-highest --verbose
  *
  * Exit Codes
  * ----------
@@ -89,15 +91,17 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import { parse as csvParse } from "csv-parse/sync";
 import { createObjectCsvWriter } from "csv-writer";
 
 import { loadConfig } from "./config.js";
+import { fileToWriteArgument } from "../../lib/file-to-write.js";
 import {
   backfillChoice,
   backfillPrices,
   DEFAULT_COLUMNS,
+  takeBackfillSettings,
 } from "./utils/backfill.js";
 import { logv, say } from "./utils/log.js";
 
@@ -231,19 +235,24 @@ export function setupBackfillCommander() {
 
     .requiredOption(
       "--input <path>",
-      "Path to input CSV file (typically a previous output.csv)",
+      "Path to input CSV file, typically a previous output.csv (required)",
     )
     .option(
       "--output <path>",
-      "Path to output CSV file (default: overwrites input)",
+      "Path to output CSV file, in a folder that exists (default: overwrites input)",
+      (value) => fileToWriteArgument(expandPath(value)),
     )
-    .option(
-      "--backfill-highest",
-      "Fill each Error price with the highest bracketing price (conservative tax estimates); config.json's BACKFILL_HIGHEST when not given",
+    .addOption(
+      new Option(
+        "--backfill-highest",
+        "Fill each Error price with the highest bracketing price (conservative tax estimates); config.json's BACKFILL_HIGHEST when not given",
+      ).conflicts("backfillLowest"),
     )
-    .option(
-      "--backfill-lowest",
-      "Fill each Error price with the lowest bracketing price (budgeting: avoid over-estimating); config.json's BACKFILL_LOWEST when not given",
+    .addOption(
+      new Option(
+        "--backfill-lowest",
+        "Fill each Error price with the lowest bracketing price (budgeting: avoid over-estimating); config.json's BACKFILL_LOWEST when not given",
+      ).conflicts("backfillHighest"),
     )
     .option("--verbose", "Enable detailed logging during processing")
 
@@ -255,13 +264,13 @@ its folder's output/csv/, fetch-from-any-exchange/crypto-price-filler/output/csv
 
 Examples:
   Backfill in place (conservative tax estimates):
-    $ node bin/backfill.js --input=fetch-from-any-exchange/crypto-price-filler/output/csv/output.csv --backfill-highest
+    $ node bin/end-user/backfill.js --input=fetch-from-any-exchange/crypto-price-filler/output/csv/output.csv --backfill-highest
 
   Backfill to new file (budgeting):
-    $ node bin/backfill.js --input=fetch-from-any-exchange/crypto-price-filler/output/csv/output.csv --output=fetch-from-any-exchange/crypto-price-filler/output/csv/budget.csv --backfill-lowest
+    $ node bin/end-user/backfill.js --input=fetch-from-any-exchange/crypto-price-filler/output/csv/output.csv --output=fetch-from-any-exchange/crypto-price-filler/output/csv/budget.csv --backfill-lowest
 
   Verbose mode:
-    $ node bin/backfill.js --input=fetch-from-any-exchange/crypto-price-filler/output/csv/output.csv --backfill-highest --verbose
+    $ node bin/end-user/backfill.js --input=fetch-from-any-exchange/crypto-price-filler/output/csv/output.csv --backfill-highest --verbose
 
 Exit codes:
   0  the output file was written
@@ -276,13 +285,11 @@ Exit codes:
 }
 
 /**
- * Parses command-line arguments.
- * @returns {Object} Parsed options
+ * Parses the process's arguments with the command line.
+ * @returns {import('commander').Command} The command, parsed, whose `opts()` gives the options
  */
-export function parseBackfillArgs() {
-  const cmd = setupBackfillCommander();
-  cmd.parse(process.argv);
-  return cmd.opts();
+export function parseBackfillCommandLine() {
+  return setupBackfillCommander().parse(process.argv);
 }
 
 /**
@@ -338,15 +345,17 @@ export async function runBackfill(options, config = loadConfig()) {
 
 /**
  * Runs the command line: reads the options, backfills the file, and ends
- * with exit code 1, the error printed, when it cannot. `bin/backfill.js`,
+ * with exit code 1, the error printed, when it cannot. `bin/end-user/backfill.js`,
  * at the repo's top, runs it.
  *
  * @returns {Promise<void>} Settles once the run has ended
  */
 export async function backfillCommandLine() {
   try {
-    const args = parseBackfillArgs();
-    await runBackfill(args);
+    const command = parseBackfillCommandLine();
+    const config = loadConfig();
+    takeBackfillSettings(command, config);
+    await runBackfill(command.opts(), config);
   } catch (error) {
     console.error(`Error: ${error.message}`);
     process.exit(1);

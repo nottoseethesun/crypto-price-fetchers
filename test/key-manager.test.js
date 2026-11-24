@@ -435,6 +435,7 @@ describe("runKeyManager", () => {
       exitCode: 1,
       stdout: "",
       stderr:
+        "error: command-argument value 'gamma' is invalid for argument 'service'. " +
         'The project\'s config.json lists no service "gamma" under apiKeys.\n',
     });
   });

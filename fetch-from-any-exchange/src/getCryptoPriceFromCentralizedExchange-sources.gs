@@ -468,9 +468,11 @@ function getPriceFromCoinGecko(id, utcMs, target) {
     return null;
   }
 
-  // No lock of its own: in the sheet, the caller, getCryptoPrice, holds the
-  // script lock. The lock keeps no count, so asking for it again has no
-  // effect, and releasing it here would end the caller's hold too.
+  /*-
+   *  No lock of its own: in the sheet, the caller, getCryptoPrice, holds
+   *  the script lock. The lock keeps no count, so asking for it again has
+   *  no effect, and releasing it here would end the caller's hold too.
+   */
 
   const dateStr = Utilities.formatDate(new Date(utcMs), "UTC", "dd-MM-yyyy");
 
@@ -555,16 +557,15 @@ function keepNoData(key, cutBefore) {
 }
 
 /**
- * Fetches time-series prices from CoinGecko market_chart/range for a 24h
- * window centred on the time, then returns the average of the highest and
- * the lowest of the data points for average, the highest for high, the
- * lowest for low, or the one nearest the time for close.
- * Returns null on failure.
+ * CoinGecko's hourly prices of a coin between two times, from
+ * market_chart/range, as [time in ms, price] points.
+ *
+ * @param {string} id - The coin's CoinGecko id, such as "bitcoin"
+ * @param {number} fromSec - The first time, in unix seconds
+ * @param {number} toSec - The last time, in unix seconds
+ * @returns {?Array<Array<number>>} The points, none when CoinGecko has none; null when the request failed, as for an id CoinGecko does not know, or was cut short
  */
-function tryCoinGeckoMarketChartRange(id, utcMs, target) {
-  const fromSec = Math.floor((utcMs - 43200000) / 1000); // 12h before
-  const toSec = Math.floor(coinGeckoWindowEndMs(utcMs) / 1000); // 12h after
-
+function coinGeckoRangePoints(id, fromSec, toSec) {
   const url = CONFIG.COINGECKO_MARKET_CHART_RANGE_TEMPLATE.replace(
     "{base}",
     CONFIG.COINGECKO_BASE,
@@ -577,12 +578,48 @@ function tryCoinGeckoMarketChartRange(id, utcMs, target) {
   const body = jsonOf(fetchWithRetries(url, coinGeckoHeaders(), label), label);
   if (body === null) return null;
 
-  const points = (Array.isArray(body.prices) ? body.prices : []).filter(
+  return (Array.isArray(body.prices) ? body.prices : []).filter(
     (point) =>
       Array.isArray(point) &&
       typeof point[0] === "number" &&
       typeof point[1] === "number",
   );
+}
+
+/**
+ * Whether CoinGecko has prices of a coin in the part of a time's window
+ * already over, from 12 hours before the time to now, which tells a coin
+ * it prices from a ticker no coin has, for a time whose window is not
+ * over (`fetchPriceFromProviders`). A request cut short counts in
+ * CALL.cutRequests, as every request does.
+ *
+ * @param {string} id - The coin's CoinGecko id, such as "bitcoin"
+ * @param {number} utcMs - The time, in ms since 1970 UTC
+ * @returns {boolean} Whether it has any
+ */
+function coinGeckoHasPricesSoFar(id, utcMs) {
+  const points = coinGeckoRangePoints(
+    id,
+    Math.floor((utcMs - 43200000) / 1000),
+    Math.floor(Date.now() / 1000),
+  );
+  return points !== null && points.length > 0;
+}
+
+/**
+ * Fetches time-series prices from CoinGecko market_chart/range for a 24h
+ * window centred on the time, then returns the average of the highest and
+ * the lowest of the data points for average, the highest for high, the
+ * lowest for low, or the one nearest the time for close.
+ * Returns null on failure.
+ */
+function tryCoinGeckoMarketChartRange(id, utcMs, target) {
+  const points = coinGeckoRangePoints(
+    id,
+    Math.floor((utcMs - 43200000) / 1000), // 12h before
+    Math.floor(coinGeckoWindowEndMs(utcMs) / 1000), // 12h after
+  );
+  if (points === null) return null;
   if (points.length === 0) {
     Logger.log("CoinGecko market_chart/range: No price data points");
     return null;
@@ -637,18 +674,73 @@ function coinGeckoHeaders() {
  * ========================================================================== */
 
 /**
+ * Whether the script asks CoinPaprika nothing for a token: GridCoin, which
+ * CoinPaprika lists as inactive (`is_active` false), with no price.
+ *
+ * @param {string} id - The token's CoinPaprika id, such as "btc-bitcoin"
+ * @returns {boolean} Whether CoinPaprika is skipped for it
+ */
+function coinPaprikaSkips(id) {
+  return new Set(["grc-gridcoin"]).has(id);
+}
+
+/**
+ * When CoinPaprika's day for a time ends: the midnight, UTC, after the
+ * time, the end of the day whose candle `getPriceFromCoinPaprika` reads.
+ * Before then, the day's candle can still change.
+ *
+ * @param {number} utcMs - The time, in ms since 1970 UTC
+ * @returns {number} The day's end, in ms since 1970 UTC
+ */
+function coinPaprikaDayEndMs(utcMs) {
+  return (Math.floor(utcMs / 86400000) + 1) * 86400000;
+}
+
+/**
+ * Whether CoinPaprika can give a target: any with a key, which asks a paid
+ * server, whose plans reach past days' candles; close alone without one,
+ * from a day's price at 00:00 UTC, since the free server keeps a candle
+ * only for the 24 hours after it begins, and so none of a day already
+ * over.
+ *
+ * @param {string} target - The price to give: "average", "high", "low" or "close"
+ * @returns {boolean} Whether it can
+ */
+function coinPaprikaCanGive(target) {
+  return (
+    configuredKey(CONFIG.COINPAPRIKA_API_KEY) !== null || target === "close"
+  );
+}
+
+/**
  * A token's price on a day from CoinPaprika: from the day's candle, or
- * else, for close alone, from the day's single price.
+ * else, for close alone, from its price at 00:00 UTC the next day, which
+ * ends the day. While the UTC day
+ * that holds the time is not over (`coinPaprikaDayEndMs`), it asks
+ * nothing and gives null, since the day's candle can still change; nor,
+ * without a key, for an average, a high or a low (`coinPaprikaCanGive`).
  *
  * @param {string} id - The token's CoinPaprika id, such as "btc-bitcoin"
  * @param {number} utcMs - The time, in ms since 1970 UTC, whose UTC day is asked
  * @param {string} target - The price to give: "average", "high", "low" or "close"
- * @returns {?number} The price in USD, or null when CoinPaprika has none for the day and target
+ * @returns {?number} The price in USD, or null when CoinPaprika has none for the day and target, or the day is not over yet
  */
 function getPriceFromCoinPaprika(id, utcMs, target) {
   Logger.log("Trying CoinPaprika for " + id);
+  if (!coinPaprikaCanGive(target)) {
+    Logger.log(
+      `CoinPaprika: without a key it gives a day's close alone, not ${target}`,
+    );
+    return null;
+  }
+  if (Date.now() < coinPaprikaDayEndMs(utcMs)) {
+    Logger.log(
+      `CoinPaprika: the UTC day of the time ends at ${new Date(coinPaprikaDayEndMs(utcMs)).toISOString()}, after now, so it gives no price yet`,
+    );
+    return null;
+  }
 
-  if (new Set(["grc-gridcoin"]).has(id)) {
+  if (coinPaprikaSkips(id)) {
     Logger.log(`Skipping CoinPaprika for inactive token: ${id}`);
     return null;
   }
@@ -668,9 +760,25 @@ function getPriceFromCoinPaprika(id, utcMs, target) {
     return null;
   }
 
-  const price = coinPaprikaDayPrice(access, id, day);
+  /*-
+   *  A day's close is its price at its end, 24:00 UTC, which is 00:00 UTC
+   *  of the next day, so the date asked here is the day after the time's,
+   *  on purpose. CoinPaprika's free server, asked without a key, keeps a
+   *  candle only for the 24 hours after the candle begins, so it holds no
+   *  candle of a day already over, but it keeps each day's price at 00:00
+   *  UTC for 365 days: the next day's gives a past day's close without a
+   *  key, and, beyond a paid plan's candles, with one.
+   */
+  const nextDay = Utilities.formatDate(
+    new Date(utcMs + 86400000),
+    "UTC",
+    "yyyy-MM-dd",
+  );
+  const price = coinPaprikaDayPrice(access, id, nextDay);
   if (price !== null) {
-    Logger.log(`CoinPaprika price for ${day} at 00:00 UTC: ${price}`);
+    Logger.log(
+      `CoinPaprika's close of ${day}: its price at 00:00 UTC on ${nextDay}, ${price}`,
+    );
   }
   return price;
 }
@@ -692,7 +800,8 @@ function coinPaprikaAccess() {
 /**
  * Reads the target's price from the day's candle (00:00 to 23:59:59 UTC).
  * Returns { price } from the candle, or price null with askDayPrice true
- * when the day's price may still answer: the plan does not reach the day
+ * when the price at 00:00 UTC the next day, which ends the day, may still
+ * answer close: the plan does not reach the day
  * (status 402), or the day has no candle with the price. askDayPrice is
  * false when CoinPaprika answers otherwise: an id it does not know, a key
  * it refuses, an error.

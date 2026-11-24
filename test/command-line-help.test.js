@@ -60,7 +60,7 @@ const COMMAND_LINES = Object.freeze([
     command: [],
   },
   { file: "bin/end-user/crypto-price-filler.js", command: [] },
-  { file: "bin/backfill.js", command: [] },
+  { file: "bin/end-user/backfill.js", command: [] },
   { file: "install/install-os-dependencies.js", command: [] },
   { program: "bash", file: "bin/unlock-api-keys.sh", command: [] },
 ]);
@@ -79,7 +79,7 @@ const COMMAND_MODULES = Object.freeze({
   "actionlint/index.js": "bin/run-actionlint.js",
   "apps-script-runner/command-line.js": "bin/end-user/crypto-price-fetchers.js",
   [`${FILLER}/commander.js`]: "bin/end-user/crypto-price-filler.js",
-  [`${FILLER}/backfill.js`]: "bin/backfill.js",
+  [`${FILLER}/backfill.js`]: "bin/end-user/backfill.js",
   "install/os-dependencies.js": "install/install-os-dependencies.js",
 });
 

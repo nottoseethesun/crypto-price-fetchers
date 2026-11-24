@@ -1,14 +1,19 @@
 /**
- * The settings, stand-in answers and runs the regression tests share,
- * and a known-bug test that needs them.
+ * The settings, stand-in answers and runs the regression tests share, as
+ * do the tests of what CoinPaprika gives without a key
+ * (`tests/coinpaprika-key.test.js`).
  * @module tests/helpers/regression-runs
  *
  * The answers stand in for the price services at the http layer: MEXC for
  * a pair it lists, CoinGecko for a coin MEXC does not list, and
- * CoinPaprika for a day its plan's candles do not reach. The runs start
+ * CoinPaprika for a day its plan's candles do not reach, or with the
+ * candle of the day asked (`answerPaprikaCandleOfTheDay`); `dateAt` is a
+ * stand-in for the script's clock, for a time in a day not yet over. The
+ * runs start
  * the command line, `bin/end-user/crypto-price-filler.js`, in a child process with
- * the stand-in MEXC of `stand-in-fetch-preload.js`, or change the
- * computer's time zone for one call.
+ * the stand-in MEXC of `stand-in-fetch-preload.js`, start backfill's
+ * command line in one with a settings file of the test's own, or change
+ * the computer's time zone for one call.
  */
 
 import { execFileSync, spawnSync } from "node:child_process";
@@ -97,6 +102,43 @@ export function cellTime(utcMs) {
 }
 
 /**
+ * A stand-in for the script's `Date`, which `loadSheetsScript` lays over
+ * the runner's services, so that the script's present is the time given:
+ * `Date.now()` and `new Date()` give it, and `new Date(…)` with an
+ * argument reads it as `Date` does.
+ *
+ * @param {number} nowMs - The present, in ms since 1970 UTC
+ * @returns {typeof Date} The stand-in
+ */
+export function dateAt(nowMs) {
+  return class extends Date {
+    constructor(...args) {
+      super(...(args.length === 0 ? [nowMs] : args));
+    }
+
+    static now() {
+      return nowMs;
+    }
+  };
+}
+
+/**
+ * Answers CoinPaprika's request for a day's candle with one candle of that
+ * day, whose high is 3 and low 1, so its average, the mean of the two, is
+ * 2, as its close is; any other request reads as a 404.
+ *
+ * @param {string} url - The requested url
+ * @returns {Object[]|null} The json body, or null for a 404
+ */
+export function answerPaprikaCandleOfTheDay(url) {
+  if (!url.includes("coinpaprika") || !url.includes("/ohlcv/")) return null;
+  const day = new URL(url).searchParams.get("start");
+  return [
+    { time_open: `${day}T00:00:00Z`, open: 1, high: 3, low: 1, close: 2 },
+  ];
+}
+
+/**
  * Answers for a coin MEXC does not list and CoinGecko lists against USD,
  * as it does Tezos: CoinGecko's hourly range has no prices, and its price
  * for the day asked says 1.23. Its live ticker says 9.99, so a tool that
@@ -126,10 +168,17 @@ export function answerCoinGeckoForPastDay(url) {
   return null;
 }
 
+/** CoinPaprika's price of XTM at 00:00 UTC on each day the stand-in knows. */
+const PAPRIKA_PRICES_AT_MIDNIGHT = new Map([
+  ["2025-06-15", 2.05],
+  ["2025-06-16", 2.15],
+]);
+
 /**
  * Answers as CoinPaprika's free plan does for a day older than a day:
- * it refuses the candle, as beyond the plan, and gives the day's price
- * at 00:00 UTC, 2.05 on 2025-06-15.
+ * it refuses the candle, as beyond the plan, and gives the price at 00:00
+ * UTC of the day asked: 2.05 on 2025-06-15, and 2.15 on 2025-06-16, which
+ * is the close of 2025-06-15.
  *
  * @param {string} url - The requested url
  * @returns {*} The answer
@@ -141,8 +190,13 @@ export function answerPaprikaBeyondCandles(url) {
         "Getting historical OHLCV data before 2026-11-19 is not allowed in this plan",
     });
   }
-  if (url.includes("/tickers/xtm-tari/historical"))
-    return [{ timestamp: "2025-06-15T00:00:00Z", price: 2.05 }];
+  if (url.includes("/tickers/xtm-tari/historical")) {
+    const day = new URL(url).searchParams.get("start");
+    const price = PAPRIKA_PRICES_AT_MIDNIGHT.get(day);
+    return price === undefined
+      ? []
+      : [{ timestamp: `${day}T00:00:00Z`, price }];
+  }
   return null;
 }
 
@@ -234,6 +288,49 @@ export function runIndexIn(folder, args, standIns = {}) {
       timeout: 30000,
     },
   );
+}
+
+/** A CSV of three rows, the second with no price, for backfill to fill. */
+export const CSV_WITH_A_GAP = `"date (UTC)","amount","$usd price","$usd amount","grand total ($usd)"
+"2024-01-01 12:00:00","10","100","1000","1000"
+"2024-01-02 12:00:00","20","Error","","1000"
+"2024-01-03 12:00:00","15","200","3000","4000"
+`;
+
+/** backfill's command line, as its owner runs it: the start file in the repo's bin/end-user/. */
+export const BACKFILL_COMMAND_LINE = fileURLToPath(
+  new URL("../../../../bin/end-user/backfill.js", import.meta.url),
+);
+
+/**
+ * Runs backfill's command line on a copy of `CSV_WITH_A_GAP` it writes in
+ * the folder given, with the arguments given after `--input` and a
+ * settings file of the test's own, through `stand-in-settings-preload.js`.
+ *
+ * @param {string} folder - A temp folder of the test's own
+ * @param {string[]} args - The arguments after `--input`
+ * @param {string} settings - The text of the settings file
+ * @returns {{run: {status: number, stderr: string}, left: string}} How the run ended, and what the copy holds after it
+ */
+export function backfillIn(folder, args, settings) {
+  const input = path.join(folder, "prices.csv");
+  fs.writeFileSync(input, CSV_WITH_A_GAP);
+  const run = spawnSync(
+    process.execPath,
+    [
+      "--import",
+      SETTINGS_PRELOAD_URL,
+      BACKFILL_COMMAND_LINE,
+      `--input=${input}`,
+      ...args,
+    ],
+    {
+      env: { ...process.env, STAND_IN_FILLER_CONFIG: settings },
+      encoding: "utf8",
+      timeout: 30000,
+    },
+  );
+  return { run, left: fs.readFileSync(input, "utf8") };
 }
 
 /**

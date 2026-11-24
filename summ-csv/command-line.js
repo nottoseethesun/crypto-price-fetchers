@@ -22,6 +22,7 @@
 import fs from "node:fs";
 import { Command, CommanderError } from "commander";
 import { messageOf } from "../lib/message-of.js";
+import { fileToReadArgument } from "../lib/file-to-read.js";
 import { fileToWriteArgument } from "../lib/file-to-write.js";
 import { writeSummCsv } from "./index.js";
 
@@ -79,14 +80,19 @@ export function runSummCsv(argv, deps = {}) {
     .description(
       "Writes a csv file for Summ's custom import from a JSON file of rows, under the header of the owner's template, once every row has passed the rules.",
     )
-    .requiredOption("--rows <file>", "the JSON file of rows")
+    .requiredOption(
+      "--rows <file>",
+      "the JSON file of rows (required)",
+      fileToReadArgument,
+    )
     .requiredOption(
       "--template <file>",
-      "the template, whose first line is Summ's header",
+      "the template, whose first line is Summ's header (required)",
+      fileToReadArgument,
     )
     .requiredOption(
       "--out <file>",
-      "the csv file to write, in a folder that exists",
+      "the csv file to write, in a folder that exists (required)",
       fileToWriteArgument,
     )
     .option("--replace", "write over a file already at --out")

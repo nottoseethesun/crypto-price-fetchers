@@ -3,7 +3,9 @@
  * `crypto-price-fetchers/src/crypto-price-fetchers.gs`, and of the menu,
  * each running in the test's thread: a cell's own cache seconds, the
  * script's cache, the pool a cell names, what a request with no answer
- * gives and the time it keeps, and the menu's Refresh. The repo's
+ * gives and the time it keeps, what an answer with a status of 500 or
+ * above gives, the wait for the script lock, and the
+ * menu's Refresh. The repo's
  * CLAUDE.md lists the other
  * files of fixed bugs' tests; a bug found later gets its test in
  * `known-bugs.test.js`, declared with `it.fails` while the bug is there,
@@ -12,13 +14,20 @@
  *
  * The menu and the current-price script run unchanged in the test's
  * thread, joined as the build joins them, through
- * `tests/helpers/sheets-script.js`, against a stand-in DexTools; the
+ * `tests/helpers/sheets-script.js`, against a stand-in DexTools and
+ * x1.ninja, and, for the wait, a script lock that is never free; the
  * menu's Refresh runs against the spreadsheet of
  * `test/helpers/stand-in-spreadsheet.js` at the repo's top.
  */
 
 import { describe, it, expect } from "vitest";
-import { loadSheetsScript } from "./helpers/sheets-script.js";
+import {
+  CUSTOM_FUNCTION_LIMIT_MS,
+  busyLockService,
+  loadSheetsScript,
+  noResponse,
+  reply,
+} from "./helpers/sheets-script.js";
 import { MENU_AND_DEXTOOLS_SCRIPTS } from "./helpers/regression-runs.js";
 import { standInSpreadsheet } from "../../../test/helpers/stand-in-spreadsheet.js";
 
@@ -175,10 +184,61 @@ describe("the current-price script, when a request gets no answer", () => {
   });
 });
 
+describe("the current-price script, when a service fails", () => {
+  const token = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
+  const pool = "CAJeVEoSm1QQZccnCqYu9cnNF7TTD2fcUA3E5HQoxRvR";
+
+  /** Each of the script's four requests, as a cell calls it. */
+  const CALLS = {
+    "DexTools' price": (script) => script.dexToolsGetTokenPrice("ether", token),
+    "DexTools' FDV": (script) => script.dexToolsGetTokenFDV("ether", token),
+    "x1.ninja's price": (script) =>
+      script.dexToolsGetTokenPrice("x1", token, pool),
+    "x1.ninja's FDV": (script) => script.dexToolsGetTokenFDV("x1", token, pool),
+  };
+
+  it("gives the script's error message, not 0, when a service answers with a status of 500 or above", () => {
+    for (const [name, call] of Object.entries(CALLS)) {
+      const script = loadSheetsScript(MENU_AND_DEXTOOLS_SCRIPTS, () =>
+        reply(503, { message: "unavailable" }),
+      );
+      expect(call(script), name).toBe("⚠️ API error – check logs");
+    }
+  });
+
+  it("gives the script's error message, not 0, when a request gets no answer", () => {
+    for (const [name, call] of Object.entries(CALLS)) {
+      const script = loadSheetsScript(MENU_AND_DEXTOOLS_SCRIPTS, () =>
+        noResponse("Service invoked too many times for one day: urlfetch."),
+      );
+      expect(call(script), name).toBe("⚠️ API error – check logs");
+    }
+  });
+});
+
 describe("the current-price script's pool argument", () => {
   it("takes a pool named as text, not only as {{address, 0}}", () => {
     const script = loadSheetsScript(MENU_AND_DEXTOOLS_SCRIPTS, () => null);
     expect(script.poolNamed("0xPool")).toBe("0xPool");
     expect(script.poolNamed([["0xPool", 0]])).toBe("0xPool");
   });
+});
+
+describe("the current-price script, while other cells hold the script lock", () => {
+  it.each(["dexToolsGetTokenPrice", "dexToolsGetTokenFDV"])(
+    "%s waits for it at most 20 seconds, keeping 10 of Google's 30 for the request, then gives the busy message",
+    (name) => {
+      const waits = [];
+      const script = loadSheetsScript(MENU_AND_DEXTOOLS_SCRIPTS, () => null, {
+        services: { LockService: busyLockService(waits) },
+      });
+      expect(
+        script[name]("pulse", "0xF84b84dAAce6Ac00DbBAed26CA32Ff3570Aaf66C"),
+      ).toBe("⌛ Rate limit / busy – retry soon");
+      expect(waits.length).toBeGreaterThan(0);
+      expect(Math.max(...waits)).toBeLessThanOrEqual(
+        CUSTOM_FUNCTION_LIMIT_MS - 10000,
+      );
+    },
+  );
 });

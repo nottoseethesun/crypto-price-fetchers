@@ -1,6 +1,6 @@
 {
   "DEXTOOLS_CONFIG": {
     "CACHE_SECONDS": 300,
-    "LOCK_WAIT_MS": 120000
+    "LOCK_WAIT_MS": 20000
   }
 }

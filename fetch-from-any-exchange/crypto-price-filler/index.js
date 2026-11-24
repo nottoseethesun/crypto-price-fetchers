@@ -11,7 +11,8 @@
  *   within the last 180 days)
  * - Every token: MEXC (the minute or hour that holds the time, widened up to the year
  *   when nothing traded), then CoinGecko (hourly prices, then the day's price
- *   for close), then CoinPaprika (the day's candle, then the day's price for close). These
+ *   for close), then CoinPaprika (the day's candle, then, for close, its price at 00:00 UTC
+ *   the next day, which ends the day). These
  *   three are the price sources of the Sheets script getCryptoPriceFromCentralizedExchange,
  *   which this tool runs unchanged through the repo's runner (`sources/exchange.js`)
  * - Every price is that of the row's time, never the current one
@@ -134,8 +135,11 @@
  *                        (https://coinpaprika.com/api). Save it with `npm run api-keys`,
  *                        in the repo's top folder. With it, CoinPaprika's paid server is
  *                        asked, which reaches as far back as the plan does. Without one,
- *                        its free server: the day's candle for the last 24 hours, and the
- *                        day's price at 00:00 UTC for the last 365 days.
+ *                        its free server, whose candles reach back only 24 hours, and so
+ *                        hold no day already over: a past day's close, its price at 00:00
+ *                        UTC the next day, which ends the day, for the last 365 days, and
+ *                        no high or low, so a run for either asks whether to go on
+ *                        without CoinPaprika's prices (`utils/coinpaprika-key.js`).
  *
  *   Moralis              Your Moralis api key. Obtain from https://admin.moralis.com
  *                        Save it with `npm run api-keys`, in the repo's top folder.
@@ -164,8 +168,9 @@
  *                        Fills each Error price with the lowest of the two bracketing prices.
  *                        Use for budgeting to avoid over-estimating income.
  *
- *   Note: CLI flags (--backfill-highest, --backfill-lowest) override config.json settings.
- *   If both are enabled, BACKFILL_HIGHEST takes precedence.
+ *   Note: with neither flag typed, the settings decide. A flag typed against the
+ *   other's setting, the two flags typed together, or the two settings both true
+ *   stop the run with exit code 1, naming the two (`takeBackfillSettings`).
  *
  * Usage
  * -----
@@ -236,10 +241,11 @@
  *
  *   Configuration:
  *   These options can also be set in config.json, your own settings, for persistent defaults:
- *     "BACKFILL_HIGHEST": true   // Enable by default (CLI flag overrides)
- *     "BACKFILL_LOWEST": true    // Enable by default (CLI flag overrides)
+ *     "BACKFILL_HIGHEST": true   // Enable by default, when no flag is typed
+ *     "BACKFILL_LOWEST": true    // Enable by default, when no flag is typed
  *
- *   Note: If both flags are specified, --backfill-highest takes precedence.
+ *   Note: the two flags typed together stop the run, as does one typed against
+ *   the other's setting.
  *
  * Progress Bar:
  *   A progress bar is displayed by default during processing, showing:
@@ -327,21 +333,26 @@ import os from "os";
 import { parse as csvParse } from "csv-parse/sync";
 import { createObjectCsvWriter } from "csv-writer";
 
-import { getCryptoPrice } from "./sources/price.js";
+import { getCryptoPrice, loadTokenConfig } from "./sources/price.js";
 import {
   checkExchangeSettings,
   closeExchangeSources,
 } from "./sources/exchange.js";
 import { loadConfig } from "./config.js";
 import { getProgressBar } from "./utils/progress.js";
-import { backfillChoice, backfillPrices } from "./utils/backfill.js";
+import {
+  backfillChoice,
+  backfillPrices,
+  takeBackfillSettings,
+} from "./utils/backfill.js";
 import { logv } from "./utils/log.js";
 import { fileURLToPath } from "url";
-import { unlockProjectKeys } from "../../api-key-store/index.js";
+import { getApiKey, unlockProjectKeys } from "../../api-key-store/index.js";
+import { goOnWithoutCoinPaprika } from "./utils/coinpaprika-key.js";
 
 import { DateTime } from "luxon";
 
-import { parseArgs } from "./commander.js";
+import { parseCommandLine } from "./commander.js";
 
 /**
  * Parses the command line, whose check of `--token` reads the token list,
@@ -351,26 +362,30 @@ import { parseArgs } from "./commander.js";
  * an option end the run as commander ends it, before the settings are
  * read. A problem of the token list or of a settings file, each checked
  * against its JSON Schema, ends the run with exit code 1, every problem
- * printed as one error.
+ * printed as one error, as does a backfill flag typed against the other's
+ * setting, or the two settings both true (`takeBackfillSettings`).
  *
  * @returns {{args: Object, config: Object}} The options and the settings
  */
 function optionsAndSettings() {
   try {
-    const args = parseArgs();
+    const command = parseCommandLine();
     const config = loadConfig();
+    takeBackfillSettings(command, config);
     checkExchangeSettings();
-    return { args, config };
+    return { args: command.opts(), config };
   } catch (error) {
     console.error(`Error: ${error.message}`);
     process.exit(1);
   }
 }
 
-// A run ends with exit code 1 until its file is written, so one that
-// stops early, as when the program reading its log stops reading and
-// lib/closed-output.js ends it with the code set so far, never ends
-// with the 0 of a file written.
+/*-
+ *  A run ends with exit code 1 until its file is written, so one that
+ *  stops early, as when the program reading its log stops reading and
+ *  lib/closed-output.js ends it with the code set so far, never ends
+ *  with the 0 of a file written.
+ */
 process.exitCode = 1;
 
 const { args, config } = optionsAndSettings();
@@ -494,6 +509,23 @@ try {
   });
 } catch (error) {
   console.error(error.message);
+  process.exit(1);
+}
+
+/*-
+ *  Without a CoinPaprika key, CoinPaprika gives no high or low: say so,
+ *  and ask whether to go on without its prices (utils/coinpaprika-key.js).
+ */
+const goOn = await goOnWithoutCoinPaprika(
+  {
+    mode,
+    coinpaprikaId: loadTokenConfig(token).coinpaprikaId,
+    keySaved: getApiKey("coinpaprika") !== null,
+  },
+  { input: process.stdin, output: process.stderr },
+);
+if (!goOn) {
+  console.error("Stopped before any price was asked for.");
   process.exit(1);
 }
 

@@ -413,16 +413,14 @@ describe("crypto-price-fetchers.js, the command line", () => {
     );
   });
 
-  it("refuses a config file named on purpose that is missing", async () => {
-    const result = await run([
-      "price",
-      "ether",
-      TOKEN,
-      "--config",
-      path.join(folder, "missing.json"),
-    ]);
+  it("refuses a config file named on purpose that is missing, naming --config", async () => {
+    const missing = path.join(folder, "missing.json");
+    const result = await run(["price", "ether", TOKEN, "--config", missing]);
     assert.equal(result.exitCode, 1);
-    assert.match(result.stderr, /Cannot read \S*missing\.json: /);
+    assert.equal(
+      result.stderr,
+      `error: option '-c, --config <file>' argument '${missing}' is invalid. No file is at ${missing}.\n`,
+    );
   });
 
   it("refuses a config file that sets a field the script reads as it loads, naming it, before it asks anything", async () => {

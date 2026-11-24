@@ -392,7 +392,7 @@ describe("utils/backfill", () => {
 });
 
 describe("backfillChoice", () => {
-  it("turns a mode on when its flag is given or config.json's setting is true", () => {
+  it("takes the flags given, when either is, and else config.json's settings", () => {
     const none = { BACKFILL_HIGHEST: false, BACKFILL_LOWEST: false };
     expect(backfillChoice({}, none)).toEqual({ highest: false, lowest: false });
     expect(backfillChoice({ backfillHighest: true }, none)).toEqual({
@@ -405,7 +405,7 @@ describe("backfillChoice", () => {
     });
     expect(
       backfillChoice({ backfillLowest: true }, { BACKFILL_HIGHEST: true }),
-    ).toEqual({ highest: true, lowest: true });
+    ).toEqual({ highest: false, lowest: true });
   });
 
   it("takes only true as on, from a flag or a setting", () => {

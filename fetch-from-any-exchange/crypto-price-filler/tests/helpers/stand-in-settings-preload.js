@@ -1,7 +1,8 @@
 /**
- * Preload that lets a test run the Node tool's real command line,
- * `bin/end-user/crypto-price-filler.js`, which loads `index.js`, in a child process
- * with a settings file or a token list of the test's own.
+ * Preload that lets a test run the Node tool's real command lines,
+ * `bin/end-user/crypto-price-filler.js`, which loads `index.js`, and
+ * `bin/end-user/backfill.js`, in a child process with a settings file or a token
+ * list of the test's own.
  * @module tests/helpers/stand-in-settings-preload
  *
  * The tool reads `config.json`, the owner's own settings, and

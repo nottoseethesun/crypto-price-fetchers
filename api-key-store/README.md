@@ -43,12 +43,11 @@ each key, and saves it encrypted once its service takes it:
 
 ## Run
 
-A project that uses the store has two programs of it, which run from the
-project's top folder: the key manager, which saves the keys, and
-`unlock-api-keys.sh`, which keeps the password for a terminal
-([Using it in another project](#using-it-in-another-project) adds them).
-Each sub-section below covers one: first an example of how to run it, then
-what it does, and, under its Usage, more examples.
+A project that uses the store runs one program of it, from the
+project's top folder: the key manager, which saves the keys
+([Using it in another project](#using-it-in-another-project) adds it).
+The sub-section below gives first an example of how to run it, then what
+it does, and, under its Usage, more examples.
 
 ### manage-api-keys.js
 
@@ -68,43 +67,10 @@ here DexTools':
 npm run api-keys -- set dextools
 ```
 
-Whether the password kept for the terminal opens every saved key, by its
-exit code, 0 when it does:
+Whether the password in `API_KEYS_PASSWORD` opens every saved key, by
+its exit code, 0 when it does:
 
 ```bash
-npm run api-keys -- check-password
-```
-
-### unlock-api-keys.sh
-
-```bash
-source ./bin/unlock-api-keys.sh
-```
-
-This asks for the password once, and keeps it for the terminal in the
-environment variable `API_KEYS_PASSWORD`. Without it, each program asks
-for the password as it starts, which is slow when several programs run in
-turn. A copy of `unlock-api-keys.sh` is in each project's `bin/` folder.
-It checks that the password opens the keys saved before it keeps it;
-while no key is saved, any password passes, and the first key saved is
-saved with it. The project's programs then open their keys with it,
-without asking, and the key manager saves new keys with it. Closing the
-terminal forgets the password, as does `unset API_KEYS_PASSWORD`. With one
-password for every project, one unlock serves them all.
-
-#### Usage of unlock-api-keys.sh
-
-The same from any other folder, by the script's path:
-
-```bash
-source /path/to/the/project/bin/unlock-api-keys.sh
-```
-
-The password kept, then checked by the key manager, which asks for
-nothing:
-
-```bash
-source ./bin/unlock-api-keys.sh
 npm run api-keys -- check-password
 ```
 
@@ -152,8 +118,9 @@ its own key manager and programs:
    it, and add `api-keys.json` and `api-keys.json.tmp` to its
    `.gitignore`. The services known are in `services.js`, each with the
    check that asks it whether it takes a key.
-3. Add the key manager, `manage-api-keys.js`, in the project's `bin/`
-   folder, with an npm script `"api-keys": "node bin/manage-api-keys.js"`:
+3. Add the key manager, `manage-api-keys.js`, in the project's
+   `bin/end-user/` folder, with an npm script
+   `"api-keys": "node bin/end-user/manage-api-keys.js"`:
 
    ```js
    import { fileURLToPath } from "node:url";
@@ -163,16 +130,11 @@ its own key manager and programs:
    endQuietlyWhenOutputCloses();
 
    process.exitCode = await runKeyManager(process.argv, {
-     projectTop: fileURLToPath(new URL("..", import.meta.url)),
+     projectTop: fileURLToPath(new URL("../..", import.meta.url)),
    });
    ```
 
-4. Copy `bin/unlock-api-keys.sh` from this repo into the project's
-   `bin/` folder, and test that the copy matches. The script finds the
-   project's top folder as the one above its own, and runs the key
-   manager there: `bin/end-user/manage-api-keys.js`, where this repo keeps
-   its own, or else `bin/manage-api-keys.js`.
-5. As a program starts, open the keys it uses:
+4. As a program starts, open the keys it uses:
 
    ```js
    import { unlockProjectKeys } from "crypto-price-fetchers/api-key-store";
@@ -186,5 +148,4 @@ the run with an error whose `keyRefused` is true and whose message says
 what to do.
 
 The tests are in `../test/api-key-store.test.js`,
-`../test/key-prompts.test.js`, `../test/key-manager.test.js` and
-`../test/unlock-api-keys.test.js`.
+`../test/key-prompts.test.js` and `../test/key-manager.test.js`.

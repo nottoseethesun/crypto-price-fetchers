@@ -228,7 +228,7 @@ describe("openCentralizedExchangePrices", () => {
       () => null,
       async (prices) => {
         assert.equal(
-          await prices.getCryptoPrice("xtm", ROW_TIME, "UTC", "high"),
+          await prices.getCryptoPrice("xtm", ROW_TIME, "UTC", "close"),
           "No data available from any source",
         );
       },
@@ -432,11 +432,14 @@ describe("getCryptoPriceFromCentralizedExchange.js, the command line", () => {
   });
 
   it("prints the script's message on stderr when there is no price, with exit code 1", async () => {
-    assert.deepEqual(printed(await run(["xtm", ROW_TIME], () => null)), {
-      exitCode: 1,
-      stdout: "",
-      stderr: "No data available from any source\n",
-    });
+    assert.deepEqual(
+      printed(await run(["xtm", ROW_TIME, "--mode", "close"], () => null)),
+      {
+        exitCode: 1,
+        stdout: "",
+        stderr: "No data available from any source\n",
+      },
+    );
   });
 
   it("asks for the password of the saved CoinGecko key, has CoinGecko check it, and sends it", async () => {

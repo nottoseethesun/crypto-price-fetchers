@@ -326,10 +326,28 @@ describe("the command line", () => {
   });
 
   it("refuses a run without an option it needs", () => {
-    const run = runWith(["--rows", "rows.json", "--template", "t.csv"]);
+    const paths = rowsFile([]);
+    const run = runWith(["--rows", paths.rows, "--template", paths.rows]);
 
     assert.equal(run.exitCode, 1);
     assert.match(run.stderr, /required option '--out <file>' not specified/);
+  });
+
+  it("refuses a --rows or a --template at which no file is, naming the option, writing nothing", () => {
+    const paths = rowsFile([]);
+    const missing = path.join(path.dirname(paths.rows), "no-such-file.json");
+    for (const [option, args] of [
+      ["--rows", ["--rows", missing, "--template", paths.rows]],
+      ["--template", ["--rows", paths.rows, "--template", missing]],
+    ]) {
+      const run = runWith([...args, "--out", paths.out]);
+      assert.equal(run.exitCode, 1);
+      assert.equal(
+        run.stderr,
+        `error: option '${option} <file>' argument '${missing}' is invalid. No file is at ${missing}.\n`,
+      );
+      assert.equal(fs.existsSync(paths.out), false);
+    }
   });
 
   it("gives its help, with the keys of a row, and exit code 0", () => {

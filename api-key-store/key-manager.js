@@ -28,12 +28,11 @@
  *   prompts and messages to stderr. A key not saved, a password that opens
  *   nothing, or a mistake in the arguments ends with exit code 1.
  *
- * Fit: a project's `bin/manage-api-keys.js`, in this repo
- * `bin/end-user/manage-api-keys.js`, runs `runKeyManager` with its top
- * folder.
+ * Fit: a project's `bin/end-user/manage-api-keys.js`, this repo's among
+ * them, runs `runKeyManager` with its top folder.
  */
 
-import { Command, CommanderError } from "commander";
+import { Command, CommanderError, InvalidArgumentError } from "commander";
 import { messageOf } from "../lib/message-of.js";
 import { openSecretPrompt } from "./ask-password.js";
 import { checkPasswordOpensKeys, hasEncryptedKey } from "./key-file.js";
@@ -186,17 +185,28 @@ function listAndAsk(run) {
  * @param {string} name - The service, as `config.json` lists it
  * @returns {Promise<number>} The exit code
  */
-function setOne(run, name) {
+function setOne(run, service) {
+  return enterKeys(run, [service]);
+}
+
+/**
+ * Reads the service `set` names, as commander parses it: one the project's
+ * config.json lists under apiKeys.
+ *
+ * @param {Object} run - The run (`runKeyManager`)
+ * @param {string} name - The service, as typed
+ * @returns {Object} The service, as the project's config.json lists it
+ * @throws {InvalidArgumentError} When config.json lists no such service
+ */
+function serviceArgument(run, name) {
   const service = readNeededKeys(run.projectTop, run.known).find(
     (listed) => listed.service === name,
   );
-  if (service === undefined) {
-    run.io.stderr.write(
-      `The project's ${PROJECT_CONFIG_FILE} lists no service ${JSON.stringify(name)} under apiKeys.\n`,
+  if (service === undefined)
+    throw new InvalidArgumentError(
+      `The project's ${PROJECT_CONFIG_FILE} lists no service ${JSON.stringify(name)} under apiKeys.`,
     );
-    return 1;
-  }
-  return enterKeys(run, [service]);
+  return service;
 }
 
 /**
@@ -288,11 +298,12 @@ export async function runKeyManager(argv, project, deps = {}) {
     .argument(
       "<service>",
       `the service, as ${PROJECT_CONFIG_FILE} names it under apiKeys`,
+      (name) => serviceArgument(run, name),
     )
     .addHelpText("after", SET_HELP_AFTER)
     .allowExcessArguments(false)
-    .action(async (name) => {
-      exitCode = await setOne(run, name);
+    .action(async (service) => {
+      exitCode = await setOne(run, service);
     });
   program
     .command("check-password")

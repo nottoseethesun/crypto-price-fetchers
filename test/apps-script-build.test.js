@@ -401,6 +401,26 @@ describe("npm run build apps-script, on a desktop with a clipboard tool", () => 
     }
   });
 
+  it("refuses a LOCK_WAIT_MS above 20000, which would leave a sheet's call less than 10 of Google's 30 seconds for its request", async () => {
+    const configFile = scripts[0].defaultConfigFile;
+    fs.writeFileSync(
+      configFile,
+      JSON.stringify({ DEXTOOLS_CONFIG: { LOCK_WAIT_MS: 20001 } }),
+    );
+    try {
+      const result = await build(["apps-script"]);
+      assert.equal(result.exitCode, 1);
+      assert.ok(
+        result.stderr.includes(
+          `${configFile} → DEXTOOLS_CONFIG.LOCK_WAIT_MS must be a whole number of milliseconds from 0 to 20000; it is 20001`,
+        ),
+      );
+      assert.deepEqual(result.copies, []);
+    } finally {
+      fs.rmSync(configFile);
+    }
+  });
+
   it("refuses an argument after apps-script, since every script goes in the one file", async () => {
     const result = await build(["apps-script", "crypto-price-fetchers"]);
     assert.equal(result.exitCode, 1);
