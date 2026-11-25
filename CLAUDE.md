@@ -507,11 +507,11 @@ functions inside the scripts that the owner runs by hand. crypto-price-filler's
 
 ## Known bugs
 
-None is known. A bug found gets a test in crypto-price-filler's
+A bug found gets a test in crypto-price-filler's
 `tests/known-bugs.test.js`, declared with `it.fails`, so it passes while the
-bug is present, and a row here, in a table of the bug and its test's name;
-the file and the table go with the last test and row, since vitest fails a
-test file that holds no test. A bug's fix makes its test fail; the same
+bug is present, and a row in the table below, of the bug and its test's
+name; the file and the table go with the last test and row, since vitest
+fails a test file that holds no test. A bug's fix makes its test fail; the same
 change declares the test with `it`, moves it to the tests that guard the
 fixed bugs of its area, and removes the row:
 
@@ -530,3 +530,17 @@ fixed bugs of its area, and removes the row:
   current-price script, or the menu with it, in the test's thread;
 - `tests/regressions.test.js`: any other; it also holds older tests that
   run the exchange script in the test's thread.
+
+| Bug | Test in `tests/known-bugs.test.js` |
+| --- | --- |
+| The exchange script prices a time from MEXC's candle of a minute not yet over, whose prices can still change. | getCryptoPrice gives no price from the minute not yet over, and says when to ask again |
+| When nothing traded in a time's minute, MEXC's climb takes a larger window not yet over, such as the hour that holds the present. | getPriceFromMEXC gives no price from the hour not yet over, for a minute in which nothing traded |
+| The exchange script's `getPriceFromMEXC`, which crypto-price-filler calls, prices a time from MEXC's candle of the minute not yet over. | getPriceFromMEXC gives no price from the minute not yet over, as crypto-price-filler asks it |
+| When MEXC gives no candle of a time's minute, the exchange script prices the time from the hour not yet over. | getPriceFromMEXC gives no price from the hour not yet over, when MEXC gives no candle of the minute |
+| crypto-price-filler's GeckoTerminal source prices a time from the candle of the minute not yet over. | gives no price from the minute not yet over |
+| When nothing traded in a time's minute, crypto-price-filler's GeckoTerminal source prices the time from the candle of the hour not yet over. | gives no price from the hour not yet over, for a minute in which nothing traded |
+| CoinGecko's price of a day for close, taken when its hourly prices are empty, is its price at 00:00 UTC that opens the time's day. | is its price at 00:00 UTC the next day, which ends the day |
+| CoinGecko's price of a day for close is asked whenever its hourly prices are empty, before CoinGecko serves the price that ends the day, from 00:50 UTC the next day. | asks CoinGecko nothing before 00:50 UTC the next day, when it serves the price that ends the day |
+| The exchange script keeps no cell's message that CoinPaprika needs a key, so asking again asks MEXC again. | is kept for the cell, as no data is, so asking again asks nothing |
+| crypto-price-filler loses an answer to its CoinPaprika question piped in after the key store's password, and stops. | takes an answer piped in after the key store's password |
+| `no-secret-logging` passes a key printed through `+=`, `\|\|=` or `??=`, or written as a template literal. | refuses a key printed through an assignment that adds to it or defaults it, or a key written as a template literal |
