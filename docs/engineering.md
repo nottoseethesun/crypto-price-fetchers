@@ -17,6 +17,8 @@ into Summ, the crypto tax calculator he keeps his books in.
 For how the parts fit, see [`docs/architecture.md`](architecture.md); for
 how each tool decides which price to give, see
 [`docs/price-determination-rules.md`](price-determination-rules.md); for
+the documentation audit every doc passes, see
+[`docs/claude/CLAUDE-DOC-AUDIT.md`](claude/CLAUDE-DOC-AUDIT.md); for
 every command, those the repo's `package.json` gives npm, Node's package
 manager, to run and those run with `node` or `source`, see
 [`docs/project-commands.md`](project-commands.md).

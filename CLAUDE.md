@@ -315,6 +315,10 @@ bin, a script, a package or an outside service. Its introduction starts
 from the big picture, gives a few words of context or a scenario where the
 tool is used, says which codebase it comes from, and says what it does in
 precise words.
+[`docs/claude/CLAUDE-DOC-AUDIT.md`](docs/claude/CLAUDE-DOC-AUDIT.md)
+gives the audit in full: each rule with examples, how to check a doc
+and its JSDoc against the code, how to write a fix, and the loop of
+fresh readers that checks an audit before its fixes are made.
 
 ## Command lines
 

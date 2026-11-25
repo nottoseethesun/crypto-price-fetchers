@@ -1099,11 +1099,13 @@ his rules on addresses and docs, with
 
 ### Architecture and Engineering References
 
-The `docs/` folder holds four references:
+The `docs/` folder holds five references:
 
 - [`docs/architecture.md`](docs/architecture.md): how the parts fit.
 - [`docs/price-determination-rules.md`](docs/price-determination-rules.md):
   how each tool decides which price to give, and when it gives none.
+- [`docs/claude/CLAUDE-DOC-AUDIT.md`](docs/claude/CLAUDE-DOC-AUDIT.md):
+  the documentation audit every doc and JSDoc block passes, in full.
 - [`docs/engineering.md`](docs/engineering.md): the files, the gates, the
   tests and CI: the checks GitHub runs, through its GitHub Actions
   service, on each pull request and each push to `main`.
