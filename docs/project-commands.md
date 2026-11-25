@@ -224,7 +224,7 @@ liquidity positions, whose merge protocol the last link below gives.
 - [Which version they install](architecture.md#which-version-they-install)
   — what that bin does.
 - [`docs/engineering.md`](engineering.md) — the gates, the tests and CI,
-  the checks GitHub Actions runs at each push.
+  the checks GitHub Actions runs on each pull request and each push to `main`.
 - [`docs/architecture.md`](architecture.md) — how the parts fit.
 - [LP Ranger's `docs/claude/CLAUDE-CI.md`](https://github.com/nottoseethesun/lp-ranger/blob/main/docs/claude/CLAUDE-CI.md)
   — the merge protocol these gates feed.

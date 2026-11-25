@@ -123,7 +123,7 @@ export function setupCommander() {
     .requiredOption(
       "--input <path>",
       "Path to input CSV file, with a column of dates written yyyy-MM-dd HH:mm:ss and read in --tz: " +
-        'the first whose name holds "date" and "UTC", or else the first whose name holds "date" (required)',
+        'the first whose name holds "date", in any letter case, and "UTC", or else the first whose name holds "date" (required)',
     )
 
     // Optional options with defaults

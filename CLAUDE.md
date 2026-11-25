@@ -299,8 +299,9 @@ checks, never as development packages, which it skips.
 `docs/price-determination-rules.md` how each tool decides which price
 to give, `docs/engineering.md`
 covers the files, the programs in `bin/` the README leaves out, the gates,
-the tests and CI (the gates, run at each push by GitHub Actions, GitHub's
-service that runs a repo's workflows), and
+the tests and CI (the gates, run by GitHub Actions, GitHub's service
+that runs a repo's workflows, on each pull request to `main`, each push
+to `main`, and on request), and
 `docs/project-commands.md` lists every command, those npm runs and those
 run with `node` or `source`, as LP Ranger's `docs/` does. A change keeps
 them true.
@@ -429,10 +430,10 @@ tracked files (`test/repo-checks.test.js`) are tested from the repo's top
 folder, on Node's own test runner. The tracked files are held to the
 checks of `lib/repo-checks.js`: every EVM address in EIP-55's form, every
 npm target named in `docs/project-commands.md`, every test file and
-helper named in `docs/engineering.md` or here, every link in a doc, and
-every path in a code span that starts at the doc's own folder, with `.`
-or `..` as its first part, pointing at a file, folder or heading the repo
-keeps, and a
+helper named in `docs/engineering.md` or here, every link in a doc
+pointing at a file, folder or heading the repo keeps, and every path in
+a code span that starts at the doc's own folder, with `.` or `..` as its
+first part, at a file or folder it keeps, and a
 `config-example.json` beside every `config.json`. The menu runs against a
 spreadsheet held in memory
 (`test/helpers/stand-in-spreadsheet.js`), and DEX Screener's part is
@@ -513,16 +514,18 @@ functions inside the scripts that the owner runs by hand. crypto-price-filler's
 
 ## Known bugs
 
-A bug found gets a test in crypto-price-filler's
+None is known. A bug found gets a test in crypto-price-filler's
 `tests/known-bugs.test.js`, declared with `it.fails`, so it passes while the
-bug is present, and a row in the table below, of the bug and its test's
-name; the file and the table go with the last test and row, since vitest
-fails a test file that holds no test. A bug's fix makes its test fail; the same
+bug is present, and a row here, in a table of the bug and its test's name;
+the file and the table go with the last test and row, since vitest fails a
+test file that holds no test. A bug's fix makes its test fail; the same
 change declares the test with `it`, moves it to the tests that guard the
 fixed bugs of its area, and removes the row:
 
-- `tests/regressions-command-line.test.js`: crypto-price-filler's two
-  command lines;
+- `tests/regressions-command-line.test.js`: crypto-price-filler's command
+  line, `index.js`, and what it shares with backfill's;
+- `tests/regressions-backfill.test.js`: backfill's command line,
+  `backfill.js`;
 - `tests/regressions-other-command-lines.test.js`: the repo's other
   command lines, the Node versions', summ-csv's, the key manager's and
   `bin/unlock-api-keys.sh`;
@@ -538,9 +541,3 @@ fixed bugs of its area, and removes the row:
   current-price script, or the menu with it, in the test's thread;
 - `tests/regressions.test.js`: any other; it also holds older tests that
   run the exchange script in the test's thread.
-
-| Bug | Test in `tests/known-bugs.test.js` |
-| --- | --- |
-| `getCryptoPrice` calls its token's `toLowerCase` unchecked, so a cell whose token is a number, a true or false, or missing shows `#ERROR!`. | gives a message, not an error, when the token is not text |
-| `localReferencesMissing` (`lib/repo-checks.js`) reads link syntax inside a code span, which Markdown shows as code, as a link, and refuses its target. | takes no link from a code span, which Markdown shows as code |
-| crypto-price-filler's first rule for its date column asks for `date` in lower case, so of the columns `Date (local)` and `Date (UTC)` it reads `Date (local)`. | is the first whose name holds "date", in any letter case, and "UTC", before an earlier column of dates |

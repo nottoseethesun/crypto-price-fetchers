@@ -24,6 +24,7 @@ import { PassThrough } from "stream";
 import { askLine } from "../../../lib/ask-line.js";
 import { askPassword, openSecretPrompt } from "../../../api-key-store/index.js";
 import { filesUsingCommander } from "../../../lib/command-line-help.js";
+import { localReferencesMissing } from "../../../lib/repo-checks.js";
 import { fetchWithinTimeLimit } from "../../../lib/time-limited-fetch.js";
 import {
   compileSettingsSchema,
@@ -242,5 +243,24 @@ describe("answers piped in together", () => {
     expect(await password).toBe("Stopped at the prompt");
     input.end("y\n");
     expect(await askLine("Go on? ", streams)).toBe("y");
+  });
+});
+
+describe("the link check of lib/repo-checks.js", () => {
+  it("takes no link from a code span, which Markdown shows as code", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "code-span-link-"));
+    try {
+      fs.writeFileSync(
+        path.join(dir, "README.md"),
+        "# A repo\n\nA link is written as `[text](target)`, and [this one](missing.md) points nowhere.\n",
+      );
+      spawnSync("git", ["init", "-q"], { cwd: dir });
+      spawnSync("git", ["add", "README.md"], { cwd: dir });
+      expect(localReferencesMissing(dir).map(({ pointer }) => pointer)).toEqual(
+        ["missing.md"],
+      );
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

@@ -462,7 +462,7 @@ rows
   );
 
 const dateColName =
-  headers.find((h) => h.includes("date") && h.includes("UTC")) ??
+  headers.find((h) => h.toLowerCase().includes("date") && h.includes("UTC")) ??
   headers.find((h) => h.toLowerCase().includes("date"));
 logv(verbose, 1, `Searching for date column in headers: ${headers.join(", ")}`);
 if (!dateColName) {

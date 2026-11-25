@@ -7,7 +7,7 @@
  *   high, low or close, for use directly in Google Sheets, Google's
  *   spreadsheet app.
  * @author Christopher M. Balz, with Grok and Claude
- * @version 2.19.0
+ * @version 2.19.1
  * @lastModified November 25, 2026
  *
  * OVERVIEW
@@ -138,7 +138,7 @@
  *
  * A past price does not change, so Refresh & freeze historical prices, in
  * the Crypto Price Fetchers menu, can replace a tab's `getCryptoPrice`
- * formulas with their numbers, with two exceptions. CoinGecko says it may revise a price for
+ * formulas with their numbers, with these exceptions. CoinGecko says it may revise a price for
  * up to 2 days after its date, as later data settles, and a price for a
  * time can come from CoinGecko's prices of the next UTC day, which can
  * change until the end of the second day after that one, when the fourth
@@ -157,6 +157,10 @@
  * and the week are over. A cell keeps the price it gave for up to
  * 6 hours, so freeze such a cell only once that period and the week have
  * been over 6 hours.
+ * MEXC keeps its minute candles for about 30 days. A price it gave from
+ * them, or as the hour's average because nothing traded in the minute,
+ * can change once MEXC lets them go, so freeze such a cell within about
+ * 30 days of its time.
  *
  * ### Time zones
  *
@@ -202,6 +206,8 @@
  *   or when Apps Script's daily quota of requests is spent; choose Clean
  *   up errors in the Crypto Price Fetchers menu, which runs the cell
  *   again.
+ * - `Invalid token: …`: give `token` as text, the coin's symbol, such
+ *   as "btc".
  * - `Unknown time zone`, or `Invalid` with a part of the date: check
  *   `tz` or `dateStr`.
  * - `#ERROR!`: choose Clean up errors in the Crypto Price Fetchers menu.
@@ -544,6 +550,15 @@ function waitInCall(milliseconds) {
 const EXCHANGE_BUSY_MESSAGE = "Rate limit busy - retry later";
 
 /**
+ * What a cell shows when it names no token as text: a number, a true or
+ * false, an empty cell or none at all, none of which names a coin.
+ *
+ * @type {string}
+ */
+const INVALID_TOKEN_MESSAGE =
+  'Invalid token: give the coin\'s symbol as text, such as "btc"';
+
+/**
  * What a cell shows when no earlier source has a price and CoinPaprika,
  * without a key, can give no average, high or low (`coinPaprikaCanGive`).
  *
@@ -651,6 +666,8 @@ function cryptoPriceInCall(token, dateStr, tz, mode, apiDelayMs) {
     `getCryptoPrice called: token=${token}, date=${dateStr}, tz=${tz}, mode=${mode}, delay=${apiDelayMs}ms`,
   );
 
+  if (typeof token !== "string" || token.trim() === "")
+    return INVALID_TOKEN_MESSAGE;
   token = token.toLowerCase();
   const target = priceTarget(mode);
 

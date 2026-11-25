@@ -7,7 +7,8 @@
  * which finds the project's folder whatever `CDPATH` lists or the shell's
  * `cd` or `pwd` prints, answers `--help`, and returns 1 when it keeps no
  * password.
- * crypto-price-filler's are in `regressions-command-line.test.js`, and
+ * crypto-price-filler's are in `regressions-command-line.test.js` and
+ * `regressions-backfill.test.js`, and
  * the repo's CLAUDE.md lists the other files of fixed bugs' tests; a bug
  * found later gets its test in `known-bugs.test.js`, declared with
  * `it.fails` while the bug is there, and its fix moves the test to one of
