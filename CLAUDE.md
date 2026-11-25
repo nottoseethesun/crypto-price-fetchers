@@ -295,7 +295,9 @@ checks, never as development packages, which it skips.
 
 ## Docs
 
-`docs/architecture.md` says how the parts fit, `docs/engineering.md`
+`docs/architecture.md` says how the parts fit,
+`docs/price-determination-rules.md` how each tool decides which price
+to give, `docs/engineering.md`
 covers the files, the programs in `bin/` the README leaves out, the gates,
 the tests and CI (the gates, run at each push by GitHub Actions, GitHub's
 service that runs a repo's workflows), and
