@@ -44,6 +44,9 @@ Node runs it. The
 Node version runs the same `.gs` file, unchanged, so the two give the same
 answers, and a fix to the script is a fix to both
 ([Node Versions of the Sheets Scripts](#node-versions-of-the-sheets-scripts)).
+How each of them decides which price to give, and when it gives
+none, is in
+[`docs/price-determination-rules.md`](docs/price-determination-rules.md).
 
 The repo also holds code that the other projects of its owner,
 nottoseethesun on GitHub, the website that hosts the repos, install from
@@ -1091,9 +1094,11 @@ his rules on addresses and docs, with
 
 ### Architecture and Engineering References
 
-The `docs/` folder holds three references:
+The `docs/` folder holds four references:
 
 - [`docs/architecture.md`](docs/architecture.md): how the parts fit.
+- [`docs/price-determination-rules.md`](docs/price-determination-rules.md):
+  how each tool decides which price to give, and when it gives none.
 - [`docs/engineering.md`](docs/engineering.md): the files, the gates, the
   tests and CI: the checks GitHub runs, through its GitHub Actions
   service, at each push.
