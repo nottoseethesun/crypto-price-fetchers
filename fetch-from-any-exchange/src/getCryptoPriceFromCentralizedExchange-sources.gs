@@ -28,7 +28,7 @@
  */
 
 // Declared in getCryptoPriceFromCentralizedExchange.gs, in the same project:
-/* global CONFIG, CALL, callHasTimeFor, getCachedResult, setCachedResult, waitInCall */
+/* global CONFIG, CALL, callHasTimeFor, getCachedResult, setCachedResult, waitInCall, mexcWindowOver, coinGeckoWindowEndMs, coinGeckoServesDayEnd, coinPaprikaDayEndMs, coinPaprikaCanGive */
 
 /** ============================================================================
  *                          REQUESTS
@@ -156,12 +156,12 @@ const MEXC_WINDOWS = Object.freeze([
  * @param {string} token - The token's symbol, such as "btc"
  * @param {number} utcMs - The time, in ms since 1970 UTC
  * @param {string} target - The price to give: "average", "high", "low" or "close"
- * @returns {?number} The price in USD, or null when MEXC lists no pair for the token, keeps no candle that can price the time (as before it listed the pair), or nothing traded in the year that holds the time
+ * @returns {?number} The price in USD, or null when MEXC lists no pair for the token, keeps no candle that can price the time (as before it listed the pair), the window that would price it is not over, or nothing traded in the year that holds the time
  */
 function getPriceFromMEXC(token, utcMs, target) {
   Logger.log(`Trying MEXC for ${token}`);
 
-  if (new Set(["grc"]).has(token.toLowerCase())) {
+  if (mexcSkips(token)) {
     Logger.log(`Skipping MEXC for known missing token: ${token}`);
     return null;
   }
@@ -191,6 +191,17 @@ function getPriceFromMEXC(token, utcMs, target) {
   }
   Logger.log(`MEXC final price: ${price} (${target}, ${found.window.name})`);
   return price;
+}
+
+/**
+ * Whether the script asks MEXC nothing for a token: GridCoin, which MEXC
+ * does not list.
+ *
+ * @param {string} token - The token's symbol, such as "btc"
+ * @returns {boolean} Whether MEXC is skipped for it
+ */
+function mexcSkips(token) {
+  return new Set(["grc"]).has(token.toLowerCase());
 }
 
 /** Fetches MEXC exchange symbols list */
@@ -235,7 +246,9 @@ function findMEXCTradingPair(token, symbols) {
  * script goes up one window at a time, to the year, and the first in which
  * something traded gives the average of its high and low, whatever the
  * target. MEXC gives a candle for every period it keeps, one in which
- * nothing traded with volume 0.
+ * nothing traded with volume 0. A window not yet over holds only the
+ * trades made so far, so its prices can still change: the script asks for
+ * none (mexcWindowOver), and MEXC gives no price.
  * The larger windows may hold only trades from after the time when the
  * time comes before the pair's first trade, which happens only on the day
  * MEXC listed the pair, or before it; a candle of the day before shows the
@@ -256,7 +269,7 @@ function findMEXCTradingPair(token, symbols) {
  * @param {string} symbol - The MEXC pair, such as XTMUSDT
  * @param {number} utcMs - The time, in ms since 1970 UTC
  * @param {string} target - The price to give: "average", "high", "low" or "close"
- * @return {?{window: Object, averaged: boolean, price: number}} The price, its window, and whether it is the average of the window's high and low; or null when the script asks for the day before, as above, and MEXC gives no candle of it or fails the request, or MEXC gives no candle of the day that holds the time, or nothing traded in the year that holds it
+ * @return {?{window: Object, averaged: boolean, price: number}} The price, its window, and whether it is the average of the window's high and low; or null when the script asks for the day before, as above, and MEXC gives no candle of it or fails the request, or MEXC gives no candle of the day that holds the time, the window it would ask for is not over, or nothing traded in the year that holds it
  */
 function mexcPairPrice(symbol, utcMs, target) {
   let dayBefore;
@@ -275,11 +288,13 @@ function mexcPairPrice(symbol, utcMs, target) {
     return null;
   };
   let level = 0;
+  if (!mexcWindowOver(MEXC_WINDOWS[0], utcMs)) return null;
   let candle = fetchWindowCandle(symbol, MEXC_WINDOWS[0], utcMs);
   if (candle === null) {
     if (Date.now() - utcMs <= MEXC_MINUTES_KEPT_MS && keptDayBefore() !== true)
       return noPriceFor("minute");
     level = 1;
+    if (!mexcWindowOver(MEXC_WINDOWS[1], utcMs)) return null;
     candle = fetchWindowCandle(symbol, MEXC_WINDOWS[1], utcMs);
   }
   if (candle !== null && candle.volume > 0) {
@@ -293,6 +308,7 @@ function mexcPairPrice(symbol, utcMs, target) {
   if (candle === null && keptDayBefore() !== true) return noPriceFor("hour");
   for (level += 1; level < MEXC_WINDOWS.length; level++) {
     const window = MEXC_WINDOWS[level];
+    if (!mexcWindowOver(window, utcMs)) return null;
     const candles = fetchWindowCandles(symbol, window, utcMs);
     candle = joinedCandle(candles);
     if (candle !== null && candle.volume > 0) {
@@ -447,8 +463,10 @@ function yearHolding(utcMs) {
 
 /**
  * A token's price at a time from CoinGecko: from its market chart over a
- * window centred on the time, or else, for close alone, from the day's
- * single price. Each answer is cached, and so is the lack of one, unless
+ * window centred on the time, or else, for close alone, from its single
+ * price of the next day, at 00:00 UTC, which ends the time's UTC day, once
+ * CoinGecko serves it (coinGeckoServesDayEnd). Each answer is cached, and
+ * so is the lack of one, unless
  * the request was cut short (CALL.cutRequests): a request with no answer,
  * or one not sent, is no sign that CoinGecko has none. While the window
  * is not over (`coinGeckoWindowEndMs`), it asks nothing and gives null,
@@ -457,7 +475,7 @@ function yearHolding(utcMs) {
  * @param {string} id - The token's CoinGecko id, such as "bitcoin"
  * @param {number} utcMs - The time, in ms since 1970 UTC
  * @param {string} target - The price to give: "average", "high", "low" or "close"
- * @returns {?number} The price in USD, or null when CoinGecko has none for the time and target, or the window around the time is not over yet
+ * @returns {?number} The price in USD, or null when CoinGecko has none for the time and target, the window around the time is not over yet, or, for close from the next day's price, CoinGecko does not serve that price yet
  */
 function getPriceFromCoinGecko(id, utcMs, target) {
   Logger.log(`Trying CoinGecko for ${id} at ${new Date(utcMs).toISOString()}`);
@@ -474,7 +492,8 @@ function getPriceFromCoinGecko(id, utcMs, target) {
    *  no effect, and releasing it here would end the caller's hold too.
    */
 
-  const dateStr = Utilities.formatDate(new Date(utcMs), "UTC", "dd-MM-yyyy");
+  const nextDay = new Date(utcMs + 86400000);
+  const dateStr = Utilities.formatDate(nextDay, "UTC", "dd-MM-yyyy");
 
   /*-
    *  1) Try market_chart/range with its own cache, kept for the time
@@ -499,9 +518,12 @@ function getPriceFromCoinGecko(id, utcMs, target) {
   }
 
   /*-
-   *  2) Fall back to the day's price (history) with its own cache. One
-   *  price is not a range, so it answers close only. Never the current
-   *  price (tickers): that would put today's price on a past date.
+   *  2) Fall back to a day's price (history) with its own cache: that of
+   *  the day after the time's, recorded at 00:00 UTC, which ends the
+   *  time's day, as a close does, so the date asked is the next day's, on
+   *  purpose. One price is not a range, so it answers close only. Never
+   *  the current price (tickers): that would put today's price on a past
+   *  date.
    */
   if (target !== "close") {
     Logger.log(
@@ -509,6 +531,7 @@ function getPriceFromCoinGecko(id, utcMs, target) {
     );
     return null;
   }
+  if (!coinGeckoServesDayEnd(utcMs)) return null;
   const dailyCacheKey = `gecko_daily_${id}_${dateStr}`;
   const dailyCached = getCachedResult(dailyCacheKey);
   if (typeof dailyCached === "number") return dailyCached;
@@ -524,18 +547,6 @@ function getPriceFromCoinGecko(id, utcMs, target) {
 
   keepNoData(dailyCacheKey, cutBeforeDay);
   return null;
-}
-
-/**
- * When CoinGecko's window for a time ends: 12 hours after the time, the
- * end of the 24 hours of hourly prices `tryCoinGeckoMarketChartRange`
- * asks for. Before then, a price from those hours could still change.
- *
- * @param {number} utcMs - The time, in ms since 1970 UTC
- * @returns {number} The window's end, in ms since 1970 UTC
- */
-function coinGeckoWindowEndMs(utcMs) {
-  return utcMs + 43200000;
 }
 
 /**
@@ -682,34 +693,6 @@ function coinGeckoHeaders() {
  */
 function coinPaprikaSkips(id) {
   return new Set(["grc-gridcoin"]).has(id);
-}
-
-/**
- * When CoinPaprika's day for a time ends: the midnight, UTC, after the
- * time, the end of the day whose candle `getPriceFromCoinPaprika` reads.
- * Before then, the day's candle can still change.
- *
- * @param {number} utcMs - The time, in ms since 1970 UTC
- * @returns {number} The day's end, in ms since 1970 UTC
- */
-function coinPaprikaDayEndMs(utcMs) {
-  return (Math.floor(utcMs / 86400000) + 1) * 86400000;
-}
-
-/**
- * Whether CoinPaprika can give a target: any with a key, which asks a paid
- * server, whose plans reach past days' candles; close alone without one,
- * from a day's price at 00:00 UTC, since the free server keeps a candle
- * only for the 24 hours after it begins, and so none of a day already
- * over.
- *
- * @param {string} target - The price to give: "average", "high", "low" or "close"
- * @returns {boolean} Whether it can
- */
-function coinPaprikaCanGive(target) {
-  return (
-    configuredKey(CONFIG.COINPAPRIKA_API_KEY) !== null || target === "close"
-  );
 }
 
 /**

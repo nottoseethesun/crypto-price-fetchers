@@ -147,7 +147,7 @@ them, after the lint, and must pass before a commit and a push.
 to Node's test runner: a test or hook still running after a minute
 fails, by name, and the rest of its file runs
 ([Tests](engineering.md#tests)). crypto-price-filler's tests run on vitest, which fails a
-test after 5 seconds.
+test after 5 seconds, unless the test gives its own limit.
 
 ---
 

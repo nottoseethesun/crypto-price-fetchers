@@ -182,7 +182,7 @@ function listAndAsk(run) {
  * Asks for one key, in place of the one saved.
  *
  * @param {Object} run - The run (`runKeyManager`)
- * @param {string} name - The service, as `config.json` lists it
+ * @param {Object} service - The service, as `config.json` lists it
  * @returns {Promise<number>} The exit code
  */
 function setOne(run, service) {

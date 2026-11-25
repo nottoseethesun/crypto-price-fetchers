@@ -1,16 +1,17 @@
 /**
  * Tests that guard fixed bugs, each running the exchange script in the
  * test's thread. A fix moves its known-bug test here from
- * `known-bugs.test.js` when the test runs the exchange script that way;
- * the current-price script's and the menu's are in
- * `regressions-sheets-price-now.test.js` (see the repo's CLAUDE.md).
+ * `known-bugs.test.js` when the test runs the exchange script that way,
+ * save a test of the period a price comes from, which goes to
+ * `regressions-sheets-periods.test.js`; the current-price script's and the
+ * menu's are in `regressions-sheets-price-now.test.js` (see the repo's
+ * CLAUDE.md).
  * @module tests/regressions-sheets.test
  *
  * The exchange script runs unchanged in the test's thread, through
  * `tests/helpers/sheets-script.js`, against a stand-in MEXC, which answers
- * as MEXC does (`test/helpers/stand-in-mexc.js`), a stand-in CoinGecko, a
- * stand-in CoinPaprika, a stand-in clock for a day not yet over, and, for
- * the waits, a script lock that is never free.
+ * as MEXC does (`test/helpers/stand-in-mexc.js`), a stand-in CoinGecko
+ * and, for the waits, a script lock that is never free.
  */
 
 import { describe, it, expect } from "vitest";
@@ -26,9 +27,7 @@ import {
   ROW_UTC_MS,
   SHEETS_SCRIPT_PATH,
   answerCoinGeckoForPastDay,
-  answerPaprikaCandleOfTheDay,
   cellTime,
-  dateAt,
 } from "./helpers/regression-runs.js";
 import { mexcKlines } from "../../../test/helpers/stand-in-mexc.js";
 
@@ -419,131 +418,20 @@ describe("CoinGecko's hourly prices are kept for the time asked, not for its day
   });
 });
 
-describe("the exchange script, for a time less than 12 hours ago", () => {
-  it("gives no CoinGecko price from a window that is not over, saying when to ask again, once CoinGecko shows it prices the coin", () => {
+describe("the message that CoinPaprika needs a key", () => {
+  it("is kept for the cell, as no data is, so asking again asks nothing", () => {
     const asked = [];
     const script = loadSheetsScript(SHEETS_SCRIPT_PATH, (url) => {
       asked.push(url);
-      if (url.includes("/market_chart/range"))
-        return { prices: [[Date.now() - 7200000, 2]] };
+      if (url.includes("/exchangeInfo")) return { symbols: [] };
+      if (url.includes("/market_chart/range")) return { prices: [] };
       return null;
     });
-    expect(
-      script.getCryptoPrice("grc", cellTime(Date.now() - 3600000), "UTC"),
-    ).toMatch(
-      /^Too recent for a final price: ask again after \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC$/,
-    );
-    const coinGecko = asked.filter((url) => url.includes("coingecko"));
-    expect(coinGecko).toHaveLength(1);
-    const to = Number(new URL(coinGecko[0]).searchParams.get("to")) * 1000;
-    expect(Math.abs(to - Date.now())).toBeLessThan(60000);
-  });
-
-  it("asks CoinPaprika, as for an older time, for a recent time of a coin CoinGecko has no prices of, once the time's UTC day is over", () => {
-    const asked = [];
-    const script = loadSheetsScript(
-      SHEETS_SCRIPT_PATH,
-      (url) => {
-        asked.push(url);
-        return null;
-      },
-      { services: { Date: dateAt(Date.UTC(2026, 10, 24, 6)) } },
-    );
-    expect(
-      script.getCryptoPrice("xtm", "2026-11-23 23:00:00", "UTC", "close"),
-    ).toBe("No data available from any source");
-    expect(asked.filter((url) => url.includes("coingecko"))).toHaveLength(1);
-    expect(asked.some((url) => url.includes("coinpaprika"))).toBe(true);
-  });
-
-  it("gives no data, not when to ask again, for a ticker CoinGecko has no prices of, once the time's UTC day is over", () => {
-    const asked = [];
-    const script = loadSheetsScript(
-      SHEETS_SCRIPT_PATH,
-      (url) => {
-        asked.push(url);
-        return null;
-      },
-      { services: { Date: dateAt(Date.UTC(2026, 10, 24, 6)) } },
-    );
-    expect(
-      script.getCryptoPrice("btcc", "2026-11-23 23:00:00", "UTC", "close"),
-    ).toBe("No data available from any source");
-    expect(asked.filter((url) => url.includes("coingecko"))).toHaveLength(1);
-  });
-
-  it("says it is busy, not when to ask again, when MEXC's request for a recent time was cut short", () => {
-    const asked = [];
-    const script = loadSheetsScript(SHEETS_SCRIPT_PATH, (url) => {
-      asked.push(url);
-      if (url.includes("mexc")) return noResponse("timed out");
-      if (url.includes("/market_chart/range"))
-        return { prices: [[Date.now() - 7200000, 2]] };
-      return null;
-    });
-    expect(
-      script.getCryptoPrice("btc", cellTime(Date.now() - 3600000), "UTC"),
-    ).toBe("Rate limit busy - retry later");
-    expect(asked.filter((url) => url.includes("coingecko"))).toEqual([]);
-  });
-});
-
-describe("CoinPaprika's UTC day of a time, while it is not over", () => {
-  it("CoinPaprika's source gives no price from the day's candle, which can still change", () => {
-    const asked = [];
-    const script = loadSheetsScript(
-      SHEETS_SCRIPT_PATH,
-      (url) => {
-        asked.push(url);
-        return answerPaprikaCandleOfTheDay(url);
-      },
-      { services: { Date: dateAt(Date.UTC(2026, 10, 24, 13)) } },
-    );
-    expect(
-      script.getPriceFromCoinPaprika(
-        "xtm-tari",
-        Date.UTC(2026, 10, 24, 12),
-        "close",
-      ),
-    ).toBeNull();
-    expect(asked).toEqual([]);
-  });
-
-  it("the exchange script says when to ask again, asking CoinPaprika nothing", () => {
-    const asked = [];
-    const script = loadSheetsScript(
-      SHEETS_SCRIPT_PATH,
-      (url) => {
-        asked.push(url);
-        return answerPaprikaCandleOfTheDay(url);
-      },
-      { services: { Date: dateAt(Date.UTC(2026, 10, 24, 13)) } },
-    );
-    expect(
-      script.getCryptoPrice("xtm", "2026-11-24 00:30:00", "UTC", "close"),
-    ).toBe(
-      "Too recent for a final price: ask again after 2026-11-25 00:00 UTC",
-    );
-    expect(asked.some((url) => url.includes("coinpaprika"))).toBe(false);
-  });
-
-  it("the exchange script says no source has a price, not when to ask again, for a token CoinPaprika lists as inactive", () => {
-    const script = loadSheetsScript(SHEETS_SCRIPT_PATH, () => null, {
-      services: { Date: dateAt(Date.UTC(2026, 10, 24, 13)) },
-    });
-    expect(
-      script.getCryptoPrice("grc", "2026-11-24 00:30:00", "UTC", "close"),
-    ).toBe("No data available from any source");
-  });
-
-  it("the exchange script says it is busy, not when to ask again, when an earlier request of the call was cut short", () => {
-    const script = loadSheetsScript(
-      SHEETS_SCRIPT_PATH,
-      (url) => (url.includes("mexc") ? noResponse("timed out") : null),
-      { services: { Date: dateAt(Date.UTC(2026, 10, 24, 13)) } },
-    );
-    expect(
-      script.getCryptoPrice("xtm", "2026-11-24 00:30:00", "UTC", "close"),
-    ).toBe("Rate limit busy - retry later");
+    const ask = () =>
+      script.getCryptoPrice("xtm", "2025-06-15 12:30:00", "UTC", "average", 0);
+    expect(ask()).toMatch(/CoinPaprika gives average, high and low only/);
+    const before = asked.length;
+    expect(ask()).toMatch(/CoinPaprika gives average, high and low only/);
+    expect(asked.slice(before)).toEqual([]);
   });
 });

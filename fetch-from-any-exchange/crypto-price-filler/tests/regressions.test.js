@@ -17,7 +17,10 @@
  * command line, run in a child process, against a preloaded fetch; and the
  * Sheets script, run unchanged in the test's thread, against a stand-in
  * `UrlFetchApp`. The Node tool's functions run on the committed settings,
- * whatever a `config.json` on this computer holds. git is asked whether it
+ * whatever a `config.json` on this computer holds. GeckoTerminal's source
+ * runs with the shared client for real against the stand-in fetch, with
+ * no waits, a record of requests of its own, and the test's present as
+ * the client's clock when a test sets one. git is asked whether it
  * ignores a path the tools write (`gitIgnores`).
  */
 
@@ -34,6 +37,8 @@ import { closeExchangeSources, exchangeSources } from "../sources/exchange.js";
 import { canonicalTimeZone, parseInputToUtcMs } from "../utils/date.js";
 import { answerWith, asked as askedByTool } from "./helpers/stand-in-fetch.js";
 import { loadSheetsScript } from "./helpers/sheets-script.js";
+import { getPriceFromGeckoTerminal } from "../sources/geckoterminal.js";
+import { clearCache } from "../utils/cache.js";
 import { mexcCandleOpen } from "../../../test/helpers/stand-in-mexc.js";
 
 // The Sheets script, opened by its Node version with the stand-in fetch
@@ -44,6 +49,29 @@ vi.mock(
     return withStandInFetch(await importOriginal());
   },
 );
+
+// The present of the GeckoTerminal client's clock, when a test sets one
+const geckoTerminalClock = vi.hoisted(() => ({ nowMs: null }));
+
+/*-
+ *  The shared GeckoTerminal client, asking the stand-in fetch, waiting for
+ *  nothing, and reading the test's present when it sets one
+ */
+vi.mock("../../../dex-prices/geckoterminal.js", async (importOriginal) => {
+  const real = await importOriginal();
+  const { standInFetch } = await import("./helpers/stand-in-fetch.js");
+  return {
+    ...real,
+    geckoTerminalSettings: (settings = {}) =>
+      real.geckoTerminalSettings({
+        ...settings,
+        fetch: standInFetch,
+        sleep: async () => {},
+        requestLog: [],
+        now: () => geckoTerminalClock.nowMs ?? Date.now(),
+      }),
+  };
+});
 
 // The committed settings, read afresh for this file, whatever a config.json holds
 vi.mock("../config.js", async () => {
@@ -176,8 +204,8 @@ describe("fixed bugs", () => {
     });
   });
 
-  describe("the day asked of CoinGecko and CoinPaprika is the UTC day, whatever the computer's clock", () => {
-    it("on a computer set to Chicago time, 03:00 UTC on 2025-03-15 asks for 2025-03-15", () => {
+  describe("the days asked of CoinGecko and CoinPaprika are UTC days, whatever the computer's clock", () => {
+    it("on a computer set to Chicago time, 03:00 UTC on 2025-03-15 asks for the candle of 2025-03-15, and CoinGecko's price at 00:00 UTC on 2025-03-16, which closes it", () => {
       const asked = [];
       const script = loadSheetsScript(SHEETS_SCRIPT_PATH, (url) => {
         asked.push(url);
@@ -191,7 +219,7 @@ describe("fixed bugs", () => {
         .filter((url) => url.includes("/history"))
         .map((url) => new URL(url).searchParams.get("date"));
       expect(geckoDays).not.toHaveLength(0);
-      for (const day of geckoDays) expect(day).toBe("15-03-2025");
+      for (const day of geckoDays) expect(day).toBe("16-03-2025");
       const paprikaDays = asked
         .filter((url) => url.includes("/ohlcv/"))
         .map((url) => new URL(url).searchParams.get("start"));
@@ -472,5 +500,80 @@ describe("the owner's files in the tools' output/ folders", () => {
     expect(gitIgnores("output/prices.csv")).toBe(true);
     expect(gitIgnores("../../summ-csv/output/summ.csv")).toBe(true);
     expect(gitIgnores("output/json/.gitkeep")).toBe(false);
+  });
+});
+
+describe("crypto-price-filler's GeckoTerminal source", () => {
+  const contract = "0x2b591e99afE9f32eAA6214f7B7629768c40Eeb39";
+  const nowMs = Date.UTC(2026, 10, 24, 13, 30, 20);
+
+  /**
+   * The source's price at a time, at the test's present, from the one
+   * trading pool GeckoTerminal lists for the token, whose candles of each
+   * timeframe `candles` gives.
+   *
+   * @param {number} utcMs - The time, in UTC milliseconds
+   * @param {{minute: Array, hour: Array}} candles - The ohlcv list of each timeframe; none where it gives none
+   * @returns {Promise<number|null>} The price, or null when the source gives none
+   */
+  async function priceAt(utcMs, candles) {
+    clearCache();
+    answerWith((url) => {
+      if (url.includes(`/tokens/${contract}/pools`)) {
+        const side = (id) => ({ data: { id: `pulsechain_${id}` } });
+        return {
+          data: [
+            {
+              attributes: {
+                address: "0x2222222222222222222222222222222222222222",
+                name: "HEX / WPLS",
+                reserve_in_usd: "3000000",
+                volume_usd: { h24: "25000" },
+              },
+              relationships: {
+                base_token: side(contract.toLowerCase()),
+                quote_token: side(`0x${"a1".repeat(20)}`),
+              },
+            },
+          ],
+        };
+      }
+      const timeframe = /\/ohlcv\/(minute|hour)/.exec(url)?.[1];
+      if (timeframe === undefined) return null;
+      return {
+        data: { attributes: { ohlcv_list: candles[timeframe] ?? [] } },
+        meta: { base: { address: contract }, quote: { address: "0xa1" } },
+      };
+    });
+    geckoTerminalClock.nowMs = nowMs;
+    try {
+      return await getPriceFromGeckoTerminal(
+        { contract, network: "pulsechain", moralisChain: "0x171" },
+        utcMs,
+        "close",
+      );
+    } finally {
+      geckoTerminalClock.nowMs = null;
+      answerWith(() => null);
+    }
+  }
+
+  it("gives no price from the minute not yet over", async () => {
+    const minuteOpen = Math.floor(nowMs / 60000) * 60;
+    expect(
+      await priceAt(nowMs - 10000, {
+        minute: [[minuteOpen, 0.004, 0.0045, 0.0038, 0.0042, 100]],
+      }),
+    ).toBeNull();
+  });
+
+  it("gives no price from the hour not yet over, for a minute in which nothing traded", async () => {
+    const hourOpen = Math.floor(nowMs / 3600000) * 3600;
+    expect(
+      await priceAt(nowMs - 120000, {
+        minute: [],
+        hour: [[hourOpen, 0.005, 0.0055, 0.0048, 0.0051, 100]],
+      }),
+    ).toBeNull();
   });
 });

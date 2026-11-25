@@ -14,7 +14,8 @@
  * `candlePage` gives up to a thousand of a pool's candles that opened
  * before a time, and `fetchCandles` every candle between two times.
  * `candleAt` and `priceAt` find a time's candle and price in a list of
- * candles.
+ * candles, and `periodEndSeconds` says when the period that holds a time
+ * ends, before which its candle can still change.
  *
  * How: a pool's candles price one of its two tokens, which the query's
  * `token` names: 'base' or 'quote', as GeckoTerminal sides the pool, or a
@@ -448,6 +449,21 @@ export function candleAt(candles, seconds, timeframe) {
   const step = TIMEFRAME_SECONDS[timeframe];
   const open = seconds - (seconds % step);
   return candles.find((candle) => candle[0] === open) ?? null;
+}
+
+/**
+ * When the period of a timeframe that holds a time ends. A candle of a
+ * period not yet over holds only the trades made so far, so its prices
+ * can still change; GeckoTerminal gives it all the same, as the newest
+ * candle of a page.
+ *
+ * @param {number} seconds - The time, in unix seconds
+ * @param {string} timeframe - 'minute', 'hour' or 'day'
+ * @returns {number} The period's end, in unix seconds
+ */
+export function periodEndSeconds(seconds, timeframe) {
+  const step = TIMEFRAME_SECONDS[timeframe];
+  return seconds - (seconds % step) + step;
 }
 
 /**

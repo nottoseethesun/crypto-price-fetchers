@@ -5,9 +5,11 @@
  *
  * What: `getPriceFromGeckoTerminal` gives the high, low or close, in USD,
  * of the candle that holds the row's time: the minute's candle, or the
- * hour's when nothing traded in that minute. GeckoTerminal's public api
- * serves the last 180 days only, so an older time gets null, and the
- * provider chain asks CoinGecko.
+ * hour's when nothing traded in that minute. It gives null while the
+ * minute, or the hour it would ask for, is not over by the clock of the
+ * client's settings, since that candle's prices can still change. GeckoTerminal's public api serves the last 180
+ * days only, so an older time gets null, and the provider chain asks
+ * CoinGecko.
  *
  * How: the pool is the one LP Ranger would read the token's price from:
  * of the first `GECKOTERMINAL_TOP_POOLS_CONSIDERED` pools GeckoTerminal
@@ -32,12 +34,12 @@
  */
 
 import {
-  TIMEFRAME_SECONDS,
   bestPool,
   candleAt,
   candlePage,
   candlePrice,
   geckoTerminalSettings,
+  periodEndSeconds,
   tokenPools,
 } from "../../../dex-prices/geckoterminal.js";
 import { loadConfig } from "../config.js";
@@ -98,14 +100,18 @@ export async function getPriceFromGeckoTerminal(
       return null;
     }
     for (const timeframe of TIMEFRAMES) {
-      const step = TIMEFRAME_SECONDS[timeframe];
+      const end = periodEndSeconds(seconds, timeframe);
+      if (settings.now() < end * 1000) {
+        logv(verbose, 1, `GeckoTerminal: the ${timeframe} is not over`);
+        return null;
+      }
       const page = await candlePage(
         {
           network: token.network,
           pool: pool.address,
           timeframe,
           token: pool.side,
-          beforeSeconds: seconds - (seconds % step) + step,
+          beforeSeconds: end,
           limit: 1,
         },
         settings,

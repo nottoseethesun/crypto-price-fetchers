@@ -15,17 +15,30 @@
  * input the test ends for the password prompt. The test of the runner's
  * check of a config object asks it to open the current-price script's
  * Node version, which refuses the object before it starts a worker
- * thread, and closes the version only if it opens.
+ * thread, and closes the version only if it opens. The test of an answer
+ * piped in after the key store's password runs crypto-price-filler's
+ * command line in a child process with the stand-in fetch preload, and a
+ * key file and password of the test's own.
  */
 
 import { describe, it, expect, vi } from "vitest";
+import { spawnSync } from "child_process";
 import fs from "fs";
 import os from "os";
 import path from "path";
 import { PassThrough } from "stream";
+import { pathToFileURL } from "url";
 import { Linter } from "eslint";
-import { SUMM_ROW, SUMM_TEMPLATE } from "./helpers/regression-runs.js";
-import { askPassword } from "../../../api-key-store/index.js";
+import {
+  COMMAND_LINE,
+  FILLER_DIR,
+  KEY_RUN_TIMEOUT_MS,
+  SUMM_ROW,
+  SUMM_TEMPLATE,
+} from "./helpers/regression-runs.js";
+import { STAND_IN_GECKO_KEY } from "./helpers/stand-in-coingecko-key.js";
+import { askPassword, saveEncryptedKey } from "../../../api-key-store/index.js";
+import noSecretLogging from "../../../eslint-rules/no-secret-logging.js";
 import { createAppsScriptServices } from "../../../apps-script-runner/apps-script-services.js";
 import { loadAppsScript } from "../../../apps-script-runner/load-apps-script.js";
 import { openCryptoPriceFetchers } from "../../../bin/end-user/crypto-price-fetchers.js";
@@ -39,7 +52,6 @@ import {
   tokenInfo,
 } from "../../../dex-prices/geckoterminal.js";
 import { requestSettings } from "../../../dex-prices/web-request.js";
-import noSecretLogging from "../../../eslint-rules/no-secret-logging.js";
 import { summCsvText, writeSummCsv } from "../../../summ-csv/index.js";
 
 describe("the runner's Apps Script services", () => {
@@ -103,6 +115,11 @@ describe("the Summ csv utility's new file", () => {
   it("removes a new file it could not write whole, and throws", () => {
     const folder = fs.mkdtempSync(path.join(os.tmpdir(), "summ-csv-half-"));
     const outPath = path.join(folder, "out.csv");
+    /*-
+     *  TEST-ONLY global swap: writeSummCsv writes through Node's
+     *  `fs.writeFileSync` and offers no seam for it; the spy answers one
+     *  call, and the test restores it.
+     */
     const write = vi
       .spyOn(fs, "writeFileSync")
       .mockImplementationOnce((file) => {
@@ -265,11 +282,28 @@ describe("the security lint's no-secret-logging, on the forms a print can take",
       expect(refused(code), code).toBe(1);
   });
 
+  it("refuses a key printed through an assignment that adds to it or defaults it, or a key written as a template literal", () => {
+    for (const code of [
+      "console.log((apiKey += ''))",
+      "console.log((apiKey ||= 'none'))",
+      "console.log((apiKey ??= 'none'))",
+      "console.log(keys[`apiKey`])",
+    ])
+      expect(refused(code), code).toBe(1);
+  });
+
   it("passes a print of a name that holds no secret, written in those forms", () => {
     for (const code of [
+      "console.error(new Error(`key ${service.name} refused`))",
       'console.log(keys["name"])',
+      "console.log(String.raw`${service.name}`)",
+      "console.log((note = service.name))",
       "console.log((apiKey, 0))",
       'console.log(new Error("refused"))',
+      "console.log((count += 1))",
+      "console.log((count ||= 1))",
+      "console.log((count ??= 1))",
+      "console.log(keys[`name`])",
     ])
       expect(refused(code), code).toBe(0);
   });
@@ -329,4 +363,57 @@ describe("GeckoTerminal's budget", () => {
       requestLog.filter((at) => at > last - 60_000).length,
     ).toBeLessThanOrEqual(20);
   });
+});
+
+describe("crypto-price-filler's question without a CoinPaprika key", () => {
+  it(
+    "takes an answer piped in after the key store's password",
+    async () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "piped-answer-"));
+      try {
+        const keyFile = path.join(dir, "api-keys.json");
+        const password = "a-password-of-the-test";
+        await saveEncryptedKey(
+          keyFile,
+          "coingecko",
+          STAND_IN_GECKO_KEY,
+          password,
+        );
+        const input = path.join(dir, "in.csv");
+        const output = path.join(dir, "out.csv");
+        fs.writeFileSync(input, "date (UTC),amount\n2025-06-15 12:30:00,10\n");
+        const run = spawnSync(
+          process.execPath,
+          [
+            "--import",
+            pathToFileURL(
+              path.join(FILLER_DIR, "tests/helpers/stand-in-fetch-preload.js"),
+            ).href,
+            COMMAND_LINE,
+            "--token=xtm",
+            `--input=${input}`,
+            `--output=${output}`,
+            "--mode=high",
+          ],
+          {
+            cwd: FILLER_DIR,
+            env: {
+              ...process.env,
+              NODE_ENV: "test",
+              API_KEYS_FILE_PATH: keyFile,
+              API_KEYS_PASSWORD: "",
+            },
+            input: `${password}\ny\n`,
+            encoding: "utf8",
+            timeout: KEY_RUN_TIMEOUT_MS,
+          },
+        );
+        expect(run.status).toBe(0);
+        expect(fs.existsSync(output)).toBe(true);
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    },
+    KEY_RUN_TIMEOUT_MS,
+  );
 });

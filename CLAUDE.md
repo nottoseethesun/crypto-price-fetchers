@@ -455,9 +455,11 @@ files.
 `test/unlock-api-keys.test.js` runs `bin/unlock-api-keys.sh` in bash.
 Its tests in zsh, the default shell of macOS, run only when the
 environment variable `UNLOCK_SCRIPT_IN_ZSH` is 1, which
-`docs/engineering.md` ("In zsh, by Hand") sets for their run by hand: zsh is one of the computer's own
-programs, which the owner's rule keeps out of the automated tests on
-every computer, one with zsh among them.
+`docs/engineering.md` ("In zsh, by Hand") sets for their run by hand:
+the automated tests rely on Node and on programs every computer they run
+on has, bash, git and the programs a shell script calls, such as
+sh, cat, dirname and basename, and zsh is not on every such computer, so,
+by the owner's rule, its tests are a step run by hand.
 
 ```bash
 npm ci
@@ -495,13 +497,15 @@ functions inside the scripts that the owner runs by hand. crypto-price-filler's
   the tool reads its two beside its own files, and the exchange script's
   Node version its own in `fetch-from-any-exchange/`, and a test
   never writes the owner's settings.
-- `full-disk-preload.js` makes every file a command line, run in a
-  child process, writes fail as on a full disk: the file is opened as the
-  write asks, which empties a file written over, and the write then fails
-  with ENOSPC.
+- `full-disk-preload.js` makes each file a command line, run in a
+  child process, writes with Node's `fs.writeFile` or `fs.writeFileSync`
+  fail as on a full disk: the file is opened as the write asks, which
+  empties a file written over, and the write then fails with ENOSPC.
 - `regression-runs.js` holds the settings, stand-in answers, times and
   runs that the regression tests share, as do the tests of what
-  CoinPaprika gives without a key (`tests/coinpaprika-key.test.js`).
+  CoinPaprika gives without a key (`tests/coinpaprika-key.test.js`), and
+  the time a run that opens a key may take, which the tests of a saved
+  CoinGecko key (`tests/coingecko-api-key.test.js`) share too.
 - `log-lines.js` reads the lines the tool prints through its log's seam
   (`utils/log.js`), so no test replaces `console.log`.
 
@@ -526,6 +530,8 @@ fixed bugs of its area, and removes the row:
   clients in `dex-prices/` and the lint rules;
 - `tests/regressions-sheets.test.js`: a test that runs the exchange
   script in the test's thread;
+- `tests/regressions-sheets-periods.test.js`: such a test of the period a
+  price comes from: one not yet over, or the end of a day that closes it;
 - `tests/regressions-sheets-price-now.test.js`: a test that runs the
   current-price script, or the menu with it, in the test's thread;
 - `tests/regressions.test.js`: any other; it also holds older tests that

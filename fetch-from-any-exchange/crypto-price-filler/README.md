@@ -21,9 +21,11 @@ It prices two kinds of token, each where it trades:
   that run inside its apps:
   `fetch-from-any-exchange/src/getCryptoPriceFromCentralizedExchange-sources.gs`,
   which it runs unchanged under Node (`sources/exchange.js`), so the sheet
-  and the tool take a price from the same sources, and neither from
-  CoinGecko's 24 hours around a time, or CoinPaprika's UTC day, before
-  they are over. Where a cell then says when to ask again, the tool writes
+  and the tool take a price from the same sources, and neither from a
+  period before it is over: MEXC's candle of the minute that holds the
+  time, or of the larger period MEXC is asked for when nothing traded in
+  that minute, CoinGecko's 24 hours around the time, or CoinPaprika's UTC
+  day. Where a cell then says when to ask again, the tool writes
   `Error` in the row's price, unless a later source gives a final one; a
   run once the period is over fills it, when a source then has a price,
   or this package's backfill, which fills each `Error` from the priced
@@ -33,8 +35,12 @@ It prices two kinds of token, each where it trades:
   is asked of Moralis first, when a Moralis key is saved, then of
   GeckoTerminal, two services that price a token from its chain's pools,
   in the order LP Ranger, the owner's bot that manages his 9mm V3
-  liquidity positions, asks them, and then of CoinGecko and CoinPaprika. Its entry in `supported-tokens.json` names its contract and
-  its chain's ids.
+  liquidity positions, asks them, and then, as every token is, of MEXC,
+  CoinGecko and CoinPaprika, each under the id the token's entry in
+  `supported-tokens.json` names, and skipped where the entry names none:
+  HEX on PulseChain names none at MEXC. GeckoTerminal's candle of a minute
+  or an hour gives no price before that minute or hour is over. The
+  token's entry also names its contract and its chain's ids.
 
 The order of the sources, and what each gives, is in the file header of
 `./index.js`.
@@ -97,7 +103,8 @@ npm run api-keys
 ```
 
 Each run then opens them before it prices anything, with the password,
-which it asks for, and asks each service once whether it takes its key. Without a saved
+from the environment variable `API_KEYS_PASSWORD` when it holds one, or
+else asked for, and asks each service once whether it takes its key. Without a saved
 key, the tool asks CoinGecko without one, at its lower rate limits, asks
 CoinPaprika's free server, and does not ask Moralis. The free server keeps
 no candle of a day already over, so it gives a past day's close, but no

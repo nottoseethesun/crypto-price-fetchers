@@ -51,12 +51,14 @@ keys encrypted, and the order in which the price clients ask the services
 that price pools follow LP Ranger, the owner's bot that manages his 9mm V3
 liquidity positions.
 
-The programs a reader runs from a terminal are in `bin/`, those an end
-user runs in `bin/end-user/`. Each of the two
+The programs a reader runs from a terminal are in `bin/`, those only an
+end user normally runs in `bin/end-user/`. Each of the two
 price tools has a folder of its own at the repo's top, which holds its
 Sheets scripts, in its `src/`, its README and its settings:
 `crypto-price-fetchers/`, a token's price now, and
-`fetch-from-any-exchange/`, a token's price at a past time, with
+`fetch-from-any-exchange/`, a token's price at a past time, by the
+script this doc calls the exchange script,
+`getCryptoPriceFromCentralizedExchange.gs` and its two other files, with
 crypto-price-filler's package, which prices from the pools of
 decentralized exchanges as well as from centralized ones. The top `src/` holds the menu, the build's
 tools are in `build/tools/`, the install of the operating system's
@@ -117,15 +119,47 @@ before the coin's first trade on MEXC, which comes on the day MEXC listed
 it, and a candle of the day before shows the coin traded before that day.
 So when MEXC gives no candle of a recent time's minute, or of the hour, or
 the request for it fails, the script asks for the day before: with none,
-or when that request fails too, the next source answers. CoinGecko's
+or when that request fails too, the next source answers. A candle of
+MEXC's of a minute, an hour or a larger period not yet over holds only
+the trades made so far, so its prices can still change, and the script
+takes none: for a time in the current minute, of any coin but GridCoin,
+which MEXC does not list and the script never asks it about, the cell
+says to ask again once the minute is over, and when the next period up
+is not over, MEXC gives no price and the next source answers. CoinGecko's
 price for a time comes from its hourly prices of the 24 hours from 12
 hours before the time to 12 after, and CoinPaprika's from its candle of
-the time's UTC day, and each can still change until those hours, or that
-day, are over. Until then the script takes no price from that source.
-For CoinGecko's hours, when CoinGecko prices the coin, the cell says when
-to ask again and the script asks no later source; when it does not, as
-for a ticker no coin has, the script goes on to CoinPaprika. For
-CoinPaprika's day, the script asks CoinPaprika nothing, and the cell says,
+the time's UTC day, and a later trade can change each until those hours,
+or that day, are over. Until then the script takes no price from that
+source.
+For close, when CoinGecko's hours hold no price, CoinGecko's price comes
+from its price at 00:00 UTC the next day, which ends the time's day, and
+which CoinGecko serves from 00:50 UTC that day. CoinGecko says it may
+revise a price for up to 2 days after its date, as later data settles.
+A price for a time can come from CoinGecko's prices of the next UTC day,
+its hourly prices up to 12 hours after the time or its price at 00:00 UTC
+that ends the time's day, and those can change until the end of the
+second day after that next day, when the fourth day after the time's UTC
+day begins. The menu's Refresh & freeze historical prices runs a tab's
+`getCryptoPrice` cells again and puts each number in place of its formula,
+so it keeps the price each cell kept, which may have been asked of
+CoinGecko up to 12 hours earlier, since the script keeps a cell's price
+for up to 6 hours and the prices CoinGecko gave it for up to 6 more; so
+it is for times 5 days old or more, when the fourth day after the time's
+UTC day began at least a day before. A coin that traded nothing on MEXC
+in the UTC day that holds a time takes the next source's price until
+MEXC can give the average of a larger period that holds the time, each
+in UTC: the week, which MEXC counts from Monday 00:00, once it is over;
+or, when nothing traded in the week either, the month, once it and the
+week are over, since a week from Monday can end after its month or its
+year; or, when nothing traded in the month either, the year, once it and
+the week are over. A cell keeps the price it gave for up to 6 hours, so
+such a cell is frozen only once that period and the week have been over
+6 hours.
+While CoinGecko's hours are not over, when CoinGecko prices the coin,
+the cell says when to ask again and the script asks no later source;
+when it does not, as for a ticker no coin has, the script goes on to
+CoinPaprika. While CoinPaprika's day is not over, the script asks
+CoinPaprika nothing, and the cell says,
 for close or with a CoinPaprika key, to ask again once the day is over
 (for an average, a high or a low without a key, see below), whether or
 not CoinPaprika has the coin, save for GridCoin, which CoinPaprika lists
@@ -133,7 +167,8 @@ as inactive and the script never asks it about: no timer asks for it
 later. A
 person seldom wants a day's price on that day, so the cell says no more.
 crypto-price-filler asks each source itself (`sources/exchange.js`), and
-the sources give it no price from hours or a day not over, so it writes
+the sources give it no price from a minute, hours or a day not over, nor
+GeckoTerminal from a minute or an hour not over, so it writes
 `Error` in such a row's price, unless a later source gives a final one:
 for a time less than 12 hours ago in a UTC day already over, it takes
 CoinPaprika's price of that day, where a cell waits for CoinGecko's hours
@@ -146,7 +181,8 @@ day after the time's: a date one day later than the time's, on purpose.
 Without a key, CoinPaprika so gives no average, high or low: the script
 asks it for none, and a cell no earlier source prices says CoinPaprika
 needs a key; crypto-price-filler, run for a high or a low with no
-CoinPaprika key saved, says so and asks whether to go on without
+CoinPaprika key saved, for a token CoinPaprika lists, says so and asks
+whether to go on without
 CoinPaprika's prices (`utils/coinpaprika-key.js`). Apps Script runs
 the calls of many cells at the same time. The script's lock makes those
 calls take turns at the services, and its cache answers a question
@@ -347,7 +383,8 @@ price, for as many rows as the file holds, asking its sources in turn
 
 As it starts, it opens the CoinGecko, CoinPaprika and Moralis keys from the
 key store, each one saved, and, run for a high or a low with no CoinPaprika
-key saved, asks whether to go on without CoinPaprika's prices. Its backfill, `backfill.js`, started by
+key saved, for a token CoinPaprika lists, asks whether to go on without
+CoinPaprika's prices. Its backfill, `backfill.js`, started by
 `bin/end-user/backfill.js`, fills the prices marked `Error` in a file already
 written.
 

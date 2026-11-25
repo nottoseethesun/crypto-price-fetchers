@@ -19,6 +19,7 @@ import path from "path";
 import { pathToFileURL } from "url";
 import { saveEncryptedKey } from "../../../api-key-store/index.js";
 import { STAND_IN_GECKO_KEY } from "./helpers/stand-in-coingecko-key.js";
+import { KEY_RUN_TIMEOUT_MS } from "./helpers/regression-runs.js";
 
 const FILLER_DIR = path.resolve(__dirname, "..");
 const COMMAND_LINE = path.resolve(
@@ -31,9 +32,6 @@ const PRELOAD_URL = pathToFileURL(
 
 /** The password the keys are saved with. */
 const PASSWORD = "typed-password";
-
-/** A child run opens a key at 600,000 rounds of PBKDF2, so it gets more than vitest's 5 seconds. */
-const RUN_TIMEOUT_MS = 30000;
 
 let folder;
 let input;
@@ -99,7 +97,7 @@ function runReading(keyFile, typed, kept = "") {
       },
       input: typed,
       encoding: "utf8",
-      timeout: RUN_TIMEOUT_MS,
+      timeout: KEY_RUN_TIMEOUT_MS,
     },
   );
   return {
@@ -128,7 +126,7 @@ describe("the command line and the saved CoinGecko api key", () => {
       ]);
       expect(run.written).toBe(true);
     },
-    RUN_TIMEOUT_MS,
+    KEY_RUN_TIMEOUT_MS,
   );
 
   it(
@@ -142,7 +140,7 @@ describe("the command line and the saved CoinGecko api key", () => {
       expect(run.asked).toEqual([]);
       expect(run.written).toBe(false);
     },
-    RUN_TIMEOUT_MS,
+    KEY_RUN_TIMEOUT_MS,
   );
 
   it(
@@ -156,7 +154,7 @@ describe("the command line and the saved CoinGecko api key", () => {
       expect(run.asked).toEqual(["https://api.coingecko.com/api/v3/ping"]);
       expect(run.written).toBe(false);
     },
-    RUN_TIMEOUT_MS,
+    KEY_RUN_TIMEOUT_MS,
   );
 
   it(
@@ -170,7 +168,7 @@ describe("the command line and the saved CoinGecko api key", () => {
       ]);
       expect(run.written).toBe(true);
     },
-    RUN_TIMEOUT_MS,
+    KEY_RUN_TIMEOUT_MS,
   );
 
   it(
@@ -182,6 +180,6 @@ describe("the command line and the saved CoinGecko api key", () => {
       expect(run.asked.some((url) => url.endsWith("/ping"))).toBe(false);
       expect(run.written).toBe(true);
     },
-    RUN_TIMEOUT_MS,
+    KEY_RUN_TIMEOUT_MS,
   );
 });
