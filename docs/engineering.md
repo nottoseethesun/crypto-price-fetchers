@@ -535,6 +535,7 @@ stand-ins of both suites answer as MEXC does.
 | `exchange.test.js` | `sources/exchange.js`: the exchange script's price sources, opened once per run with the run's keys and closed at its end. |
 | `geckoterminal-source.test.js` | `sources/geckoterminal.js`: a token that trades in pools, priced from the GeckoTerminal candle that holds a row's time. |
 | `index.test.js` | The command line's helpers, the time zones and the reading of a date, and the command line, `bin/end-user/crypto-price-filler.js`, run as a program. |
+| `known-bugs.test.js` | The known bugs, each declared with `it.fails`. |
 | `mexc-windows.test.js` | The windows the exchange script asks MEXC for: the minute, or for an older time the hour, and, when nothing traded in it, each window up to the year, whose average of high and low then answers; and, when MEXC keeps no candle of the hour, the climb when it keeps one of the day before, or no price when it does not. |
 | `moralis-source.test.js` | `sources/moralis.js`: a token that trades in pools, priced by Moralis at the block its chain had at a row's time. |
 | `price.test.js` | `sources/price.js`: the order the sources are asked in, and the cache. |
@@ -620,7 +621,7 @@ answered at once.
 | ----- | ------------------- | --------------- |
 | `test/crypto-price-fetchers.test.js`, `test/get-crypto-price-from-centralized-exchange.test.js` | Through its Node version, in the worker thread. Each request goes to `standInFetch` (`test/helpers/stand-in-web.js`), which answers as DexTools or x1.ninja, the services that give current prices, or MEXC or CoinGecko, which give past ones, does. | What each Sheets function returns, as its cell would show it, and the Node versions' command lines. |
 | `test/run-apps-script.test.js` | A small script, `test/fixtures/runner-check.gs`, in the worker thread. Its requests go through Node's own `fetch` to a web server on this computer. | The hand-off between the threads: the worker waits, the main thread does the request, and each response reaches the request it answers. |
-| crypto-price-filler's `tests/sheets-sources.test.js`, `tests/mexc-windows.test.js`, `tests/regressions.test.js`, `tests/regressions-sheets.test.js`, `tests/regressions-sheets-price-now.test.js`, `tests/xtm-coingecko-id.test.js`, `tests/coinpaprika-key.test.js`, `tests/regressions-sheets-periods.test.js` | In the test's own thread (`tests/helpers/sheets-script.js`). `UrlFetchApp.fetch` answers at once from a function the test gives, so nothing waits. | What each price source gives, the cases the regression tests cover, what CoinPaprika gives without a key, and that no file of the exchange script holds a CoinGecko api key. |
+| crypto-price-filler's `tests/sheets-sources.test.js`, `tests/mexc-windows.test.js`, `tests/regressions.test.js`, `tests/regressions-sheets.test.js`, `tests/regressions-sheets-price-now.test.js`, `tests/xtm-coingecko-id.test.js`, `tests/coinpaprika-key.test.js`, `tests/regressions-sheets-periods.test.js`, `tests/known-bugs.test.js` | In the test's own thread (`tests/helpers/sheets-script.js`). `UrlFetchApp.fetch` answers at once from a function the test gives, so nothing waits. | What each price source gives, the cases the regression tests cover, what CoinPaprika gives without a key, and that no file of the exchange script holds a CoinGecko api key. |
 | crypto-price-filler's `tests/regressions.test.js`, `tests/xtm-coingecko-id.test.js`, through the tool | Through the exchange script's Node version, in the worker thread, as the tool runs it (`tests/helpers/stand-in-fetch.js`). | The same cases, reached through the tool's provider chain. |
 | `test/load-apps-script.test.js`, `test/apps-script-services.test.js` | Small scripts in `test/fixtures/`, in the test's own thread, with requests answered at once. | That a script's files load into one scope, in order, and that each Node service acts as Apps Script's does. |
 | `test/crypto-price-fetchers-menu.test.js`; crypto-price-filler's `tests/regressions-sheets-price-now.test.js` and `tests/regressions-sheets.test.js` | In the test's own thread, with a spreadsheet held in memory (`test/helpers/stand-in-spreadsheet.js`) or a stand-in lock in place of Apps Script's. | What each menu item writes, in which order, and what it reports; and the price functions' waits for the lock. |
@@ -781,7 +782,7 @@ deleted. The steps from a branch to `main` are LP Ranger's eight, in its
 ## Known Bugs
 
 A bug found but not yet fixed is recorded as a test, which fails once the
-bug is gone, so the record cannot go stale. None is known today. A bug
+bug is gone, so the record cannot go stale. Three are known today. A bug
 found gets its test in crypto-price-filler's `tests/known-bugs.test.js`,
 declared with `it.fails`: the test passes while the bug is present. The
 fix makes it fail. The same change declares

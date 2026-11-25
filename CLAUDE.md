@@ -513,11 +513,11 @@ functions inside the scripts that the owner runs by hand. crypto-price-filler's
 
 ## Known bugs
 
-None is known. A bug found gets a test in crypto-price-filler's
+A bug found gets a test in crypto-price-filler's
 `tests/known-bugs.test.js`, declared with `it.fails`, so it passes while the
-bug is present, and a row here, in a table of the bug and its test's name;
-the file and the table go with the last test and row, since vitest fails a
-test file that holds no test. A bug's fix makes its test fail; the same
+bug is present, and a row in the table below, of the bug and its test's
+name; the file and the table go with the last test and row, since vitest
+fails a test file that holds no test. A bug's fix makes its test fail; the same
 change declares the test with `it`, moves it to the tests that guard the
 fixed bugs of its area, and removes the row:
 
@@ -538,3 +538,9 @@ fixed bugs of its area, and removes the row:
   current-price script, or the menu with it, in the test's thread;
 - `tests/regressions.test.js`: any other; it also holds older tests that
   run the exchange script in the test's thread.
+
+| Bug | Test in `tests/known-bugs.test.js` |
+| --- | --- |
+| `getCryptoPrice` calls its token's `toLowerCase` unchecked, so a cell whose token is a number, a true or false, or missing shows `#ERROR!`. | gives a message, not an error, when the token is not text |
+| `localReferencesMissing` (`lib/repo-checks.js`) reads link syntax inside a code span, which Markdown shows as code, as a link, and refuses its target. | takes no link from a code span, which Markdown shows as code |
+| crypto-price-filler's first rule for its date column asks for `date` in lower case, so of the columns `Date (local)` and `Date (UTC)` it reads `Date (local)`. | is the first whose name holds "date", in any letter case, and "UTC", before an earlier column of dates |
