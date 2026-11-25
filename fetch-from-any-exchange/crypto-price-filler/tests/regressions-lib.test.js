@@ -22,7 +22,7 @@ import { spawnSync } from "child_process";
 import { pathToFileURL } from "url";
 import { PassThrough } from "stream";
 import { askLine } from "../../../lib/ask-line.js";
-import { askPassword } from "../../../api-key-store/index.js";
+import { askPassword, openSecretPrompt } from "../../../api-key-store/index.js";
 import { filesUsingCommander } from "../../../lib/command-line-help.js";
 import { fetchWithinTimeLimit } from "../../../lib/time-limited-fetch.js";
 import {
@@ -204,5 +204,43 @@ describe("answers piped in together", () => {
       (error) => error.message,
     );
     expect(password).toBe("pw");
+  });
+
+  it("askLine takes the line the password prompt read past its answer, once", async () => {
+    const streams = piped("pw\ny");
+    expect(await askPassword("Password: ", streams)).toBe("pw");
+    expect(await askLine("Go on? ", streams)).toBe("y");
+    expect(await askLine("Again? ", streams)).toBeNull();
+  });
+
+  it("askLine gets nothing of a password piped in without a line end, which the password prompt took", async () => {
+    const streams = piped("pw");
+    expect(await askPassword("Password: ", streams)).toBe("pw");
+    expect(await askLine("Go on? ", streams)).toBeNull();
+  });
+
+  it("askLine takes once a line the open password prompt read when the input ended", async () => {
+    const input = new PassThrough();
+    const streams = { input, output: { write: () => true } };
+    const prompts = openSecretPrompt(streams);
+    const password = prompts.ask("Password: ");
+    input.end("pw\ny");
+    expect(await password).toBe("pw");
+    await new Promise((resolve) => input.once("close", resolve));
+    prompts.close();
+    expect(await askLine("Go on? ", streams)).toBe("y");
+    expect(await askLine("Again? ", streams)).toBeNull();
+  });
+
+  it("askLine gets nothing of a password the prompt was stopped in, with Ctrl+C", async () => {
+    const input = new PassThrough();
+    const streams = { input, output: { write: () => true } };
+    const password = askPassword("Password: ", streams).catch(
+      (error) => error.message,
+    );
+    input.write("secr\u0003");
+    expect(await password).toBe("Stopped at the prompt");
+    input.end("y\n");
+    expect(await askLine("Go on? ", streams)).toBe("y");
   });
 });

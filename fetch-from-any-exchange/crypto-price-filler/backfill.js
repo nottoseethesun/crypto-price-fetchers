@@ -259,6 +259,15 @@ export function setupBackfillCommander() {
     .addHelpText(
       "after",
       `
+Settings:
+  config.json, in crypto-price-filler's folder,
+  fetch-from-any-exchange/crypto-price-filler/, laid over the committed
+  config-example.json beside it, holds BACKFILL_HIGHEST and
+  BACKFILL_LOWEST, the backfill a run makes when no --backfill flag is
+  typed. A --backfill flag typed against the other's setting, the two
+  flags typed together, or the two settings both true stop the run, which
+  leaves the file as it was.
+
 The examples run from the repo's top folder, on a file the filler wrote in
 its folder's output/csv/, fetch-from-any-exchange/crypto-price-filler/output/csv/.
 

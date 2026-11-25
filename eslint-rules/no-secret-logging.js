@@ -9,15 +9,18 @@
  *
  * A string literal passes, since it holds no secret's value. The rule
  * looks at the names, of variables and of a member's object and
- * property, a property written as a string, as in `keys["apiKey"]`,
- * among them, in an argument and in these parts of it: the expressions
+ * property, a property written as a string, as in `keys["apiKey"]`, or
+ * as a template literal with no expression in it, as in
+ * ``keys[`apiKey`]``, among them, in an argument and in these parts of
+ * it: the expressions
  * of a template literal, a tagged template and its tag, either side of
  * `+`, `??`, `||` and `&&`, either result of `?:`, a call and its
  * arguments, a `new` and its arguments, an object's values, an array's
  * elements, a spread, an `await`, an optional chain, the value an
- * assignment gives and the last expression of a sequence, which is the
- * sequence's value. The security pass, `eslint-security.config.js`, runs
- * it.
+ * assignment gives, its right side and, for any assignment but `=`, such
+ * as `+=`, `||=` or `??=`, its left side too, and the last expression of
+ * a sequence, which is the sequence's value. The security pass,
+ * `eslint-security.config.js`, runs it.
  *
  * pulsechain-analytics, pulsechain-validator-analytics and
  * x1-validator-analytics run it too, from this repo:
@@ -30,7 +33,8 @@ const SENSITIVE =
 
 /**
  * A member's property as a name: the property itself, or, for one
- * written as a string, as in `keys["apiKey"]`, a name of that text.
+ * written as a string, as in `keys["apiKey"]`, or as a template literal
+ * with no expression in it, a name of that text.
  *
  * @param {Object} member - The member's syntax node
  * @returns {Object} The property's syntax node, or a name made of it
@@ -39,6 +43,8 @@ function propertyName(member) {
   const { property } = member;
   if (member.computed && typeof property.value === "string")
     return { type: "Identifier", name: property.value };
+  if (property.type === "TemplateLiteral" && property.expressions.length === 0)
+    return { type: "Identifier", name: property.quasis[0].value.cooked };
   return property;
 }
 
@@ -63,7 +69,8 @@ const PARTS = {
   SpreadElement: (node) => [node.argument],
   AwaitExpression: (node) => [node.argument],
   ChainExpression: (node) => [node.expression],
-  AssignmentExpression: (node) => [node.right],
+  AssignmentExpression: (node) =>
+    node.operator === "=" ? [node.right] : [node.left, node.right],
   SequenceExpression: (node) => [node.expressions.at(-1)],
 };
 

@@ -20,7 +20,10 @@
  * One readline interface answers every question of a prompt, in order, so
  * answers piped in together are each kept for their question, after the
  * lines `askLine` (`lib/ask-line.js`) read past its answers on the same
- * input, which the prompt takes first. Ctrl+C, or
+ * input, which the prompt takes first; what the prompt reads past its own
+ * answers it hands back when it closes, for the next question asked with
+ * `askLine` to take, save after Ctrl+C, when it hands back nothing, since
+ * the line it was reading is part of a secret. Ctrl+C, or
  * the input ending before an answer, stops the question with an error,
  * at once for a prompt opened once the input has ended, whose interface
  * would wait for an end that has passed.
@@ -30,7 +33,7 @@
 
 import readline from "node:readline";
 import { Writable } from "node:stream";
-import { takeLinesRead } from "../lib/ask-line.js";
+import { keepLinesRead, takeLinesRead } from "../lib/ask-line.js";
 
 /**
  * A stream that takes whatever is written to it and shows none of it.
@@ -62,6 +65,7 @@ export function openSecretPrompt(streams = {}) {
   let stopped = input.readableEnded
     ? "The input ended before an answer was typed"
     : null;
+  let stoppedWithCtrlC = false;
   const rl = readline.createInterface({
     input,
     output: showsNothing(),
@@ -73,12 +77,22 @@ export function openSecretPrompt(streams = {}) {
     else next.resolve(line);
   });
   rl.on("SIGINT", () => {
+    stoppedWithCtrlC = true;
     stopped = "Stopped at the prompt";
     rl.close();
   });
   rl.on("close", () => {
     stopped ??= "The input ended before an answer was typed";
     for (const next of waiting.splice(0)) next.reject(new Error(stopped));
+    /*-
+     *  A prompt stopped with Ctrl+C hands back nothing: the line it was
+     *  reading is part of a secret. When the input ends, readline gives
+     *  the line it was reading as a line before it closes, and leaves it in
+     *  rl.line: an answer by now, or among the lines kept, so only a prompt
+     *  closed before the end hands back the line it was reading.
+     */
+    if (stoppedWithCtrlC) return;
+    keepLinesRead(input, lines.splice(0), input.readableEnded ? "" : rl.line);
   });
   const ask = async (prompt) => {
     output.write(prompt);

@@ -278,11 +278,11 @@ describe("CoinGecko (getPriceFromCoinGecko)", () => {
     expect(script.getPriceFromCoinGecko("tezos", TIME_MS, "high")).toBe(3.5);
   });
 
-  it("gives the price of the UTC day for close once the range is empty, never the current one", () => {
+  it("gives the price at 00:00 UTC the next day, which closes the UTC day, for close once the range is empty, never the current one", () => {
     const { script, asked } = scriptAnswering(coinGeckoAnswering([], 1.23));
     expect(script.getPriceFromCoinGecko("tezos", TIME_MS, "close")).toBe(1.23);
     const history = asked.find((request) => request.url.includes("/history"));
-    expect(new URL(history.url).searchParams.get("date")).toBe("15-06-2025");
+    expect(new URL(history.url).searchParams.get("date")).toBe("16-06-2025");
     expect(asked.some((request) => request.url.includes("/tickers"))).toBe(
       false,
     );

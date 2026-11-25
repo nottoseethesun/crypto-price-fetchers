@@ -1,7 +1,9 @@
 /**
  * The settings, stand-in answers and runs the regression tests share, as
  * do the tests of what CoinPaprika gives without a key
- * (`tests/coinpaprika-key.test.js`).
+ * (`tests/coinpaprika-key.test.js`), and the time a run that opens a key
+ * may take, which the tests of a saved CoinGecko key
+ * (`tests/coingecko-api-key.test.js`) share too.
  * @module tests/helpers/regression-runs
  *
  * The answers stand in for the price services at the http layer: MEXC for
@@ -26,7 +28,10 @@ import { mexcKlines } from "../../../../test/helpers/stand-in-mexc.js";
 
 export const FILLER_DIR = fileURLToPath(new URL("../..", import.meta.url));
 
-/** The command line, as its owner runs it: the start file in the repo's bin/. */
+/** A child run opens a key at 600,000 rounds of PBKDF2, so it gets more than vitest's 5 seconds. */
+export const KEY_RUN_TIMEOUT_MS = 30000;
+
+/** The command line, as its owner runs it: the start file in the repo's bin/end-user/. */
 export const COMMAND_LINE = fileURLToPath(
   new URL("../../../../bin/end-user/crypto-price-filler.js", import.meta.url),
 );

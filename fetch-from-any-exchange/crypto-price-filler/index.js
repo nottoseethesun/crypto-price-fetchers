@@ -8,11 +8,11 @@
  * Features:
  * - A token that trades in pools: Moralis first, with a saved Moralis key (the close at the
  *   block of the row's time), then GeckoTerminal (1m & 1h candles of the pool it ranks highest,
- *   within the last 180 days)
+ *   within the last 180 days, once the minute or hour is over)
  * - Every token: MEXC (the minute or hour that holds the time, widened up to the year
- *   when nothing traded), then CoinGecko (hourly prices, then the day's price
- *   for close), then CoinPaprika (the day's candle, then, for close, its price at 00:00 UTC
- *   the next day, which ends the day). These
+ *   when nothing traded), then CoinGecko (hourly prices, then, for close, its price at
+ *   00:00 UTC the next day), then CoinPaprika (the day's candle, then, for close, its price
+ *   at 00:00 UTC the next day, which ends the day), each only once its period is over. These
  *   three are the price sources of the Sheets script getCryptoPriceFromCentralizedExchange,
  *   which this tool runs unchanged through the repo's runner (`sources/exchange.js`)
  * - Every price is that of the row's time, never the current one
@@ -200,7 +200,10 @@
  *   --mode        {string}  Price type: 'high', 'low', or 'close'. Default: 'close'
  *                           high and low are those of the period around the time;
  *                           close is the price at the period's end, or CoinGecko's
- *                           hourly price nearest the time. When MEXC must widen
+ *                           hourly price nearest the time, or, when those are empty,
+ *                           its price at 00:00 UTC the next day, which ends the day,
+ *                           or Moralis's at the block the chain had at the time.
+ *                           A period not yet over gives no price. When MEXC must widen
  *                           its period to find a trade, every mode gets that period's
  *                           average of high and low.
  *   --tz          {string}  Time zone the dates are in, named in full (e.g. America/Chicago)

@@ -86,10 +86,13 @@ timestamps. For a token that trades in pools, it asks Moralis and
 GeckoTerminal first; for every token, it then asks MEXC, CoinGecko and
 CoinPaprika through the Apps Script's own price sources, run unchanged
 under Node, so the sheet and the tool take a price from the same sources,
-and neither from CoinGecko's 24 hours around a time, or CoinPaprika's UTC
-day, before they are over. Where a cell then says when to ask again, the
-tool writes `Error` in the row's price, unless a later source gives a
-final one.
+and neither from a period before it is over: MEXC's candle of the minute
+that holds the time, or of the larger period MEXC is asked for when
+nothing traded in that minute, CoinGecko's 24 hours around the time, or
+CoinPaprika's UTC day. GeckoTerminal's candle of a minute or an hour gives
+the tool no price before it is over either. Where a cell then says when
+to ask again, the tool writes `Error` in the row's price, unless a later
+source gives a final one.
 
 The repo's `bin/end-user/crypto-price-filler.js` starts it. For detailed
 documentation, see the file header in

@@ -39,7 +39,10 @@ each key, and saves it encrypted once its service takes it:
   AES-256-GCM. Without the password, the file tells nothing of the api key.
   A wrong password, or a file changed on disk, fails to open it.
 - Every key in one file is saved with one password. The password is kept
-  nowhere on disk, and the plain keys only in memory, for one run.
+  nowhere on disk, and the plain keys only in memory, for one run. A
+  program that opens the keys takes the password from the environment
+  variable `API_KEYS_PASSWORD` when it holds one, and asks for it only
+  when it does not.
 
 ## Run
 
@@ -68,7 +71,8 @@ npm run api-keys -- set dextools
 ```
 
 Whether the password in `API_KEYS_PASSWORD` opens every saved key, by
-its exit code, 0 when it does:
+its exit code, 0 when it does; run with no `API_KEYS_PASSWORD` set, it
+says so and ends with exit code 1:
 
 ```bash
 npm run api-keys -- check-password

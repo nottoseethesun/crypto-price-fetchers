@@ -7,8 +7,8 @@
  *   high, low or close, for use directly in Google Sheets, Google's
  *   spreadsheet app.
  * @author Christopher M. Balz, with Grok and Claude
- * @version 2.18.0
- * @lastModified November 21, 2026
+ * @version 2.19.0
+ * @lastModified November 25, 2026
  *
  * OVERVIEW
  * --------
@@ -84,20 +84,22 @@
  * As the script is written (the CACHE_EXPIRY_SECONDS setting), a price for
  * a time is kept for up to 6 hours, the longest Apps Script's cache keeps
  * a value, and "no data" for up to 5 minutes, so a cell that runs again
- * within that time gives the answer it gave before. A past
- * price does not change, so Refresh & freeze historical prices, in the
- * Crypto Price Fetchers menu, can replace these formulas with their
- * numbers.
+ * within that time gives the answer it gave before; Refresh & freeze,
+ * below, says when a cell's price stops changing.
  *
  * ### Average, high, low and close
  *
- * Each source prices a period around the time. `"high"` gives the
- * highest price recorded in that period and `"low"` the lowest, which
- * bound what a trade at that time was worth, and `"average"` the average
- * of the two. `"close"` gives the price at the end of the period, the
- * close of MEXC's minute or hour or of CoinPaprika's day, but from
- * CoinGecko its hourly price nearest the time. The period depends on the
- * source that answers:
+ * Each source prices a period around the time, once the period is over:
+ * a period not over holds only the prices so far, which can still
+ * change. `"high"` gives the highest price recorded in that period and
+ * `"low"` the lowest, which bound what a trade at that time was worth,
+ * and `"average"` the average of the two. For a coin MEXC prices through
+ * its pair against BTC, high multiplies the pair's high by BTC's in the
+ * same period, and low the two lows, so the two can lie beyond any price
+ * the coin traded at in USD. `"close"` gives the price at the end of the
+ * period, the close of MEXC's minute or hour or of CoinPaprika's day, but
+ * from CoinGecko its hourly price nearest the time. The period depends on
+ * the source that answers:
  *
  * - MEXC, an exchange, asked first: the minute that holds the time, when
  *   the time falls in about the last 30 days, for which MEXC keeps minute
@@ -115,17 +117,46 @@
  *   the coin or before, or when that request fails too, the next source
  *   answers. When nothing traded in the year, the next source answers. A
  *   request MEXC fails for a larger period is never taken for a period
- *   with no candle: the script goes on up.
+ *   with no candle: the script goes on up. For a time in the minute not
+ *   yet over, the cell says when to ask again (below); when the next
+ *   period up is not over, the script stops going up, and the next source
+ *   answers.
  * - CoinGecko, a service that gathers the exchanges' prices, asked next:
  *   24 hours of hourly prices, from 12 hours before the time to 12 hours
  *   after, whose price the script takes only once those hours are over;
- *   for `"close"` only, when they hold no price, the day's price at 00:00
- *   UTC.
+ *   for `"close"` only, when they hold no price, its price at 00:00 UTC
+ *   the next day, which ends the time's UTC day, and which CoinGecko
+ *   serves from 00:50 UTC that day: asked before then, CoinGecko gives no
+ *   price.
  * - CoinPaprika, a service like CoinGecko, asked last: the day, from 00:00
  *   to 23:59:59 UTC, that holds the time, whose price the script takes
  *   only once the day is over; for `"close"` only, when the day is older
  *   than the plan's candles reach, its price at 00:00 UTC the next day,
  *   which ends the day.
+ *
+ * ### Refresh & freeze
+ *
+ * A past price does not change, so Refresh & freeze historical prices, in
+ * the Crypto Price Fetchers menu, can replace a tab's `getCryptoPrice`
+ * formulas with their numbers, with two exceptions. CoinGecko says it may revise a price for
+ * up to 2 days after its date, as later data settles, and a price for a
+ * time can come from CoinGecko's prices of the next UTC day, which can
+ * change until the end of the second day after that one, when the fourth
+ * day after the time's UTC day begins. Refresh & freeze keeps the price
+ * the cell kept, which may have been asked of CoinGecko up to 12 hours
+ * earlier, since the script keeps a cell's price for up to 6 hours and
+ * the prices CoinGecko gave it for up to 6 more. So freeze a cell only
+ * once its time is 5 days old, when the fourth day after the time's UTC
+ * day began at least a day before. And a coin that traded nothing on MEXC
+ * in the UTC day that holds the time takes the next source's price until
+ * MEXC can give the average of a larger period that holds the time, each
+ * in UTC: the week, which MEXC counts from Monday 00:00, once it is over;
+ * or, when nothing traded in the week either, the month, once it and the
+ * week are over, since a week from Monday can end after its month or its
+ * year; or, when nothing traded in the month either, the year, once it
+ * and the week are over. A cell keeps the price it gave for up to
+ * 6 hours, so freeze such a cell only once that period and the week have
+ * been over 6 hours.
  *
  * ### Time zones
  *
@@ -147,8 +178,9 @@
  *   the day is over. A CoinPaprika key, saved with `npm run api-keys`
  *   before the build, has the script ask its paid server.
  * - `No data available for future dates`: the time is after now.
- * - `Too recent for a final price: ask again after …`: MEXC has no price
- *   for the time, no request of the call was cut short, and a later
+ * - `Too recent for a final price: ask again after …`: the time is in the
+ *   minute not yet over, for a coin MEXC is asked about; or MEXC has no
+ *   price for the time, no request of the call was cut short, and a later
  *   source's period that holds the time is not over: CoinGecko's 24 hours
  *   around the time, when CoinGecko has prices of the coin in the part of
  *   them already over, or else CoinPaprika's UTC day of the time, for
@@ -181,7 +213,11 @@
  * out from its own data:
  *
  *   MEXC: Asks for the 1-minute candle of the minute containing the
- *     requested timestamp. MEXC gives a candle for every period it keeps:
+ *     requested timestamp, once the minute is over: before then, the cell
+ *     says when to ask again (fetchPriceFromProviders), since a candle of
+ *     a period not over holds only the trades made so far, and the script
+ *     goes up to no window that is not over (mexcWindowOver): MEXC then
+ *     gives no price. MEXC gives a candle for every period it keeps:
  *     one in which nothing traded has volume 0, and open, high, low and
  *     close all at the last trade's price. It keeps 1-minute candles for
  *     about the last 30 days and gives none for an older minute, nor for a
@@ -213,14 +249,18 @@
  *
  *   CoinGecko market_chart/range: Fetches hourly data points over a
  *     24-hour window centered on the requested time (12 hours before to
- *     12 hours after), once that window is over, so the price it gives
- *     never changes: the average of the highest and the lowest for
- *     average, the highest for high, the lowest for low, and the one
- *     nearest the time for close.
+ *     12 hours after), once that window is over, so that no later trade
+ *     changes the price it gives, though CoinGecko says it may revise a
+ *     price for up to 2 days after its date: the average of the highest
+ *     and the lowest for average, the highest for high, the lowest for
+ *     low, and the one nearest the time for close.
  *
- *   CoinGecko history: The day's single price, recorded at 00:00 UTC.
- *     One price is not a range, so it answers close only; average, high
- *     and low go on to CoinPaprika.
+ *   CoinGecko history: A day's single price, recorded at 00:00 UTC. The
+ *     script asks for the day after the time's, whose price at 00:00 UTC
+ *     ends the time's day, as CoinPaprika's close does, once CoinGecko
+ *     serves it, from 00:50 UTC that day (coinGeckoServesDayEnd). One
+ *     price is not a range, so it answers close only; average, high and
+ *     low go on to CoinPaprika.
  *
  *   CoinPaprika: The day's OHLCV candle (00:00 to 23:59:59 UTC) holding
  *     the requested time, once the day is over, so the price it gives
@@ -251,14 +291,14 @@
  *
  *   1. MEXC       - Primary. Real OHLCV candles (1-minute for about the
  *                   last 30 days, else 1-hour; up to the year when
- *                   nothing traded). Queries exchangeInfo to verify the
- *                   trading pair exists. Skip list: grc (not listed on
- *                   MEXC).
+ *                   nothing traded), of periods already over. Queries
+ *                   exchangeInfo to verify the trading pair exists. Skip
+ *                   list: grc (not listed on MEXC).
  *
  *   2. CoinGecko  - Tries two sub-endpoints in order, both dated:
  *                   a) market_chart/range (24h window, hourly data points)
- *                   b) history (the price of the requested UTC day), for
- *                      close only
+ *                   b) history (the price at 00:00 UTC the day after the
+ *                      requested UTC day, which ends it), for close only
  *                   Both send the demo api key when
  *                   CONFIG.COINGECKO_API_KEY holds one (see API KEYS
  *                   above).
@@ -275,8 +315,8 @@
  *   CoinPaprika ID. To add a new token, add an entry with its gecko and
  *   paprika IDs:
  *     'mytok': { gecko: 'mytoken-id', paprika: 'mytok-mytoken' }
- *   If the token is not on MEXC, add it to the skip set inside
- *   getPriceFromMEXC. Similarly for CoinPaprika in coinPaprikaSkips.
+ *   If the token is not on MEXC, add it to the skip set in mexcSkips.
+ *   Similarly for CoinPaprika in coinPaprikaSkips.
  *
  * CONFIGURATION
  * -------------
@@ -368,7 +408,7 @@
 
 // Declared in getCryptoPriceFromCentralizedExchange-sources.gs, in the same
 // project:
-/* global getPriceFromMEXC, getPriceFromCoinGecko, getPriceFromCoinPaprika, coinGeckoWindowEndMs, coinGeckoHasPricesSoFar, coinPaprikaDayEndMs, coinPaprikaSkips, coinPaprikaCanGive */
+/* global getPriceFromMEXC, getPriceFromCoinGecko, getPriceFromCoinPaprika, mexcSkips, coinGeckoHasPricesSoFar, coinPaprikaSkips, configuredKey */
 
 /** ============================================================================
  *                          CONFIGURATION & GLOBALS
@@ -530,7 +570,7 @@ const TOKEN_TO_ID = {
  * A price kept in the script's cache.
  *
  * @param {string} key - The cache key
- * @returns {number|string|null} The price; "No data available (cached)" when a lookup that found nothing was cached; or null when nothing usable is cached
+ * @returns {number|string|null} The price; "No data available (cached)" when a lookup that found nothing was cached; the message that CoinPaprika needs a key, when that was kept; or null when nothing usable is cached
  */
 function getCachedResult(key) {
   const cache = CacheService.getScriptCache();
@@ -541,6 +581,7 @@ function getCachedResult(key) {
       Logger.log(`Negative cache hit for ${key}`);
       return "No data available (cached)";
     }
+    if (cached === "NEEDS_KEY") return COINPAPRIKA_KEY_MESSAGE;
     const num = parseFloat(cached);
     if (isNaN(num)) {
       Logger.log(`Invalid cached value (NaN) for ${key} - treating as miss`);
@@ -635,6 +676,13 @@ function cryptoPriceInCall(token, dateStr, tz, mode, apiDelayMs) {
 
   try {
     const price = fetchPriceFromProviders(token, utcMs, target);
+    if (price === COINPAPRIKA_KEY_MESSAGE) {
+      CacheService.getScriptCache().put(
+        cacheKey,
+        "NEEDS_KEY",
+        CONFIG.CACHE_EXPIRY_SECONDS.NEGATIVE_CACHE,
+      );
+    }
     if (typeof price === "string") return price;
     if (price === null && CALL.cutRequests > 0) {
       Logger.log(
@@ -731,9 +779,10 @@ function releaseLockIfHeld(lockAcquired) {
 }
 
 /**
- * Tries each provider in order, and gives the first valid price; or,
- * when MEXC has none and no request of the call was cut short, the
- * message that says when to ask again, while a later source's period for
+ * Tries each provider in order, and gives the first valid price; or the
+ * message that says when to ask again, for a time in MEXC's minute not
+ * yet over, or, when MEXC has no price and no request of the call was cut
+ * short, while a later source's period for
  * the time is not over: CoinGecko's window, when CoinGecko has prices of
  * the coin in the part of it already over, without asking CoinPaprika, or
  * else CoinPaprika's UTC day, which the script asks nothing of until the
@@ -770,31 +819,9 @@ function fetchPriceFromProviders(token, utcMs, target) {
   ];
 
   for (const provider of providers) {
-    if (
-      provider.name === "CoinGecko" &&
-      Date.now() < coinGeckoWindowEndMs(utcMs)
-    ) {
-      const pricedSoFar =
-        CALL.cutRequests === 0 && coinGeckoHasPricesSoFar(idMap.gecko, utcMs);
-      if (pricedSoFar) return tooRecentMessage(coinGeckoWindowEndMs(utcMs));
-      if (CALL.cutRequests > 0) return null;
-      continue;
-    }
-    if (provider.name === "CoinPaprika" && coinPaprikaSkips(idMap.paprika)) {
-      Logger.log(`Skipping CoinPaprika for inactive token: ${idMap.paprika}`);
-      continue;
-    }
-    if (provider.name === "CoinPaprika" && !coinPaprikaCanGive(target)) {
-      if (CALL.cutRequests > 0) return null;
-      return COINPAPRIKA_KEY_MESSAGE;
-    }
-    if (
-      provider.name === "CoinPaprika" &&
-      Date.now() < coinPaprikaDayEndMs(utcMs)
-    ) {
-      if (CALL.cutRequests > 0) return null;
-      return tooRecentMessage(coinPaprikaDayEndMs(utcMs));
-    }
+    const early = beforeAsking(provider.name, token, idMap, utcMs, target);
+    if (early === SKIP_SOURCE) continue;
+    if (early !== ASK_SOURCE) return early;
     const price = provider.fn();
     if (isValidPrice(price)) {
       Logger.log(`Final price from ${provider.name}: ${price}`);
@@ -803,6 +830,52 @@ function fetchPriceFromProviders(token, utcMs, target) {
   }
   Logger.log("All providers failed");
   return null;
+}
+
+/** What `beforeAsking` gives for a source to ask, and for one to pass over. */
+const ASK_SOURCE = "ask";
+const SKIP_SOURCE = "skip";
+
+/**
+ * What the provider loop does with a source before it asks it, as
+ * `fetchPriceFromProviders` describes: ask it (ASK_SOURCE), pass over it
+ * (SKIP_SOURCE), or end the loop with a result: the message that says
+ * when to ask again, or that CoinPaprika needs a key, or null, which the
+ * caller shows as busy, when a request of the call was cut short. MEXC,
+ * asked first, comes before any request of the call. The count of
+ * requests cut short is read at each check, since the request for
+ * CoinGecko's prices so far, asked here, may itself be cut short.
+ *
+ * @param {string} name - The source: "MEXC", "CoinGecko" or "CoinPaprika"
+ * @param {string} token - The ticker
+ * @param {{gecko: string, paprika: string}} idMap - The token's ids at CoinGecko and CoinPaprika
+ * @param {number} utcMs - The time, in ms since 1970 UTC
+ * @param {string} target - The price to give
+ * @return {string|null} ASK_SOURCE, SKIP_SOURCE, the message, or null
+ */
+function beforeAsking(name, token, idMap, utcMs, target) {
+  if (name === "MEXC") {
+    if (mexcSkips(token) || Date.now() >= mexcMinuteEndMs(utcMs))
+      return ASK_SOURCE;
+    return tooRecentMessage(mexcMinuteEndMs(utcMs));
+  }
+  if (name === "CoinGecko") {
+    if (Date.now() >= coinGeckoWindowEndMs(utcMs)) return ASK_SOURCE;
+    if (CALL.cutRequests === 0 && coinGeckoHasPricesSoFar(idMap.gecko, utcMs))
+      return tooRecentMessage(coinGeckoWindowEndMs(utcMs));
+    return CALL.cutRequests > 0 ? null : SKIP_SOURCE;
+  }
+  if (coinPaprikaSkips(idMap.paprika)) {
+    Logger.log(`Skipping CoinPaprika for inactive token: ${idMap.paprika}`);
+    return SKIP_SOURCE;
+  }
+  if (!coinPaprikaCanGive(target))
+    return CALL.cutRequests > 0 ? null : COINPAPRIKA_KEY_MESSAGE;
+  if (Date.now() < coinPaprikaDayEndMs(utcMs))
+    return CALL.cutRequests > 0
+      ? null
+      : tooRecentMessage(coinPaprikaDayEndMs(utcMs));
+  return ASK_SOURCE;
 }
 
 /** Checks if price is a valid number */
@@ -823,12 +896,97 @@ function cacheAndReturn(cacheKey, price) {
   }
 }
 
+/** ============================================================================
+ *                 WHEN A SOURCE CAN GIVE A PRICE FOR A TIME
+ * ========================================================================== */
+
 /**
- * What a cell shows when MEXC has no price for a time, no request of the
- * call was cut short, and a later source's period for the time is not
- * over: CoinGecko's window, or CoinPaprika's UTC day. A price from part
- * of the period could still change, so the script gives none until the
- * period ends, the minute it names, rounded up, in UTC.
+ * Whether a window that holds a time is over. MEXC's candle of a window
+ * not over holds only the trades made so far, so its prices can still
+ * change, and MEXC gives no price from it.
+ *
+ * @param {Object} window - One of MEXC_WINDOWS
+ * @param {number} utcMs - The time, in ms since 1970 UTC
+ * @returns {boolean} Whether the window is over
+ */
+function mexcWindowOver(window, utcMs) {
+  if (Date.now() > window.bounds(utcMs).end) return true;
+  Logger.log(`MEXC: the ${window.name} that holds the time is not over`);
+  return false;
+}
+
+/**
+ * When the minute that holds a time ends, the period of MEXC's smallest
+ * candle. Before then, the candle holds only the trades made so far, so
+ * its prices can still change.
+ *
+ * @param {number} utcMs - The time, in ms since 1970 UTC
+ * @returns {number} The minute's end, in ms since 1970 UTC
+ */
+function mexcMinuteEndMs(utcMs) {
+  return (Math.floor(utcMs / 60000) + 1) * 60000;
+}
+
+/**
+ * When CoinGecko's window for a time ends: 12 hours after the time, the
+ * end of the 24 hours of hourly prices `tryCoinGeckoMarketChartRange`
+ * asks for. Before then, a price from those hours could still change.
+ *
+ * @param {number} utcMs - The time, in ms since 1970 UTC
+ * @returns {number} The window's end, in ms since 1970 UTC
+ */
+function coinGeckoWindowEndMs(utcMs) {
+  return utcMs + 43200000;
+}
+
+/**
+ * Whether CoinGecko serves the price that ends a time's UTC day, its daily
+ * price for the next day, recorded at 00:00 UTC: it does from 00:50 UTC
+ * that day, as CoinGecko's documentation of its history says.
+ *
+ * @param {number} utcMs - The time, in ms since 1970 UTC
+ * @returns {boolean} Whether it serves it yet
+ */
+function coinGeckoServesDayEnd(utcMs) {
+  if (Date.now() >= coinPaprikaDayEndMs(utcMs) + 3000000) return true;
+  Logger.log("CoinGecko serves the price that ends the day from 00:50 UTC");
+  return false;
+}
+
+/**
+ * When CoinPaprika's day for a time ends: the midnight, UTC, after the
+ * time, the end of the day whose candle `getPriceFromCoinPaprika` reads.
+ * Before then, the day's candle can still change.
+ *
+ * @param {number} utcMs - The time, in ms since 1970 UTC
+ * @returns {number} The day's end, in ms since 1970 UTC
+ */
+function coinPaprikaDayEndMs(utcMs) {
+  return (Math.floor(utcMs / 86400000) + 1) * 86400000;
+}
+
+/**
+ * Whether CoinPaprika can give a target: any with a key, which asks a paid
+ * server, whose plans reach past days' candles; close alone without one,
+ * from a day's price at 00:00 UTC, since the free server keeps a candle
+ * only for the 24 hours after it begins, and so none of a day already
+ * over.
+ *
+ * @param {string} target - The price to give: "average", "high", "low" or "close"
+ * @returns {boolean} Whether it can
+ */
+function coinPaprikaCanGive(target) {
+  return (
+    configuredKey(CONFIG.COINPAPRIKA_API_KEY) !== null || target === "close"
+  );
+}
+
+/**
+ * What a cell shows when a source's period for a time is not over, and no
+ * request of the call was cut short: MEXC's minute, or, when MEXC has no
+ * price for the time, CoinGecko's window or CoinPaprika's UTC day. A price
+ * from part of the period could still change, so the script gives none
+ * until the period ends, the minute it names, rounded up, in UTC.
  *
  * @param {number} endMs - When the period ends, in ms since 1970 UTC
  * @return {string} The message

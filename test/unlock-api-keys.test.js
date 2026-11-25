@@ -10,9 +10,10 @@
  * key file in a temp folder of the test's own, which `API_KEYS_FILE_PATH`
  * names, removed afterwards. The same tests run in zsh only when the
  * environment variable `UNLOCK_SCRIPT_IN_ZSH` is 1, as docs/engineering.md's
- * "In zsh, by Hand" sets it for their run by hand, on a computer with zsh: zsh is
- * one of the computer's own programs, which the automated tests never
- * run, wherever they run.
+ * "In zsh, by Hand" sets it for their run by hand, on a computer with zsh:
+ * the automated tests rely on Node and on programs every computer they run
+ * on has, bash, git and the programs a shell script calls, such as
+ * sh, cat, dirname and basename, and zsh is not on every such computer.
  */
 
 import { after, before, describe, it } from "node:test";

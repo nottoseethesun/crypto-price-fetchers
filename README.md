@@ -314,7 +314,11 @@ npm run api-keys
 It lists each key, saved or not, never showing its characters, and asks for
 each one not saved: the key, then the password, showing nothing of what is
 typed. The password is typed twice while no key is saved, and once
-after that. Each key is saved only once its service takes it; Enter
+after that. A program that opens the keys, the key manager among them,
+takes the password from the environment variable `API_KEYS_PASSWORD`
+when it holds one, and asks for it only when it does not;
+[`docs/engineering.md`](docs/engineering.md#the-programs-in-bin) says how
+a terminal can keep it there. Each key is saved only once its service takes it; Enter
 alone skips one. [manage-api-keys.js](#manage-api-keysjs-1), under
 [Run](#run), shows its other uses. The store itself is a module
 any Node project can use: see [its README](./api-key-store/README.md).
@@ -354,7 +358,8 @@ the script does not take or a value of the wrong kind
    step is optional: Enter, or y, includes them, and n leaves them out. If
    the build fails, run it again and answer n.
 2. **The password.** The build opens the saved keys as the tools do, with
-   the password, which it asks for.
+   the password from `API_KEYS_PASSWORD`, or, when that holds none, asks
+   for it.
 3. **The clipboard.** The build puts the file on the clipboard and says how
    to paste it.
 4. **Paste.** In the spreadsheet, open Extensions > Apps Script. Open the
@@ -562,20 +567,22 @@ case the script asks nothing.
 
 ##### A Past Price: getCryptoPrice
 
-`getCryptoPrice(token, dateStr, tz, mode)` gives a coin's price in USD at
-a past time, from MEXC, then CoinGecko, then CoinPaprika. Each source
+`getCryptoPrice(token, dateStr, tz, mode)` gives a coin's price in USD
+at a past time, from MEXC, then CoinGecko, then CoinPaprika. Each source
 prices a period that holds the time. MEXC's is the minute, for a time in
 about the last 30 days, else the hour; when nothing traded in it, the
-script widens it a step at a time, up to the year. A larger period may
-hold only trades from after a time that comes before the coin's first
-trade on MEXC, which comes on the day MEXC listed it. So when MEXC gives
-no candle of a recent time's minute, or of the hour, or the request for it
-fails, the script asks for the day before, whose candle shows the coin
-traded before that day: with none, or when that request fails too,
-CoinGecko answers. CoinGecko's is the 24 hours from 12 hours before the
-time to 12 after, whose price the script takes only once they are over,
-and CoinPaprika's the day, in UTC, whose price it takes only once the day
-is over.
+script widens it a step at a time, up to the year, among the periods
+already over: for a time in the minute not yet over, the cell says when
+to ask again, and when the next period up is not over, CoinGecko
+answers. A larger period may hold only trades from after a time that
+comes before the coin's first trade on MEXC, which comes on the day MEXC
+listed it. So when MEXC gives no candle of a recent time's minute, or of
+the hour, or the request for it fails, the script asks for the day
+before, whose candle shows the coin traded before that day: with none,
+or when that request fails too, CoinGecko answers. CoinGecko's is the 24
+hours from 12 hours before the time to 12 after, whose price the script
+takes only once they are over, and CoinPaprika's the day, in UTC, whose
+price it takes only once the day is over.
 
 - `token` is the coin's ticker symbol, such as `"btc"` or `"xmr"`.
 - `dateStr` is the time, written `"YYYY-MM-DD HH:MM:SS"` on a 24-hour
@@ -585,9 +592,10 @@ is over.
   empty, UTC.
 - `mode` is `"average"`, the average of the period's highest and lowest
   price, unless it is `"high"`, `"low"` or `"close"`, the price at the
-  period's end, or, from CoinGecko, its hourly price nearest the time.
-  When MEXC has to widen its period to find a trade, every mode gets that
-  period's average.
+  period's end, or, from CoinGecko, its hourly price nearest the time, or,
+  when its hourly prices are empty, its price at 00:00 UTC the next day,
+  which ends the time's UTC day. When MEXC has to widen its period to
+  find a trade, every mode gets that period's average.
 
 XTM's average price at the time in cell C2, read in UTC, as in the
 [Screenshot](#screenshot):
@@ -610,8 +618,10 @@ Bitcoin's highest price in the period around 14:30, US Central time, on
 ```
 
 A cell shows a message instead of a price when no source has one for that
-coin at that time, when the time is in the future, when MEXC has no price
-and a later source's period that holds the time is not over (CoinGecko's
+coin at that time, when the time is in the future, when the time is in
+the minute not yet over, whose price at MEXC can still change, when MEXC
+has no price and a later source's period that holds the time is not over
+(CoinGecko's
 24 hours around a time less than 12 hours ago, while CoinGecko prices the
 coin, or CoinPaprika's day, in UTC, for a time today), when no source has
 a price for an average, a high or a low and no CoinPaprika key is set,
@@ -636,7 +646,24 @@ price cells again:
 - Refresh & freeze historical prices (this tab) runs again every cell of
   the tab you are on that calls `getCryptoPrice`, then replaces each
   formula that gave a number with that number, since a past price does
-  not change.
+  not change, with two exceptions. CoinGecko says it may revise a price
+  for up to 2 days after its date, and a price for a time can come from
+  CoinGecko's prices of the next UTC day, which can change until the end
+  of the second day after it, when the fourth day after the time's UTC
+  day begins. The item keeps the price each cell kept, which may have
+  been asked of CoinGecko up to 12 hours earlier, since the script keeps
+  a cell's price for up to 6 hours and the prices CoinGecko gave it for
+  up to 6 more; so freeze a tab only once its times are 5 days old, when
+  the fourth day after each time's UTC day began at least a day before. And a coin that traded nothing on
+  MEXC in the UTC day that holds a time takes the next source's price until
+  MEXC can give the average of a larger period that holds the time, each
+  in UTC: the week, which MEXC counts from Monday 00:00, once it is over;
+  or, when nothing traded in the week either, the month, once it and the
+  week are over, since a week from Monday can end after its month or its
+  year; or, when nothing traded in the month either, the year, once it
+  and the week are over. A cell keeps the price it gave for up to
+  6 hours, so freeze a tab that holds such a cell only once that period
+  and the week have been over 6 hours.
 - Help shows how to use each function.
 
 ##### DEX Screener's Functions
@@ -658,7 +685,8 @@ documents the functions.
 
 The build sets the saved keys in the file, so a key saved or changed
 reaches the spreadsheet once the file is built and pasted again. The
-file, built with the password typed when the build asks for it:
+file, built with the key store's password, from `API_KEYS_PASSWORD` or
+typed when the build asks for it:
 
 ```bash
 npm run build apps-script
@@ -678,7 +706,7 @@ a token's price in USD now, and `fdv` its fully diluted value.
 #### Usage of crypto-price-fetchers.js
 
 It sends DexTools' key, or x1.ninja's for X1, opened with the password,
-which it asks for. `--pool` names the
+from `API_KEYS_PASSWORD` or asked for. `--pool` names the
 pool to price the token in, which X1 needs.
 
 Wrapped XNT's price on X1, in its pool with USDC.X:
@@ -749,8 +777,11 @@ the time zone `--tz` names, UTC by default: the first column whose name
 holds `date` and `UTC`, or else the first whose name holds `date`. It
 writes the file again with three columns added: `$usd price`, by default the
 close of the period that holds the row's time, or CoinGecko's hourly
-price nearest it, or, when MEXC must widen the period to find a trade,
-that period's average; `$usd amount`, the row's
+price nearest it, or, when CoinGecko's hourly prices are empty, its price
+at 00:00 UTC the next day, which ends the time's UTC day, or, for a token
+that trades in pools, Moralis's price at the block the chain had at the
+row's time, or, when MEXC must widen the period to find a trade, that
+period's average; `$usd amount`, the row's
 amount at that price; and `grand total ($usd)`. Your files go in its
 folder's `input/`, `fetch-from-any-exchange/crypto-price-filler/input/`, and it writes, by default, `output.csv`
 in its folder's `output/csv/`; git keeps nothing in either folder but
@@ -763,7 +794,8 @@ row no service priced gets `Error` in `$usd price`: `--backfill-highest`
 or `--backfill-lowest` fills it in the same run, or, afterwards,
 `bin/end-user/backfill.js`, which fills it in the file the filler wrote, asking no
 service ([backfill.js](#backfilljs-1)). With api keys
-saved, a run asks for the key store's password. It reads its own files from its
+saved, a run opens them with the key store's password, from
+`API_KEYS_PASSWORD` or asked for. It reads its own files from its
 package's folder, and writes its default output there, so it runs from
 any folder, and takes the paths `--input` and `--output` name from the
 folder it runs in.
@@ -819,6 +851,12 @@ not overstate income:
 node bin/end-user/backfill.js --input=fetch-from-any-exchange/crypto-price-filler/output/csv/output.csv --output=fetch-from-any-exchange/crypto-price-filler/output/csv/budget.csv --backfill-lowest
 ```
 
+The same fill in place with the higher price, printing the files, the mode, the columns it reads and the rows it filled:
+
+```bash
+node bin/end-user/backfill.js --input=fetch-from-any-exchange/crypto-price-filler/output/csv/output.csv --backfill-highest --verbose
+```
+
 ### manage-api-keys.js
 
 ```bash
@@ -838,8 +876,9 @@ DexTools' saved key replaced, as after DexTools issues a new one:
 npm run api-keys -- set dextools
 ```
 
-Whether the password kept for the terminal opens every saved key, by its
-exit code, 0 when it does:
+Whether the password in `API_KEYS_PASSWORD` opens every saved key, by its
+exit code, 0 when it does; run with no `API_KEYS_PASSWORD` set, it says so
+and ends with exit code 1:
 
 ```bash
 npm run api-keys -- check-password
