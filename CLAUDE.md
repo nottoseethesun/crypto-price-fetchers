@@ -299,8 +299,9 @@ checks, never as development packages, which it skips.
 `docs/price-determination-rules.md` how each tool decides which price
 to give, `docs/engineering.md`
 covers the files, the programs in `bin/` the README leaves out, the gates,
-the tests and CI (the gates, run at each push by GitHub Actions, GitHub's
-service that runs a repo's workflows), and
+the tests and CI (the gates, run by GitHub Actions, GitHub's service
+that runs a repo's workflows, on each pull request to `main`, each push
+to `main`, and on request), and
 `docs/project-commands.md` lists every command, those npm runs and those
 run with `node` or `source`, as LP Ranger's `docs/` does. A change keeps
 them true.
@@ -314,6 +315,10 @@ bin, a script, a package or an outside service. Its introduction starts
 from the big picture, gives a few words of context or a scenario where the
 tool is used, says which codebase it comes from, and says what it does in
 precise words.
+[`docs/claude/CLAUDE-DOC-AUDIT.md`](docs/claude/CLAUDE-DOC-AUDIT.md)
+gives the audit in full: each rule with examples, how to check a doc
+and its JSDoc against the code, how to write a fix, and the loop of
+fresh readers that checks an audit before its fixes are made.
 
 ## Command lines
 
@@ -429,10 +434,10 @@ tracked files (`test/repo-checks.test.js`) are tested from the repo's top
 folder, on Node's own test runner. The tracked files are held to the
 checks of `lib/repo-checks.js`: every EVM address in EIP-55's form, every
 npm target named in `docs/project-commands.md`, every test file and
-helper named in `docs/engineering.md` or here, every link in a doc, and
-every path in a code span that starts at the doc's own folder, with `.`
-or `..` as its first part, pointing at a file, folder or heading the repo
-keeps, and a
+helper named in `docs/engineering.md` or here, every link in a doc
+pointing at a file, folder or heading the repo keeps, and every path in
+a code span that starts at the doc's own folder, with `.` or `..` as its
+first part, at a file or folder it keeps, and a
 `config-example.json` beside every `config.json`. The menu runs against a
 spreadsheet held in memory
 (`test/helpers/stand-in-spreadsheet.js`), and DEX Screener's part is
@@ -521,8 +526,10 @@ test file that holds no test. A bug's fix makes its test fail; the same
 change declares the test with `it`, moves it to the tests that guard the
 fixed bugs of its area, and removes the row:
 
-- `tests/regressions-command-line.test.js`: crypto-price-filler's two
-  command lines;
+- `tests/regressions-command-line.test.js`: crypto-price-filler's command
+  line, `index.js`, and what it shares with backfill's;
+- `tests/regressions-backfill.test.js`: backfill's command line,
+  `backfill.js`;
 - `tests/regressions-other-command-lines.test.js`: the repo's other
   command lines, the Node versions', summ-csv's, the key manager's and
   `bin/unlock-api-keys.sh`;

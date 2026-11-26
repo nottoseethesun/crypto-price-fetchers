@@ -27,6 +27,7 @@ import {
   ROW_UTC_MS,
   SHEETS_SCRIPT_PATH,
   answerCoinGeckoForPastDay,
+  answerMexcCandle,
   cellTime,
 } from "./helpers/regression-runs.js";
 import { mexcKlines } from "../../../test/helpers/stand-in-mexc.js";
@@ -160,6 +161,9 @@ describe("the exchange script in the hour MEXC lists a pair", () => {
 /** A MEXC candle in which something traded: open, high, low, close, volume. */
 const TRADED = ["1.00", "1.50", "0.80", "1.20", "10"];
 
+/** An hour's candle with another close than `TRADED`'s, to tell the hour's price apart. */
+const HOUR_TRADED = ["1.10", "1.70", "0.90", "1.60", "4"];
+
 /**
  * Loads the exchange script with a stand-in MEXC that lists XTMUSDT and
  * answers its klines with `klines`, and CoinGecko's answer for a past day.
@@ -191,10 +195,11 @@ describe("MEXC's minute candles", () => {
       const asked = new URL(url).searchParams;
       if (asked.get("interval") === "1m" && asked.get("limit") === "1")
         return reply(503, null);
-      return mexcKlines(url, () => TRADED);
+      const hour = asked.get("interval") === "60m";
+      return mexcKlines(url, () => (hour ? HOUR_TRADED : TRADED));
     });
     const time = cellTime(Date.now() - 2 * 86400000);
-    expect(script.getCryptoPrice("xtm", time, "UTC", "close")).toBe(1.2);
+    expect(script.getCryptoPrice("xtm", time, "UTC", "close")).toBe(1.6);
   });
 
   it("getCryptoPrice prices a time in the hour MEXC's minute candles begin in from MEXC's hour, rather than taking the minutes MEXC let go for minutes before the pair's first trade", () => {
@@ -433,5 +438,16 @@ describe("the message that CoinPaprika needs a key", () => {
     const before = asked.length;
     expect(ask()).toMatch(/CoinPaprika gives average, high and low only/);
     expect(asked.slice(before)).toEqual([]);
+  });
+});
+
+describe("getCryptoPrice's token", () => {
+  it("gives a message, not an error, when the token is not text", () => {
+    const script = loadSheetsScript(SHEETS_SCRIPT_PATH, answerMexcCandle);
+    const time = cellTime(ROW_UTC_MS);
+    for (const token of [42, true, "", "  ", undefined])
+      expect(script.getCryptoPrice(token, time, "UTC", "close", 0)).toBe(
+        'Invalid token: give the coin\'s symbol as text, such as "btc"',
+      );
   });
 });

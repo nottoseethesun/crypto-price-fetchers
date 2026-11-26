@@ -24,6 +24,7 @@ import { PassThrough } from "stream";
 import { askLine } from "../../../lib/ask-line.js";
 import { askPassword, openSecretPrompt } from "../../../api-key-store/index.js";
 import { filesUsingCommander } from "../../../lib/command-line-help.js";
+import { localReferencesMissing } from "../../../lib/repo-checks.js";
 import { fetchWithinTimeLimit } from "../../../lib/time-limited-fetch.js";
 import {
   compileSettingsSchema,
@@ -242,5 +243,111 @@ describe("answers piped in together", () => {
     expect(await password).toBe("Stopped at the prompt");
     input.end("y\n");
     expect(await askLine("Go on? ", streams)).toBe("y");
+  });
+});
+
+describe("the link check of lib/repo-checks.js", () => {
+  it("takes no link from a code span, which Markdown shows as code, and checks a link beside one that runs over two lines, or after a backtick a blank line leaves alone", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "code-span-link-"));
+    try {
+      fs.writeFileSync(
+        path.join(dir, "README.md"),
+        [
+          "# A repo",
+          "",
+          "A link is written as `[text](target)`, and [this one](missing.md) points nowhere.",
+          "",
+          "Run `npm run build",
+          "apps-script`, then read [the guide](missing-too.md) and `npm test`.",
+          "",
+          "A link is written as `[text](target)",
+          "in Markdown`, or as ``[text](target)``, or as ``a ` [text](target)``.",
+          "",
+          "A backtick alone, `, ends with its paragraph.",
+          "   ",
+          "So [the third](missing-three.md) is checked, beside `npm test`.",
+          "",
+        ].join("\n"),
+      );
+      spawnSync("git", ["init", "-q"], { cwd: dir });
+      spawnSync("git", ["add", "README.md"], { cwd: dir });
+      expect(localReferencesMissing(dir).map(({ pointer }) => pointer)).toEqual(
+        ["missing.md", "missing-too.md", "missing-three.md"],
+      );
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("ends a code span with its block, as Markdown parses one, opens none at an escaped backtick, opens no block of code at a line that starts with a code span of three backticks, and takes no link from an HTML comment that starts a line", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "code-span-block-"));
+    try {
+      fs.writeFileSync(
+        path.join(dir, "README.md"),
+        [
+          "# A repo",
+          "",
+          "An escaped backtick, \\`, opens no span, so [one](missing-1.md) is checked beside `npm test`.",
+          "",
+          "## A lone ` in a heading",
+          "Then [two](missing-2.md) beside `npm test`.",
+          "",
+          "| A | B | C |",
+          "| --- | --- | --- |",
+          "| A lone ` here | [three](missing-3.md) | `npm test` |",
+          "",
+          "- A lone ` in an item",
+          "- [four](missing-4.md) beside `npm test`",
+          "- A link is written as `[text](target)",
+          "  in Markdown`, in an item of two lines.",
+          "",
+          "> A lone ` in a quote.",
+          ">",
+          "> So [five](missing-5.md) is checked, beside `npm test`.",
+          "",
+          "A lone ` before a quote",
+          "> [six](missing-6.md) beside `npm test`.",
+          "",
+          "A lone ` before a thematic break",
+          "***",
+          "[seven](missing-7.md) beside `npm test`.",
+          "",
+          "A lone ` in a heading of two lines",
+          "===",
+          "[eight](missing-8.md) beside `npm test`.",
+          "",
+          "<!-- A lone ` in a comment, and [no link](missing-in-a-comment.md) -->",
+          "[nine](missing-9.md) beside `npm test`.",
+          "",
+          "```npm test``` opens no block of code, so [ten](missing-10.md) is checked.",
+          "",
+          "A link is written as `[text](target)",
+          "2. in Markdown`: an item that does not start at 1 goes on a paragraph.",
+          "",
+          "A link is written as `[text](target)",
+          "\u00a0",
+          "in Markdown`: a line of a no-break space is no blank line.",
+          "",
+        ].join("\n"),
+      );
+      spawnSync("git", ["init", "-q"], { cwd: dir });
+      spawnSync("git", ["add", "README.md"], { cwd: dir });
+      expect(localReferencesMissing(dir).map(({ pointer }) => pointer)).toEqual(
+        [
+          "missing-1.md",
+          "missing-2.md",
+          "missing-3.md",
+          "missing-4.md",
+          "missing-5.md",
+          "missing-6.md",
+          "missing-7.md",
+          "missing-8.md",
+          "missing-9.md",
+          "missing-10.md",
+        ],
+      );
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

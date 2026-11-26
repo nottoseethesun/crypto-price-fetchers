@@ -460,7 +460,7 @@ no price.
 | `Too recent for a final price: ask again after …` | A period that holds the time is not over: MEXC's minute, CoinGecko's 24 hours or CoinPaprika's day (above). |
 | `Rate limit busy - retry later` | Other cells kept the call from its turn, or no source gave a price and a request of the call was cut short (below). |
 | `No data available for future dates` | The time is after now. |
-| `Unknown time zone …`, or a message that starts `Invalid` | The time zone or the time cannot be read. |
+| `Unknown time zone …`, or a message that starts `Invalid` | The token, the time zone or the time cannot be read: a token that is not text gets `Invalid token: …`. |
 | `Error: …` | The script itself failed; the message says why. |
 | `#ERROR!` | Google stopped the call after 30 seconds. |
 
@@ -537,7 +537,11 @@ give another in these cases, which set when to freeze:
   - and, when no source has a price, no number, so the formula stays.
 
   So, to keep a price MEXC gave while it kept the candle of the time's
-  minute, freeze the cell within about 30 days of its time.
+  minute, freeze the cell within about 30 days of its time. Refresh &
+  freeze historical prices takes every `getCryptoPrice` cell of the open
+  tab, with no choice among them, so keep a cell that waits for its week,
+  month or year to be over in a tab apart from the cells to freeze within
+  about 30 days of their times.
 
 A request cut short during a run
 ([When a Cell Gets No Price](#when-a-cell-gets-no-price)) can leave a
@@ -579,10 +583,10 @@ settings in that folder's `config.json`, laid over the
   ([The Order of the Filler's Sources](#the-order-of-the-fillers-sources)
   says more of each).
 - Each row's time is in the date column: the first column whose name
-  holds both `date`, in lower-case letters, and `UTC`, in capitals; or,
-  when no name holds both so written, the first whose name holds "date"
-  in any letter case. So of the columns `Date (local)` and `Date (UTC)`,
-  in that order, the filler reads `Date (local)`. The time is written
+  holds "date", in any letter case, and `UTC`, in capitals; or, when no
+  name holds both, the first whose name holds "date". So of the columns
+  `Date (local)` and `Date (UTC)`, the filler reads `Date (UTC)`. The
+  time is written
   `YYYY-MM-DD HH:mm:ss`, and read in the time zone `--tz` names in full,
   such as `America/Chicago`, or in UTC, the default, with the offset the
   zone had at that time, daylight saving included.
@@ -659,10 +663,10 @@ with these differences:
 - Without a CoinPaprika key, a run with `--mode high` or `--mode low`,
   for a token with a CoinPaprika id, says that CoinPaprika can give
   neither, and asks, before it prices anything, whether to go on without
-  CoinPaprika's prices. y goes on, and a row no other source prices gets
-  `Error`; Enter, n, or an input that ends with no answer stops the run
-  with exit code 1, before any price is asked for; any other answer asks
-  again.
+  CoinPaprika's prices. y or yes goes on, and a row no other source
+  prices gets `Error`; Enter, n or no, or an input that ends with no
+  answer, stops the run with exit code 1, before any price is asked for;
+  any other answer asks again.
 - No lock and no 25-second limit apply: those are for cells.
 
 ### What a Row Gets

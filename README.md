@@ -649,7 +649,7 @@ price cells again:
 - Refresh & freeze historical prices (this tab) runs again every cell of
   the tab you are on that calls `getCryptoPrice`, then replaces each
   formula that gave a number with that number, since a past price does
-  not change, with two exceptions. CoinGecko says it may revise a price
+  not change, with these exceptions. CoinGecko says it may revise a price
   for up to 2 days after its date, and a price for a time can come from
   CoinGecko's prices of the next UTC day, which can change until the end
   of the second day after it, when the fourth day after the time's UTC
@@ -666,7 +666,14 @@ price cells again:
   year; or, when nothing traded in the month either, the year, once it
   and the week are over. A cell keeps the price it gave for up to
   6 hours, so freeze a tab that holds such a cell only once that period
-  and the week have been over 6 hours.
+  and the week have been over 6 hours. MEXC keeps its minute candles for
+  about 30 days. A price it gave from them, or as the hour's average
+  because nothing traded in the minute, can change once MEXC lets them
+  go, so freeze a tab that holds such a cell within about 30 days of its
+  times. The item takes every `getCryptoPrice` cell of the tab, with no
+  choice among them, so keep a cell that waits for its week, month or
+  year to be over in a tab apart from the cells to freeze within about
+  30 days of their times.
 - Help shows how to use each function.
 
 ##### DEX Screener's Functions
@@ -777,7 +784,8 @@ This writes Gridcoin's close at each row's time, read in UTC, to
 `bin/end-user/crypto-price-filler.js` prices each row of a CSV file at the
 time in its column of dates, written `yyyy-MM-dd HH:mm:ss` and read in
 the time zone `--tz` names, UTC by default: the first column whose name
-holds `date` and `UTC`, or else the first whose name holds `date`. It
+holds "date", in any letter case, and "UTC", in capitals, or else the
+first whose name holds "date". It
 writes the file again with three columns added: `$usd price`, by default the
 close of the period that holds the row's time, or CoinGecko's hourly
 price nearest it, or, when CoinGecko's hourly prices are empty, its price
@@ -1094,14 +1102,16 @@ his rules on addresses and docs, with
 
 ### Architecture and Engineering References
 
-The `docs/` folder holds four references:
+The `docs/` folder holds five references:
 
 - [`docs/architecture.md`](docs/architecture.md): how the parts fit.
 - [`docs/price-determination-rules.md`](docs/price-determination-rules.md):
   how each tool decides which price to give, and when it gives none.
+- [`docs/claude/CLAUDE-DOC-AUDIT.md`](docs/claude/CLAUDE-DOC-AUDIT.md):
+  the documentation audit every doc and JSDoc block passes, in full.
 - [`docs/engineering.md`](docs/engineering.md): the files, the gates, the
   tests and CI: the checks GitHub runs, through its GitHub Actions
-  service, at each push.
+  service, on each pull request and each push to `main`.
 - [`docs/project-commands.md`](docs/project-commands.md): every command,
   with its flags and an example.
 
