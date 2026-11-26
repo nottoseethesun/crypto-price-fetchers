@@ -158,9 +158,10 @@ such a cell is frozen only once that period and the week have been over
 gave from them, or as the hour's average because nothing traded in the
 minute, can change once MEXC lets them go, so such a cell is frozen
 within about 30 days of its time. Refresh & freeze historical prices
-freezes a whole tab at once, so a cell that waits for its week, month or
-year to be over goes in a tab apart from the cells frozen within about
-30 days of their times.
+takes every `getCryptoPrice` cell of the open tab, with no choice among
+them, so a cell that waits for its week, month or year to be over goes
+in a tab apart from the cells frozen within about 30 days of their
+times.
 While CoinGecko's hours are not over, when CoinGecko prices the coin,
 the cell says when to ask again and the script asks no later source;
 when it does not, as for a ticker no coin has, the script goes on to

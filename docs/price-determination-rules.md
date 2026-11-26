@@ -538,9 +538,10 @@ give another in these cases, which set when to freeze:
 
   So, to keep a price MEXC gave while it kept the candle of the time's
   minute, freeze the cell within about 30 days of its time. Refresh &
-  freeze historical prices freezes a whole tab at once, so keep a cell
-  that waits for its week, month or year to be over in a tab apart from
-  the cells to freeze within about 30 days of their times.
+  freeze historical prices takes every `getCryptoPrice` cell of the open
+  tab, with no choice among them, so keep a cell that waits for its week,
+  month or year to be over in a tab apart from the cells to freeze within
+  about 30 days of their times.
 
 A request cut short during a run
 ([When a Cell Gets No Price](#when-a-cell-gets-no-price)) can leave a

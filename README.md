@@ -670,9 +670,10 @@ price cells again:
   about 30 days. A price it gave from them, or as the hour's average
   because nothing traded in the minute, can change once MEXC lets them
   go, so freeze a tab that holds such a cell within about 30 days of its
-  times. The item freezes a whole tab at once, so keep a cell that waits
-  for its week, month or year to be over in a tab apart from the cells to
-  freeze within about 30 days of their times.
+  times. The item takes every `getCryptoPrice` cell of the tab, with no
+  choice among them, so keep a cell that waits for its week, month or
+  year to be over in a tab apart from the cells to freeze within about
+  30 days of their times.
 - Help shows how to use each function.
 
 ##### DEX Screener's Functions

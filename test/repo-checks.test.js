@@ -314,7 +314,7 @@ describe("this repo", () => {
     );
   });
 
-  it("points its docs' links, and the paths that start at a doc's own folder, only at files, folders and headings it keeps", () => {
+  it("points its docs' links only at files, folders and headings it keeps, and the paths in code spans that start at a doc's own folder only at files and folders", () => {
     assert.deepEqual(localReferencesMissing(REPO_TOP), []);
   });
 
