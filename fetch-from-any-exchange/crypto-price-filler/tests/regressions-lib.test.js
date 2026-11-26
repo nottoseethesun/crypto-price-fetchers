@@ -261,7 +261,7 @@ describe("the link check of lib/repo-checks.js", () => {
           "apps-script`, then read [the guide](missing-too.md) and `npm test`.",
           "",
           "A link is written as `[text](target)",
-          "in Markdown`, or as ``a ` [text](target)``.",
+          "in Markdown`, or as ``[text](target)``, or as ``a ` [text](target)``.",
           "",
           "A backtick alone, `, ends with its paragraph.",
           "   ",
@@ -279,7 +279,7 @@ describe("the link check of lib/repo-checks.js", () => {
     }
   });
 
-  it("ends a code span with its block, as Markdown parses one, opens none at an escaped backtick or a run of backticks that opens no fence, and takes no link from an HTML comment", () => {
+  it("ends a code span with its block, as Markdown parses one, opens none at an escaped backtick, opens no block of code at a line that starts with a code span of three backticks, and takes no link from an HTML comment that starts a line", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "code-span-block-"));
     try {
       fs.writeFileSync(
