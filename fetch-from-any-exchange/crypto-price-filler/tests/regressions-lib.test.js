@@ -247,17 +247,32 @@ describe("answers piped in together", () => {
 });
 
 describe("the link check of lib/repo-checks.js", () => {
-  it("takes no link from a code span, which Markdown shows as code", () => {
+  it("takes no link from a code span, which Markdown shows as code, and checks a link beside one that runs over two lines, or after a backtick a blank line leaves alone", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "code-span-link-"));
     try {
       fs.writeFileSync(
         path.join(dir, "README.md"),
-        "# A repo\n\nA link is written as `[text](target)`, and [this one](missing.md) points nowhere.\n",
+        [
+          "# A repo",
+          "",
+          "A link is written as `[text](target)`, and [this one](missing.md) points nowhere.",
+          "",
+          "Run `npm run build",
+          "apps-script`, then read [the guide](missing-too.md) and `npm test`.",
+          "",
+          "A link is written as `[text](target)",
+          "in Markdown`, or as ``[text](target)``.",
+          "",
+          "A backtick alone, `, ends with its paragraph.",
+          "   ",
+          "So [the third](missing-three.md) is checked, beside `npm test`.",
+          "",
+        ].join("\n"),
       );
       spawnSync("git", ["init", "-q"], { cwd: dir });
       spawnSync("git", ["add", "README.md"], { cwd: dir });
       expect(localReferencesMissing(dir).map(({ pointer }) => pointer)).toEqual(
-        ["missing.md"],
+        ["missing.md", "missing-too.md", "missing-three.md"],
       );
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });

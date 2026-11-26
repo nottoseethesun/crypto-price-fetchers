@@ -1,9 +1,11 @@
 /**
  * Tests that guard fixed bugs in crypto-price-filler's command line,
  * `index.js`, and in what it shares with backfill's, `backfill.js`: their
- * checks of a value, the settings they fall back to, how a settings file
- * or token list they cannot take ends a run, what `index.js` logs, the
- * column of dates it reads, and the exit code a run ends with. Those of
+ * checks of a value, the settings they fall back to, a backfill flag typed
+ * against the other's setting, how a settings file or token list they
+ * cannot take ends a run, how they fill the rows that hold no data, what
+ * `index.js` logs, the column of dates it reads, and the exit code a run
+ * ends with. Those of
  * backfill's alone are in `regressions-backfill.test.js`; the repo's
  * other command lines' are in `regressions-other-command-lines.test.js`,
  * and the repo's CLAUDE.md lists the other files of fixed bugs' tests; a
@@ -18,11 +20,11 @@
  * `helpers/stand-in-settings-preload.js`, a stand-in fetch through
  * `helpers/stand-in-fetch-preload.js`, and, for one test, a full disk
  * through `helpers/full-disk-preload.js`; its command, and `backfill.js`'s,
- * are also parsed here, in the test's thread, and `backfill.js` backfills
- * a CSV in a temp folder of the test's own, with the settings the test
- * gives it, in the test's thread or, through `backfillIn`
- * (`helpers/regression-runs.js`), as backfill's command line, in a child
- * process.
+ * are also parsed here, in the test's thread; `backfillPrices`
+ * (`utils/backfill.js`), which both command lines run, fills rows in the
+ * test's thread; and backfill's command line, run through `backfillIn`
+ * (`helpers/regression-runs.js`) in a child process, is refused an
+ * `--output` in a folder that does not exist.
  */
 
 import { afterAll, beforeAll, describe, it, expect } from "vitest";
@@ -32,7 +34,7 @@ import os from "os";
 import path from "path";
 import { setupBackfillCommander } from "../backfill.js";
 import { parseTimeZone, setupCommander } from "../commander.js";
-import { backfillChoice } from "../utils/backfill.js";
+import { backfillChoice, backfillPrices } from "../utils/backfill.js";
 import {
   backfillIn,
   runCommandLine,
@@ -404,5 +406,100 @@ describe("crypto-price-filler's date column", () => {
       `--output=${path.join(folder, "two-date-columns-out.csv")}`,
     ]);
     expect(run.stdout).toContain('Using date column: "Date (UTC)"');
+  });
+});
+
+describe("backfill and the rows that hold no data", () => {
+  it("backfillPrices leaves out of the backfill and the grand total the rows the filler leaves blank on purpose, such as a Total row", () => {
+    const row = (date, amount, price) => ({
+      date,
+      amount,
+      "$usd price": price,
+      "$usd amount": "",
+      "grand total ($usd)": "",
+    });
+    const rows = [
+      row("2025-06-01", "10", "2"),
+      row("2025-06-02", "10", "Error"),
+      row("2025-06-03", "10", "3"),
+      row("Total", "30", ""),
+    ];
+    backfillPrices(rows, {
+      priceColName: "$usd price",
+      amountColName: "amount",
+      usdAmountColName: "$usd amount",
+      grandTotalColName: "grand total ($usd)",
+      useHighest: true,
+    });
+    expect(rows[1]["$usd price"]).toBe(3);
+    expect(rows[3]["$usd price"]).toBe("");
+    expect(rows[3]["grand total ($usd)"]).toBe((80).toFixed(6));
+  });
+});
+
+describe("backfill beside a row that holds no data", () => {
+  it("backfillPrices brackets a block of Error prices with the nearest priced rows, past a blank row beside it", () => {
+    const row = (date, price) => ({
+      date,
+      amount: "1",
+      "$usd price": price,
+      "$usd amount": "",
+      "grand total ($usd)": "",
+    });
+    const options = {
+      priceColName: "$usd price",
+      amountColName: "amount",
+      usdAmountColName: "$usd amount",
+      grandTotalColName: "grand total ($usd)",
+    };
+    const highest = [
+      row("2025-06-01", "30"),
+      row("", ""),
+      row("2025-06-02", "Error"),
+      row("2025-06-03", "20"),
+    ];
+    backfillPrices(highest, { ...options, useHighest: true });
+    expect(highest[2]["$usd price"]).toBe(30);
+    const lowest = [
+      row("2025-06-01", "10"),
+      row("", ""),
+      row("2025-06-02", "Error"),
+      row("2025-06-03", "20"),
+    ];
+    backfillPrices(lowest, { ...options, useHighest: false });
+    expect(lowest[2]["$usd price"]).toBe(10);
+  });
+});
+
+describe("the filler's backfill flags set against each other", () => {
+  it("the filler's command line refuses a flag typed against the other's setting, naming both, writing no file", () => {
+    const folder = fs.mkdtempSync(path.join(os.tmpdir(), "filler-flags-"));
+    try {
+      fs.writeFileSync(
+        path.join(folder, "in.csv"),
+        "date (UTC),amount\n2025-06-15 12:30:00,10\n",
+      );
+      const output = path.join(folder, "out.csv");
+      const run = runIndexIn(
+        folder,
+        [
+          "--token",
+          "xtm",
+          "--input",
+          "in.csv",
+          "--output",
+          output,
+          "--backfill-lowest",
+        ],
+        { STAND_IN_FILLER_CONFIG: '{"BACKFILL_HIGHEST": true}' },
+      );
+      expect(run.stderr).toContain(
+        "option '--backfill-highest' (set in config.json) cannot be used with option '--backfill-lowest'",
+      );
+      expect(run.status).toBe(1);
+      expect(fs.existsSync(output)).toBe(false);
+    } finally {
+      fs.rmSync(folder, { recursive: true, force: true });
+    }
   });
 });

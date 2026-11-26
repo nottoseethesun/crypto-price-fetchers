@@ -160,7 +160,9 @@
  * MEXC keeps its minute candles for about 30 days. A price it gave from
  * them, or as the hour's average because nothing traded in the minute,
  * can change once MEXC lets them go, so freeze such a cell within about
- * 30 days of its time.
+ * 30 days of its time. Refresh & freeze freezes a whole tab at once, so
+ * keep a cell that waits for its week, month or year to be over in a tab
+ * apart from the cells to freeze within about 30 days of their times.
  *
  * ### Time zones
  *
