@@ -8,7 +8,7 @@
  * ends with. Those of
  * backfill's alone are in `regressions-backfill.test.js`; the repo's
  * other command lines' are in `regressions-other-command-lines.test.js`,
- * and the repo's CLAUDE.md lists the other files of fixed bugs' tests; a
+ * and the repo's `docs/engineering.md` (Known Bugs) lists the other files of fixed bugs' tests; a
  * bug found later gets its test in `known-bugs.test.js`, declared with
  * `it.fails` while the bug is there, and its fix moves the test to one of
  * them.

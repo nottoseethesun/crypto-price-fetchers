@@ -2,12 +2,10 @@
 
 An api key must not be committed, and should not sit on disk in plain
 text. This module, part of crypto-price-fetchers, the owner's repo of code
-his projects share, keeps a project's api keys in a JSON file that git,
-the version-control program, ignores,
-each encrypted with one password the owner types. It is the way LP Ranger,
-the owner's bot that manages his 9mm V3 liquidity positions, keeps its api
-keys, as a module any project on Node, the program that runs JavaScript
-outside a browser, can use.
+his projects share, keeps a project's api keys in a JSON file that git ignores, each encrypted with one password the owner types. It is the way LP Ranger keeps its api
+keys, as a module any project on Node can use. The tools and terms this README
+names without introducing them are in the repo's
+[glossary](../docs/glossary.md).
 
 ## How it keeps a key
 
@@ -27,9 +25,7 @@ each key, and saves it encrypted once its service takes it:
   twice or one the store does not know, stops the program, with every
   problem listed. The file's other keys are the project's.
 
-- The project's key manager, which `npm run api-keys` runs (npm, Node's
-  package manager, runs the commands a project's `package.json` names),
-  lists those keys, each saved or not, and asks for each one not saved. Nothing it prints shows a
+- The project's key manager, which `npm run api-keys` runs, lists those keys, each saved or not, and asks for each one not saved. Nothing it prints shows a
   key's characters. Each key is saved only once its service takes it.
 - A service may give keys of more than one type, which look alike, each
   taken only at an api of its own, as CoinGecko gives a Demo key, its free
@@ -135,8 +131,7 @@ would refuse.
 
 ## Using it in another project
 
-Another project installs this repo from GitHub, the website that hosts
-it, then calls the store from
+Another project installs this repo from GitHub, then calls the store from
 its own key manager and programs:
 
 1. Install this repo from GitHub as a dependency, following its main

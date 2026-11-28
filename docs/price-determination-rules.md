@@ -12,19 +12,14 @@ and each decides its price by rules of its own:
   a CSV file at the row's own time, such as each payout in a year of a
   miner's payouts. Its backfill fills the rows no service priced.
 
-The cells are those of Google Sheets, Google's spreadsheet app, whose
-functions here are scripts in Apps Script, Google's platform for scripts
-that run inside its apps. The build step, `npm run build apps-script`,
-joins the repo's Sheets scripts into the one file pasted into a
-spreadsheet; npm is the package manager of Node, the program that runs
-JavaScript outside a browser, and runs the commands the repo's
-`package.json` names. The Node version of each Sheets script, in
+The cells are those of Google Sheets, whose functions here are scripts in
+Apps Script. The build step, `npm run build apps-script`,
+joins the repo's Sheets scripts into the one file pasted into a spreadsheet. The tools and terms this page names without
+introducing them are in [`docs/glossary.md`](glossary.md). The Node version of each Sheets script, in
 `bin/end-user/`, runs the same script on Node, and so follows the same
 rules, save that what it keeps lasts
 only for its run, and Google's own limits, such as its daily quota of
-requests, do not apply. The build step can also add the functions of DEX
-Screener, a service that lists the pairs of decentralized exchanges with
-their prices, such as `DEX_SCREENER_PAIR_PROP`; their code is DEX
+requests, do not apply. The build step can also add the functions of DEX Screener, such as `DEX_SCREENER_PAIR_PROP`; their code is DEX
 Screener's own, which decides their prices, and this page does not cover
 them.
 
@@ -42,9 +37,8 @@ instead.
 
 ## Contents
 
-- [1. Candles, Statuses and Cells](#1-candles-statuses-and-cells)
+- [1. Candles, Periods and Cells](#1-candles-periods-and-cells)
   - [Candles and Periods](#candles-and-periods)
-  - [Http Statuses](#http-statuses)
   - [When a Cell Runs](#when-a-cell-runs)
 - [2. A Price Now: dexToolsGetTokenPrice and dexToolsGetTokenFDV](#2-a-price-now-dextoolsgettokenprice-and-dextoolsgettokenfdv)
   - [The Service Asked](#the-service-asked)
@@ -85,26 +79,16 @@ instead.
   - [What a Row Gets](#what-a-row-gets)
   - [Backfill: Prices for the Rows No Service Priced](#backfill-prices-for-the-rows-no-service-priced)
 
-## 1. Candles, Statuses and Cells
+## 1. Candles, Periods and Cells
 
 ### Candles and Periods
 
-Most of the services the scripts ask give a token's past prices as
-candles. A candle sums up the trades of one market over one period, such
-as a minute, an hour or a day, from its open time: the first price
-(open), the highest (high), the lowest (low), the last (close), and how
-much traded (volume). A period's candle is final once the period is
+Most of the services the scripts ask give a token's past prices as candles
+([glossary](glossary.md#terms)), each of one period, such as a minute, an
+hour or a day. A period's candle is final once the period is
 over. Until then it holds only the trades made so far, and a later trade
 can change its high, its low and its close; so the past-price tools take
-a price only from a period already over. Every period on this page is
-one of UTC, Coordinated Universal Time.
-
-### Http Statuses
-
-A service answers each request with an http status: a number that says
-how the request went, such as 200 when it went well, 429 when the
-service refuses it as one too many, and 500 or above when the service
-failed.
+a price only from a period already over. Every period on this page is one of UTC.
 
 ### When a Cell Runs
 
@@ -138,17 +122,13 @@ diluted value (FDV): its price times its total supply. Their script is
 
 ### The Service Asked
 
-A decentralized exchange is a set of contracts on a blockchain in which
-people swap one token for another. It has pools, each holding two tokens
-that people swap for each other, and each pool has its own price. The
-script asks one of two services that price tokens from such pools,
+The script asks one of two services that price tokens from the pools of
+decentralized exchanges ([glossary](glossary.md#terms)),
 chosen by the chain the first argument names:
 
-- DexTools, a service that prices tokens from the pools of decentralized
-  exchanges on many chains, for each chain it lists, named as DexTools
+- DexTools, for each chain it lists, named as DexTools
   names it, such as `ether` for Ethereum or `pulse` for PulseChain.
-- x1.ninja, a service that gives the prices of the pools of X1's
-  decentralized exchanges, for X1, named `x1`, which DexTools does not
+- x1.ninja, for X1, named `x1`, which DexTools does not
   list.
 
 ### The Pool Priced
@@ -214,8 +194,7 @@ number, in place of the 5 minutes above.
 a past time: a price of a short period around that time, from one of
 three sources, which
 [The Order of the Sheet's Sources](#the-order-of-the-sheets-sources)
-describes: MEXC, a centralized exchange, and CoinGecko and CoinPaprika,
-two services that gather the prices of many exchanges. Its script is in
+describes: MEXC, CoinGecko and CoinPaprika. Its script is in
 `fetch-from-any-exchange/src/`:
 `getCryptoPriceFromCentralizedExchange.gs`, with its price sources in
 `getCryptoPriceFromCentralizedExchange-sources.gs`. The figures in this
@@ -290,11 +269,9 @@ no request once they are used.
 The script asks three sources, one after another, and gives the first
 price one of them gives:
 
-1. MEXC, a centralized exchange: a company that runs markets in which
-   people trade coins, and publishes each market's candles. It takes no
-   api key.
-2. CoinGecko, a service that gathers the prices of many exchanges, and
-   CoinPaprika, a service like CoinGecko, which each take an api key, one
+1. MEXC, which publishes each of its markets' candles. It takes no api
+   key.
+2. CoinGecko and CoinPaprika, which each take an api key, one
    after the other in the order of priority the owner ranked their keys
    in (`npm run api-keys -- rank`), which the build step writes into the
    script as `CONFIG.API_KEY_PRIORITY`. Until the owner ranks them, and in
@@ -568,9 +545,7 @@ it, puts it in place of the formula.
 
 ### The Exchange Script's Settings
 
-`fetch-from-any-exchange/config.json`, a settings file that git, the
-version-control program that keeps the repo's history, leaves out of
-that history, may change the figures this section gives. The build step writes its
+`fetch-from-any-exchange/config.json`, a settings file that git ignores, may change the figures this section gives. The build step writes its
 values into the file pasted into a spreadsheet, and the Node version and
 crypto-price-filler read it. It may set the quote currency of MEXC's
 pairs, `QUOTE_CURRENCY`, to USDC in place of USDT, the stablecoin both
@@ -594,9 +569,7 @@ settings in that folder's `config.json`, laid over the
   `fetch-from-any-exchange/crypto-price-filler/supported-tokens.json`,
   names; the run refuses any other before it asks anything. The list
   gives each token's id at each source, and, for a token that trades in a
-  blockchain's pools, its contract and its chain's ids at GeckoTerminal
-  and Moralis, two services that price a token from its chain's pools
-  ([The Order of the Filler's Sources](#the-order-of-the-fillers-sources)
+  blockchain's pools, its contract and its chain's ids at GeckoTerminal and Moralis ([The Order of the Filler's Sources](#the-order-of-the-fillers-sources)
   says more of each).
 - Each row's time is in the date column: the first column whose name
   holds "date", in any letter case, and `UTC`, in capitals; or, when no
@@ -641,8 +614,7 @@ again to a row of the same token, time and mode without asking.
 
 #### Moralis
 
-Moralis, a service that prices tokens from the pools of decentralized
-exchanges and takes an api key, gives a token's price at a block of its
+Moralis, which takes an api key, gives a token's price at a block of its
 chain. The filler asks Moralis for the block the chain had at the row's
 time, then for the token's price in USD at that block. One price is not
 a range, so Moralis answers close only; for a high or a low, the filler
@@ -650,15 +622,13 @@ asks GeckoTerminal and the sources after it.
 
 #### GeckoTerminal
 
-GeckoTerminal, a service that lists the pools of decentralized exchanges
-with their prices and candles, gives a pool's candles of each minute and
+GeckoTerminal gives a pool's candles of each minute and
 hour:
 
 - The pool: of the first pools GeckoTerminal lists for the token, 10 by
   default (`GECKOTERMINAL_TOP_POOLS_CONSIDERED`), the filler takes the
   one that holds the most value in USD among those that traded in the
-  last 24 hours and hold the token, as LP Ranger, the owner's bot that
-  manages his liquidity positions, picks a pool. It picks the pool once a
+  last 24 hours and hold the token, as LP Ranger picks a pool. It picks the pool once a
   run, from the pools as they stand when it runs, and prices every row
   from that pool.
 - The candle: that of the minute that holds the row's time, or, when

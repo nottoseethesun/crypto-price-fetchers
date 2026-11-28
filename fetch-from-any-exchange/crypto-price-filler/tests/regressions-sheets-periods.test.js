@@ -4,7 +4,7 @@
  * change, and the end of a day that closes it. Each runs the exchange
  * script in the test's thread; a fix moves its known-bug test here from
  * `known-bugs.test.js` when it is about such a period (see the repo's
- * CLAUDE.md).
+ * `docs/engineering.md`, Known Bugs).
  * @module tests/regressions-sheets-periods.test
  *
  * The exchange script runs unchanged in the test's thread, through

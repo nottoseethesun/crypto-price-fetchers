@@ -1,20 +1,18 @@
 # crypto-price-fetchers — Project Commands
 
 Every command of crypto-price-fetchers, the owner's repo of code his
-projects share, with what each does and what to type. Most run through
-npm, the package manager of Node, the program that runs JavaScript outside
-a browser, from a `package.json`: those its top `package.json` defines,
+projects share, with what each does and what to type. Most run through npm, from a `package.json`: those its top `package.json` defines,
 which run from the repo's top folder, and those of crypto-price-filler,
 its tool that fills a CSV's price columns, which has a package of its own.
 The rest run with `node`, or `source`, at a terminal
 ([Commands Run Without npm](#commands-run-without-npm)).
 
-Each command runs on both major versions of Node the repo supports: the
-newest LTS (long-term support) version, today 26, and the version two
+Each command runs on both major versions of Node the repo supports: the newest LTS version, today 26, and the version two
 majors before it, today 24.
 
 Companion to [`docs/engineering.md`](engineering.md), which covers how the
-gates work. This file covers how to drive them.
+gates work. This file covers how to drive them. The tools and terms it
+names without introducing them are in [`docs/glossary.md`](glossary.md).
 
 ---
 
@@ -43,9 +41,7 @@ of the repo's command lines passes `--help` on to it, which then lists its
 options, examples of its common uses and its exit codes:
 `npm run build -- --help`. These three commands replace the saved key of
 DexTools, the service that gives current prices ([Api Keys](#api-keys)),
-run the tests whose names hold `unlockApiKeys` ([Test](#test)), and give
-the Sheets scripts, the repo's scripts for Google Sheets, Google's
-spreadsheet app, as one file, with their keys ([Build](#build)):
+run the tests whose names hold `unlockApiKeys` ([Test](#test)), and give the Sheets scripts as one file, with their keys ([Build](#build)):
 
 ```sh
 npm run api-keys -- set dextools
@@ -64,7 +60,7 @@ installs it where it is missing.
 
 | Command | Flags | Description | Example |
 | ------- | ----- | ----------- | ------- |
-| `os-dependencies` | `--help` | Runs `install/install-os-dependencies.js`. Says which clipboard tool is installed: pbcopy on macOS, clip on Windows, wl-copy, xclip or xsel in a Linux desktop session. Where none is, it installs wl-clipboard for a Wayland session or xclip for an X11 one with Homebrew, the package manager for macOS and Linux, when `brew` is installed. Without Homebrew, it recommends installing it, as <https://brew.sh> says, then running the command again, and, where apt is installed, asks whether to install the package with `sudo apt install -y` instead. With neither, or when an install fails, it names the package to install by hand. With no desktop session open, as over ssh, it installs nothing. Exits with 0 when nothing is missing, 1 when a program still is or an argument is not one it takes. | `npm run os-dependencies` · `node install/install-os-dependencies.js` |
+| `os-dependencies` | `--help` | Runs `install/install-os-dependencies.js`. Says which clipboard tool is installed: pbcopy on macOS, clip on Windows, wl-copy, xclip or xsel in a Linux desktop session. Where none is, it installs wl-clipboard for a Wayland session or xclip for an X11 one with Homebrew, when `brew` is installed. Without Homebrew, it recommends installing it, as <https://brew.sh> says, then running the command again, and, where apt is installed, asks whether to install the package with `sudo apt install -y` instead. With neither, or when an install fails, it names the package to install by hand. With no desktop session open, as over ssh, it installs nothing. Exits with 0 when nothing is missing, 1 when a program still is or an argument is not one it takes. | `npm run os-dependencies` · `node install/install-os-dependencies.js` |
 
 ---
 
@@ -86,22 +82,19 @@ keeps the password for a terminal ([Commands Run Without npm](#commands-run-with
 
 ## Build
 
-A spreadsheet runs the Sheets scripts from its project in Apps Script,
-Google's platform for scripts that run inside its apps, which cannot read
-the key file and runs every script file in one global scope,
+A spreadsheet runs the Sheets scripts from its project in Apps Script, which cannot read the key file and runs every script file in one global scope,
 so the scripts are pasted as one file, with the keys written in. One
 command gives that file.
 
 | Command | Flags | Description | Example |
 | ------- | ----- | ----------- | ------- |
-| `build` | `apps-script`, `--help` | `apps-script` first reads the config.json each Node version, the script's twin that runs it on Node, reads, and checks it as that Node version does, stopping, with every problem listed, when a file sets a field the script does not take or a value of the wrong kind. It then asks whether to include the Google Sheets functions of DEX Screener, a service that lists the pairs of decentralized exchanges with their prices (Enter or y includes them, n leaves them out), naming the commit of DEX Screener's repo they come from, and saying that the step is optional and that a build that fails should be run again with n. On a yes, it checks that those files are the ones this repo pinned: it downloads each and compares its SHA-256 with the one written in the repo, the check `audit:dex-screener` runs on its own; then it prints the result and compiles the files it checked. Then it opens the saved keys, as the programs do, and joins the menu, every Sheets script and DEX Screener's functions into one file, with the keys, the values of those config.json files, and the Help page set at its end. It puts the file on the clipboard, says how to paste it, waits for Enter, and clears the clipboard. With no clipboard tool installed, on a Linux desktop with Homebrew or apt, it offers the install `os-dependencies` runs; declined, failed, or with no install to offer, it warns that the keys go to disk in the clear, then writes the file to `dist/apps-script/crypto-price-fetchers.gs`, readable by the owner alone. It takes no other argument; `--help` gives its exit codes. | `npm run build apps-script` |
+| `build` | `apps-script`, `--help` | `apps-script` first reads the config.json each Node version, the script's twin that runs it on Node, reads, and checks it as that Node version does, stopping, with every problem listed, when a file sets a field the script does not take or a value of the wrong kind. It then asks whether to include the Google Sheets functions of DEX Screener (Enter or y includes them, n leaves them out), naming the commit of DEX Screener's repo they come from, and saying that the step is optional and that a build that fails should be run again with n. On a yes, it checks that those files are the ones this repo pinned: it downloads each and compares its SHA-256 with the one written in the repo, the check `audit:dex-screener` runs on its own; then it prints the result and compiles the files it checked. Then it opens the saved keys, as the programs do, and joins the menu, every Sheets script and DEX Screener's functions into one file, with the keys, the values of those config.json files, and the Help page set at its end. It puts the file on the clipboard, says how to paste it, waits for Enter, and clears the clipboard. With no clipboard tool installed, on a Linux desktop with Homebrew or apt, it offers the install `os-dependencies` runs; declined, failed, or with no install to offer, it warns that the keys go to disk in the clear, then writes the file to `dist/apps-script/crypto-price-fetchers.gs`, readable by the owner alone. It takes no other argument; `--help` gives its exit codes. | `npm run build apps-script` |
 
 ---
 
 ## Summ CSV Files
 
-Every CSV file the owner imports into Summ, the crypto tax calculator he
-keeps his books in, is written by one utility, this repo's `summ-csv/`,
+Every CSV file the owner imports into Summ is written by one utility, this repo's `summ-csv/`,
 which checks every row first and writes nothing while any row breaks a
 rule ([its README](../summ-csv/README.md) lists the rules).
 
@@ -118,9 +111,9 @@ and `format` and `lint:fix` make the fixes the tools can make.
 
 | Command | Flags | Description | Example |
 | ------- | ----- | ----------- | ------- |
-| `format` | — | The write pass of Prettier, the package that formats code, over every JavaScript, Sheets script, JSON and YAML file. | `npm run format` |
+| `format` | — | The write pass of Prettier over every JavaScript, Sheets script, JSON and YAML file. | `npm run format` |
 | `knip:files` | — | The dead-code check: fails on any file nothing reaches. `lint` runs it. | `npm run knip:files` |
-| `lint` | — | The linters: ESLint, which checks JavaScript against rules, LP Ranger's and `no-or-default`, this repo's rule against a default made with `\|\|`; markdownlint, which checks the form of Markdown files; Prettier in check mode; actionlint, which checks the GitHub Actions workflow files, run from its official release by this repo's bin `run-actionlint`, which checks the release's SHA-256; and knip's check for files nothing uses. husky, the package that runs scripts at the hooks of git, the version-control program, runs it before each commit. | `npm run lint` |
+| `lint` | — | The linters: ESLint, with LP Ranger's rules and `no-or-default`, this repo's rule against a default made with `\|\|`; markdownlint; Prettier in check mode; actionlint, on the GitHub Actions workflow files, run from its official release by this repo's bin `run-actionlint`, which checks the release's SHA-256; and knip's check for files nothing uses. husky runs it before each commit. | `npm run lint` |
 | `lint:fix` | — | ESLint and markdownlint with their fixes, then `format`. | `npm run lint:fix` |
 
 ---
@@ -132,10 +125,10 @@ them, after the lint, and must pass before a commit and a push.
 
 | Command | Flags | Description | Example |
 | ------- | ----- | ----------- | ------- |
-| `audit:actionlint` | `--help` | Runs `run-actionlint --check`: downloads every archive of the release of actionlint, the checker of GitHub Actions workflow files, that `lint` runs, and fails when one cannot be downloaded, or its SHA-256 or its program's differs from the one `actionlint/release.js` pins; npm audit does not cover actionlint, which is no npm package. `audit:deps` runs it. | `npm run audit:actionlint` |
-| `audit:deps` | — | `npm audit`, npm's check of the installed packages against known vulnerabilities, at the `high` threshold over the packages that ship (`--omit=dev`), the repo's and crypto-price-filler's, then `audit:dex-screener` and `audit:actionlint`. | `npm run audit:deps` |
+| `audit:actionlint` | `--help` | Runs `run-actionlint --check`: downloads every archive of the release of actionlint that `lint` runs, and fails when one cannot be downloaded, or its SHA-256 or its program's differs from the one `actionlint/release.js` pins; npm audit does not cover actionlint, which is no npm package. `audit:deps` runs it. | `npm run audit:actionlint` |
+| `audit:deps` | — | `npm audit` at the `high` threshold over the packages that ship (`--omit=dev`), the repo's and crypto-price-filler's, then `audit:dex-screener` and `audit:actionlint`. | `npm run audit:deps` |
 | `audit:dex-screener` | `--help` | Downloads each file of DEX Screener's Google Sheets functions at the commit the build step uses, and fails when one cannot be downloaded or its SHA-256 differs from the one the build checks; npm audit does not cover that code. `audit:deps` runs it. | `npm run audit:dex-screener` |
-| `audit:secrets` | — | secretlint, which looks for keys and credentials in files, across the repo. | `npm run audit:secrets` |
+| `audit:secrets` | — | Every file of the repo checked for keys and credentials, by secretlint. | `npm run audit:secrets` |
 | `audit:security` | — | The security lint, ESLint with `eslint-security.config.js`: the rules of eslint-plugin-security, against code open to attack, of eslint-plugin-no-secrets, against strings that look like keys, and `no-secret-logging`, this repo's rule against printing a name that may hold a secret. | `npm run audit:security` |
 | `check` | — | The full gate: `lint`, `test:coverage`, `test:filler`, `audit:deps` (with `audit:dex-screener` and `audit:actionlint`), `audit:security` and `audit:secrets`, in that order, stopping at the first that fails. | `npm run check` |
 | `format:check` | — | Prettier in check mode; fails rather than rewriting. | `npm run format:check` |
@@ -157,7 +150,7 @@ npm runs this command itself, before another one.
 
 | Command | Flags | Description | Example |
 | ------- | ----- | ----------- | ------- |
-| `prelint` | — | Runs before `lint`; installs the husky hooks, so the pre-commit hook is in place once `lint` or `check` has run. It is here rather than in `prepare` because npm runs a git dependency's `prepare`, after installing its development packages, in every project that installs this repo from GitHub, the website that hosts it. | automatic |
+| `prelint` | — | Runs before `lint`; installs the husky hooks, so the pre-commit hook is in place once `lint` or `check` has run. It is here rather than in `prepare` because npm runs a git dependency's `prepare`, after installing its development packages, in every project that installs this repo from GitHub. | automatic |
 
 ---
 
@@ -171,7 +164,7 @@ run in `fetch-from-any-exchange/crypto-price-filler/`, after
 | ------- | ----- | ----------- | ------- |
 | `clean` | — | Remove the files a test run can leave: `output/csv/mock-filled*.csv`, which the run with real data in `index.js`'s header writes, and `test.log` and `test.html`, which the header's commands that save the tests' logs write. | `npm run clean` |
 | `start` | the tool's options; `--help` | Run the tool: read a CSV, fill its price columns, write the output. See its README. | `npm start -- --token=xtm --input=input/in.csv --output=output/csv/out.csv` |
-| `test` | — | vitest, a test runner for JavaScript, with coverage, quietly. | `npm test` |
+| `test` | — | vitest, with coverage, quietly. | `npm test` |
 | `test:ci` | — | vitest with coverage and no cache. | `npm run test:ci` |
 | `test:debug` | — | vitest with `VERBOSE=1`, the verbose reporter, coverage and no cache. | `npm run test:debug` |
 | `test:strict` | — | `validate-parse`, then the tests with coverage, failing below 80% of lines covered. What `npm run check` runs. | `npm run test:strict` |
@@ -186,9 +179,7 @@ These command lines run with `node`, or, for the password script,
 `source`, at a terminal, from the repo's top folder: the Node version of
 each Sheets script, which prints the number the script gives a cell,
 crypto-price-filler's command line and its backfill, the script that
-keeps the key store's password for a terminal, and the runner of
-actionlint, the checker of GitHub Actions workflow files, which `lint`
-and `audit:actionlint` run. The other programs in `bin/end-user/` and
+keeps the key store's password for a terminal, and the runner of actionlint, which `lint` and `audit:actionlint` run. The other programs in `bin/end-user/` and
 `bin/` run through the npm targets above, the key manager as `api-keys`
 and the Summ CSV writer as `summ-csv`, or, the versions tool, in the
 projects that install this repo (See Also, below). Each Node command
@@ -201,10 +192,10 @@ password script and the runner of actionlint.
 | Command | Flags | Description | Example |
 | ------- | ----- | ----------- | ------- |
 | `node bin/end-user/crypto-price-fetchers.js` | `price <chain> <token>`, `fdv <chain> <token>`, `--pool <address>` (after `price` or `fdv`), `--config <file>`, `--verbose`, `--help` | The Node version of `crypto-price-fetchers/src/crypto-price-fetchers.gs`: a token's price, or fully diluted value (FDV), in USD now, from DexTools, or from x1.ninja for X1, which needs `--pool`. `--config` names a settings file in place of `crypto-price-fetchers/config.json`. | `node bin/end-user/crypto-price-fetchers.js price ether 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48` |
-| `node bin/end-user/getCryptoPriceFromCentralizedExchange.js` | `<token> <date>`, `--tz <abbreviation>`, `--mode <mode>`, `--config <file>`, `--verbose`, `--help` | The Node version of the exchange script: a coin's USD price at a past time, from MEXC, then CoinGecko and CoinPaprika in the order of priority their keys are ranked in (`npm run api-keys -- rank`). `--config` names a settings file in place of `fetch-from-any-exchange/config.json`. | `node bin/end-user/getCryptoPriceFromCentralizedExchange.js btc "2026-01-15 14:30:00"` |
-| `node bin/end-user/crypto-price-filler.js` | `--token <symbol>`, `--input <path>`, `--output <path>`, `--mode <mode>`, `--tz <zone>`, `--list-valid-timezones`, `--backfill-highest`, `--backfill-lowest`, `--verbose`, `--version`, `--help` | crypto-price-filler's command line: fills the price columns of a CSV file of dated rows with the token's USD price at each row's time, from the pools a token trades in and from MEXC, CoinGecko and CoinPaprika, in the order of priority the services' keys are ranked in (`npm run api-keys -- rank`), the pools first until they are; a row no service priced gets `Error`. It loads the package in `fetch-from-any-exchange/crypto-price-filler/`, whose `npm start` runs it too; `--input` and `--output` are read from the folder it runs in, and with no `--output` it writes `output.csv` in its package's `output/csv/`. Your files go in its package's `input/`; git keeps nothing in either folder but the folder. | `node bin/end-user/crypto-price-filler.js --token=grc --input=fetch-from-any-exchange/crypto-price-filler/input/mining.csv` |
+| `node bin/end-user/getCryptoPriceFromCentralizedExchange.js` | `<token> <date>`, `--tz <abbreviation>`, `--mode <mode>`, `--config <file>`, `--verbose`, `--help` | The Node version of the exchange script: a coin's USD price at a past time, from MEXC, CoinGecko and CoinPaprika, in [their order](price-determination-rules.md#the-order-of-the-sheets-sources). `--config` names a settings file in place of `fetch-from-any-exchange/config.json`. | `node bin/end-user/getCryptoPriceFromCentralizedExchange.js btc "2026-01-15 14:30:00"` |
+| `node bin/end-user/crypto-price-filler.js` | `--token <symbol>`, `--input <path>`, `--output <path>`, `--mode <mode>`, `--tz <zone>`, `--list-valid-timezones`, `--backfill-highest`, `--backfill-lowest`, `--verbose`, `--version`, `--help` | crypto-price-filler's command line: fills the price columns of a CSV file of dated rows with the token's USD price at each row's time, from the pools a token trades in and from MEXC, CoinGecko and CoinPaprika, in [their order](price-determination-rules.md#the-order-of-the-fillers-sources); a row no service priced gets `Error`. It loads the package in `fetch-from-any-exchange/crypto-price-filler/`, whose `npm start` runs it too; `--input` and `--output` are read from the folder it runs in, and with no `--output` it writes `output.csv` in its package's `output/csv/`. Your files go in its package's `input/`; git keeps nothing in either folder but the folder. | `node bin/end-user/crypto-price-filler.js --token=grc --input=fetch-from-any-exchange/crypto-price-filler/input/mining.csv` |
 | `node bin/end-user/backfill.js` | `--input <path>`, `--output <path>`, `--backfill-highest`, `--backfill-lowest`, `--verbose`, `--version`, `--help` | crypto-price-filler's backfill: fills each price the filler marked `Error`, in a CSV it wrote, with the price of the nearest priced row before or after it, the higher of the two or the lower, asking no service. `--input` and `--output` are read from the folder it runs in, and with no `--output` it writes over the input. | `node bin/end-user/backfill.js --input=fetch-from-any-exchange/crypto-price-filler/output/csv/output.csv --backfill-highest` |
-| `node bin/run-actionlint.js` | `[files...]`, `--check`, `--help` | Runs actionlint, the checker of GitHub Actions workflow files, from its official release: on its first run it downloads the archive for this system, refuses it unless its SHA-256, and its program's, are those `actionlint/release.js` pins, keeps the program in `node_modules/.cache/actionlint/`, and runs it on the files named; later runs check the kept program's SHA-256 again. `--check` downloads every archive of the release and checks each, and its program, running nothing. `lint` runs it on `.github/workflows/*.yml`, and `audit:actionlint` with `--check`. | `node bin/run-actionlint.js .github/workflows/*.yml` |
+| `node bin/run-actionlint.js` | `[files...]`, `--check`, `--help` | Runs actionlint from its official release: on its first run it downloads the archive for this system, refuses it unless its SHA-256, and its program's, are those `actionlint/release.js` pins, keeps the program in `node_modules/.cache/actionlint/`, and runs it on the files named; later runs check the kept program's SHA-256 again. `--check` downloads every archive of the release and checks each, and its program, running nothing. `lint` runs it on `.github/workflows/*.yml`, and `audit:actionlint` with `--check`. | `node bin/run-actionlint.js .github/workflows/*.yml` |
 | `source ./bin/unlock-api-keys.sh` | `--help` | Asks for the key store's password, showing nothing typed, checks that it opens every key saved, which any password does while no key is saved, and keeps it in `API_KEYS_PASSWORD` for the terminal, so the programs open their keys without asking. Runs in bash or zsh, and returns 0 when it keeps the password, 1 when it keeps none. `--help`, or `-h`, prints its help, asks nothing and returns 0. | `source ./bin/unlock-api-keys.sh` |
 
 ---
@@ -218,8 +209,7 @@ pulsechain-validator-analytics and x1-validator-analytics) run it, as
 is the command above, for a project that installs this repo, and its bin
 `run-actionlint` is the actionlint of `lint` above, which each of those
 projects' lint runs on its workflow files.
-The gates are those of LP Ranger, the owner's bot that manages his 9mm V3
-liquidity positions, whose merge protocol the last link below gives.
+The gates are those of LP Ranger, whose merge protocol the last link below gives.
 
 - [Which version they install](architecture.md#which-version-they-install)
   — what that bin does.

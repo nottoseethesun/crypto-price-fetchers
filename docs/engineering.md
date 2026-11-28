@@ -2,29 +2,22 @@
 
 The files the programs read and write, the programs in `bin/` that the
 README leaves out, the gates every change passes, the tests, and CI: the
-same gates, run on each pull request and each push to `main` by GitHub Actions, the service of GitHub,
-the website that hosts the repo. The programs are this
-repo's parts. The Sheets scripts run in Google Sheets, Google's spreadsheet
-app, as Apps Script, Google's platform for scripts that run inside its
-apps, and their Node versions run them on Node, the program that runs
-JavaScript outside a browser; both price tokens in USD. crypto-price-filler
+same gates, run on each pull request and each push to `main` by GitHub Actions. The programs are this
+repo's parts. The Sheets scripts run in Google Sheets, as Apps Script, and their Node versions run them on Node; both price tokens in USD. crypto-price-filler
 is the Node tool that fills a CSV's price columns; the build step joins
 the Sheets scripts into one file, with the saved api keys set in it, for
 one paste into Apps Script; the key store keeps the api keys encrypted;
 the versions tool sets a project's dependencies from GitHub to a branch or
-a release; and the Summ CSV writer writes the CSV files the owner imports
-into Summ, the crypto tax calculator he keeps his books in.
-For how the parts fit, see [`docs/architecture.md`](architecture.md); for
+a release; and the Summ CSV writer writes the CSV files the owner imports into Summ. The tools and terms this doc names without introducing
+them are in [`docs/glossary.md`](glossary.md). For how the parts fit, see [`docs/architecture.md`](architecture.md); for
 how each tool decides which price to give, see
 [`docs/price-determination-rules.md`](price-determination-rules.md); for
 the documentation audit every doc passes, see
 [`docs/claude/CLAUDE-DOC-AUDIT.md`](claude/CLAUDE-DOC-AUDIT.md); for
-every command, those the repo's `package.json` gives npm, Node's package
-manager, to run and those run with `node` or `source`, see
+every command, those the repo's `package.json` gives npm to run and those run with `node` or `source`, see
 [`docs/project-commands.md`](project-commands.md).
 
-The repo follows the coding standards of LP Ranger, the owner's bot that
-manages his 9mm V3 liquidity positions: its `CLAUDE.md` and
+The repo follows the coding standards of LP Ranger: its `CLAUDE.md` and
 `docs/claude/`, in
 [nottoseethesun/lp-ranger](https://github.com/nottoseethesun/lp-ranger).
 
@@ -62,8 +55,7 @@ manages his 9mm V3 liquidity positions: its `CLAUDE.md` and
 
 ## Quick Start
 
-The repo supports two major versions of Node: the newest LTS (long-term
-support) version, today 26, and the version two majors before it, today
+The repo supports two major versions of Node: the newest LTS version, today 26, and the version two majors before it, today
 24. Every tool, every test and every npm command runs on both, and CI runs
 the gate on each (below).
 
@@ -86,8 +78,7 @@ npm run build apps-script   # the Sheets scripts as one file, for Apps Script
 
 ## Files on Disk
 
-The programs and their tests read and write these files. Git, the
-version-control program that keeps the repo's history, keeps only the ones
+The programs and their tests read and write these files. Git keeps only the ones
 that hold no key and none of the owner's own settings.
 
 | File | In git | What it holds |
@@ -119,7 +110,7 @@ in `bin/end-user/`. The others, in `bin/` itself, are run by npm, by the
 lint or by the projects that install this repo, or, the script that keeps
 the key store's password for a terminal, sourced rather than run: the
 command line of the Summ CSV writer, that script, the versions tool, and
-the runner of actionlint, the checker of GitHub Actions workflow files. Each sub-section
+the runner of actionlint. Each sub-section
 below covers one: how to run it, with an example, and, under its Usage,
 the cases that take more. Run them from the repo's top folder; each
 answers `--help` with its options, more examples and its exit codes, and
@@ -164,8 +155,7 @@ program asks for the password as it starts, which is slow when several
 run in turn; with it, the programs, the build and the key manager open
 the keys with that password without asking, and the key manager saves
 new keys with it. While no key is saved, any password passes, and the
-first key saved is saved with it. It runs in bash or zsh, the default
-shell of macOS, and with `source`, since a script run as a program
+first key saved is saved with it. It runs in bash or zsh, and with `source`, since a script run as a program
 cannot set anything in the terminal that started it; no program runs
 it. From the repo's top folder:
 
@@ -288,8 +278,7 @@ node bin/run-actionlint.js --check
 `npm run check` runs every gate, in order, and stops at the first that
 fails: the lint, the tests with coverage, crypto-price-filler's tests with
 coverage, then the security audits. It must pass before every commit and
-push, and CI runs it on Node 26, the newest LTS (long-term support) version,
-and on Node 24, the oldest the repo supports.
+push, and CI runs it on Node 26, the newest LTS version, and on Node 24, the oldest the repo supports.
 
 ---
 
@@ -297,16 +286,14 @@ and on Node 24, the oldest the repo supports.
 
 The lint checks each file's form before any test runs: the rules the code
 follows, its formatting, the workflows, and files nothing uses.
-`npm run lint` runs five tools: four npm packages, and actionlint, a
-program its author publishes for each system, which the table's fourth
-row explains:
+`npm run lint` runs five tools: four npm packages, and actionlint, which the table's fourth row explains:
 
-| Tool | Configured in | What it does, and what it holds the repo to |
+| Tool | Configured in | What it holds the repo to |
 | ---- | ------------- | ------------------------------------------- |
-| ESLint | `eslint.config.js` | Checks JavaScript against rules: LP Ranger's, with no warning allowed: cyclomatic complexity ≤ 17, ≤ 500 lines of code a file (blank lines and comments not counted), lines ≤ 80 characters but strings, urls and comments, `===`, no unused name, no `var`, `const` where nothing is reassigned, no `Math.random`, no comment that tells Prettier, the formatter in the row below, to skip code, and every import resolved; and `no-or-default` (`eslint-rules/`), this repo's rule against `a \|\| b` whose value is kept, as a default is, when `b` is no boolean, since `\|\|` takes its fallback for every falsy value, a 0 or an empty string held on purpose among them: a default is written with `??` or an explicit check. It reads the Sheets scripts too, as the paragraph below the table says. |
-| markdownlint | `.markdownlint-cli2.jsonc` | Checks the form of Markdown files: LP Ranger's settings, over every Markdown file, such as one top heading first and no HTML. |
-| Prettier | `.prettierrc`, `.prettierignore` | Formats code; in check mode, it fails on any JavaScript, Sheets script, JSON or YAML file the repo keeps whose layout its formatting would change. |
-| actionlint | `actionlint/release.js` | Checks the GitHub Actions workflow files, in `.github/workflows/`, for mistakes in their syntax, their expressions and the shell scripts their steps run. The lint runs the official release of actionlint, rhysd's program, through this repo's bin `run-actionlint` (`bin/run-actionlint.js`, `actionlint/`): the first run downloads the archive for its system, refuses it unless its SHA-256 is the one `actionlint/release.js` pins, refuses the program in it unless its own SHA-256 is the one pinned beside it, and keeps the program in `node_modules/.cache/actionlint/`; each later run checks the kept program's SHA-256 again, and downloads the archive again when the program has changed. |
+| ESLint | `eslint.config.js` | LP Ranger's rules, with no warning allowed: cyclomatic complexity ≤ 17, ≤ 500 lines of code a file (blank lines and comments not counted), lines ≤ 80 characters but strings, urls and comments, `===`, no unused name, no `var`, `const` where nothing is reassigned, no `Math.random`, no comment that tells Prettier, the formatter in the row below, to skip code, and every import resolved; and `no-or-default` (`eslint-rules/`), this repo's rule against `a \|\| b` whose value is kept, as a default is, when `b` is no boolean, since `\|\|` takes its fallback for every falsy value, a 0 or an empty string held on purpose among them: a default is written with `??` or an explicit check. It reads the Sheets scripts too, as the paragraph below the table says. |
+| markdownlint | `.markdownlint-cli2.jsonc` | LP Ranger's settings, over every Markdown file, such as one top heading first and no HTML. |
+| Prettier | `.prettierrc`, `.prettierignore` | Its formatting: in check mode, it fails on any JavaScript, Sheets script, JSON or YAML file the repo keeps whose layout its formatting would change. |
+| actionlint | `actionlint/release.js` | The GitHub Actions workflow files, in `.github/workflows/`, free of mistakes in their syntax, their expressions and the shell scripts their steps run. The lint runs the official release of actionlint through this repo's bin `run-actionlint` (`bin/run-actionlint.js`, `actionlint/`): the first run downloads the archive for its system, refuses it unless its SHA-256 is the one `actionlint/release.js` pins, refuses the program in it unless its own SHA-256 is the one pinned beside it, and keeps the program in `node_modules/.cache/actionlint/`; each later run checks the kept program's SHA-256 again, and downloads the archive again when the program has changed. |
 | knip | `knip.json` | Finds files outside the top folder's `test/` that nothing imports or runs, and fails on any. See [Dead Code Detection](#dead-code-detection). |
 
 The Sheets scripts are plain scripts, not modules: Apps Script loads them
@@ -317,7 +304,7 @@ since no import says where it comes from. And `no-unused-vars` passes a
 script's top-level functions, since a cell or another file calls them, out
 of ESLint's sight. The security lint reads the Sheets scripts too.
 
-husky, a package that runs scripts at git's hooks, runs `npm run lint`
+husky runs `npm run lint`
 before each commit (`.husky/pre-commit`), so an unformatted or failing
 file stops the commit; `npm run format` or
 `npm run lint:fix` fixes formatting. No rule is ever switched off in a file,
@@ -325,9 +312,7 @@ no file git keeps is left out of the lint, and a file over 500 lines is
 split, not excused. The one folder the lint and the security lint pass
 over is `dist/`, which git ignores: the build step writes its file there
 when there is no
-clipboard, and that file holds the compiled code of DEX Screener, a
-service that lists the pairs of decentralized exchanges with their prices,
-and the api keys. The format check and the secret scan also pass over the
+clipboard, and that file holds DEX Screener's compiled code and the api keys. The format check and the secret scan also pass over the
 tools' `input/` and `output/` folders, which hold the owner's own files
 and which git ignores but for their `.gitkeep` (`.prettierignore`,
 `.secretlintignore`).
@@ -337,8 +322,7 @@ and which git ignores but for their `.gitkeep` (`.prettierignore`,
 ## Tests
 
 Two test suites run in `npm run check`: the top folder's, on Node's own
-test runner, and crypto-price-filler's, on vitest, a test runner its tests
-were written for. Neither asks a service
+test runner, and crypto-price-filler's, on vitest, which its tests were written for. Neither asks a service
 outside the computer, and neither reads the owner's key file or password.
 
 **The top folder's tests** (`test/`, Node's test runner) cover the runner
@@ -361,8 +345,7 @@ answers as GeckoTerminal, one of those services, does). The build step's tests s
 clipboard, the install, the questions and DEX Screener's part.
 `test/dex-screener.test.js` builds that part from stand-in TypeScript
 sources, written in the test with their checksums, served by a stand-in
-fetch, and compiled with the real esbuild, the program that compiles
-TypeScript and JavaScript into one file; `test/built-script.test.js`
+fetch, and compiled with the real esbuild; `test/built-script.test.js`
 checks the joining of parts on short scripts. The menu's tests run
 `src/crypto-price-fetchers-menu.gs` unchanged against a spreadsheet held in
 memory (`test/helpers/stand-in-spreadsheet.js`), which records each
@@ -385,8 +368,7 @@ file ends; `test/fixtures/lp-ranger-api-keys.json`, written by LP Ranger's
 own code, checks that the store opens LP Ranger's files. A test that starts
 a program gives it an environment without `API_KEYS_PASSWORD`, and a key
 file of its own in `API_KEYS_FILE_PATH`. `bin/unlock-api-keys.sh`, the script
-that keeps the password for a terminal, is tested in bash; its tests in
-zsh, the default shell of macOS, run only when the environment variable
+that keeps the password for a terminal, is tested in bash; its tests in zsh run only when the environment variable
 `UNLOCK_SCRIPT_IN_ZSH` is 1, which [In zsh, by Hand](#in-zsh-by-hand)
 sets for their run by hand, since zsh is not on every computer the
 automated tests run on, as that section says.
@@ -412,8 +394,7 @@ five of `tests/coingecko-api-key.test.js` do: 30 seconds each.
 **crypto-price-filler's tests** (`tests/`, vitest) cover the tool, its
 sources and its command line, and run the exchange script unchanged under
 Node: its price sources in `sheets-sources.test.js`, which carries what
-each source must do for both tools, and the windows the script asks MEXC,
-a centralized exchange, for in `mexc-windows.test.js`. Its
+each source must do for both tools, and the windows the script asks MEXC for in `mexc-windows.test.js`. Its
 `vitest.config.js` names a key file
 that does not exist and empties `API_KEYS_PASSWORD`, so no test finds the
 owner's key, and fails a coverage run below 80% of lines. `tests/helpers/`
@@ -431,9 +412,7 @@ holds the stand-ins:
   worker, and the pool sources, whose shared clients then ask it.
 - `stand-in-fetch-preload.js` runs the real command line,
   `bin/end-user/crypto-price-filler.js`, in a
-  child process against a stand-in MEXC, a centralized exchange, and a
-  stand-in ping of CoinGecko, a service that gathers the exchanges' prices,
-  that takes the one key in `stand-in-coingecko-key.js`.
+  child process against a stand-in MEXC, and a stand-in ping of CoinGecko that takes the one key in `stand-in-coingecko-key.js`.
 - `stand-in-settings-preload.js` hands crypto-price-filler's command line,
   or backfill's, run in a child process, a settings file, a token list or
   a `config.json` of the
@@ -449,8 +428,7 @@ holds the stand-ins:
 - `regression-runs.js` holds the settings, stand-in answers, times and
   runs that the regression tests share, as do the tests of what
   CoinPaprika gives without a key (`tests/coinpaprika-key.test.js`):
-  answers as MEXC, CoinGecko and
-  CoinPaprika, a service like CoinGecko, give them, a time as a cell writes it (`cellTime`), a stand-in for the script's clock (`dateAt`), the time a child run that opens a saved key may take (`KEY_RUN_TIMEOUT_MS`, 30 seconds, which `tests/coingecko-api-key.test.js` shares too), since opening one turns the password into the key's encryption key by 600,000 rounds of PBKDF2, a function that makes a key from a password ([the key store](architecture.md#the-key-store)), the header of Summ's template and a row summ-csv takes (`SUMM_TEMPLATE`, `SUMM_ROW`), the command line run over one row in a child process, or
+  answers as MEXC, CoinGecko and CoinPaprika give them, a time as a cell writes it (`cellTime`), a stand-in for the script's clock (`dateAt`), the time a child run that opens a saved key may take (`KEY_RUN_TIMEOUT_MS`, 30 seconds, which `tests/coingecko-api-key.test.js` shares too), since opening one turns the password into the key's encryption key by 600,000 rounds of PBKDF2 ([the key store](architecture.md#the-key-store)), the header of Summ's template and a row summ-csv takes (`SUMM_TEMPLATE`, `SUMM_ROW`), the command line run over one row in a child process, or
   in a folder of the test's own with the stand-in settings (`runIndexIn`,
   for `tests/regressions-command-line.test.js`), backfill's command line
   run on a CSV with a gap, with settings of the test's own (`backfillIn`,
@@ -508,9 +486,9 @@ that this section, or `CLAUDE.md`, names every one.
 | `no-or-default.test.js` | `eslint-rules/no-or-default.js`, the lint's rule against a default made with `\|\|`. |
 | `package-exports.test.js` | Every module the package exports, loaded by the package's name, as a project that installs this repo loads it, and shipped. |
 | `no-secret-logging.test.js` | `eslint-rules/no-secret-logging.js`, the security lint's rule against printing a name that may hold a secret. |
-| `option-conflicts.test.js` | `lib/option-conflicts.js`: a typed option that conflicts with one a settings file sets refused, naming both and the file; the settings file's option alone, or neither option, passed; and two typed options left to commander, the package that parses command lines, which refuses them as it parses. |
-| `os-dependencies.test.js` | The install of the operating system's programs (`install/os-dependencies.js`): a clipboard tool already installed, none needed with no desktop session, xclip or wl-clipboard installed with Homebrew, a package manager of macOS and Linux, Homebrew recommended and apt, the package manager of Debian and Ubuntu, asked for without it, a package left to be installed by hand, an install's exit code; `runAtTerminal`; and the command line's exit codes. |
-| `repo-checks.test.js` | `lib/repo-checks.js`, on repos made in temp folders, and this repo held to it: its EVM addresses in EIP-55's form, its npm targets and test files named in the docs, its docs' links, pointing at the files, folders and headings it keeps, and the paths in their code spans that start at the doc's own folder, at the files and folders it keeps, and a `config-example.json` beside each `config.json`, each beside a committed `config.json` holding what that file holds. |
+| `option-conflicts.test.js` | `lib/option-conflicts.js`: a typed option that conflicts with one a settings file sets refused, naming both and the file; the settings file's option alone, or neither option, passed; and two typed options left to commander, which refuses them as it parses. |
+| `os-dependencies.test.js` | The install of the operating system's programs (`install/os-dependencies.js`): a clipboard tool already installed, none needed with no desktop session, xclip or wl-clipboard installed with Homebrew, Homebrew recommended and apt asked for without it, a package left to be installed by hand, an install's exit code; `runAtTerminal`; and the command line's exit codes. |
+| `repo-checks.test.js` | `lib/repo-checks.js`, on repos made in temp folders, and this repo held to it: its EVM addresses in EIP-55's form, its npm targets and test files named in the docs, its docs' links, pointing at the files, folders and headings it keeps, and the paths in their code spans that start at the doc's own folder, at the files and folders it keeps, and a `config-example.json` beside each `config.json`, each beside a committed `config.json` holding what that file holds; and the README's table of api keys in the order the top `config.json` gives. |
 | `run-apps-script.test.js` | `openAppsScript`: a Sheets script run in a worker thread, with its web requests done on the caller's thread. |
 | `settings-file.test.js` | `lib/settings-file.js`: a settings file's JSON object read whole; a missing file giving no settings unless it is required; a file it cannot read, one that is not JSON and JSON that is no object refused, naming the file; a file its schema finds problems in refused, listing every problem; and settings about to be written held to their schema by the same rule (`checkSettings`). |
 | `settings-schema.test.js` | `lib/settings-schema.js`: a schema compiled strict, with the shared formats and a project's own; every problem in a file named at once, in the words of its kind; a value no shape of a choice fits refused in one line; a key another needs named missing; a key its object's `propertyNames` refuses named as the key; a value whose schema is `writeOnly` never quoted; the kinds of a time limit and of a wait, up to the longest Node's timers keep; and an option parser made from a kind. |
@@ -697,11 +675,10 @@ log. No automated run calls them.
 ## Security Audits
 
 Five audits look for security problems: in the packages the repo
-installs, through npm audit, npm's check of installed packages against
-known vulnerabilities; in the code DEX Screener publishes that the build
+installs, through npm audit; in the code DEX Screener publishes that the build
 step can put in its file; in the release of actionlint the lint runs; in
 the repo's code, through ESLint with security rules; and in the text of
-every file, through secretlint, which looks for keys and credentials.
+every file, through secretlint.
 
 | Command | What it runs | What it catches |
 | ------- | ------------ | --------------- |
@@ -739,8 +716,7 @@ compiles DEX Screener's Google Sheets functions into that file.
 
 ### Packages That Ship in the Built File
 
-DEX Screener's code imports zod, a library that checks data against a
-schema, and lodash, a library of helper functions. esbuild compiles both,
+DEX Screener's code imports zod and lodash. esbuild compiles both,
 from this repo's `node_modules`, into the pasted file, where they run in
 the spreadsheet with DEX Screener's functions. So `package.json` lists them
 as dependencies, not development packages, and the gate's npm audit, which
@@ -778,9 +754,15 @@ request to `main`, and by hand:
 | `security-audit.yml` | Dependency Audit, Security Lint, Secret Scan | Each audit as a job of its own; Dependency Audit runs `npm run audit:deps`, so the checks of DEX Screener's files and of actionlint's archives with it. |
 
 The two checks of `ci.yml` are named for their roles, not their Node
-versions, so moving to newer versions renames no check. Each stops at 20
-minutes (`timeout-minutes`), where it takes under two, which ends a hang
-no test's time limit can ([Tests](#tests)).
+versions, and each stops at 20 minutes (`timeout-minutes`), where it takes
+under two, which ends a hang no test's time limit can ([Tests](#tests)).
+Moving to newer versions renames no check: it changes the two
+`node-version` values in `ci.yml`, `NODE_VERSION` in `security-audit.yml`,
+the `engines` of both `package.json` files, the repo's and
+crypto-price-filler's, and the docs, and `main`'s required checks stay as
+they are. `engines` names only the oldest supported major as a minimum,
+`>=24`, raised to a minor version, such as `>=24.15`, only when the code
+needs what that version added; no file pins one exact version of Node.
 
 `main` is protected: a change reaches it only by a pull request whose five
 checks, those five jobs, have passed. Force pushes and deletion are
@@ -793,12 +775,11 @@ deleted. The steps from a branch to `main` are LP Ranger's eight, in its
 ## Known Bugs
 
 A bug found but not yet fixed is recorded as a test, which fails once the
-bug is gone, so the record cannot go stale. None is known today. A bug
-found gets its test in crypto-price-filler's `tests/known-bugs.test.js`,
-declared with `it.fails`: the test passes while the bug is present. The
-fix makes it fail. The same change declares
-it with `it` and moves it to the regression tests of its area, where it
-keeps the fixed behavior from coming back:
+bug is gone, so the record cannot go stale. The
+repo's [`CLAUDE.md`](../CLAUDE.md#known-bugs) gives the steps: where a
+known bug's test goes, how its fix moves it, and the table of the bugs
+known. A fixed bug's test stays among the regression tests of its area,
+where it keeps the fixed behavior from coming back:
 `tests/regressions-command-line.test.js`,
 `tests/regressions-backfill.test.js`,
 `tests/regressions-other-command-lines.test.js`,
@@ -807,7 +788,4 @@ keeps the fixed behavior from coming back:
 `tests/regressions-sheets-periods.test.js`,
 `tests/regressions-sheets-price-now.test.js` and
 `tests/regressions.test.js`, whose rows in the table of
-crypto-price-filler's tests say what each guards. The repo's `CLAUDE.md`
-gives each file's area, and lists the bugs known, each with its test.
-The known-bug file goes with its last test, since vitest fails a test
-file that holds none.
+crypto-price-filler's tests say what each guards.

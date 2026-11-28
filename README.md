@@ -24,13 +24,11 @@ such tokens trade: the centralized exchanges that list them, and, for a
 token that trades in a blockchain's pools, the services that price those
 pools.
 
-The scripts run in Google Sheets, Google's spreadsheet app, as scripts
-written in the "Apps Script" computer language, and equally also, as
-stand-alone NodeJS scripts that are run from the Terminal on the
-command-line. Apps Script is Google's platform for scripts that run
-inside its apps: in a sheet, a cell calls a script's function as it calls
-a built-in one. NodeJS, or Node, is the program that runs JavaScript
-outside a browser. Each of the two
+The scripts run in Google Sheets, as scripts written in the "Apps Script" computer language, and equally also, as
+stand-alone NodeJS scripts that are run from the Terminal on the command-line. In a sheet, a cell calls a script's function as it
+calls a built-in one. The tools and terms this README names without
+introducing them, such as Apps Script and Node, are in
+[`docs/glossary.md`](docs/glossary.md). Each of the two
 price tools has a folder of its own, which holds its Google Sheets
 scripts (`.gs`), in its `src/`, its README and its settings:
 [`crypto-price-fetchers/`](crypto-price-fetchers/README.md), the price
@@ -48,11 +46,8 @@ How each of them decides which price to give, and when it gives
 none, is in
 [`docs/price-determination-rules.md`](docs/price-determination-rules.md).
 
-The repo also holds code that the other projects of its owner,
-nottoseethesun on GitHub, the website that hosts the repos, install from
-it: the key store, which keeps api
-keys encrypted; the Summ CSV writer, which writes the CSV files that Summ,
-his crypto tax calculator, imports; and the tool that sets which version
+The repo also holds code that the other projects of its owner, nottoseethesun on GitHub, install from it: the key store, which keeps api
+keys encrypted; the Summ CSV writer, which writes the CSV files that Summ imports; and the tool that sets which version
 of this repo a project installs ([Development](#development)). It also
 holds programs that serve the repo's own work and those projects, which
 [`docs/engineering.md`](docs/engineering.md#the-programs-in-bin) covers.
@@ -79,20 +74,17 @@ saved api keys set at its end, for one paste into a spreadsheet
 ([Install in Google Sheets](#4-install-in-google-sheets)):
 
 - `crypto-price-fetchers/src/crypto-price-fetchers.gs` gives a token's
-  current price, and its fully diluted value. It asks DexTools, a service that prices tokens
-  from the pools of decentralized exchanges, so it covers tokens on the
+  current price, and its fully diluted value. It asks DexTools, so it covers tokens on the
   chains DexTools lists, such as PulseChain, Ethereum and Solana. For X1,
-  which DexTools does not list, it asks x1.ninja, a service that does the
-  same for X1, instead.
+  which DexTools does not list, it asks x1.ninja instead.
 - The exchange script,
   `fetch-from-any-exchange/src/getCryptoPriceFromCentralizedExchange.gs`,
   with its price sources in `-sources.gs` and its in-editor tests in
   `-tests.gs`, gives a token's price at a past time, as recent as a
   minute ago: by default the average of the high and the low of a period
-  around that time, or else its high, low or close. It asks MEXC, a
-  centralized exchange, then CoinGecko and CoinPaprika, two services
-  that gather the exchanges' prices, in the order of priority their keys
-  are ranked in ([The Api Keys](#3-the-api-keys)), so it covers the tokens
+  around that time, or else its high, low or close. It asks MEXC, CoinGecko and CoinPaprika, in the
+  order [The Order of the Sheet's Sources](docs/price-determination-rules.md#the-order-of-the-sheets-sources)
+  gives, so it covers the tokens
   they price.
 - `src/crypto-price-fetchers-menu.gs` adds the Crypto Price Fetchers menu
   to the spreadsheet. Its items run the price cells again, clear cells
@@ -100,9 +92,7 @@ saved api keys set at its end, for one paste into a spreadsheet
   with their numbers, and show Help: how to use each function, made from
   the help section of each script's header.
 
-The build can add the Google Sheets functions of DEX Screener, a service
-that lists the pairs of decentralized exchanges with their prices, such
-as `DEX_SCREENER_PAIR_PROP`, downloaded from DEX Screener's repo; this
+The build can add the Google Sheets functions of DEX Screener, such as `DEX_SCREENER_PAIR_PROP`, downloaded from DEX Screener's repo; this
 repo holds none of their code.
 
 A spreadsheet's scripts run within
@@ -129,8 +119,9 @@ cell, a token's price at a past time.
 crypto-price-filler prices each row of a CSV file of any length, at each
 row's time. It asks the exchange script's own three price sources, run
 under Node, and, for a token that trades in pools, Moralis and
-GeckoTerminal first, two services that price a token from its chain's
-pools ([Tokens That Trade in Pools](#tokens-that-trade-in-pools)). Its
+GeckoTerminal ([Tokens That Trade in Pools](#tokens-that-trade-in-pools)),
+in the order [The Order of the Filler's Sources](docs/price-determination-rules.md#the-order-of-the-fillers-sources)
+gives. Its
 code is the package in `fetch-from-any-exchange/crypto-price-filler/`,
 which this start file loads.
 
@@ -225,12 +216,10 @@ bar; it is now Crypto Price Fetchers.
 ## Prerequisites
 
 - A terminal, in which the programs and npm run.
-- Node 24 or later, from [nodejs.org](https://nodejs.org/), with npm, the
-  package manager that comes with it, which installs a project's packages
-  and runs the commands its `package.json` names. The repo is tested on
+- Node 24 or later, from [nodejs.org](https://nodejs.org/), with npm,
+  which comes with it. The repo is tested on
   Node 24 and 26.
-- git, the version-control program, to clone the repo from GitHub, the
-  website that hosts it.
+- git, to clone the repo from GitHub.
 - For the Sheets scripts: a Google account and a spreadsheet in Google
   Sheets. A clipboard tool, which the build puts the built file on, saves
   a step: without one, the build writes the file to disk
@@ -281,12 +270,9 @@ and installs what is missing. From the repo's top folder:
 npm run os-dependencies
 ```
 
-It installs the tool with Homebrew, the package manager for macOS and
-Linux, when Homebrew is installed. Without Homebrew, it recommends
+It installs the tool with Homebrew, when Homebrew is installed. Without Homebrew, it recommends
 installing it, as [brew.sh](https://brew.sh) says, since it works on
-Linux and macOS alike, then running `npm run os-dependencies` again; and,
-where apt, the package manager of Debian and Ubuntu, is installed, it
-asks whether to install the tool with `sudo apt install` instead, sudo
+Linux and macOS alike, then running `npm run os-dependencies` again; and, where apt is installed, it asks whether to install the tool with `sudo apt install` instead, sudo
 asking for your computer's password at its own prompt. With neither, or
 when the install fails, it names the package to install yourself. With
 no desktop session open, as over ssh, no clipboard can be reached, and
@@ -297,15 +283,14 @@ codes.
 
 The keys the tools send are kept in `api-keys.json` at the repo's top,
 which git ignores, encrypted with one password you choose, by this repo's
-key store, `api-key-store/`, which keeps keys as LP Ranger, the owner's bot
-that manages his 9mm V3 liquidity positions, keeps its own. The top
+key store, `api-key-store/`, which keeps keys as LP Ranger keeps its own. The top
 `config.json` lists the services they are for:
 
 | Service     | What it prices                                                          | Without a key                      |
 | ----------- | ----------------------------------------------------------------------- | ---------------------------------- |
+| Moralis     | Past prices of tokens that trade in pools, for crypto-price-filler      | Not asked                          |
 | CoinGecko   | Past prices, for the exchange script and crypto-price-filler            | Asked without one, at a lower rate |
 | CoinPaprika | Past prices, the same; a key is for one of its paid plans               | Its free server: close prices only |
-| Moralis     | Past prices of tokens that trade in pools, for crypto-price-filler      | Not asked                          |
 | DexTools    | Current prices and fully diluted values, for `crypto-price-fetchers.gs` | No price: DexTools needs a key     |
 | x1.ninja    | The same, on X1                                                         | No price: x1.ninja needs a key     |
 
@@ -335,13 +320,12 @@ The keys also have an order of priority. Where more than one service
 with a key can do one job, the programs ask them in that order: the
 exchange script asks CoinGecko and CoinPaprika in it, in the sheet and
 under Node, and crypto-price-filler asks Moralis, CoinGecko and
-CoinPaprika in it. A source that takes no key stays with the sources it
-goes with: MEXC is asked right before the first of CoinGecko and
-CoinPaprika, and GeckoTerminal right after Moralis. DexTools and x1.ninja
+CoinPaprika in it ([The Order of the Sheet's Sources](docs/price-determination-rules.md#the-order-of-the-sheets-sources),
+[The Order of the Filler's Sources](docs/price-determination-rules.md#the-order-of-the-fillers-sources)). DexTools and x1.ninja
 never do one job, since the chain decides which is asked. The manager
 lists the services numbered in that order. While no order is saved, the
-programs follow the order the top `config.json` lists them in, which
-puts Moralis first and CoinGecko before CoinPaprika, and the manager asks
+programs follow the order the top `config.json` lists them in, which the
+table above follows, and the manager asks
 for an order: type the services' numbers, highest priority first, such
 as `2 1 3 4 5`, or Enter alone to keep the order shown. The order is
 saved in `api-keys.json` beside the keys, in plain text, since it is no
@@ -377,9 +361,7 @@ the script does not take or a value of the wrong kind
    `DEX_SCREENER_PAIR_PROP`. DEX Screener wrote them, and this repo holds
    none of their code. Before it uses that code, the build checks that
    each file is the one this repo pinned: it downloads the files from DEX
-   Screener's repo at the commit the question names, compares each file's
-   SHA-256, a fingerprint of its contents, with the one written in this
-   repo, and says the result; `npm run audit:dex-screener` runs the same
+   Screener's repo at the commit the question names, compares each file's SHA-256 with the one written in this repo, and says the result; `npm run audit:dex-screener` runs the same
    check on its own. Then it compiles the checked files into the file. The
    step is optional: Enter, or y, includes them, and n leaves them out. If
    the build fails, run it again and answer n.
@@ -453,8 +435,7 @@ prints the commit it names.
 `package-lock.json` keeps for it, its `integrity`, and stops when one
 differs. Two more downloads are checked against SHA-256 hashes this repo
 pins: the files of DEX Screener's functions, by the build and by
-`npm run audit:dex-screener`, and actionlint, the checker of GitHub
-Actions workflow files, by `run-actionlint`, the repo's bin that runs it
+`npm run audit:dex-screener`, and actionlint, by `run-actionlint`, the repo's bin that runs it
 in the lint.
 
 ---
@@ -594,19 +575,18 @@ case the script asks nothing.
 ##### A Past Price: getCryptoPrice
 
 `getCryptoPrice(token, dateStr, tz, mode)` gives a coin's price in USD
-at a past time, from MEXC, then CoinGecko and CoinPaprika in the order of
-priority their keys are ranked in, CoinGecko first until they are. Each source
+at a past time, from MEXC, CoinGecko and CoinPaprika, in the order
+[The Order of the Sheet's Sources](docs/price-determination-rules.md#the-order-of-the-sheets-sources)
+gives. Each source
 prices a period that holds the time. MEXC's is the minute, for a time in
 about the last 30 days, else the hour; when nothing traded in it, the
 script widens it a step at a time, up to the year, among the periods
 already over: for a time in the minute not yet over, the cell says when
-to ask again, and when the next period up is not over, CoinGecko
-answers. A larger period may hold only trades from after a time that
+to ask again, and when the next period up is not over, the next source answers. A larger period may hold only trades from after a time that
 comes before the coin's first trade on MEXC, which comes on the day MEXC
 listed it. So when MEXC gives no candle of a recent time's minute, or of
 the hour, or the request for it fails, the script asks for the day
-before, whose candle shows the coin traded before that day: with none,
-or when that request fails too, CoinGecko answers. CoinGecko's is the 24
+before, whose candle shows the coin traded before that day: with none, or when that request fails too, the next source answers. CoinGecko's is the 24
 hours from 12 hours before the time to 12 after, whose price the script
 takes only once they are over, and CoinPaprika's the day, in UTC, whose
 price it takes only once the day is over.
@@ -939,8 +919,7 @@ npm run api-keys -- check-password
 ## Configure
 
 The tools run as they come; a settings file changes how one runs. Each
-file is JSON, checked against its JSON Schema, a description of the keys
-the file may hold and the kind of value each takes, before the tool takes
+file is JSON, checked against its JSON Schema before the tool takes
 any setting: a key the tool does not read, or a value of the wrong kind,
 stops the run, with every problem listed, one line each.
 
@@ -967,10 +946,8 @@ schemas.
 ## Lint & Test
 
 The gate, LP Ranger's, runs the lint, the tests and the security audits,
-and must pass before every commit and push. The lint runs ESLint, which
-checks JavaScript against rules; markdownlint, which checks the form of
-Markdown files; the check of Prettier, a program that formats code;
-actionlint; and knip, which finds files nothing uses. From the repo's top
+and must pass before every commit and push. The lint runs ESLint, markdownlint, Prettier's check, actionlint and knip
+([Lint](docs/engineering.md#lint)). From the repo's top
 folder, after install step 1:
 
 ```bash
@@ -1106,12 +1083,10 @@ lists for the token, the deepest that traded in the last day. Their clients are 
 one loop that sends a request again when a service refuses it as one too
 many, which every client shares.
 
-crypto-price-filler prices such a token with these, and with the
-exchange script's three sources: MEXC, then CoinGecko and CoinPaprika. It
-asks Moralis, CoinGecko and CoinPaprika, which each take a key, in the
-order of priority the keys are ranked in, with GeckoTerminal right after
-Moralis and MEXC right before the first of CoinGecko and CoinPaprika;
-until the keys are ranked, Moralis comes first.
+crypto-price-filler prices such a token with these, and with the exchange script's three sources, MEXC, CoinGecko and
+CoinPaprika, in the order
+[The Order of the Filler's Sources](docs/price-determination-rules.md#the-order-of-the-fillers-sources)
+gives.
 Other repos install this one to use the clients, as
 `crypto-price-fetchers/dex-prices/geckoterminal`,
 `crypto-price-fetchers/dex-prices/moralis`,
@@ -1146,7 +1121,7 @@ his rules on addresses and docs, with
 
 ### Architecture and Engineering References
 
-The `docs/` folder holds five references:
+The `docs/` folder holds six references:
 
 - [`docs/architecture.md`](docs/architecture.md): how the parts fit.
 - [`docs/price-determination-rules.md`](docs/price-determination-rules.md):
@@ -1158,6 +1133,8 @@ The `docs/` folder holds five references:
   service, on each pull request and each push to `main`.
 - [`docs/project-commands.md`](docs/project-commands.md): every command,
   with its flags and an example.
+- [`docs/glossary.md`](docs/glossary.md): the tools and terms the docs
+  name without introducing them.
 
 ---
 
@@ -1170,7 +1147,8 @@ the full text.
 
 ## Road Map
 
-The repo lists no planned work yet, and no bug is known.
+The repo lists no planned work yet;
+[`CLAUDE.md`](CLAUDE.md#known-bugs) lists the bugs known.
 
 ---
 

@@ -5,7 +5,7 @@
  * save a test of the period a price comes from, which goes to
  * `regressions-sheets-periods.test.js`; the current-price script's and the
  * menu's are in `regressions-sheets-price-now.test.js` (see the repo's
- * CLAUDE.md).
+ * `docs/engineering.md`, Known Bugs).
  * @module tests/regressions-sheets.test
  *
  * The exchange script runs unchanged in the test's thread, through

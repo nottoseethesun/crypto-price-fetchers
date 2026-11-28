@@ -3,7 +3,7 @@
  * repo use: the runner, which runs a Sheets script under Node, and its
  * services; the Summ csv utility; the key store's password prompt, and its
  * manager's check of a CoinGecko key; the clients in `dex-prices/` and
- * their shared requests; and the security lint's rule `no-secret-logging`. The repo's CLAUDE.md lists the other
+ * their shared requests; and the security lint's rule `no-secret-logging`. The repo's `docs/engineering.md` (Known Bugs) lists the other
  * files of fixed bugs' tests; a bug found later gets its test in
  * `known-bugs.test.js`, declared with `it.fails` while the bug is there,
  * and its fix moves the test to one of them.

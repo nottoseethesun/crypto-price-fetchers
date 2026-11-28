@@ -6,16 +6,13 @@
 
 This folder holds the tool that gives a crypto token's price in USD now,
 and its fully diluted value (FDV): its price times its total supply. It
-asks DexTools, a service that prices tokens from the pools of
-decentralized exchanges, for the chains DexTools lists, such as
-PulseChain, Ethereum and Solana. For X1, which DexTools does not list, it
-asks x1.ninja, a service that does the same for X1.
+asks DexTools, for the chains DexTools lists, such as
+PulseChain, Ethereum and Solana. For X1, which DexTools does not list, it asks x1.ninja.
 
 ## Tools
 
-The tool runs in Google Sheets, Google's spreadsheet app, as Apps Script,
-Google's platform for scripts that run inside its apps, and on Node, the
-program that runs JavaScript outside a browser:
+The tool runs in Google Sheets, as Apps Script, and on Node (the repo's
+[glossary](../docs/glossary.md) introduces each):
 
 | Tool | Use | Limits |
 | ---- | --- | ------ |
@@ -30,9 +27,7 @@ and `=dexToolsGetTokenFDV()`, its fully diluted value. The help section of
 its header, which the spreadsheet shows under Crypto Price Fetchers >
 Help, says how to call each.
 
-The repo's build step, `npm run build apps-script` (npm, Node's package
-manager, runs the commands the repo's `package.json` names), puts the
-script, with the repo's other Sheets scripts and the Crypto Price Fetchers
+The repo's build step, `npm run build apps-script`, puts the script, with the repo's other Sheets scripts and the Crypto Price Fetchers
 menu, in one file to paste into a spreadsheet, with the DexTools and
 x1.ninja keys saved in the repo set at its end: see
 [Install in Google Sheets](../README.md#4-install-in-google-sheets) in the
@@ -45,8 +40,7 @@ The repo's `bin/end-user/crypto-price-fetchers.js` runs
 Node, so it answers as the spreadsheet's functions do, from a Node program
 or the command line, run from the repo's top folder ([Run](#run)). It sends DexTools' key, or x1.ninja's for X1, saved, encrypted, in the
 repo's key file ([The Api Keys](../README.md#3-the-api-keys)), asking for
-its password first. Its settings are `config.json`, in this folder, which
-git, the version-control program, ignores and which may set the fields of
+its password first. Its settings are `config.json`, in this folder, which git ignores and which may set the fields of
 the script's
 `DEXTOOLS_CONFIG` it reads each time it is called: `CACHE_SECONDS`, how
 long a price above 0 is kept, and `LOCK_WAIT_MS`, how long a call waits
