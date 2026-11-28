@@ -195,6 +195,21 @@ describe("settingsProblems", () => {
       "config.json → to is missing, since from is set",
     ]);
   });
+
+  it("names the place and the rule of a value whose schema is writeOnly, but never the value, which may be a secret", () => {
+    const validate = compileSettingsSchema({
+      type: "object",
+      properties: {
+        entry: { type: "object", writeOnly: true, description: "an object" },
+      },
+    });
+    assert.deepEqual(
+      settingsProblems("keys.json", validate, {
+        entry: "a-secret-of-the-test",
+      }),
+      ["keys.json → entry must be an object"],
+    );
+  });
 });
 
 describe("the kinds of a time limit", () => {

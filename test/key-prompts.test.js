@@ -6,7 +6,8 @@
  * Each test's key file is in a temp folder of its own, removed afterwards,
  * so no test reads or writes the owner's `api-keys.json`. The prompts
  * answer from lists the tests give, and the services' checks are
- * functions the tests give, so nothing outside the computer is asked.
+ * functions the tests give, or CoinGecko's own, asking a stand-in fetch
+ * (`helpers/stand-in-web.js`), so nothing outside the computer is asked.
  *
  * Every key is encrypted at 600,000 rounds of PBKDF2, a few tenths of a
  * second each, so the tests save and open no more keys than they check.
@@ -19,14 +20,17 @@ import path from "node:path";
 import {
   enterApiKey,
   getApiKey,
+  getApiKeyType,
   hasEncryptedKey,
   keyRefused,
   loadEncryptedKey,
   saveEncryptedKey,
   savingPassword,
+  SERVICES,
   setApiKey,
   unlockApiKeys,
 } from "../api-key-store/index.js";
+import { standInFetch } from "./helpers/stand-in-web.js";
 import { makeTempFolder, removeTempFolders } from "./helpers/temp-folders.js";
 
 after(removeTempFolders);
@@ -92,6 +96,7 @@ describe("unlockApiKeys", () => {
     beta = standInService("beta", checked);
     setApiKey("alpha", null);
     setApiKey("beta", null);
+    setApiKey("coingecko", null);
   });
 
   it("answers null for each service, and asks nothing, when no key is saved", async () => {
@@ -186,6 +191,44 @@ describe("unlockApiKeys", () => {
     assert.deepEqual(spec.said, [
       "Service alpha did not answer the check of its api key (timed out), so the run uses the key unchecked.",
     ]);
+  });
+
+  it("checks a saved CoinGecko key as the type saved with it alone, and gives the type beside the key, keeping both for the run", async () => {
+    await saveEncryptedKey(file, "coingecko", "gecko-key", "pw", "paid");
+    const spec = standInSpec(file, { env: { API_KEYS_PASSWORD: "pw" } });
+    const fetch = standInFetch(({ url, headers }) =>
+      url === "https://pro-api.coingecko.com/api/v3/ping" &&
+      headers["x-cg-pro-api-key"] === "gecko-key"
+        ? { ok: true }
+        : { status: 401, text: "{}" },
+    );
+    spec.checkOptions = { fetch };
+    assert.deepEqual(await unlockApiKeys(spec, [SERVICES.coingecko]), {
+      coingecko: "gecko-key",
+      coingeckoKeyType: "paid",
+    });
+    assert.deepEqual(
+      fetch.requests.map((request) => request.url),
+      ["https://pro-api.coingecko.com/api/v3/ping"],
+    );
+    assert.equal(getApiKey("coingecko"), "gecko-key");
+    assert.equal(getApiKeyType("coingecko"), "paid");
+  });
+
+  it("stops the run when CoinGecko refuses a saved key as its saved type, naming the type", async () => {
+    await saveEncryptedKey(file, "coingecko", "gecko-key", "pw", "demo");
+    const spec = standInSpec(file, { env: { API_KEYS_PASSWORD: "pw" } });
+    spec.checkOptions = {
+      fetch: standInFetch(() => ({ status: 401, text: "{}" })),
+    };
+    await assert.rejects(
+      unlockApiKeys(spec, [SERVICES.coingecko]),
+      (error) =>
+        error.keyRefused === true &&
+        error.message ===
+          `CoinGecko refused the api key saved in ${file}, as a Demo key. Save a new one, in the project's top folder: npm run api-keys -- set coingecko`,
+    );
+    assert.equal(getApiKey("coingecko"), null);
   });
 });
 

@@ -7,9 +7,7 @@
 This directory contains utilities for fetching historical
 cryptocurrency prices in USD. They are built for tokens that trade
 on centralized exchanges (CEXs), such as Bitcoin (BTC), Monero (XMR)
-and Tari (XTM), and crypto-price-filler, the tool here that fills a CSV's
-price columns on Node, the program that runs JavaScript outside a browser,
-prices tokens that trade in a blockchain's pools as well.
+and Tari (XTM), and crypto-price-filler, the tool here that fills a CSV's price columns on Node, prices tokens that trade in a blockchain's pools as well.
 
 **Historical prices for a whole file.** crypto-price-filler prices every
 row of a CSV file at the row's own time, such as a year of a miner's
@@ -18,19 +16,18 @@ each one's price in USD and its amount at that price, for the tokens its
 list of supported tokens names ([crypto-price-filler.js](#crypto-price-fillerjs)).
 
 A token that trades only on centralized exchanges has no pool, so its
-price has to come from an exchange's API, or from a service that
-gathers the exchanges' prices: the API of MEXC, an exchange, first, then
-those of CoinGecko and CoinPaprika, two such services. A token that
-trades in pools, such as HEX on PulseChain, is priced from the pools:
-crypto-price-filler asks Moralis and GeckoTerminal, two services that
-price a token from its chain's pools, for it before those three.
+price has to come from an exchange's API, or from a service that gathers the exchanges' prices: those of MEXC,
+CoinGecko and CoinPaprika. A token that trades in pools, such as HEX on
+PulseChain, is priced from the pools: crypto-price-filler asks Moralis
+and GeckoTerminal for it too. Each tool's order of sources is in
+[The Order of the Sheet's Sources](../docs/price-determination-rules.md#the-order-of-the-sheets-sources)
+and [The Order of the Filler's Sources](../docs/price-determination-rules.md#the-order-of-the-fillers-sources).
 
 ## Tools
 
 This directory contains two tools for different uses, and a Node
-version of the first. The first runs in Google Sheets, Google's
-spreadsheet app, as Apps Script, Google's platform for scripts that run
-inside its apps:
+version of the first. The first runs in Google Sheets, as Apps Script (the repo's
+[glossary](../docs/glossary.md) introduces both):
 
 | Tool | Use | Limits |
 | ---- | --- | ------ |
@@ -44,8 +41,9 @@ inside its apps:
 
 A custom `=getCryptoPrice()` function for Google Sheets, which gives
 the average of the high and the low, by default, or the high, the low or
-the close, of the period around a time. It asks
-MEXC for the price first, then CoinGecko, then CoinPaprika. It caches
+the close, of the period around a time. It asks MEXC, CoinGecko and CoinPaprika for the price, in the order
+[The Order of the Sheet's Sources](../docs/price-determination-rules.md#the-order-of-the-sheets-sources)
+gives. It caches
 each answer, and its lock makes the calls of many cells take turns,
 so a sheet stays within each service's rate limit.
 
@@ -54,15 +52,14 @@ one, since Apps Script runs every script file of a project in one global
 scope:
 
 - [`getCryptoPriceFromCentralizedExchange.gs`](src/getCryptoPriceFromCentralizedExchange.gs):
-  `=getCryptoPrice()`, its settings and the cache.
+  `=getCryptoPrice()`, its settings, the cache, and the requests the price
+  sources send, each sent again after a refusal as one too many.
 - [`getCryptoPriceFromCentralizedExchange-sources.gs`](src/getCryptoPriceFromCentralizedExchange-sources.gs):
   the price sources.
 - [`getCryptoPriceFromCentralizedExchange-tests.gs`](src/getCryptoPriceFromCentralizedExchange-tests.gs):
   the tests to run from the Apps Script editor.
 
-The repo's build step, `npm run build apps-script` (npm, Node's package
-manager, runs the commands the repo's `package.json` names), puts the
-three files, with the repo's other Sheets scripts and the Crypto Price
+The repo's build step, `npm run build apps-script`, puts the three files, with the repo's other Sheets scripts and the Crypto Price
 Fetchers menu, which runs a spreadsheet's price cells again, in one file
 to paste into a spreadsheet, with the CoinGecko and
 CoinPaprika keys saved in the repo set at its end: see
@@ -83,8 +80,9 @@ data sources.
 
 A command-line tool for batch processing CSV files with thousands of
 timestamps. For a token that trades in pools, it asks Moralis and
-GeckoTerminal first; for every token, it then asks MEXC, CoinGecko and
-CoinPaprika through the Apps Script's own price sources, run unchanged
+GeckoTerminal; for every token, it asks MEXC, CoinGecko and CoinPaprika, in the order
+[The Order of the Filler's Sources](../docs/price-determination-rules.md#the-order-of-the-fillers-sources)
+gives, the last three through the Apps Script's own price sources, run unchanged
 under Node, so the sheet and the tool take a price from the same sources,
 and neither from a period before it is over: MEXC's candle of the minute
 that holds the time, or of the larger period MEXC is asked for when
@@ -112,8 +110,7 @@ The repo's `bin/end-user/getCryptoPriceFromCentralizedExchange.js` runs
 unchanged, under Node, so it answers as `=getCryptoPrice()` does, from a Node program or the
 command line, run from the repo's top folder ([Run](#run)). It sends the CoinGecko and CoinPaprika keys saved, encrypted, in the
 repo's key file ([The api keys](../README.md#3-the-api-keys)), asking for
-its password first. Its settings are `config.json`, in this folder, which
-git, the version-control program, ignores and which may set fields of the
+its password first. Its settings are `config.json`, in this folder, which git ignores and which may set fields of the
 script's `CONFIG`; without
 it, the script runs on the values written in it, which
 `config-example.json`, beside it, shows for each field. The rest is in the
@@ -243,8 +240,7 @@ crypto-price-filler.
 
 ## Contributing
 
-Contributions are welcome: fork the repo on GitHub, the website that
-hosts it, and open a pull request.
+Contributions are welcome: fork the repo on GitHub and open a pull request.
 
 **Requirements:**
 

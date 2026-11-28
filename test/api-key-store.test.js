@@ -6,8 +6,9 @@
  * Each test's key file is in a temp folder of its own, removed afterwards,
  * so no test reads or writes the owner's `api-keys.json`. The password
  * prompt reads from a stand-in input stream. LP Ranger's own code wrote
- * `fixtures/lp-ranger-api-keys.json`, which the store must open. The flows
- * that open and save keys are tested in `key-prompts.test.js`.
+ * `fixtures/lp-ranger-api-keys.json`, which the store must open. Files
+ * written by hand hold what the store refuses to read. The flows that open
+ * and save keys are tested in `key-prompts.test.js`.
  *
  * Every key is encrypted at 600,000 rounds of PBKDF2, a few tenths of a
  * second each, so the tests save and open no more keys than they check.
@@ -25,13 +26,18 @@ import {
   decryptKey,
   encryptKey,
   getApiKey,
+  getApiKeyType,
   hasEncryptedKey,
   loadEncryptedKey,
   openSecretPrompt,
   PBKDF2_ITERATIONS,
   saveEncryptedKey,
+  savedKeyType,
+  savedPriority,
   savedServices,
+  savePriority,
   setApiKey,
+  setApiKeyPriority,
 } from "../api-key-store/index.js";
 import { capturedOutput } from "./helpers/captured-output.js";
 import { makeTempFolder, removeTempFolders } from "./helpers/temp-folders.js";
@@ -163,12 +169,14 @@ describe("the key file", () => {
     assert.equal(await loadEncryptedKey(file, "coingecko", ""), null);
   });
 
-  it("saves a key, readable by its owner alone, leaving no other file beside it", async () => {
-    await saveEncryptedKey(file, "coingecko", "gecko-key", "pw");
+  it("saves a key, with its type, readable by its owner alone, leaving no other file beside it", async () => {
+    await saveEncryptedKey(file, "coingecko", "gecko-key", "pw", "demo");
     assert.equal(hasEncryptedKey(file, "coingecko"), true);
     assert.deepEqual(savedServices(file), ["coingecko"]);
+    assert.equal(savedKeyType(file, "coingecko"), "demo");
     assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(file, "utf8"))), [
       "coingeckoEncrypted",
+      "coingeckoKeyType",
     ]);
     assert.deepEqual(fs.readdirSync(folder), ["api-keys.json"]);
     if (process.platform !== "win32")
@@ -176,17 +184,19 @@ describe("the key file", () => {
     assert.equal(await loadEncryptedKey(file, "coingecko", "pw"), "gecko-key");
   });
 
-  it("saves a second service's key under the same password, and replaces a key, keeping the others", async () => {
-    await saveEncryptedKey(file, "coingecko", "first-key", "pw");
+  it("saves a second service's key under the same password, and replaces a key and its type, keeping the others", async () => {
+    await saveEncryptedKey(file, "coingecko", "first-key", "pw", "demo");
     await saveEncryptedKey(file, "dextools", "dex-key", "pw");
-    await saveEncryptedKey(file, "coingecko", "second-key", "pw");
+    await saveEncryptedKey(file, "coingecko", "second-key", "pw", "paid");
     assert.deepEqual(savedServices(file).sort(), ["coingecko", "dextools"]);
     assert.equal(await loadEncryptedKey(file, "coingecko", "pw"), "second-key");
+    assert.equal(savedKeyType(file, "coingecko"), "paid");
     assert.equal(await loadEncryptedKey(file, "dextools", "pw"), "dex-key");
+    assert.equal(savedKeyType(file, "dextools"), null);
   });
 
   it("refuses a key under a password other than that of the keys already saved, leaving the file as it was", async () => {
-    await saveEncryptedKey(file, "coingecko", "gecko-key", "pw");
+    await saveEncryptedKey(file, "coingecko", "gecko-key", "pw", "demo");
     const before = fs.readFileSync(file, "utf8");
     await assert.rejects(
       saveEncryptedKey(file, "dextools", "dex-key", "other"),
@@ -199,15 +209,66 @@ describe("the key file", () => {
     fs.writeFileSync(file, "{ not json");
     assert.throws(
       () => hasEncryptedKey(file, "coingecko"),
-      /is not valid JSON, so no key in it can be read/,
+      /api-keys\.json is not valid JSON: /,
     );
     await assert.rejects(
-      saveEncryptedKey(file, "coingecko", "gecko-key", "pw"),
+      saveEncryptedKey(file, "coingecko", "gecko-key", "pw", "demo"),
       /is not valid JSON/,
     );
     assert.equal(fs.readFileSync(file, "utf8"), "{ not json");
     fs.writeFileSync(file, "[]");
     assert.throws(() => savedServices(file), /holds no JSON object/);
+  });
+
+  it("refuses to save a CoinGecko key with no type, or with a type CoinGecko does not give, writing nothing", async () => {
+    await assert.rejects(
+      saveEncryptedKey(file, "coingecko", "gecko-key", "pw"),
+      (error) =>
+        error.message ===
+        `${file} → coingeckoKeyType is missing, since coingeckoEncrypted is set`,
+    );
+    await assert.rejects(
+      saveEncryptedKey(file, "coingecko", "gecko-key", "pw", "pro"),
+      (error) =>
+        error.message ===
+        `${file} → coingeckoKeyType must be "demo" or "paid", the type of the CoinGecko key; it is "pro"`,
+    );
+    assert.equal(fs.existsSync(file), false);
+  });
+
+  it("refuses to read a file that breaks its schema, naming every problem, but no value of a key's entry, which may be a key typed in by hand: an entry of no kind it keeps, an entry that is no object, and a type with no key", () => {
+    fs.writeFileSync(
+      file,
+      JSON.stringify({
+        coingeckoKeyType: "paid",
+        dextoolsEncrypted: "not an entry",
+        notes: "kept by hand",
+      }),
+    );
+    assert.throws(
+      () => savedServices(file),
+      (error) =>
+        error.message ===
+        [
+          `${file} → notes is not a setting this tool reads`,
+          `${file} → dextoolsEncrypted must be an object, a key encrypted with the password in LP Ranger's format`,
+          `${file} → coingeckoEncrypted is missing, since coingeckoKeyType is set`,
+        ].join("\n"),
+    );
+  });
+
+  it("refuses an order of priority that names a service twice, or is no list, writing nothing", () => {
+    assert.throws(
+      () => savePriority(file, ["alpha", "alpha"]),
+      (error) =>
+        error.message ===
+        `${file} → priority must be a list of the services' names, each once, highest priority first; it is ["alpha","alpha"]`,
+    );
+    fs.writeFileSync(file, JSON.stringify({ priority: "alpha" }));
+    assert.throws(
+      () => savedPriority(file),
+      /→ priority must be a list of the services' names, each once, highest priority first; it is "alpha"$/,
+    );
   });
 
   it("refuses a service whose name is not letters and digits", () => {
@@ -252,20 +313,48 @@ describe("askPassword and openSecretPrompt", () => {
     terminal.input.write("\u0003");
     await assert.rejects(answer, /Stopped at the prompt/);
   });
+
+  it("keep each answer piped in for its question when the input ends while the prompt waits between two questions, as on a service's check of a key", async () => {
+    const input = new PassThrough();
+    input.end("first-key\nsecond-key\n");
+    const prompt = openSecretPrompt({ input, output: capturedOutput() });
+    try {
+      assert.equal(await prompt.ask("First key: "), "first-key");
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      assert.equal(await prompt.ask("Second key: "), "second-key");
+    } finally {
+      prompt.close();
+    }
+  });
 });
 
-describe("setApiKey and getApiKey", () => {
+describe("setApiKey, getApiKey and getApiKeyType", () => {
   it("keep a key for the run, give null for a service with none, and forget a key set to null", () => {
     setApiKey("holdertest", "held-key");
     assert.equal(getApiKey("holdertest"), "held-key");
+    assert.equal(getApiKeyType("holdertest"), null);
     assert.equal(getApiKey("nonesaved"), null);
     setApiKey("holdertest", null);
     assert.equal(getApiKey("holdertest"), null);
   });
 
-  it("refuse a key that is not a string that is not empty", () => {
+  it("keep a key's type with it, and forget the type with the key, or when the key is set again with none", () => {
+    setApiKey("holdertest", "held-key", "paid");
+    assert.equal(getApiKeyType("holdertest"), "paid");
+    setApiKey("holdertest", "other-key");
+    assert.equal(getApiKeyType("holdertest"), null);
+    setApiKey("holdertest", "held-key", "demo");
+    setApiKey("holdertest", null);
+    assert.equal(getApiKeyType("holdertest"), null);
+  });
+
+  it("refuse a key that is not a string that is not empty, and a type that is neither that nor null", () => {
     assert.throws(() => setApiKey("holdertest", ""), TypeError);
     assert.throws(() => setApiKey("holdertest", 42), TypeError);
+    assert.throws(() => setApiKey("holdertest", "held-key", ""), TypeError);
+    assert.throws(() => setApiKey("holdertest", "held-key", 1), TypeError);
+    assert.throws(() => setApiKeyPriority("alpha"), TypeError);
+    assert.throws(() => setApiKeyPriority(["alpha", ""]), TypeError);
   });
 });
 

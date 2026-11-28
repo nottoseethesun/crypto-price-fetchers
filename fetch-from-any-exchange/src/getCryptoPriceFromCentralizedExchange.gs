@@ -18,7 +18,8 @@
  * average of the high and the low of a period around it, or the high, the
  * low or the close, asking one source after another until
  * one has a price: MEXC, a centralized exchange, then CoinGecko and
- * CoinPaprika, two services that gather the exchanges' prices.
+ * CoinPaprika, two services that gather the exchanges' prices, in the
+ * order of priority the owner ranked their keys in (API_KEY_PRIORITY).
  * crypto-price-filler, the repo's tool for whole CSV files, which runs on
  * Node, the program that runs JavaScript outside a browser, asks these
  * same price sources through the repo's runner, so a fix here fixes both.
@@ -27,8 +28,10 @@
  * ------------
  * The script is in three files, to keep each under the 500 lines of code
  * that LP Ranger's rules allow (LP Ranger, the owner's bot that manages his
- * 9mm V3 liquidity positions, sets the coding standards the repo follows): this one, getCryptoPriceFromCentralizedExchange-sources.gs, the
- * price sources, MEXC, CoinGecko and CoinPaprika, and
+ * 9mm V3 liquidity positions, sets the coding standards the repo follows):
+ * this one, which holds the call's budget and the requests the sources
+ * send within it; getCryptoPriceFromCentralizedExchange-sources.gs, the
+ * price sources, MEXC, CoinGecko and CoinPaprika; and
  * getCryptoPriceFromCentralizedExchange-tests.gs, the tests run from the
  * Apps Script editor. Apps Script runs every script file of a project in
  * one global scope, so the three work as one. The build step of the
@@ -42,12 +45,19 @@
  * This file, as committed, holds no api key: CONFIG.COINGECKO_API_KEY and
  * CONFIG.COINPAPRIKA_API_KEY are empty, and the script asks each service
  * without a key. The build step sets them at the end of the file it gives,
- * from the keys saved in the repo (`npm run api-keys`). Each key is
- * optional:
+ * from the keys saved in the repo (`npm run api-keys`), with the CoinGecko
+ * key's type in CONFIG.COINGECKO_API_KEY_TYPE. Each key is optional:
  *
- *   COINGECKO_API_KEY   - A CoinGecko demo api key, sent to CoinGecko in
- *                         the x-cg-demo-api-key header. Without it,
- *                         CoinGecko answers at a lower rate.
+ *   COINGECKO_API_KEY   - A CoinGecko api key, of either type CoinGecko
+ *                         gives, which CONFIG.COINGECKO_API_KEY_TYPE names
+ *                         and which the key store tells apart when the key
+ *                         is saved: "demo", its free key, sent to its
+ *                         public api (COINGECKO_BASE) in the
+ *                         x-cg-demo-api-key header; or "paid", a key of one
+ *                         of its paid plans, sent to its Pro api
+ *                         (COINGECKO_PRO_BASE) in the x-cg-pro-api-key
+ *                         header. Without a key, the script asks the public
+ *                         api, which answers at a lower rate.
  *   COINPAPRIKA_API_KEY - A key for one of CoinPaprika's paid plans, sent
  *                         to CoinPaprika's paid server as the whole
  *                         Authorization header. Without it, the script
@@ -178,20 +188,21 @@
  *   coin at that time; `No data available (cached)` repeats that answer
  *   while the script keeps "no data" (above).
  * - `No data available from any source; CoinPaprika gives average, high
- *   and low only with an api key`: no earlier source had a price for an
- *   average, a high or a low, and CoinPaprika, asked last, gives those
- *   only from a day's candle, which its free server, asked without a key,
+ *   and low only with an api key`: no source had a price for an
+ *   average, a high or a low, and CoinPaprika, passed over for them
+ *   without a key, gives those only from a day's candle, which its free server, asked without a key,
  *   keeps only for the 24 hours after the candle begins, and so never once
  *   the day is over. A CoinPaprika key, saved with `npm run api-keys`
  *   before the build, has the script ask its paid server.
  * - `No data available for future dates`: the time is after now.
  * - `Too recent for a final price: ask again after …`: the time is in the
- *   minute not yet over, for a coin MEXC is asked about; or MEXC has no
- *   price for the time, no request of the call was cut short, and a later
- *   source's period that holds the time is not over: CoinGecko's 24 hours
- *   around the time, when CoinGecko has prices of the coin in the part of
- *   them already over, or else CoinPaprika's UTC day of the time, for
- *   which the script asks CoinPaprika nothing until the day is over, for
+ *   minute not yet over, for a coin MEXC is asked about; or no source
+ *   before it has a price for the time, no request of the call was cut
+ *   short, and a later source's period that holds the time is not over:
+ *   CoinGecko's 24 hours around the time, when CoinGecko has prices of the
+ *   coin in the part of them already over, or CoinPaprika's UTC day of the
+ *   time, for which the script asks CoinPaprika nothing until the day is
+ *   over, nor any source ranked after the one not over, for
  *   close or with a CoinPaprika key (without one, an average, a high or a
  *   low gets the message on keys, above), so this message comes whether or
  *   not CoinPaprika has the coin, save for GridCoin, which the script never
@@ -286,6 +297,9 @@
  * DATA SOURCES (PROVIDER CHAIN)
  * -----------------------------
  * Providers are tried in order; the first successful result is returned.
+ * MEXC, which takes no api key, comes first; CoinGecko and CoinPaprika,
+ * which each take one, follow in the order of priority the owner ranked
+ * their keys in (CONFIG.API_KEY_PRIORITY), CoinGecko first as committed.
  * None asks for the current price, which would put today's price on a
  * past date. A request a provider refuses as one too many (status 429) is
  * sent again after each wait in RETRY_DELAYS_MS, while the wait fits in
@@ -308,9 +322,9 @@
  *                   a) market_chart/range (24h window, hourly data points)
  *                   b) history (the price at 00:00 UTC the day after the
  *                      requested UTC day, which ends it), for close only
- *                   Both send the demo api key when
- *                   CONFIG.COINGECKO_API_KEY holds one (see API KEYS
- *                   above).
+ *                   Both send the api key, to the api its type takes,
+ *                   when CONFIG.COINGECKO_API_KEY holds one (see API
+ *                   KEYS above).
  *
  *   3. CoinPaprika - The day's candle, then, for close, the price at 00:00
  *                   UTC of the next day, which ends the day (see above).
@@ -357,12 +371,29 @@
  *                          the longest Apps Script's cache keeps a value)
  *     NEGATIVE_CACHE     - TTL for "no data" results (300 = 5min)
  *
- *   COINGECKO_BASE       - CoinGecko API v3 base URL
- *   COINGECKO_API_KEY    - The CoinGecko demo api key; empty for none, as
+ *   COINGECKO_BASE       - CoinGecko's public api, v3, asked with no key
+ *                          or with a Demo key
+ *   COINGECKO_PRO_BASE   - CoinGecko's Pro api, v3, asked with a paid
+ *                          plan's key
+ *   COINGECKO_API_KEY    - The CoinGecko api key; empty for none, as
  *                          committed (see API KEYS)
+ *   COINGECKO_API_KEY_TYPE
+ *                        - The key's type, "demo" or "paid" (see API
+ *                          KEYS); any other value stops the script at
+ *                          CoinGecko with an error that names it
  *   COINGECKO_API_KEY_HEADER
- *                        - The header the key is sent in
+ *                        - The header a Demo key is sent in
  *                          ("x-cg-demo-api-key")
+ *   COINGECKO_PRO_API_KEY_HEADER
+ *                        - The header a paid plan's key is sent in
+ *                          ("x-cg-pro-api-key")
+ *   API_KEY_PRIORITY     - The services whose keys the script sends, by
+ *                          name, in the order of priority the owner ranked
+ *                          them in: CoinGecko and CoinPaprika are asked in
+ *                          this order. The build step and the Node version
+ *                          set it from the key store (`npm run api-keys --
+ *                          rank`); as committed, ["coingecko",
+ *                          "coinpaprika"]
  *   COINPAPRIKA_BASE     - CoinPaprika API v1 base URL, the free server
  *   COINPAPRIKA_PRO_BASE - CoinPaprika's paid server, asked with a key
  *   COINPAPRIKA_API_KEY  - The CoinPaprika api key; empty for none, as
@@ -417,7 +448,7 @@
 
 // Declared in getCryptoPriceFromCentralizedExchange-sources.gs, in the same
 // project:
-/* global getPriceFromMEXC, getPriceFromCoinGecko, getPriceFromCoinPaprika, mexcSkips, coinGeckoHasPricesSoFar, coinPaprikaSkips, configuredKey */
+/* global getPriceFromMEXC, getPriceFromCoinGecko, getPriceFromCoinPaprika, mexcSkips, coinGeckoHasPricesSoFar, coinPaprikaSkips, sourcesInPriority */
 
 /** ============================================================================
  *                          CONFIGURATION & GLOBALS
@@ -444,15 +475,28 @@ const CONFIG = {
 
   // API URL bases
   COINGECKO_BASE: "https://api.coingecko.com/api/v3",
+  COINGECKO_PRO_BASE: "https://pro-api.coingecko.com/api/v3",
   COINPAPRIKA_BASE: "https://api.coinpaprika.com/v1",
   COINPAPRIKA_PRO_BASE: "https://api-pro.coinpaprika.com/v1",
 
   /*-
-   *  The CoinGecko demo api key, sent in this header; empty for none. The
-   *  build step sets it (see API KEYS), as the Node version does.
+   *  The CoinGecko api key, empty for none, and its type: "demo", sent to
+   *  COINGECKO_BASE in COINGECKO_API_KEY_HEADER, or "paid", sent to
+   *  COINGECKO_PRO_BASE in COINGECKO_PRO_API_KEY_HEADER. The build step
+   *  sets both (see API KEYS), as the Node version does.
    */
   COINGECKO_API_KEY: "",
+  COINGECKO_API_KEY_TYPE: "demo",
   COINGECKO_API_KEY_HEADER: "x-cg-demo-api-key",
+  COINGECKO_PRO_API_KEY_HEADER: "x-cg-pro-api-key",
+
+  /*-
+   *  The services, by name, in the order of priority the owner ranked their
+   *  keys in; a service it does not name comes after those it names. The
+   *  build step sets it from the key store (see API KEYS), as the Node
+   *  version does.
+   */
+  API_KEY_PRIORITY: ["coingecko", "coinpaprika"],
 
   /*-
    *  The CoinPaprika paid-plan api key, sent as this header's whole
@@ -539,6 +583,88 @@ function callHasTimeFor(milliseconds) {
 function waitInCall(milliseconds) {
   CALL.waitedMs += milliseconds;
   Utilities.sleep(milliseconds);
+}
+
+/** ============================================================================
+ *                          REQUESTS
+ * ========================================================================== */
+
+/**
+ * Asks a url, and asks it again after each wait in CONFIG.RETRY_DELAYS_MS
+ * while the provider refuses it as one too many (status 429), within the
+ * time the call has left (callHasTimeFor). Returns the last response,
+ * whatever its status; or null when the request got no response at all,
+ * for which UrlFetchApp.fetch throws, as on a timeout, a refused
+ * connection or Apps Script's own quota of requests, or the call had no
+ * time left to send it. A refusal as one too many still there after the
+ * last try, or one the call has no time left to wait out, an answer with a
+ * server error (5xx) or a request timeout (408), a request with no
+ * response, and a request it has no time to send are counted as cut short
+ * (CALL.cutRequests): the source then answers nothing, which is no answer
+ * to keep, since none of them says whether it has a price.
+ */
+function fetchWithRetries(url, headers, label) {
+  const delays = CONFIG.RETRY_DELAYS_MS;
+  for (let attempt = 0; ; attempt++) {
+    if (!callHasTimeFor(0)) {
+      Logger.log(`${label}: the call has used its time, so it is not sent`);
+      CALL.cutRequests += 1;
+      return null;
+    }
+    let response;
+    try {
+      response = UrlFetchApp.fetch(url, {
+        muteHttpExceptions: true,
+        headers: headers,
+      });
+    } catch (e) {
+      Logger.log(`${label} got no response: ${e.message}`);
+      CALL.cutRequests += 1;
+      return null;
+    }
+    const code = response.getResponseCode();
+    if (code >= 500 || code === 408) {
+      Logger.log(`${label} answered ${code}, which says nothing of its data`);
+      CALL.cutRequests += 1;
+      return response;
+    }
+    if (code !== 429) return response;
+    if (attempt >= delays.length || !callHasTimeFor(delays[attempt])) {
+      Logger.log(
+        attempt >= delays.length
+          ? `${label} answered 429 to every try`
+          : `${label} answered 429, and the call has no time left to wait`,
+      );
+      CALL.cutRequests += 1;
+      return response;
+    }
+    Logger.log(
+      `${label} answered 429 - waiting ${delays[attempt]} ms (try ${attempt + 2} of ${delays.length + 1} next)`,
+    );
+    waitInCall(delays[attempt]);
+  }
+}
+
+/** The json body of a response with status 200, or null for any other status, a body that is not json, or no response */
+function jsonOf(response, label) {
+  if (response === null) return null;
+  const code = response.getResponseCode();
+  if (code !== 200) {
+    Logger.log(`${label} failed: HTTP ${code}`);
+    return null;
+  }
+  try {
+    return JSON.parse(response.getContentText());
+  } catch (e) {
+    Logger.log(`${label} gave a body that is not json: ${e.message}`);
+    return null;
+  }
+}
+
+/** An api key set in CONFIG, trimmed, or null when none is set */
+function configuredKey(key) {
+  if (typeof key !== "string" || key.trim() === "") return null;
+  return key.trim();
 }
 
 /**
@@ -633,6 +759,29 @@ function setCachedResult(
   Logger.log(`Cached: ${key} = ${valueToCache} (TTL ${ttl}s)`);
 }
 
+/**
+ * What decides which source prices a cell, for the key its price is kept
+ * under (`cryptoPriceInCall`): the order the sources are asked in
+ * (SHEET_SOURCES, CONFIG.API_KEY_PRIORITY); the CoinGecko key's type,
+ * which names the api CoinGecko is asked at, and so how far back it
+ * answers; and whether a CoinPaprika key is set, which decides what
+ * CoinPaprika can give (`coinPaprikaCanGive`). A build that changes any of
+ * them, as when the owner ranks the keys again or saves a key, so asks the
+ * sources again rather than give a price kept under the last one.
+ *
+ * @return {string} Such as "MEXC-CoinGecko-CoinPaprika_demo_nokey"
+ */
+function priceCacheScope() {
+  const gecko =
+    configuredKey(CONFIG.COINGECKO_API_KEY) === null
+      ? "nokey"
+      : CONFIG.COINGECKO_API_KEY_TYPE;
+  const paprika =
+    configuredKey(CONFIG.COINPAPRIKA_API_KEY) === null ? "nokey" : "key";
+  const order = sourcesInPriority(SHEET_SOURCES, CONFIG.API_KEY_PRIORITY);
+  return `${order.join("-")}_${gecko}_${paprika}`;
+}
+
 /** ============================================================================
  * Main entry point custom function for Google Sheets
  * ========================================================================== */
@@ -685,8 +834,8 @@ function cryptoPriceInCall(token, dateStr, tz, mode, apiDelayMs) {
   if (typeof utcMs === "string") return utcMs;
   if (utcMs > Date.now()) return "No data available for future dates";
 
-  // Check cache
-  const cacheKey = `price_${token}_${safeDateStr.replace(/[^0-9-]/g, "")}_${tz}_${target}`;
+  // Check cache, under what decides which source prices the cell
+  const cacheKey = `price_${token}_${safeDateStr.replace(/[^0-9-]/g, "")}_${tz}_${target}_${priceCacheScope()}`;
   const cached = getCachedResult(cacheKey);
   if (cached !== null) return cached;
 
@@ -799,20 +948,38 @@ function releaseLockIfHeld(lockAcquired) {
 }
 
 /**
- * Tries each provider in order, and gives the first valid price; or the
+ * The sheet's sources, for sourcesInPriority: MEXC, which takes no key,
+ * right before the first of CoinGecko and CoinPaprika, which each take
+ * one and follow in the order of CONFIG.API_KEY_PRIORITY.
+ */
+const SHEET_SOURCES = Object.freeze([
+  Object.freeze({
+    name: "MEXC",
+    before: Object.freeze(["coingecko", "coinpaprika"]),
+  }),
+  Object.freeze({ name: "CoinGecko", service: "coingecko" }),
+  Object.freeze({ name: "CoinPaprika", service: "coinpaprika" }),
+]);
+
+/**
+ * Tries each provider in the order sourcesInPriority gives (SHEET_SOURCES),
+ * and gives the first valid price; or the
  * message that says when to ask again, for a time in MEXC's minute not
- * yet over, or, when MEXC has no price and no request of the call was cut
- * short, while a later source's period for
+ * yet over, or, when no source before it has a price and no request of
+ * the call was cut short, while a later source's period for
  * the time is not over: CoinGecko's window, when CoinGecko has prices of
- * the coin in the part of it already over, without asking CoinPaprika, or
- * else CoinPaprika's UTC day, which the script asks nothing of until the
+ * the coin in the part of it already over, without asking a source ranked
+ * after it, or CoinPaprika's UTC day, which the script asks nothing of, nor
+ * any source ranked after it, until the
  * day is over; or else null, which the caller shows as busy when a
- * request of the call was cut short, and as no data otherwise. A source
+ * request of the call was cut short, and as no data otherwise. So a
+ * time's price comes from the highest-ranked source that has one. A source
  * gives no price from a period not over; when CoinGecko has none of the
- * coin, as for a ticker no coin has, the script goes on to CoinPaprika.
+ * coin, as for a ticker no coin has, the script goes on to the next source.
  * Without a CoinPaprika key, CoinPaprika can give no average, high or low
- * (`coinPaprikaCanGive`), so for those it is not asked, and the message
- * says it needs a key, save for a token CoinPaprika lists as inactive
+ * (`coinPaprikaCanGive`), so for those it is not asked, the script goes on
+ * to the next source, and, when none gives a price, the message says
+ * CoinPaprika needs a key, save for a token CoinPaprika lists as inactive
  * (`coinPaprikaSkips`), or the caller shows busy when a request of the
  * call was cut short.
  * For a token CoinPaprika lists as inactive (`coinPaprikaSkips`), the
@@ -826,30 +993,31 @@ function releaseLockIfHeld(lockAcquired) {
  */
 function fetchPriceFromProviders(token, utcMs, target) {
   const idMap = TOKEN_TO_ID[token] ?? { gecko: token, paprika: token };
-  const providers = [
-    { name: "MEXC", fn: () => getPriceFromMEXC(token, utcMs, target) },
-    {
-      name: "CoinGecko",
-      fn: () => getPriceFromCoinGecko(idMap.gecko, utcMs, target),
-    },
-    {
-      name: "CoinPaprika",
-      fn: () => getPriceFromCoinPaprika(idMap.paprika, utcMs, target),
-    },
-  ];
-
-  for (const provider of providers) {
-    const early = beforeAsking(provider.name, token, idMap, utcMs, target);
+  const askSource = {
+    MEXC: () => getPriceFromMEXC(token, utcMs, target),
+    CoinGecko: () => getPriceFromCoinGecko(idMap.gecko, utcMs, target),
+    CoinPaprika: () => getPriceFromCoinPaprika(idMap.paprika, utcMs, target),
+  };
+  let keyNeeded = false;
+  for (const name of sourcesInPriority(
+    SHEET_SOURCES,
+    CONFIG.API_KEY_PRIORITY,
+  )) {
+    const early = beforeAsking(name, token, idMap, utcMs, target);
     if (early === SKIP_SOURCE) continue;
+    if (early === KEY_NEEDED) {
+      keyNeeded = true;
+      continue;
+    }
     if (early !== ASK_SOURCE) return early;
-    const price = provider.fn();
+    const price = askSource[name]();
     if (isValidPrice(price)) {
-      Logger.log(`Final price from ${provider.name}: ${price}`);
+      Logger.log(`Final price from ${name}: ${price}`);
       return price;
     }
   }
   Logger.log("All providers failed");
-  return null;
+  return keyNeeded && CALL.cutRequests === 0 ? COINPAPRIKA_KEY_MESSAGE : null;
 }
 
 /** What `beforeAsking` gives for a source to ask, and for one to pass over. */
@@ -857,12 +1025,19 @@ const ASK_SOURCE = "ask";
 const SKIP_SOURCE = "skip";
 
 /**
+ * What `beforeAsking` gives for a source that gives the target only with a
+ * key no one saved: the loop goes on to the next source, and gives the
+ * message that CoinPaprika needs a key only when no source has a price.
+ */
+const KEY_NEEDED = "keyNeeded";
+
+/**
  * What the provider loop does with a source before it asks it, as
  * `fetchPriceFromProviders` describes: ask it (ASK_SOURCE), pass over it
- * (SKIP_SOURCE), or end the loop with a result: the message that says
- * when to ask again, or that CoinPaprika needs a key, or null, which the
- * caller shows as busy, when a request of the call was cut short. MEXC,
- * asked first, comes before any request of the call. The count of
+ * (SKIP_SOURCE), pass over it for want of a key (KEY_NEEDED), or end the
+ * loop with a result: the message that says when to ask again, or null,
+ * which the caller shows as busy, when a request of the call was cut
+ * short. MEXC, asked first, comes before any request of the call. The count of
  * requests cut short is read at each check, since the request for
  * CoinGecko's prices so far, asked here, may itself be cut short.
  *
@@ -871,7 +1046,7 @@ const SKIP_SOURCE = "skip";
  * @param {{gecko: string, paprika: string}} idMap - The token's ids at CoinGecko and CoinPaprika
  * @param {number} utcMs - The time, in ms since 1970 UTC
  * @param {string} target - The price to give
- * @return {string|null} ASK_SOURCE, SKIP_SOURCE, the message, or null
+ * @return {string|null} ASK_SOURCE, SKIP_SOURCE, KEY_NEEDED, the message, or null
  */
 function beforeAsking(name, token, idMap, utcMs, target) {
   if (name === "MEXC") {
@@ -889,8 +1064,7 @@ function beforeAsking(name, token, idMap, utcMs, target) {
     Logger.log(`Skipping CoinPaprika for inactive token: ${idMap.paprika}`);
     return SKIP_SOURCE;
   }
-  if (!coinPaprikaCanGive(target))
-    return CALL.cutRequests > 0 ? null : COINPAPRIKA_KEY_MESSAGE;
+  if (!coinPaprikaCanGive(target)) return KEY_NEEDED;
   if (Date.now() < coinPaprikaDayEndMs(utcMs))
     return CALL.cutRequests > 0
       ? null

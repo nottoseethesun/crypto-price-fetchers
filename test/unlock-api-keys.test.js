@@ -77,6 +77,7 @@ for (const shell of ["bash", "zsh"]) {
           "coingecko",
           "gecko-key",
           "right-password",
+          "demo",
         );
       });
 

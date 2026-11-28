@@ -3,10 +3,13 @@
  * @module tests/price.test
  *
  * `getCryptoPrice` asks the pool sources (Moralis, then GeckoTerminal) for
- * a token that names a contract, then the Sheets script's sources (MEXC,
+ * a token that names a contract, and the Sheets script's sources (MEXC,
  * CoinGecko, CoinPaprika, through `exchange.js`), each skipped when the
- * token's entry names no id for it. Every source is a stand-in here, as
- * are the cache and the token list.
+ * token's entry names no id for it, in the order the script's rule gives
+ * (`sourcesInPriority`). Every source is a stand-in here, the rule among
+ * them, which gives today's order unless a test says otherwise, as are
+ * the cache and the token list; `source-priority.test.js` runs the real
+ * rule.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -54,12 +57,22 @@ const mockGetCache = vi.mocked(cacheModule.getCache);
 const mockSetCache = vi.mocked(cacheModule.setCache);
 const mockReadFileSync = vi.mocked(fs.readFileSync);
 
-/** The Sheets script's sources, as `exchangeSources` gives them. */
+/** The Sheets script's sources, and its rule for their order, as `exchangeSources` gives them. */
 const sources = {
   getPriceFromMEXC: vi.fn(),
   getPriceFromCoinGecko: vi.fn(),
   getPriceFromCoinPaprika: vi.fn(),
+  sourcesInPriority: vi.fn(),
 };
+
+/** The order the stand-in rule gives unless a test says otherwise: the one with no order of priority saved. */
+const TODAYS_ORDER = [
+  "Moralis",
+  "GeckoTerminal",
+  "MEXC",
+  "CoinGecko",
+  "CoinPaprika",
+];
 
 const PHEX_CONTRACT = "0x2b591e99afE9f32eAA6214f7B7629768c40Eeb39";
 
@@ -140,6 +153,7 @@ beforeEach(() => {
   sources.getPriceFromMEXC.mockResolvedValue(null);
   sources.getPriceFromCoinGecko.mockResolvedValue(null);
   sources.getPriceFromCoinPaprika.mockResolvedValue(null);
+  sources.sourcesInPriority.mockResolvedValue(TODAYS_ORDER);
   mockMoralis.mockResolvedValue(null);
   mockGeckoTerminal.mockResolvedValue(null);
   mockGetCache.mockReturnValue(undefined);
@@ -200,6 +214,23 @@ describe("Price Fetching Orchestration", () => {
         expect(mockExchangeSources).toHaveBeenCalledWith(true);
       });
 
+      it("asks the sources in the order the script's rule gives, from the filler's sources and the run's order of priority", async () => {
+        sources.sourcesInPriority.mockResolvedValueOnce([
+          "CoinPaprika",
+          "MEXC",
+          "CoinGecko",
+          "Moralis",
+          "GeckoTerminal",
+        ]);
+        sources.getPriceFromCoinPaprika.mockResolvedValueOnce(51000);
+        sources.getPriceFromMEXC.mockResolvedValue(50000);
+        expect(await priceOf("btc")).toBe(51000);
+        expect(sources.getPriceFromMEXC).not.toHaveBeenCalled();
+        const [given, priority] = sources.sourcesInPriority.mock.calls[0];
+        expect(given.map((source) => source.name)).toEqual(TODAYS_ORDER);
+        expect(priority).toEqual([]);
+      });
+
       it("passes over an answer that is not a finite number", async () => {
         sources.getPriceFromMEXC.mockResolvedValueOnce(Number.NaN);
         sources.getPriceFromCoinGecko.mockResolvedValueOnce("49500");
@@ -223,7 +254,9 @@ describe("Price Fetching Orchestration", () => {
           false,
         );
         expect(mockGeckoTerminal).not.toHaveBeenCalled();
-        expect(mockExchangeSources).not.toHaveBeenCalled();
+        expect(sources.getPriceFromMEXC).not.toHaveBeenCalled();
+        expect(sources.getPriceFromCoinGecko).not.toHaveBeenCalled();
+        expect(sources.getPriceFromCoinPaprika).not.toHaveBeenCalled();
       });
 
       it("is asked of GeckoTerminal when Moralis has no price", async () => {

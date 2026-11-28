@@ -8,12 +8,20 @@
  * and `check(key, options)`, which asks the service about a key once. A
  * check answers 'valid' when the service takes the key and 'invalid' when
  * it refuses it, and throws when the service does not answer, or answers
- * so that neither can be told. `serviceNamed` finds one by its listed name.
+ * so that neither can be told. A service whose keys come in types, each
+ * taken at an api of its own, lists them in `keyTypes` in place of one
+ * check: each type with its words in messages and its own check, in the
+ * order a new key is checked as each (`key-prompts.js`). `serviceNamed`
+ * finds a service by its listed name.
  *
  * How each is asked:
  *
- * - coingecko: CoinGecko's ping, with the key in the `x-cg-demo-api-key`
- *   header. 200 takes the key; 400 and 401 refuse it.
+ * - coingecko: CoinGecko's ping, at the api that takes each of its two
+ *   types of key, which come in one form, so only CoinGecko's answer tells
+ *   them apart (`COINGECKO_KEY_TYPES`): a Demo key, its free one, at its
+ *   public api, in the `x-cg-demo-api-key` header; a key of one of its
+ *   paid plans at its Pro api, in the `x-cg-pro-api-key` header. 200 takes
+ *   the key; 400 and 401 refuse it.
  * - coinpaprika: the facts CoinPaprika's paid server gives about a key
  *   (`/key/info`), with the key as the whole `Authorization` header, as
  *   its paid plans take it. 200 takes the key; 401 and 403 refuse it.
@@ -51,11 +59,29 @@ import { fetchWithinTimeLimit } from "../lib/time-limited-fetch.js";
 /** How long a service has to answer a check, in milliseconds. */
 const CHECK_TIMEOUT_MS = 15000;
 
-/** The header CoinGecko reads a demo api key from. */
-export const COINGECKO_KEY_HEADER = "x-cg-demo-api-key";
-
-/** CoinGecko's ping. */
-const COINGECKO_PING = "https://api.coingecko.com/api/v3/ping";
+/**
+ * CoinGecko's types of api key, in the order a new key is checked as each:
+ * each with its words in messages, the root of the api that takes it, the
+ * header the key goes in there, and its check. The exchange script sends a
+ * key to the same api in the same header (`CONFIG.COINGECKO_BASE` and
+ * `CONFIG.COINGECKO_API_KEY_HEADER` for a Demo key,
+ * `CONFIG.COINGECKO_PRO_BASE` and `CONFIG.COINGECKO_PRO_API_KEY_HEADER`
+ * for a paid plan's), which `test/config-schemas.test.js` holds to these.
+ */
+export const COINGECKO_KEY_TYPES = Object.freeze({
+  demo: Object.freeze({
+    name: "a Demo key",
+    base: "https://api.coingecko.com/api/v3",
+    header: "x-cg-demo-api-key",
+    check: checkCoinGeckoDemo,
+  }),
+  paid: Object.freeze({
+    name: "a paid plan's key",
+    base: "https://pro-api.coingecko.com/api/v3",
+    header: "x-cg-pro-api-key",
+    check: checkCoinGeckoPaid,
+  }),
+});
 
 /** What CoinPaprika's paid server says of the key it is sent. */
 const COINPAPRIKA_KEY_INFO = "https://api-pro.coinpaprika.com/v1/key/info";
@@ -118,25 +144,50 @@ async function statusOf(options, url, headers, name) {
 }
 
 /**
- * Asks CoinGecko's ping whether it takes a demo api key.
+ * Asks CoinGecko's ping, at the api that takes a type of key, whether it
+ * takes a key as that type.
+ *
+ * @param {string} keyType - The type, a key of `COINGECKO_KEY_TYPES`
+ * @param {string} key - The key
+ * @param {CheckOptions} options - What a test replaces
+ * @returns {Promise<string>} 'valid' or 'invalid'
+ * @throws {Error} When CoinGecko does not answer, or answers with another status
+ */
+async function checkCoinGeckoAs(keyType, key, options) {
+  const { base, header } = COINGECKO_KEY_TYPES[keyType];
+  const status = await statusOf(
+    options,
+    `${base}/ping`,
+    { [header]: key },
+    "CoinGecko",
+  );
+  if (status === 200) return "valid";
+  if (status === 400 || status === 401) return "invalid";
+  throw new Error(`CoinGecko answered with status ${status}`);
+}
+
+/**
+ * Asks CoinGecko's public api whether it takes a key as a Demo key.
  *
  * @param {string} key - The key
  * @param {CheckOptions} [options] - What a test replaces
  * @returns {Promise<string>} 'valid' or 'invalid'
  * @throws {Error} When CoinGecko does not answer, or answers with another status
  */
-async function checkCoinGecko(key, options = {}) {
-  const status = await statusOf(
-    options,
-    COINGECKO_PING,
-    {
-      [COINGECKO_KEY_HEADER]: key,
-    },
-    "CoinGecko",
-  );
-  if (status === 200) return "valid";
-  if (status === 400 || status === 401) return "invalid";
-  throw new Error(`CoinGecko answered with status ${status}`);
+function checkCoinGeckoDemo(key, options = {}) {
+  return checkCoinGeckoAs("demo", key, options);
+}
+
+/**
+ * Asks CoinGecko's Pro api whether it takes a key as a paid plan's key.
+ *
+ * @param {string} key - The key
+ * @param {CheckOptions} [options] - What a test replaces
+ * @returns {Promise<string>} 'valid' or 'invalid'
+ * @throws {Error} When CoinGecko does not answer, or answers with another status
+ */
+function checkCoinGeckoPaid(key, options = {}) {
+  return checkCoinGeckoAs("paid", key, options);
 }
 
 /**
@@ -238,12 +289,21 @@ async function checkX1Ninja(key, options = {}) {
 }
 
 /**
+ * A type of key a service gives.
+ *
+ * @typedef {Object} KeyType
+ * @property {string} name - Its words in messages, such as "a paid plan's key"
+ * @property {function(string, CheckOptions=): Promise<string>} check - Asks the service about a key as this type: 'valid' or 'invalid'; throws when it does not answer
+ */
+
+/**
  * A service whose key a project keeps.
  *
  * @typedef {Object} Service
  * @property {string} service - Its name in `config.json` and the key file, such as 'coingecko'
  * @property {string} name - Its name in messages, such as 'CoinGecko'
- * @property {function(string, CheckOptions=): Promise<string>} check - Asks it about a key: 'valid' or 'invalid'; throws when it does not answer
+ * @property {function(string, CheckOptions=): Promise<string>} [check] - Asks it about a key: 'valid' or 'invalid'; throws when it does not answer. A service with `keyTypes` has none
+ * @property {Object<string, KeyType>} [keyTypes] - The types its keys come in, by the name the key file keeps the type under, in the order a new key is checked as each
  */
 
 /** The services, by the name `config.json` lists them under. */
@@ -251,7 +311,7 @@ export const SERVICES = Object.freeze({
   coingecko: Object.freeze({
     service: "coingecko",
     name: "CoinGecko",
-    check: checkCoinGecko,
+    keyTypes: COINGECKO_KEY_TYPES,
   }),
   coinpaprika: Object.freeze({
     service: "coinpaprika",

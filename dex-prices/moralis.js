@@ -24,9 +24,10 @@
  * them. Every request goes through `fetchWithRetries` (`web-request.js`),
  * which waits out a 429.
  *
- * Fit: crypto-price-filler asks Moralis first for a token's price at a
- * time, when the owner has saved a Moralis key (`sources/moralis.js`), and
- * GeckoTerminal (`geckoterminal.js`) for what Moralis does not answer.
+ * Fit: crypto-price-filler asks Moralis for a token's price at a time,
+ * when the owner has saved a Moralis key (`sources/moralis.js`), first
+ * until the keys are ranked otherwise, and GeckoTerminal
+ * (`geckoterminal.js`) for what Moralis does not answer.
  * pulsechain-analytics' ratio chart asks it for each token's pair and that
  * pair's candles. The key comes from the repo's key store
  * (`api-key-store/`), whose check of a Moralis key is in

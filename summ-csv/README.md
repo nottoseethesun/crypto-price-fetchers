@@ -1,15 +1,14 @@
 # summ-csv
 
-Summ, the crypto tax service, imports a csv file in its own layout, and
+Summ imports a csv file in its own layout, and
 takes whatever the file says: a token named wrongly, an amount rounded, or
 gas on two rows reaches the books as written. This utility, part of
 crypto-price-fetchers, the owner's repo of code his projects share, writes
 those files. It checks every row against the rules below and writes nothing while
 any row breaks one, naming each problem and its row. Every csv for Summ is
-made with it, by `npm run summ-csv` (npm, the package manager of Node, the
-program that runs JavaScript outside a browser, runs the commands a
-`package.json` names) or from a Node program, rather than by a script
-written for the occasion, so every file passes the same checks.
+made with it, by `npm run summ-csv` or from a Node program, rather than by a script written for the occasion, so every file passes the same checks.
+The tools and terms this README names without introducing them are in
+the repo's [glossary](../docs/glossary.md).
 
 ## Contents
 
@@ -107,8 +106,7 @@ told to replace it.
 
 The rows and your copy of the template go in this folder's `input/`, and
 the csv is written in its `output/csv/`: the files hold your own data, and
-the repo is public, so git, the version-control program, keeps nothing in
-either folder but the folder. `--out` names a file in a folder that exists
+the repo is public, so git keeps nothing in either folder but the folder. `--out` names a file in a folder that exists
 and takes a new file; a folder, or a file in a missing folder, is refused
 before the rows are read. `--help` gives the keys of a row.
 
@@ -142,8 +140,7 @@ written; no digit passes through a JavaScript number.
 
 #### From a project that installs this repo
 
-A project that installs this repo from GitHub, the website that hosts
-it, imports
+A project that installs this repo from GitHub imports
 `crypto-price-fetchers/summ-csv`, as above, and has the bin `summ-csv`,
 which a script in its `package.json` runs, such as
 `"summ-csv": "summ-csv"`.

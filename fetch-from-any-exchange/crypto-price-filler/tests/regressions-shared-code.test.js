@@ -1,9 +1,9 @@
 /**
  * Tests that guard fixed bugs in the code the projects that install this
  * repo use: the runner, which runs a Sheets script under Node, and its
- * services; the Summ csv utility; the key store's password prompt; the
- * clients in `dex-prices/` and their shared requests; and the security
- * lint's rule `no-secret-logging`. The repo's CLAUDE.md lists the other
+ * services; the Summ csv utility; the key store's password prompt, and its
+ * manager's check of a CoinGecko key; the clients in `dex-prices/` and
+ * their shared requests; and the security lint's rule `no-secret-logging`. The repo's `docs/engineering.md` (Known Bugs) lists the other
  * files of fixed bugs' tests; a bug found later gets its test in
  * `known-bugs.test.js`, declared with `it.fails` while the bug is there,
  * and its fix moves the test to one of them.
@@ -18,7 +18,9 @@
  * thread, and closes the version only if it opens. The test of an answer
  * piped in after the key store's password runs crypto-price-filler's
  * command line in a child process with the stand-in fetch preload, and a
- * key file and password of the test's own.
+ * key file and password of the test's own. The test of the manager's check
+ * of a CoinGecko key runs the manager in the test's thread, with a project
+ * folder and key file of its own and a stand-in CoinGecko.
  */
 
 import { describe, it, expect, vi } from "vitest";
@@ -37,7 +39,13 @@ import {
   SUMM_TEMPLATE,
 } from "./helpers/regression-runs.js";
 import { STAND_IN_GECKO_KEY } from "./helpers/stand-in-coingecko-key.js";
-import { askPassword, saveEncryptedKey } from "../../../api-key-store/index.js";
+import {
+  askPassword,
+  loadEncryptedKey,
+  runKeyManager,
+  saveEncryptedKey,
+  savedKeyType,
+} from "../../../api-key-store/index.js";
 import noSecretLogging from "../../../eslint-rules/no-secret-logging.js";
 import { createAppsScriptServices } from "../../../apps-script-runner/apps-script-services.js";
 import { loadAppsScript } from "../../../apps-script-runner/load-apps-script.js";
@@ -378,6 +386,7 @@ describe("crypto-price-filler's question without a CoinPaprika key", () => {
           "coingecko",
           STAND_IN_GECKO_KEY,
           password,
+          "demo",
         );
         const input = path.join(dir, "in.csv");
         const output = path.join(dir, "out.csv");
@@ -416,4 +425,64 @@ describe("crypto-price-filler's question without a CoinPaprika key", () => {
     },
     KEY_RUN_TIMEOUT_MS,
   );
+});
+
+describe("the key manager's check of a CoinGecko key", () => {
+  /** The paid plan's key the stand-in CoinGecko takes. */
+  const PAID_KEY = "CG-a-paid-plans-key-of-the-test";
+
+  /**
+   * Answers as CoinGecko does for a key of one of its paid plans: its Pro
+   * api's ping takes the key in its header; its public api refuses it,
+   * with status 400 and error 10010, which asks for the Pro api's root.
+   *
+   * @param {string} url - The url
+   * @param {Object} init - The request's options
+   * @returns {Promise<Response>} The answer
+   */
+  async function paidCoinGecko(url, init) {
+    if (
+      url === "https://pro-api.coingecko.com/api/v3/ping" &&
+      init.headers["x-cg-pro-api-key"] === PAID_KEY
+    )
+      return new Response('{"gecko_says":"(V3) To the Moon!"}');
+    if (url.startsWith("https://api.coingecko.com/"))
+      return new Response(
+        '{"error_code":10010,"status":{"error_message":"If you are using Pro API key, please change your root URL from api.coingecko.com to pro-api.coingecko.com"}}',
+        { status: 400 },
+      );
+    return new Response('{"status":{"error_code":10002}}', { status: 401 });
+  }
+
+  it("saves a paid plan's key, which CoinGecko's Pro api takes", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "paid-gecko-key-"));
+    try {
+      fs.writeFileSync(
+        path.join(dir, "config.json"),
+        JSON.stringify({ apiKeys: ["coingecko"] }),
+      );
+      const keyFile = path.join(dir, "api-keys.json");
+      const answers = [PAID_KEY, "pw", "pw"];
+      const said = [];
+      const exitCode = await runKeyManager(
+        ["node", "manage-api-keys", "set", "coingecko"],
+        { projectTop: dir },
+        {
+          env: { API_KEYS_FILE_PATH: keyFile, API_KEYS_PASSWORD: "" },
+          ask: async () => answers.shift(),
+          checkOptions: { fetch: paidCoinGecko },
+          stdout: { write: (text) => said.push(text) },
+          stderr: { write: (text) => said.push(text) },
+        },
+      );
+      expect(said.join("")).toContain(
+        `The CoinGecko api key is saved, encrypted, in ${keyFile}, as a paid plan's key.`,
+      );
+      expect(exitCode).toBe(0);
+      expect(await loadEncryptedKey(keyFile, "coingecko", "pw")).toBe(PAID_KEY);
+      expect(savedKeyType(keyFile, "coingecko")).toBe("paid");
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

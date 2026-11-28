@@ -84,15 +84,6 @@ export function openSecretPrompt(streams = {}) {
   rl.on("close", () => {
     stopped ??= "The input ended before an answer was typed";
     for (const next of waiting.splice(0)) next.reject(new Error(stopped));
-    /*-
-     *  A prompt stopped with Ctrl+C hands back nothing: the line it was
-     *  reading is part of a secret. When the input ends, readline gives
-     *  the line it was reading as a line before it closes, and leaves it in
-     *  rl.line: an answer by now, or among the lines kept, so only a prompt
-     *  closed before the end hands back the line it was reading.
-     */
-    if (stoppedWithCtrlC) return;
-    keepLinesRead(input, lines.splice(0), input.readableEnded ? "" : rl.line);
   });
   const ask = async (prompt) => {
     output.write(prompt);
@@ -106,7 +97,26 @@ export function openSecretPrompt(streams = {}) {
     output.write("\n");
     return answer;
   };
-  return { ask, close: () => rl.close() };
+  /*-
+   *  The lines read past the answers stay for this prompt's own questions,
+   *  even once the input has ended, and are handed back only when the
+   *  prompt is closed, for a question asked with askLine to take. A prompt
+   *  stopped with Ctrl+C hands back nothing: the line it was reading is
+   *  part of a secret. When the input ends, readline gives the line it was
+   *  reading as a line before it closes, and leaves it in rl.line: an
+   *  answer by now, or among the lines kept, so only a prompt closed
+   *  before the end hands back the line it was reading.
+   */
+  let closed = false;
+  const close = () => {
+    if (closed) return;
+    closed = true;
+    const partial = input.readableEnded ? "" : rl.line;
+    rl.close();
+    if (stoppedWithCtrlC) return;
+    keepLinesRead(input, lines.splice(0), partial);
+  };
+  return { ask, close };
 }
 
 /**

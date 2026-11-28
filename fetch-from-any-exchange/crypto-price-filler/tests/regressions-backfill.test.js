@@ -3,7 +3,7 @@
  * the second of crypto-price-filler's two command lines: its options and
  * the settings it falls back to, and its flags set against each other.
  * Those of the first, `index.js`, and of the code the two share, are in
- * `regressions-command-line.test.js`, and the repo's CLAUDE.md
+ * `regressions-command-line.test.js`, and the repo's `docs/engineering.md` (Known Bugs)
  * lists the other files of fixed bugs' tests; a bug found later gets its
  * test in `known-bugs.test.js`, declared with `it.fails` while the bug is
  * there, and its fix moves the test to one of them.

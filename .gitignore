@@ -11,7 +11,8 @@ api-keys.json.tmp
 # code or in its committed config-example.json. Beside each, a
 # config-example.json, which git keeps, shows the settings with those
 # values. The top config.json is committed: it lists the services whose
-# keys the project keeps, and holds no key.
+# keys the project keeps, in the order of priority the programs use until
+# the owner ranks them, and holds no key.
 /crypto-price-fetchers/config.json
 /fetch-from-any-exchange/config.json
 /fetch-from-any-exchange/crypto-price-filler/config.json

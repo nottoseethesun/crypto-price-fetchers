@@ -2,7 +2,7 @@
  * Tests that guard fixed bugs in the repo's shared helpers, in `lib/`,
  * which the repo's own tools, crypto-price-filler and the projects that
  * install this repo use.
- * The repo's CLAUDE.md lists the other files of fixed bugs' tests; a bug
+ * The repo's `docs/engineering.md` (Known Bugs) lists the other files of fixed bugs' tests; a bug
  * found later gets its test in `known-bugs.test.js`, declared with
  * `it.fails` while the bug is there, and its fix moves the test to one of
  * them.

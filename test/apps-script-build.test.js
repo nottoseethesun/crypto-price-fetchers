@@ -40,6 +40,9 @@ const KEYS = Object.freeze({
   x1ninja: "x1-key-4",
 });
 
+/** The types the test saves its keys with: the CoinGecko key as a paid plan's. */
+const KEY_TYPES = Object.freeze({ coingecko: "paid" });
+
 /** The menu, the built file's first part. */
 const MENU_SOURCE = fs.readFileSync(
   new URL("../src/crypto-price-fetchers-menu.gs", import.meta.url),
@@ -88,7 +91,7 @@ before(async () => {
   );
   keyFile = path.join(top, "api-keys.json");
   for (const [service, key] of Object.entries(KEYS)) {
-    await saveEncryptedKey(keyFile, service, key, "pw");
+    await saveEncryptedKey(keyFile, service, key, "pw", KEY_TYPES[service]);
   }
   scripts = APPS_SCRIPTS.map((spec) => ({
     ...spec,
@@ -269,7 +272,12 @@ describe("npm run build apps-script, on a desktop with a clipboard tool", () => 
     assert.match(file, /\nDEXTOOLS_CONFIG\.API_KEY = "dex-key-3";\n/);
     assert.match(file, /\nX1_CONFIG\.API_KEY = "x1-key-4";\n/);
     assert.match(file, /\nCONFIG\.COINGECKO_API_KEY = "gecko-key-1";\n/);
+    assert.match(file, /\nCONFIG\.COINGECKO_API_KEY_TYPE = "paid";\n/);
     assert.match(file, /\nCONFIG\.COINPAPRIKA_API_KEY = "paprika-key-2";\n/);
+    assert.match(
+      file,
+      /\nCONFIG\.API_KEY_PRIORITY = \["coingecko","coinpaprika","dextools","x1ninja"\];\n/,
+    );
     assert.match(file, /\nHELP_PAGE\.HTML = "<!DOCTYPE html>.*";\n$/);
     assert.match(
       result.stdout,
@@ -366,7 +374,7 @@ describe("npm run build apps-script, on a desktop with a clipboard tool", () => 
       const result = await build(["apps-script"]);
       assert.match(
         result.copies[0].text,
-        /\nCONFIG\.GENERAL_DELAY_MS = 500;\nCONFIG\.COINGECKO_API_KEY = "gecko-key-1";\nCONFIG\.COINPAPRIKA_API_KEY = "paprika-key-2";\n/,
+        /\nCONFIG\.GENERAL_DELAY_MS = 500;\nCONFIG\.COINGECKO_API_KEY = "gecko-key-1";\nCONFIG\.COINGECKO_API_KEY_TYPE = "paid";\nCONFIG\.COINPAPRIKA_API_KEY = "paprika-key-2";\n/,
       );
     } finally {
       fs.rmSync(configFile);
@@ -428,7 +436,7 @@ describe("npm run build apps-script, on a desktop with a clipboard tool", () => 
     assert.deepEqual(result.copies, []);
   });
 
-  it("gives the scripts as committed, with only the Help page set, when no key is saved", async () => {
+  it("gives the scripts as committed, with only the order of priority and the Help page set, when no key is saved", async () => {
     const result = await build(["apps-script"], {
       env: { API_KEYS_FILE_PATH: path.join(top, "no-such-keys.json") },
     });
@@ -441,7 +449,7 @@ describe("npm run build apps-script, on a desktop with a clipboard tool", () => 
         .split("\n")
         .filter((line) => / = /.test(line))
         .map((line) => line.split(" = ")[0]),
-      ["HELP_PAGE.HTML"],
+      ["CONFIG.API_KEY_PRIORITY", "HELP_PAGE.HTML"],
     );
   });
 
@@ -570,5 +578,19 @@ describe("npm run build apps-script, with no clipboard tool installed", () => {
     assert.equal(noSession.questions.length, 1);
     assert.deepEqual(noSession.copies, []);
     assert.match(noSession.stdout, /in the clear/);
+  });
+
+  it("writes the file without saying keys go to disk in the clear when no key is saved, though it sets the order of priority", async () => {
+    const result = await build(["apps-script"], {
+      installed: [],
+      env: { API_KEYS_FILE_PATH: path.join(top, "no-such-keys.json") },
+    });
+    assert.equal(result.exitCode, 0, result.output);
+    assert.match(result.stdout, /Install xclip yourself/);
+    assert.doesNotMatch(result.output, /in the clear/);
+    assert.match(
+      fs.readFileSync(path.join(top, BUILD_FOLDER, BUILT_FILE_NAME), "utf8"),
+      /\nCONFIG\.API_KEY_PRIORITY = \["coingecko","coinpaprika","dextools","x1ninja"\];\n/,
+    );
   });
 });

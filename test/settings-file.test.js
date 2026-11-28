@@ -3,7 +3,8 @@
  * in JSON: a missing file gives no settings unless it is required, a file
  * that cannot be read, is not JSON or holds no JSON object is an error
  * that names it, and a file its schema finds a problem in is refused,
- * every problem listed.
+ * every problem listed; and checks settings about to be written by the
+ * same rule (`checkSettings`).
  * @module test/settings-file.test
  *
  * The files are written in a temp folder of the tests' own
@@ -14,7 +15,7 @@ import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { readSettingsFile } from "../lib/settings-file.js";
+import { checkSettings, readSettingsFile } from "../lib/settings-file.js";
 import { KINDS } from "../lib/settings-schema.js";
 import { makeTempFolder, removeTempFolders } from "./helpers/temp-folders.js";
 
@@ -130,5 +131,37 @@ describe("readSettingsFile", () => {
         {},
       );
     });
+  });
+});
+
+describe("checkSettings", () => {
+  const SCHEMA = {
+    type: "object",
+    additionalProperties: false,
+    required: ["rpcUrl"],
+    properties: { rpcUrl: KINDS.url },
+  };
+
+  it("passes settings the schema finds no problem in", () => {
+    assert.equal(
+      checkSettings({ rpcUrl: "https://rpc.test" }, SCHEMA, {
+        name: "keys.json",
+      }),
+      undefined,
+    );
+  });
+
+  it("refuses settings as readSettingsFile refuses a file, listing every problem under the name given", () => {
+    assert.throws(
+      () => checkSettings({ colour: "red" }, SCHEMA, { name: "keys.json" }),
+      (error) => {
+        assert.deepEqual(error.problems, [
+          "keys.json → rpcUrl is missing",
+          "keys.json → colour is not a setting this tool reads",
+        ]);
+        assert.equal(error.message, error.problems.join("\n"));
+        return true;
+      },
+    );
   });
 });

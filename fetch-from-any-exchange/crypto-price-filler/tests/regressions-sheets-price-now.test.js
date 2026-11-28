@@ -6,7 +6,7 @@
  * gives and the time it keeps, what an answer with a status of 500 or
  * above gives, the wait for the script lock, and the
  * menu's Refresh. The repo's
- * CLAUDE.md lists the other
+ * `docs/engineering.md` (Known Bugs) lists the other
  * files of fixed bugs' tests; a bug found later gets its test in
  * `known-bugs.test.js`, declared with `it.fails` while the bug is there,
  * and its fix moves the test to one of them.

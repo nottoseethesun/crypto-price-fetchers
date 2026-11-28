@@ -4,8 +4,9 @@
 
 USE AT YOUR OWN RISK: SEE LICENSE FILE, INCLUDED TWO DIRECTORIES UP.
 
-This tool, which runs on Node, the program that runs JavaScript outside
-a browser, fills in a token's prices in a CSV file. It reads a CSV
+This tool, which runs on Node, fills in a token's prices in a CSV file
+(the tools and terms this README names without introducing them are in
+the repo's [glossary](../../docs/glossary.md)). It reads a CSV
 whose rows each hold a timestamp, finds the token's USD price at each
 time, down to the minute, and writes the file again with each row's
 price, by default as `output.csv` in this folder's `output/csv/`.
@@ -14,11 +15,7 @@ It prices two kinds of token, each where it trades:
 
 - A coin that trades on centralized exchanges rather than in pools, such
   as Bitcoin and Monero, has no pool for a pool's price service to read.
-  The tool asks MEXC, a centralized exchange, then CoinGecko, then
-  CoinPaprika, two services that gather the exchanges' prices, through the
-  price sources of the repo's script for Google Sheets, Google's
-  spreadsheet app, written in Apps Script, Google's platform for scripts
-  that run inside its apps:
+  The tool asks MEXC, CoinGecko and CoinPaprika through the price sources of the repo's script for Google Sheets, written in Apps Script:
   `fetch-from-any-exchange/src/getCryptoPriceFromCentralizedExchange-sources.gs`,
   which it runs unchanged under Node (`sources/exchange.js`), so the sheet
   and the tool take a price from the same sources, and neither from a
@@ -32,18 +29,19 @@ It prices two kinds of token, each where it trades:
   rows around it
   ([Current Roster of Utilities](#current-roster-of-utilities)).
 - A token that trades in a blockchain's pools, such as HEX on PulseChain,
-  is asked of Moralis first, when a Moralis key is saved, then of
-  GeckoTerminal, two services that price a token from its chain's pools,
-  in the order LP Ranger, the owner's bot that manages his 9mm V3
-  liquidity positions, asks them, and then, as every token is, of MEXC,
-  CoinGecko and CoinPaprika, each under the id the token's entry in
+  is asked of Moralis, for a close (the default `--mode`) when a Moralis
+  key is saved, and of GeckoTerminal,
+  and, as every token is, of MEXC, CoinGecko and CoinPaprika, in an order
+  the ranking of the keys sets (`npm run api-keys -- rank`, in the repo's
+  top folder).
+  Each of the last three is asked under the id the token's entry in
   `supported-tokens.json` names, and skipped where the entry names none:
   HEX on PulseChain names none at MEXC. GeckoTerminal's candle of a minute
   or an hour gives no price before that minute or hour is over. The
   token's entry also names its contract and its chain's ids.
 
-The order of the sources, and what each gives, is in the file header of
-`./index.js`.
+The order of the sources, and what each gives, is in
+[The Order of the Filler's Sources](../../docs/price-determination-rules.md#the-order-of-the-fillers-sources).
 
 ### Current Roster of Utilities
 
@@ -64,8 +62,7 @@ NodeJS 24+
 The tool uses two parts of crypto-price-fetchers, the repo this folder is
 in: the runner, which runs a Sheets script under Node, and the key store,
 which keeps the api keys encrypted. Both come from the repo's top folder,
-so the tool needs the packages of both folders, which npm, Node's package
-manager, installs. From the repo's top folder:
+so the tool needs the packages of both folders, which npm installs. From the repo's top folder:
 
 ```bash
 npm ci
@@ -77,8 +74,7 @@ See [Install](../../README.md#install) in the repo's README.
 ## Configuration
 
 `config-example.json` holds the tool's settings as committed. Your own
-settings go in `config.json` beside it, which git, the version-control
-program, ignores: each setting there
+settings go in `config.json` beside it, which git ignores: each setting there
 takes the place of the same one in `config-example.json`, so it needs only
 those that differ. The file header in `./index.js` describes every setting.
 Both files, and `supported-tokens.json`, are checked against their JSON
@@ -179,8 +175,7 @@ node bin/end-user/crypto-price-filler.js --token=grc --input=fetch-from-any-exch
 
 The repo's lint, run from its top folder, covers this tool too, with LP
 Ranger's rules: no function above cyclomatic complexity 17, no file above
-500 lines of code, the formatting of Prettier, the package that formats
-code, and the rest that
+500 lines of code, the formatting of Prettier, and the rest that
 [`docs/engineering.md`](../../docs/engineering.md) lists.
 
 ```bash
@@ -194,7 +189,7 @@ this one's with at least 80% of lines covered, and the security audits.
 
 ### Test
 
-The tests run on vitest, a test runner. vitest loads each file through its
+The tests run on vitest, which loads each file through its
 own module loader, which finds imports
 that Node itself does not. So the tests can pass while `index.js` fails to
 start under Node, for example after a wrong `import`. `test:strict` first
@@ -249,11 +244,11 @@ alias swtlog="aha --black -y 'body { font-size: 14px; }' < test.log > test.html 
 
 ## Contributing
 
-Fork the repo on GitHub, the website that hosts it. Contributions are welcome, and each is subject to the license in the repo's [LICENSE](../../LICENSE) file, two folders up.
+Fork the repo on GitHub. Contributions are welcome, and each is subject to the license in the repo's [LICENSE](../../LICENSE) file, two folders up.
 
 To be accepted for pull request:
 
-- **ESLint, which checks JavaScript against rules, must pass** (`npm run lint`, from the repo's top folder, two folders up): it allows a cyclomatic complexity of at most 17
+- **ESLint must pass** (`npm run lint`, from the repo's top folder, two folders up): it allows a cyclomatic complexity of at most 17
 - **All tests must pass** (`npm run test:strict`)
 - Any major new functionality must have a test runnable from the current approach
 - Line coverage must remain at or above 80%

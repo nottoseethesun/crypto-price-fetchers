@@ -1,12 +1,16 @@
 /**
  * @file price.js
  * @description Main price fetching logic for crypto-price-filler.
- * A token that trades in pools, which names its contract in
- * supported-tokens.json, is asked of Moralis first (with a saved key) and
- * GeckoTerminal next; then every token is asked of MEXC, CoinGecko and
- * CoinPaprika, in that order, until one gives a price. Those three are
- * the Sheets script getCryptoPriceFromCentralizedExchange's own price
- * sources, run through the repo's runner (`exchange.js`).
+ * Each token is asked of five sources until one gives a price: Moralis
+ * (with a saved key) and GeckoTerminal, for a token that trades in pools
+ * and names its contract in supported-tokens.json; and MEXC, CoinGecko and
+ * CoinPaprika, the Sheets script getCryptoPriceFromCentralizedExchange's
+ * own price sources, run through the repo's runner (`exchange.js`). The
+ * order is the one the script's rule gives (`sourcesInPriority`): the
+ * sources that take a key, Moralis, CoinGecko and CoinPaprika, in the
+ * run's order of priority (`npm run api-keys -- rank`); GeckoTerminal
+ * right after Moralis; and MEXC right before the first of CoinGecko and
+ * CoinPaprika (`FILLER_SOURCES`).
  * Handles caching and verbose logging.
  *
  * @module price
@@ -14,6 +18,7 @@
  * @author Christopher M. Balz with Grok and Claude.ai
  */
 
+import { getApiKeyPriority } from "../../../api-key-store/index.js";
 import { getPriceFromMoralis } from "./moralis.js";
 import { getPriceFromGeckoTerminal } from "./geckoterminal.js";
 import { exchangeSources } from "./exchange.js";
@@ -21,6 +26,40 @@ import { getCache, setCache } from "../utils/cache.js";
 import { parseInputToUtcMs } from "../utils/date.js";
 import { logv } from "../utils/log.js";
 import { readSupportedTokens } from "../supported-tokens.js";
+
+/**
+ * The filler's sources, for the Sheets script's rule for the order to ask
+ * sources in (`sourcesInPriority`): Moralis, which takes a key, with
+ * GeckoTerminal, which prices pools without one, right after it; and MEXC,
+ * which takes none, right before the first of CoinGecko and CoinPaprika,
+ * which each take one. Those that take a key are asked in the run's order
+ * of priority; with none, as before a run opens its keys, in the order
+ * written here.
+ */
+const FILLER_SOURCES = Object.freeze([
+  Object.freeze({ name: "Moralis", service: "moralis" }),
+  Object.freeze({ name: "GeckoTerminal", after: "moralis" }),
+  Object.freeze({
+    name: "MEXC",
+    before: Object.freeze(["coingecko", "coinpaprika"]),
+  }),
+  Object.freeze({ name: "CoinGecko", service: "coingecko" }),
+  Object.freeze({ name: "CoinPaprika", service: "coinpaprika" }),
+]);
+
+/**
+ * The order to ask the filler's sources in (`FILLER_SOURCES`), as the
+ * Sheets script orders sources (`sourcesInPriority`), from the run's order
+ * of priority (`getApiKeyPriority`).
+ *
+ * @param {boolean} verbose - Enable verbose logging, for the script's sources as they open
+ * @returns {Promise<Array<string>>} The sources' names, in the order to ask them
+ * @throws {Error} When the script's sources cannot be opened
+ */
+export async function sourceOrder(verbose) {
+  const sources = await exchangeSources(verbose);
+  return sources.sourcesInPriority(FILLER_SOURCES, getApiKeyPriority() ?? []);
+}
 
 /**
  * Reads the pool facts of a token's entry: its contract, and the ids
@@ -191,18 +230,20 @@ async function tryExchangeSource(
 /**
  * Fetches historical crypto price for a given token, date/time, and target (high/low/close).
  *
- * Priority:
- * 1. Cache hit
- * 2. Moralis, for a token with a contract and a Moralis chain, when a
- *    Moralis key is saved; it answers the close only
- * 3. GeckoTerminal, for a token with a contract and a GeckoTerminal
- *    network, within the last 180 days
- * 4. MEXC, under the token's mexc_symbol
- * 5. CoinGecko, under its coingecko_id
- * 6. CoinPaprika, under its coinpaprika_id
+ * A price kept in the cache comes first. Then the sources, in the order
+ * `sourceOrder` gives:
+ * - Moralis, for a token with a contract and a Moralis chain, when a
+ *   Moralis key is saved; it answers the close only
+ * - GeckoTerminal, for a token with a contract and a GeckoTerminal
+ *   network, within the last 180 days
+ * - MEXC, under the token's mexc_symbol
+ * - CoinGecko, under its coingecko_id
+ * - CoinPaprika, under its coinpaprika_id
  *
- * 4 to 6 are the Sheets script's price sources (`exchange.js`); each is
- * skipped when the token's entry names no id for it.
+ * The last three are the Sheets script's price sources (`exchange.js`);
+ * each is skipped when the token's entry names no id for it. When the
+ * script's sources cannot be opened, so the order cannot be had, the price
+ * is null, and nothing is cached.
  *
  * @param {string} token - Token symbol (e.g. 'xtm', 'grc')
  * @param {string} dateStr - Date/time string in 'yyyy-MM-dd HH:mm:ss' format
@@ -260,44 +301,49 @@ export async function getCryptoPrice(
 
   logv(verbose, 1, `Cache MISS for "${cacheKey}" - fetching price`);
 
-  // Try sources in order
-  let price = await tryMoralis(poolToken, utcMs, target, verbose);
-
-  if (price === null) {
-    price = await tryGeckoTerminal(poolToken, utcMs, target, verbose);
+  let order;
+  try {
+    order = await sourceOrder(verbose);
+  } catch (err) {
+    logv(verbose, 1, `The sources' order could not be had: ${err.message}`);
+    return null;
   }
-
-  if (price === null) {
-    price = await tryExchangeSource(
-      "MEXC",
-      "getPriceFromMEXC",
-      mexcSymbol,
-      utcMs,
-      target,
-      verbose,
-    );
-  }
-
-  if (price === null) {
-    price = await tryExchangeSource(
-      "CoinGecko",
-      "getPriceFromCoinGecko",
-      coingeckoId,
-      utcMs,
-      target,
-      verbose,
-    );
-  }
-
-  if (price === null) {
-    price = await tryExchangeSource(
-      "CoinPaprika",
-      "getPriceFromCoinPaprika",
-      coinpaprikaId,
-      utcMs,
-      target,
-      verbose,
-    );
+  logv(verbose, 1, `Sources, in order: ${order.join(", ")}`);
+  const askSource = {
+    Moralis: () => tryMoralis(poolToken, utcMs, target, verbose),
+    GeckoTerminal: () => tryGeckoTerminal(poolToken, utcMs, target, verbose),
+    MEXC: () =>
+      tryExchangeSource(
+        "MEXC",
+        "getPriceFromMEXC",
+        mexcSymbol,
+        utcMs,
+        target,
+        verbose,
+      ),
+    CoinGecko: () =>
+      tryExchangeSource(
+        "CoinGecko",
+        "getPriceFromCoinGecko",
+        coingeckoId,
+        utcMs,
+        target,
+        verbose,
+      ),
+    CoinPaprika: () =>
+      tryExchangeSource(
+        "CoinPaprika",
+        "getPriceFromCoinPaprika",
+        coinpaprikaId,
+        utcMs,
+        target,
+        verbose,
+      ),
+  };
+  let price = null;
+  for (const name of order) {
+    price = await askSource[name]();
+    if (price !== null) break;
   }
 
   // Cache and return

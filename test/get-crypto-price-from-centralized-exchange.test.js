@@ -4,8 +4,9 @@
  * @module test/get-crypto-price-from-centralized-exchange.test
  *
  * The real `.gs` runs under the real runner. Its requests go to a stand-in
- * fetch (`helpers/stand-in-web.js`) that answers as MEXC and CoinGecko
- * answer, so the tests ask nothing outside the computer. The script waits
+ * fetch (`helpers/stand-in-web.js`) that answers as MEXC, CoinGecko and
+ * CoinPaprika answer (`helpers/stand-in-exchanges.js`), so the tests ask
+ * nothing outside the computer. The script waits
  * its 200 milliseconds before each lookup, as in the sheet.
  *
  * The command line's key file is one in a temp folder, removed afterwards,
@@ -28,108 +29,18 @@ import {
   runCommandLine,
 } from "../bin/end-user/getCryptoPriceFromCentralizedExchange.js";
 import { capturedOutput } from "./helpers/captured-output.js";
-import { mexcKlines } from "./helpers/stand-in-mexc.js";
+import {
+  answerCoinGeckoProRange,
+  answerCoinGeckoRange,
+  answerMexcCandle,
+  answerPaprikaPaid,
+  coinGeckoKeysSent,
+  COINPAPRIKA_PRO,
+  ROW_TIME,
+  ROW_UTC_MS,
+} from "./helpers/stand-in-exchanges.js";
 import { standInFetch } from "./helpers/stand-in-web.js";
 import { makeTempFolder, removeTempFolders } from "./helpers/temp-folders.js";
-
-const MEXC = "https://api.mexc.com/api/v3";
-const COINGECKO = "https://api.coingecko.com/api/v3";
-const COINPAPRIKA_PRO = "https://api-pro.coinpaprika.com/v1";
-
-/** 12:30 UTC on 2025-06-15, the time the tests ask about. */
-const ROW_UTC_MS = Date.UTC(2025, 5, 15, 12, 30, 0);
-const ROW_TIME = "2025-06-15 12:30:00";
-
-/**
- * Answers as MEXC does for XTM, a pair it lists: the candle of the minute
- * asked (`helpers/stand-in-mexc.js`), with open 1.00, high 1.50, low 0.80
- * and close 1.10.
- *
- * @param {{url: string}} request - The request
- * @returns {Object|Array|null} The json body, or null for a 404
- */
-function answerMexcCandle({ url }) {
-  if (url === `${MEXC}/exchangeInfo`)
-    return {
-      symbols: [{ symbol: "XTMUSDT", baseAsset: "XTM", quoteAsset: "USDT" }],
-    };
-  if (url.startsWith(`${MEXC}/klines?symbol=XTMUSDT&interval=1m&`)) {
-    return mexcKlines(url, ["1.00", "1.50", "0.80", "1.10", "10"]);
-  }
-  return null;
-}
-
-/**
- * Answers for when MEXC lists no XTM pair and CoinGecko's hourly prices
- * around the time are 2.00 and 2.50. CoinGecko's ping takes the key
- * `gecko-key` alone.
- *
- * @param {{url: string, headers: Object<string, string>}} request - The request
- * @returns {*} The response (`standInFetch`)
- */
-function answerCoinGeckoRange({ url, headers }) {
-  if (url === `${MEXC}/exchangeInfo`) return { symbols: [] };
-  if (url === `${COINGECKO}/ping`) {
-    return headers["x-cg-demo-api-key"] === "gecko-key"
-      ? { gecko_says: "(V3) To the Moon!" }
-      : { status: 401, text: "{}" };
-  }
-  if (url.startsWith(`${COINGECKO}/coins/minotari/market_chart/range?`)) {
-    return {
-      prices: [
-        [ROW_UTC_MS - 3600000, 2.0],
-        [ROW_UTC_MS + 3600000, 2.5],
-      ],
-    };
-  }
-  return null;
-}
-
-/**
- * Answers for when MEXC lists no XTM pair, CoinGecko has no hourly prices,
- * and only CoinPaprika's paid server, asked with the key `paprika-key`,
- * gives XTM's candle of 2025-06-15, with high 2.50. The paid server's key
- * facts take that key alone.
- *
- * @param {{url: string, headers: Object<string, string>}} request - The request
- * @returns {*} The response (`standInFetch`)
- */
-function answerPaprikaPaid({ url, headers }) {
-  if (url === `${MEXC}/exchangeInfo`) return { symbols: [] };
-  if (url.startsWith(`${COINGECKO}/coins/minotari/market_chart/range?`))
-    return { prices: [] };
-  if (!url.startsWith(COINPAPRIKA_PRO)) return null;
-  if (headers.authorization !== "paprika-key")
-    return { status: 403, text: "{}" };
-  if (url === `${COINPAPRIKA_PRO}/key/info`) return { plan: "starter" };
-  if (url.startsWith(`${COINPAPRIKA_PRO}/coins/xtm-tari/ohlcv/historical?`)) {
-    return [
-      {
-        time_open: "2025-06-15T00:00:00Z",
-        time_close: "2025-06-15T23:59:59Z",
-        high: 2.5,
-        low: 2.0,
-        close: 2.2,
-      },
-    ];
-  }
-  return null;
-}
-
-/**
- * The CoinGecko key each request to CoinGecko carried, by its path.
- *
- * @param {function} fetch - The stand-in fetch
- * @returns {Array<Array<string>>} Each request's path and key (null when it had none)
- */
-function coinGeckoKeysSent(fetch) {
-  return fetch.requests
-    .filter((request) => request.url.startsWith(COINGECKO))
-    .map((request) => [
-      new URL(request.url).pathname,
-      request.headers["x-cg-demo-api-key"] ?? null,
-    ]);
-}
 
 /**
  * Opens the Node version with a stand-in fetch, runs `use` on it, and
@@ -211,6 +122,48 @@ describe("openCentralizedExchangePrices", () => {
     );
   });
 
+  it("sends a paid plan's key to CoinGecko's Pro api, in its header and in no url, asking the public api nothing", async () => {
+    await withPrices(
+      answerCoinGeckoProRange,
+      async (prices, fetch) => {
+        assert.equal(
+          await prices.getCryptoPrice("xtm", ROW_TIME, "UTC", "high"),
+          2.5,
+        );
+        const gecko = fetch.requests.filter((request) =>
+          request.url.includes("coingecko.com"),
+        );
+        assert.deepEqual(
+          gecko.map((request) => [
+            new URL(request.url).origin,
+            request.headers["x-cg-pro-api-key"],
+            request.headers["x-cg-demo-api-key"] ?? null,
+          ]),
+          [["https://pro-api.coingecko.com", "gecko-key", null]],
+        );
+        assert.ok(
+          gecko.every((request) => !request.url.includes("gecko-key")),
+          "a url holds the key",
+        );
+      },
+      { apiKeys: { coingecko: "gecko-key", coingeckoKeyType: "paid" } },
+    );
+  });
+
+  it("gives the cell an error naming CONFIG.COINGECKO_API_KEY_TYPE when it holds a type CoinGecko does not give", async () => {
+    await withPrices(
+      answerCoinGeckoRange,
+      async (prices, fetch) => {
+        assert.equal(
+          await prices.getCryptoPrice("xtm", ROW_TIME, "UTC", "high"),
+          'Error: CONFIG.COINGECKO_API_KEY_TYPE is "pro"; it takes "demo" or "paid"',
+        );
+        assert.deepEqual(coinGeckoKeysSent(fetch), []);
+      },
+      { apiKeys: { coingecko: "gecko-key", coingeckoKeyType: "pro" } },
+    );
+  });
+
   it("asks CoinGecko without a key when it is given none", async () => {
     await withPrices(answerCoinGeckoRange, async (prices, fetch) => {
       assert.equal(
@@ -235,15 +188,24 @@ describe("openCentralizedExchangePrices", () => {
     );
   });
 
-  it("refuses a config object that sets an api key, as it refuses a file that does", async () => {
-    await assert.rejects(
-      openCentralizedExchangePrices({
-        config: { CONFIG: { COINGECKO_API_KEY: "" } },
-        apiKeys: { coingecko: "gecko-key" },
-        fetch: standInFetch(answerCoinGeckoRange),
-      }),
-      /the config given → CONFIG\.COINGECKO_API_KEY is not a setting this tool reads/,
-    );
+  it("refuses a config object that sets an api key, or a key's type, as it refuses a file that does", async () => {
+    for (const field of [
+      "COINGECKO_API_KEY",
+      "COINGECKO_API_KEY_TYPE",
+      "API_KEY_PRIORITY",
+    ]) {
+      await assert.rejects(
+        openCentralizedExchangePrices({
+          config: { CONFIG: { [field]: "paid" } },
+          apiKeys: { coingecko: "gecko-key" },
+          fetch: standInFetch(answerCoinGeckoRange),
+        }),
+        (error) =>
+          error.message.includes(
+            `the config given → CONFIG.${field} is not a setting this tool reads`,
+          ),
+      );
+    }
   });
 
   it("asks CoinPaprika's paid server with the CoinPaprika key it is given, the whole Authorization header", async () => {
@@ -291,7 +253,23 @@ describe("openCentralizedExchangeSources", () => {
     }
   });
 
-  it("sets each key it is given in the script's CONFIG, and none it is not", () => {
+  it("sets each key it is given in the script's CONFIG, with the CoinGecko key's type and the order of priority, and none it is not", () => {
+    assert.deepEqual(
+      keyConfig({
+        coingecko: "g",
+        coingeckoKeyType: "paid",
+        coinpaprika: "p",
+        priority: ["coinpaprika", "coingecko"],
+      }),
+      {
+        CONFIG: {
+          COINGECKO_API_KEY: "g",
+          COINGECKO_API_KEY_TYPE: "paid",
+          COINPAPRIKA_API_KEY: "p",
+          API_KEY_PRIORITY: ["coinpaprika", "coingecko"],
+        },
+      },
+    );
     assert.deepEqual(keyConfig({ coingecko: "g", coinpaprika: "p" }), {
       CONFIG: { COINGECKO_API_KEY: "g", COINPAPRIKA_API_KEY: "p" },
     });
@@ -313,7 +291,13 @@ describe("getCryptoPriceFromCentralizedExchange.js, the command line", () => {
     fs.writeFileSync(configFile, JSON.stringify({ CONFIG: {} }));
     noKeysFile = path.join(folder, "no-api-keys.json");
     savedKeyFile = path.join(folder, "api-keys.json");
-    await saveEncryptedKey(savedKeyFile, "coingecko", "gecko-key", "pw");
+    await saveEncryptedKey(
+      savedKeyFile,
+      "coingecko",
+      "gecko-key",
+      "pw",
+      "demo",
+    );
     paprikaKeyFile = path.join(folder, "paprika-api-keys.json");
     await saveEncryptedKey(paprikaKeyFile, "coinpaprika", "paprika-key", "pw");
   });
@@ -504,7 +488,7 @@ describe("getCryptoPriceFromCentralizedExchange.js, the command line", () => {
     assert.equal(result.exitCode, 1);
     assert.match(
       result.stderr,
-      /^CoinGecko refused the api key saved in .*api-keys\.json\. Save a new one, in the project's top folder: npm run api-keys -- set coingecko\n$/,
+      /^CoinGecko refused the api key saved in .*api-keys\.json, as a Demo key\. Save a new one, in the project's top folder: npm run api-keys -- set coingecko\n$/,
     );
     assert.deepEqual(
       result.fetch.requests.map((request) => new URL(request.url).pathname),

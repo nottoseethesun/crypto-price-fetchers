@@ -195,9 +195,9 @@ Settings and tokens:
   takes; a token is added there.
 
 Api keys:
-  The tool sends a Moralis api key, a CoinGecko demo api key and a
-  CoinPaprika api key when each is saved (npm run api-keys, in the repo's
-  top folder). It opens them with the password in API_KEYS_PASSWORD, which
+  The tool sends a Moralis api key, a CoinGecko api key, a Demo key or a
+  paid plan's, and a CoinPaprika api key when each is saved
+  (npm run api-keys, in the repo's top folder). It opens them with the password in API_KEYS_PASSWORD, which
   source ./bin/unlock-api-keys.sh keeps for a terminal, or else asks for
   the password on stderr. Without a Moralis key it prices pool tokens
   from GeckoTerminal alone; without the others it asks CoinGecko and

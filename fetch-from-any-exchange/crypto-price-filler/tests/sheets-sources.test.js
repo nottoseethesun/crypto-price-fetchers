@@ -316,12 +316,15 @@ describe("CoinGecko (getPriceFromCoinGecko)", () => {
     ).toBeNull();
   });
 
-  it("sends the demo key set in CONFIG in CoinGecko's header, and none without one", () => {
+  it("sends a Demo key set in CONFIG to CoinGecko's public api, in its header, and none without one", () => {
     const keyed = scriptAnswering(coinGeckoAnswering(HOURLY_POINTS, null), {
       config: { CONFIG: { COINGECKO_API_KEY: " gecko-key " } },
     });
     keyed.script.getPriceFromCoinGecko("tezos", TIME_MS, "high");
-    expect(keyed.asked[0].headers["x-cg-demo-api-key"]).toBe("gecko-key");
+    expect(keyed.asked[0].headers).toEqual({
+      "x-cg-demo-api-key": "gecko-key",
+    });
+    expect(keyed.asked[0].url).toMatch(/^https:\/\/api\.coingecko\.com\//);
     expect(keyed.asked[0].url).not.toContain("gecko-key");
 
     for (const key of ["", "  "]) {
@@ -331,6 +334,23 @@ describe("CoinGecko (getPriceFromCoinGecko)", () => {
       bare.script.getPriceFromCoinGecko("tezos", TIME_MS, "high");
       expect(bare.asked[0].headers).toEqual({});
     }
+  });
+
+  it("sends a paid plan's key set in CONFIG to CoinGecko's Pro api, in its header", () => {
+    const keyed = scriptAnswering(coinGeckoAnswering(HOURLY_POINTS, null), {
+      config: {
+        CONFIG: {
+          COINGECKO_API_KEY: "gecko-key",
+          COINGECKO_API_KEY_TYPE: "paid",
+        },
+      },
+    });
+    keyed.script.getPriceFromCoinGecko("tezos", TIME_MS, "high");
+    expect(keyed.asked[0].headers).toEqual({ "x-cg-pro-api-key": "gecko-key" });
+    expect(keyed.asked[0].url).toMatch(
+      /^https:\/\/pro-api\.coingecko\.com\/api\/v3\/coins\/tezos\/market_chart\/range\?/,
+    );
+    expect(keyed.asked[0].url).not.toContain("gecko-key");
   });
 
   it("asks again after each wait in RETRY_DELAYS_MS while CoinGecko answers 429", () => {

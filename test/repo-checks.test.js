@@ -30,6 +30,7 @@ import {
   testFilesMissingFromDocs,
   trackedFiles,
 } from "../lib/repo-checks.js";
+import { SERVICES } from "../api-key-store/services.js";
 import { makeTempFolder, removeTempFolders } from "./helpers/temp-folders.js";
 
 after(removeTempFolders);
@@ -320,5 +321,23 @@ describe("this repo", () => {
 
   it("ships a config-example.json, which git keeps, beside each of its config.json files, the top one holding what the committed config.json holds", () => {
     assert.deepEqual(configExampleProblems(REPO_TOP), []);
+  });
+
+  it("lists the services in the README's table of api keys in the order the top config.json gives them, the default order of priority, as the README says", () => {
+    const readme = fs.readFileSync(path.join(REPO_TOP, "README.md"), "utf8");
+    const section = readme.split("### 3. The Api Keys")[1].split("\n### ")[0];
+    const serviceOf = Object.fromEntries(
+      Object.entries(SERVICES).map(([service, spec]) => [spec.name, service]),
+    );
+    const tableOrder = section
+      .split("\n")
+      .filter((line) => line.startsWith("| ") && !line.startsWith("| Service"))
+      .filter((line) => !/^\|\s*-+/.test(line))
+      .map((line) => line.split("|")[1].trim())
+      .map((name) => serviceOf[name] ?? `a service named ${name}`);
+    const { apiKeys } = JSON.parse(
+      fs.readFileSync(path.join(REPO_TOP, "config.json"), "utf8"),
+    );
+    assert.deepEqual(tableOrder, apiKeys);
   });
 });
