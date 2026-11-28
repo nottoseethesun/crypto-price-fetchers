@@ -35,8 +35,10 @@
  * - The keys are opened as the programs open them (`unlockProjectKeys`):
  *   with the password in `API_KEYS_PASSWORD`, or else one asked for, and
  *   each service is asked once whether it takes its key. Each script's
- *   values are its config.json's, with the keys laid over them by the
- *   spec's `keyConfig`, as its Node version lays them.
+ *   values are its config.json's, with the keys, and the services' order
+ *   of priority, laid over them by the spec's `keyConfig`, as its Node
+ *   version lays them. The file holds a key when one of the services a
+ *   script uses has a key saved.
  * - The Help page is made from the help section of the menu's header, of
  *   each script's first file, and of DEX Screener's functions when they go
  *   in (`help-page.js`).
@@ -308,9 +310,10 @@ async function buildText(run) {
   let values = {};
   let holdsKeys = false;
   for (const [index, spec] of run.scripts.entries()) {
-    const keyValues = spec.keyConfig(keys);
-    holdsKeys ||= Object.keys(keyValues).length > 0;
-    values = layConfig(values, layConfig(configs[index], keyValues));
+    holdsKeys ||= spec.services.some(
+      (service) => typeof keys[service] === "string",
+    );
+    values = layConfig(values, layConfig(configs[index], spec.keyConfig(keys)));
   }
   const parts = partsOf(run, dexScreener);
   const sections = parts

@@ -10,7 +10,7 @@
  * code reads keeps the value written in the script, whatever the file
  * says. `configSchemaProblems` finds where the schemas and the script
  * part: a field a schema names that the script reads as it loads, that
- * holds an api key, which the key store sets, or that the object lacks; a
+ * the key store sets, an api key or a key's type, or that the object lacks; a
  * field the script does not read as it loads that no schema names; a value
  * the script gives a field that its schema refuses; and an object the
  * script does not declare.
@@ -123,7 +123,7 @@ function loadWatching(files) {
  * @param {Object} object - The object, as the script made it
  * @param {Set<string>} readAsItLoads - The fields the script read of it as it loaded
  * @param {Object|undefined} schema - Its schema, if the Node version gives one
- * @param {Set<string>} keys - The fields that hold api keys
+ * @param {Set<string>} keys - The fields the key store sets: the api keys and their types
  * @returns {string[]} The problems
  */
 function objectProblems(name, object, readAsItLoads, schema, keys) {
@@ -136,7 +136,7 @@ function objectProblems(name, object, readAsItLoads, schema, keys) {
       );
     } else if (keys.has(field)) {
       problems.push(
-        `${name}.${field} holds an api key, which the key store sets, and its schema names it`,
+        `${name}.${field} is set by the key store, as an api key or a key's type, and its schema names it`,
       );
     } else if (readAsItLoads.has(field)) {
       problems.push(
@@ -174,7 +174,7 @@ function objectProblems(name, object, readAsItLoads, schema, keys) {
  * @param {Object} spec - The script and its schemas
  * @param {Array<string|URL>} spec.files - The script's files, in the order Apps Script loads them
  * @param {Object<string, Object>} spec.configSchemas - Each config object's JSON Schema, by its name in the script
- * @param {Object<string, Object>} [spec.keyFields={}] - The fields that hold api keys, by config object, as the Node version's `keyConfig` gives them
+ * @param {Object<string, Object>} [spec.keyFields={}] - The fields the key store sets, the api keys and their types, by config object, as the Node version's `keyConfig` gives them
  * @returns {string[]} The problems, one line each; none when the schemas fit the script
  * @throws {Error} When a file cannot be read, does not compile, or throws as it loads
  */

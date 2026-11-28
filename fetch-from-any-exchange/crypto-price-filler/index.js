@@ -6,15 +6,19 @@
  * and date/time, then fill a CSV file with USD prices and calculated USD amounts.
  *
  * Features:
- * - A token that trades in pools: Moralis first, with a saved Moralis key (the close at the
+ * - A token that trades in pools: Moralis, with a saved Moralis key (the close at the
  *   block of the row's time), then GeckoTerminal (1m & 1h candles of the pool it ranks highest,
  *   within the last 180 days, once the minute or hour is over)
  * - Every token: MEXC (the minute or hour that holds the time, widened up to the year
  *   when nothing traded), then CoinGecko (hourly prices, then, for close, its price at
- *   00:00 UTC the next day), then CoinPaprika (the day's candle, then, for close, its price
+ *   00:00 UTC the next day) and CoinPaprika (the day's candle, then, for close, its price
  *   at 00:00 UTC the next day, which ends the day), each only once its period is over. These
  *   three are the price sources of the Sheets script getCryptoPriceFromCentralizedExchange,
  *   which this tool runs unchanged through the repo's runner (`sources/exchange.js`)
+ * - The order: Moralis, CoinGecko and CoinPaprika, which each take a key, in the order of
+ *   priority the keys are ranked in (npm run api-keys -- rank), Moralis first until they
+ *   are; GeckoTerminal right after Moralis, and MEXC right before the first of CoinGecko
+ *   and CoinPaprika (`sources/price.js`)
  * - Every price is that of the row's time, never the current one
  * - Reads dates in a named time zone, daylight saving included
  * - Caching, rate-limit retry, BTC-pair adjustment at the row's time
@@ -125,11 +129,13 @@
  *
  * API KEYS (kept encrypted in api-keys.json at the repo's top, never in a settings file):
  *
- *   CoinGecko            Your CoinGecko demo API key. Obtain from https://www.coingecko.com/en/api
- *                        The free "Demo" tier provides 30 requests/minute and 365 days of
- *                        historical data. Save it with `npm run api-keys`, in the repo's
- *                        top folder. Without one, CoinGecko is asked without a key
- *                        (stricter rate limits).
+ *   CoinGecko            Your CoinGecko API key, from https://www.coingecko.com/en/api: a
+ *                        Demo key, the free one, which its public api takes at 30
+ *                        requests/minute with 365 days of historical data, or a key of
+ *                        one of its paid plans, which its Pro api takes. Save it with
+ *                        `npm run api-keys`, in the repo's top folder, which tells the
+ *                        two apart and saves the key's type with it. Without one,
+ *                        CoinGecko is asked without a key (stricter rate limits).
  *
  *   CoinPaprika          A key for one of CoinPaprika's paid plans, if you buy one
  *                        (https://coinpaprika.com/api). Save it with `npm run api-keys`,

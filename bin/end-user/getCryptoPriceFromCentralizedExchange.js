@@ -11,8 +11,9 @@
  * itself, unchanged, through the shared runner (`../../apps-script-runner/`). The `.gs` file's header says
  * what the function takes and returns: the average of the high and the
  * low of the period around the time, or its high, low or close, from MEXC,
- * then CoinGecko, then CoinPaprika, or a message for the cell when there
- * is none.
+ * then CoinGecko and CoinPaprika in the order of priority their keys are
+ * ranked in (`CONFIG.API_KEY_PRIORITY`), or a message for the cell when
+ * there is none.
  *
  * How:
  *
@@ -22,12 +23,14 @@
  * - `openCentralizedExchangeSources` opens it the same way and returns its
  *   three price sources instead, `getPriceFromMEXC`, `getPriceFromCoinGecko`
  *   and `getPriceFromCoinPaprika`, each taking an id, the time in UTC
- *   milliseconds and "average", "high", "low" or "close".
- *   crypto-price-filler prices
- *   its rows with them.
- * - Either takes the CoinGecko demo api key and the CoinPaprika api key,
- *   and sets each in the script's `CONFIG` (`keyConfig`), as the repo's
- *   build step sets them in the script it gives for the sheet.
+ *   milliseconds and "average", "high", "low" or "close", and the script's
+ *   rule for the order to ask sources in, `sourcesInPriority`.
+ *   crypto-price-filler prices its rows with the sources, in the order the
+ *   rule gives its own.
+ * - Either takes the CoinGecko api key, with its type, the CoinPaprika
+ *   api key, and the services' order of priority, and sets each in the
+ *   script's `CONFIG` (`keyConfig`), as the repo's build step sets them in
+ *   the script it gives for the sheet.
  * - The command line, `node bin/end-user/getCryptoPriceFromCentralizedExchange.js <token>
  *   "<date>"`, with `--tz` and `--mode`, prints the price (`--help` gives
  *   the rest). It first checks the time zone and the date as the script
@@ -143,8 +146,10 @@ const WAITS_MS = Object.freeze({
 
 /**
  * The JSON Schema of each config object `config.json` may set, by its name
- * in the script: each field of `CONFIG` but its two api keys, of its kind
- * of value, and no other. A field that holds an object is set whole, so
+ * in the script: each field of `CONFIG` but those the key store sets
+ * (`keyConfig`), its two api keys, the CoinGecko key's type and the order
+ * of priority, each of its kind of value, and no other. A field that
+ * holds an object is set whole, so
  * its schema asks for every part the script reads: `UTC` among the time
  * zones, which an empty zone means, and both cache times.
  */
@@ -188,9 +193,11 @@ export const CONFIG_SCHEMAS = Object.freeze({
         description: "the seconds a price, and a price not found, are kept",
       },
       COINGECKO_BASE: KINDS.url,
+      COINGECKO_PRO_BASE: KINDS.url,
       COINPAPRIKA_BASE: KINDS.url,
       COINPAPRIKA_PRO_BASE: KINDS.url,
       COINGECKO_API_KEY_HEADER: KINDS.text,
+      COINGECKO_PRO_API_KEY_HEADER: KINDS.text,
       COINPAPRIKA_API_KEY_HEADER: KINDS.text,
       COINGECKO_HISTORY_TEMPLATE: KINDS.text,
       COINGECKO_MARKET_CHART_RANGE_TEMPLATE: ASKS_COINGECKO_FOR_USD,
@@ -212,34 +219,46 @@ const SHEETS_TESTS = new URL(
   import.meta.url,
 );
 
-/** The script's price sources, which `openCentralizedExchangeSources` returns. */
+/** The script's price sources, and its rule for the order to ask sources in, which `openCentralizedExchangeSources` returns. */
 const SOURCE_FUNCTIONS = Object.freeze([
   "getPriceFromMEXC",
   "getPriceFromCoinGecko",
   "getPriceFromCoinPaprika",
+  "sourcesInPriority",
 ]);
 
 /**
- * The api keys the script sends, by the service each is saved under.
+ * The api keys the script sends, by the service each is saved under, as
+ * the key store gives them (`unlockProjectKeys`), with the CoinGecko key's
+ * type beside it, and the services' order of priority.
  *
  * @typedef {Object} ScriptKeys
- * @property {?string} [coingecko] - The CoinGecko demo api key, or null or absent for none
+ * @property {?string} [coingecko] - The CoinGecko api key, or null or absent for none
+ * @property {?string} [coingeckoKeyType] - Its type: 'demo' or 'paid'
  * @property {?string} [coinpaprika] - The CoinPaprika api key, or null or absent for none
+ * @property {?Array<string>} [priority] - The services' names, highest priority first
  */
 
 /**
- * The config values that hand the script its api keys:
- * `CONFIG.COINGECKO_API_KEY` and `CONFIG.COINPAPRIKA_API_KEY`.
+ * The config values that hand the script its api keys and their order of
+ * priority: `CONFIG.COINGECKO_API_KEY`, with its type in
+ * `CONFIG.COINGECKO_API_KEY_TYPE`, `CONFIG.COINPAPRIKA_API_KEY`, and
+ * `CONFIG.API_KEY_PRIORITY`, the order the script asks CoinGecko and
+ * CoinPaprika in.
  *
  * @param {ScriptKeys} apiKeys - The keys, such as `unlockProjectKeys` opens
- * @returns {Object<string, Object>} The values: one field for each key given, none for no key
+ * @returns {Object<string, Object>} The values: one field for each key, type and order given, none for none
  */
 export function keyConfig(apiKeys) {
   const fields = {};
   if (typeof apiKeys.coingecko === "string")
     fields.COINGECKO_API_KEY = apiKeys.coingecko;
+  if (typeof apiKeys.coingeckoKeyType === "string")
+    fields.COINGECKO_API_KEY_TYPE = apiKeys.coingeckoKeyType;
   if (typeof apiKeys.coinpaprika === "string")
     fields.COINPAPRIKA_API_KEY = apiKeys.coinpaprika;
+  if (Array.isArray(apiKeys.priority))
+    fields.API_KEY_PRIORITY = [...apiKeys.priority];
   return Object.keys(fields).length === 0 ? {} : { CONFIG: fields };
 }
 
@@ -322,10 +341,13 @@ export function openCentralizedExchangePrices(options = {}) {
  * Each takes an id (the ticker for MEXC, the coin's id at CoinGecko or
  * CoinPaprika), the time in UTC milliseconds, and "average", "high", "low"
  * or "close", and gives the price in USD, or null when the source has
- * none.
+ * none. With them comes the script's rule for the order to ask sources in,
+ * `sourcesInPriority`, which takes the sources, each named with the
+ * service whose key it takes or the keyed sources it goes with, and an
+ * order of priority, and gives their names in the order to ask them.
  *
  * @param {OpenOptions} [options] - How to open it
- * @returns {Promise<{getPriceFromMEXC: function(string, number, string): Promise<?number>, getPriceFromCoinGecko: function(string, number, string): Promise<?number>, getPriceFromCoinPaprika: function(string, number, string): Promise<?number>, close: function(): Promise<void>}>} The sources
+ * @returns {Promise<{getPriceFromMEXC: function(string, number, string): Promise<?number>, getPriceFromCoinGecko: function(string, number, string): Promise<?number>, getPriceFromCoinPaprika: function(string, number, string): Promise<?number>, sourcesInPriority: function(Array<Object>, Array<string>): Promise<Array<string>>, close: function(): Promise<void>}>} The sources, and the rule
  */
 export function openCentralizedExchangeSources(options = {}) {
   return openWith([...SOURCE_FUNCTIONS], options);
@@ -334,8 +356,9 @@ export function openCentralizedExchangeSources(options = {}) {
 /** What the help says of the api keys. */
 const KEY_HELP = `
 Api keys:
-  The command sends a CoinGecko demo api key and a CoinPaprika api key
-  when either is saved (npm run api-keys, in the repo's top folder). It
+  The command sends a CoinGecko api key, a Demo key or a paid plan's, to
+  the api that takes its type, and a CoinPaprika api key, when either is
+  saved (npm run api-keys, in the repo's top folder). It
   opens them with the password in API_KEYS_PASSWORD, which
   source ./bin/unlock-api-keys.sh keeps for a terminal, or else asks for the
   password on stderr. Without a key, it asks that service without one;
@@ -376,7 +399,8 @@ function describeCommandLine(program, runCall) {
   program
     .name("getCryptoPriceFromCentralizedExchange")
     .description(
-      "A coin's USD price at a past time, from centralized exchanges (MEXC, then CoinGecko, then CoinPaprika), " +
+      "A coin's USD price at a past time, from centralized exchanges (MEXC, then CoinGecko and CoinPaprika " +
+        "in the order of priority their keys are ranked in, npm run api-keys -- rank), " +
         "worked out by getCryptoPriceFromCentralizedExchange.gs run under Node.",
     )
     .argument(

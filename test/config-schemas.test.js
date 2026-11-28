@@ -8,8 +8,10 @@
  * tested on a fixture script, then run on each Node version's schemas, its
  * script loaded as the build joins it. Each Node version's
  * config-example.json, beside the config.json it reads, is held to its
- * schemas and to the values written in its script. A config.json is then
- * checked against the schemas as the runner and the build check it.
+ * schemas and to the values written in its script, and the apis and
+ * headers the key store checks CoinGecko's keys at to those the exchange
+ * script sends them to. A config.json is then checked against the schemas
+ * as the runner and the build check it.
  */
 
 import { after, before, describe, it } from "node:test";
@@ -18,6 +20,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
+import {
+  COINGECKO_KEY_TYPES,
+  readNeededKeys,
+  SERVICES,
+  typeEntryName,
+} from "../api-key-store/index.js";
 import { APPS_SCRIPTS } from "../build/tools/apps-script-build/index.js";
 import { createAppsScriptServices } from "../apps-script-runner/apps-script-services.js";
 import { readConfigFile } from "../apps-script-runner/config-file.js";
@@ -26,11 +34,70 @@ import { loadAppsScript } from "../apps-script-runner/load-apps-script.js";
 import { KINDS } from "../lib/settings-schema.js";
 import { makeTempFolder, removeTempFolders } from "./helpers/temp-folders.js";
 
+/** The repo's top folder, whose config.json lists the services. */
+const REPO_TOP = fileURLToPath(new URL("..", import.meta.url));
+
 /** The fixture script the check's own tests run on. */
 const CHECK_SCRIPT = new URL(
   "./fixtures/config-schema-check.gs",
   import.meta.url,
 );
+
+/**
+ * Loads a Node version's script, its files in the order the build joins
+ * them, asking the web nothing.
+ *
+ * @param {Object} spec - The Node version's build spec
+ * @returns {Object} The script's context
+ */
+function loadedScript(spec) {
+  return loadAppsScript(
+    spec.files.map((file) => ({
+      source: fs.readFileSync(file.path, "utf8"),
+      filename: file.path,
+    })),
+    createAppsScriptServices({
+      fetchSync: () => {
+        throw new Error("The script asked the web as it loaded");
+      },
+    }),
+  );
+}
+
+/**
+ * A config object, as the script writes it.
+ *
+ * @param {Object} script - The script's context (`loadedScript`)
+ * @param {string} name - The object's name, such as 'CONFIG'
+ * @returns {Object} Its fields
+ */
+function writtenConfig(script, name) {
+  return JSON.parse(vm.runInContext(`JSON.stringify(${name})`, script));
+}
+
+/**
+ * The keys a run opens for the services given, as `unlockProjectKeys`
+ * gives them: each "key", and, beside the key of a service whose keys come
+ * in types, its first type; and the services' order of priority.
+ *
+ * @param {string[]} services - The services, as config.json names them
+ * @returns {Object<string, *>} The keys, the types and the order
+ */
+function openedKeys(services) {
+  return {
+    ...Object.fromEntries(
+      services.flatMap((service) => {
+        const { keyTypes } = SERVICES[service];
+        if (keyTypes === undefined) return [[service, "key"]];
+        return [
+          [service, "key"],
+          [typeEntryName(service), Object.keys(keyTypes)[0]],
+        ];
+      }),
+    ),
+    priority: [...services],
+  };
+}
 
 describe("configSchemaProblems, on a script whose object has a field read as it loads, one read when called, and a key", () => {
   /** The fixture's object's schema, naming only what a config may set. */
@@ -76,7 +143,7 @@ describe("configSchemaProblems, on a script whose object has a field read as it 
       }),
       [
         "SETTINGS.HOST is read as the script loads, so a value laid after the load does not reach it, and its schema names it",
-        "SETTINGS.API_KEY holds an api key, which the key store sets, and its schema names it",
+        "SETTINGS.API_KEY is set by the key store, as an api key or a key's type, and its schema names it",
         "SETTINGS.RETRIES is named in its schema, and the script's SETTINGS has no such field",
         "SETTINGS.WAIT_MS is not read as the script loads, so a config may set it, and no schema names it",
       ],
@@ -122,9 +189,7 @@ for (const spec of APPS_SCRIPTS) {
       configSchemaProblems({
         files: spec.files.map((file) => file.path),
         configSchemas: spec.configSchemas,
-        keyFields: spec.keyConfig(
-          Object.fromEntries(spec.services.map((service) => [service, "key"])),
-        ),
+        keyFields: spec.keyConfig(openedKeys(spec.services)),
       }),
       [],
     );
@@ -139,21 +204,9 @@ for (const spec of APPS_SCRIPTS) {
       required: true,
       schemas: spec.configSchemas,
     });
-    const script = loadAppsScript(
-      spec.files.map((file) => ({
-        source: fs.readFileSync(file.path, "utf8"),
-        filename: file.path,
-      })),
-      createAppsScriptServices({
-        fetchSync: () => {
-          throw new Error("The script asked the web as it loaded");
-        },
-      }),
-    );
+    const script = loadedScript(spec);
     for (const [name, schema] of Object.entries(spec.configSchemas)) {
-      const written = JSON.parse(
-        vm.runInContext(`JSON.stringify(${name})`, script),
-      );
+      const written = writtenConfig(script, name);
       assert.deepEqual(
         values[name],
         Object.fromEntries(
@@ -166,6 +219,34 @@ for (const spec of APPS_SCRIPTS) {
     }
   });
 }
+
+it("the key store checks CoinGecko's keys at the apis, and in the headers, the exchange script sends each type of key to", () => {
+  const exchange = APPS_SCRIPTS.find(
+    (spec) => spec.name === "getCryptoPriceFromCentralizedExchange",
+  );
+  const written = writtenConfig(loadedScript(exchange), "CONFIG");
+  const { demo, paid } = COINGECKO_KEY_TYPES;
+  assert.deepEqual(
+    {
+      demo: [written.COINGECKO_BASE, written.COINGECKO_API_KEY_HEADER],
+      paid: [written.COINGECKO_PRO_BASE, written.COINGECKO_PRO_API_KEY_HEADER],
+    },
+    { demo: [demo.base, demo.header], paid: [paid.base, paid.header] },
+  );
+  assert.equal(written.COINGECKO_API_KEY_TYPE, "demo");
+});
+
+it("the exchange script, as committed, asks CoinGecko and CoinPaprika in the order config.json lists them in, the order of priority until the owner ranks them", () => {
+  const exchange = APPS_SCRIPTS.find(
+    (spec) => spec.name === "getCryptoPriceFromCentralizedExchange",
+  );
+  const written = writtenConfig(loadedScript(exchange), "CONFIG");
+  const listed = readNeededKeys(REPO_TOP).map((service) => service.service);
+  assert.deepEqual(
+    written.API_KEY_PRIORITY,
+    listed.filter((service) => exchange.services.includes(service)),
+  );
+});
 
 describe("a config.json checked against a Node version's schemas", () => {
   const [dexTools, exchange] = APPS_SCRIPTS;

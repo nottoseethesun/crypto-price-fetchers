@@ -54,9 +54,16 @@ beforeAll(async () => {
     "coingecko",
     STAND_IN_GECKO_KEY,
     PASSWORD,
+    "demo",
   );
   refusedKeyFile = path.join(folder, "refused-api-keys.json");
-  await saveEncryptedKey(refusedKeyFile, "coingecko", "refused-key", PASSWORD);
+  await saveEncryptedKey(
+    refusedKeyFile,
+    "coingecko",
+    "refused-key",
+    PASSWORD,
+    "demo",
+  );
 });
 
 afterAll(() => {
@@ -149,7 +156,7 @@ describe("the command line and the saved CoinGecko api key", () => {
       const run = runReading(refusedKeyFile, `${PASSWORD}\n`);
       expect(run.status).toBe(1);
       expect(run.stderr).toMatch(
-        /CoinGecko refused the api key saved in .*refused-api-keys\.json\. Save a new one, in the project's top folder: npm run api-keys -- set coingecko/,
+        /CoinGecko refused the api key saved in .*refused-api-keys\.json, as a Demo key\. Save a new one, in the project's top folder: npm run api-keys -- set coingecko/,
       );
       expect(run.asked).toEqual(["https://api.coingecko.com/api/v3/ping"]);
       expect(run.written).toBe(false);

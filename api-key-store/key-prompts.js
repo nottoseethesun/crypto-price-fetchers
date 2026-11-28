@@ -9,13 +9,19 @@
  *
  * - `unlockApiKeys` opens the keys saved for the services a run uses, with
  *   one password, then asks each service once whether it takes its key,
- *   and keeps each in memory for the run (`key-holder.js`). A service with
- *   no key saved gets null, and the run goes on without one; with no key
- *   saved at all, no password is asked.
+ *   as the type saved with it for a service whose keys come in types, and
+ *   keeps each in memory for the run, with its type (`key-holder.js`). It
+ *   gives each key, and beside the key of a service whose keys come in
+ *   types, its type, under the name the key file keeps it under
+ *   (`typeEntryName`), such as `coingeckoKeyType`. A service with no key
+ *   saved gets null, and the run goes on without one; with no key saved at
+ *   all, no password is asked.
  * - `enterApiKey` asks for one service's key, asks the service whether it
- *   takes it, and saves it, encrypted, only if it does, in place of any key
- *   saved for the service. `savingPassword` gives the password the keys a
- *   run enters are saved with, asked once however many are entered.
+ *   takes it, as each type in turn for a service whose keys come in types,
+ *   and saves it, encrypted, only if it does, with the type it took the
+ *   key as, in place of any key saved for the service. `savingPassword`
+ *   gives the password the keys a run enters are saved with, asked once
+ *   however many are entered.
  *
  * How:
  *
@@ -26,8 +32,10 @@
  * - A key and a password are never arguments, which shell history and
  *   `ps` would keep, and no message shows any character of a key. The
  *   password is kept nowhere, and the plain keys only in memory.
- * - What a service says of a key comes from its `check` (`services.js`). A
- *   refused key stops the run. A saved key the service cannot be asked
+ * - What a service says of a key comes from its `check`, or from the check
+ *   of a type of its keys (`services.js`). A key of a service whose keys
+ *   come in types is refused only when the service refuses it as every
+ *   type. A refused key stops the run. A saved key the service cannot be asked
  *   about is used, and a line says so, since the service may answer the
  *   run's own requests a moment later; a new key it cannot be asked about
  *   is not saved.
@@ -47,7 +55,9 @@ import {
   hasEncryptedKey,
   loadEncryptedKey,
   saveEncryptedKey,
+  savedKeyType,
   savedServices,
+  typeEntryName,
 } from "./key-file.js";
 import { setApiKey } from "./key-holder.js";
 
@@ -126,22 +136,60 @@ async function withAsk(spec, use) {
 }
 
 /**
- * Asks a service what it says of a key.
+ * The checks that ask a service about a key: its one check; or, for a
+ * service whose keys come in types, the check of the type given, or of
+ * each type in turn when none is given.
+ *
+ * @param {import('./services.js').Service} service - The service
+ * @param {?string} keyType - The key's type, or null to check it as each type in turn
+ * @returns {Array<{keyType: ?string, check: function(string, Object): Promise<string>}>} Each check, with the type it checks the key as: null for a service whose keys do not come in types
+ */
+function checksOf(service, keyType) {
+  if (service.keyTypes === undefined)
+    return [{ keyType: null, check: service.check }];
+  const types = keyType === null ? Object.keys(service.keyTypes) : [keyType];
+  return types.map((type) => ({
+    keyType: type,
+    check: service.keyTypes[type].check,
+  }));
+}
+
+/**
+ * Asks a service what it says of a key, through each of its checks in
+ * turn until one takes it (`checksOf`).
  *
  * @param {KeyStoreSpec} spec - Where the keys are kept
  * @param {import('./services.js').Service} service - The service
  * @param {string} key - The key
- * @returns {Promise<{verdict: string, reason: (string|undefined)}>} 'valid', 'invalid', or 'unanswered' with why
+ * @param {?string} keyType - The key's type, or null to check it as each type in turn
+ * @returns {Promise<{verdict: string, reason: (string|undefined), keyType: ?string}>} 'valid', with the type it was taken as; 'invalid' when every check refused it; or 'unanswered', with why, when no check took it and one could not be asked
  */
-async function askService(spec, service, key) {
-  try {
-    return {
-      verdict: await service.check(key, spec.checkOptions ?? {}),
-      reason: undefined,
-    };
-  } catch (error) {
-    return { verdict: "unanswered", reason: error.message };
+async function askService(spec, service, key, keyType) {
+  let reason;
+  for (const asked of checksOf(service, keyType)) {
+    try {
+      if ((await asked.check(key, spec.checkOptions ?? {})) === "valid")
+        return { verdict: "valid", reason: undefined, keyType: asked.keyType };
+    } catch (error) {
+      reason ??= error.message;
+    }
   }
+  return {
+    verdict: reason === undefined ? "invalid" : "unanswered",
+    reason,
+    keyType: null,
+  };
+}
+
+/**
+ * The words that name a key's type, after what they follow in a message.
+ *
+ * @param {import('./services.js').Service} service - The service
+ * @param {?string} keyType - The key's type; null for a service whose keys do not come in types
+ * @returns {string} Such as ", as a paid plan's key"; "" for no type
+ */
+function asType(service, keyType) {
+  return keyType === null ? "" : `, as ${service.keyTypes[keyType].name}`;
 }
 
 /**
@@ -176,20 +224,23 @@ async function openSavedKeys(spec, saved, password) {
 }
 
 /**
- * Asks each service once about its key, before the run uses it.
+ * Asks each service once about its key, as the type saved with it, before
+ * the run uses it.
  *
  * @param {KeyStoreSpec} spec - Where the keys are kept
  * @param {Array<import('./services.js').Service>} saved - The services with a key opened
  * @param {Object<string, string>} keys - The keys, by service
+ * @param {Object<string, ?string>} types - Their types, by service: null for a service whose keys do not come in types
  * @returns {Promise<void>} Settles once every service has taken its key or not answered
  * @throws {Error} With `keyRefused` set, when a service refuses its key
  */
-async function checkSavedKeys(spec, saved, keys) {
+async function checkSavedKeys(spec, saved, keys, types) {
   for (const service of saved) {
     const { verdict, reason } = await askService(
       spec,
       service,
       keys[service.service],
+      types[service.service],
     );
     if (verdict === "unanswered") {
       spec.say(
@@ -197,7 +248,7 @@ async function checkSavedKeys(spec, saved, keys) {
       );
     } else if (verdict !== "valid") {
       throw keyRefused(
-        `${service.name} refused the api key saved in ${spec.file}. ` +
+        `${service.name} refused the api key saved in ${spec.file}${asType(service, types[service.service])}. ` +
           `Save a new one, in the project's top folder: ${MANAGE_COMMAND} -- set ${service.service}`,
       );
     }
@@ -210,7 +261,7 @@ async function checkSavedKeys(spec, saved, keys) {
  *
  * @param {KeyStoreSpec} spec - Where the keys are kept, and how to reach the person and the services
  * @param {Array<import('./services.js').Service>} services - The services the run uses
- * @returns {Promise<Object<string, ?string>>} Each service's key, or null when none is saved
+ * @returns {Promise<Object<string, ?string>>} Each service's key, or null when none is saved; and, beside the key of a service whose keys come in types, its type, under `typeEntryName`'s name, such as `coingeckoKeyType: 'paid'`
  * @throws {Error} With `keyRefused` set, when the password does not open the keys or a service refuses its key; or when the key file cannot be read
  */
 export async function unlockApiKeys(spec, services) {
@@ -232,10 +283,18 @@ export async function unlockApiKeys(spec, services) {
         }
       : { password: fromEnvironment, typed: false };
   const opened = await openSavedKeys(spec, saved, password);
-  await checkSavedKeys(spec, saved, opened);
+  const types = Object.fromEntries(
+    saved.map((service) => [
+      service.service,
+      savedKeyType(spec.file, service.service),
+    ]),
+  );
+  await checkSavedKeys(spec, saved, opened, types);
   for (const service of saved) {
-    setApiKey(service.service, opened[service.service]);
+    const keyType = types[service.service];
+    setApiKey(service.service, opened[service.service], keyType);
     keys[service.service] = opened[service.service];
+    if (keyType !== null) keys[typeEntryName(service.service)] = keyType;
   }
   return keys;
 }
@@ -261,11 +320,14 @@ function sameText(typed, other) {
  * @param {KeyStoreSpec} spec - Where the keys are kept
  * @param {function(string): Promise<string>} ask - Prompts and answers what is typed
  * @returns {Promise<string>} The password
- * @throws {Error} With `keyRefused` and `passwordRefused` set, when the password does not open the keys saved, is empty, or is not typed the same twice
+ * @throws {Error} With `keyRefused` and `passwordRefused` set, when the password does not open the keys saved, is empty, or is not typed the same twice; without them, when the key file cannot be read or its schema refuses it
  */
 async function askSavingPassword(spec, ask) {
   const fromEnvironment = environmentPassword(spec.env ?? process.env);
-  if (fromEnvironment === null && savedServices(spec.file).length === 0) {
+  // Read first, so a key file that cannot be read, or that its schema
+  // refuses, stops the run in its own words, not as a password refused
+  const saved = savedServices(spec.file);
+  if (fromEnvironment === null && saved.length === 0) {
     const password = await ask("Password to encrypt the api keys with: ");
     if (password.length === 0)
       throw passwordRefused("No password was entered, so no key was saved.");
@@ -307,8 +369,10 @@ export function savingPassword(spec) {
 
 /**
  * Asks for one service's key, then for the password if the run has none
- * yet, has the service check the key, and saves it, encrypted, in place
- * of any key saved for the service; then keeps it in memory for the run.
+ * yet, has the service check the key, as each type in turn for a service
+ * whose keys come in types, and saves it, encrypted, with the type the
+ * service took it as, in place of any key saved for the service; then
+ * keeps it in memory for the run.
  *
  * @param {KeyStoreSpec} spec - Where the keys are kept, and how to reach the person and the services
  * @param {import('./services.js').Service} service - The service
@@ -326,25 +390,38 @@ export async function enterApiKey(spec, service, password, ask) {
     return null;
   }
   const saving = await password(ask);
-  const { verdict, reason } = await askService(spec, service, key);
+  const { verdict, reason, keyType } = await askService(
+    spec,
+    service,
+    key,
+    null,
+  );
   if (verdict === "unanswered") {
     throw keyRefused(
       `${service.name} did not answer the check of the api key (${reason}), so it was not saved. Try again later.`,
     );
   }
   if (verdict !== "valid") {
+    const asEachType =
+      service.keyTypes === undefined
+        ? ""
+        : ` as ${Object.values(service.keyTypes)
+            .map((type) => type.name)
+            .join(" and as ")}`;
     throw keyRefused(
-      `${service.name} refused the api key, so it was not saved. Enter the key as ${service.name} shows it.`,
+      `${service.name} refused the api key${asEachType}, so it was not saved. Enter the key as ${service.name} shows it.`,
     );
   }
   try {
-    await saveEncryptedKey(spec.file, service.service, key, saving);
+    await saveEncryptedKey(spec.file, service.service, key, saving, keyType);
   } catch (error) {
     throw keyRefused(
       `The ${service.name} api key was not saved: ${error.message}`,
     );
   }
-  setApiKey(service.service, key);
-  spec.say(`The ${service.name} api key is saved, encrypted, in ${spec.file}.`);
+  setApiKey(service.service, key, keyType);
+  spec.say(
+    `The ${service.name} api key is saved, encrypted, in ${spec.file}${asType(service, keyType)}.`,
+  );
   return key;
 }

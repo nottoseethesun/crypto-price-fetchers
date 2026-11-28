@@ -90,8 +90,10 @@ saved api keys set at its end, for one paste into a spreadsheet
   `-tests.gs`, gives a token's price at a past time, as recent as a
   minute ago: by default the average of the high and the low of a period
   around that time, or else its high, low or close. It asks MEXC, a
-  centralized exchange, then CoinGecko, then CoinPaprika, two services
-  that gather the exchanges' prices, so it covers the tokens they price.
+  centralized exchange, then CoinGecko and CoinPaprika, two services
+  that gather the exchanges' prices, in the order of priority their keys
+  are ranked in ([The Api Keys](#3-the-api-keys)), so it covers the tokens
+  they price.
 - `src/crypto-price-fetchers-menu.gs` adds the Crypto Price Fetchers menu
   to the spreadsheet. Its items run the price cells again, clear cells
   stuck on `#ERROR!` or on a busy message, replace past prices' formulas
@@ -317,12 +319,33 @@ npm run api-keys
 It lists each key, saved or not, never showing its characters, and asks for
 each one not saved: the key, then the password, showing nothing of what is
 typed. The password is typed twice while no key is saved, and once
-after that. A program that opens the keys, the key manager among them,
+after that. Then, while no order of priority is saved, it asks for one. A program that opens the keys, the key manager among them,
 takes the password from the environment variable `API_KEYS_PASSWORD`
 when it holds one, and asks for it only when it does not;
 [`docs/engineering.md`](docs/engineering.md#the-programs-in-bin) says how
 a terminal can keep it there. Each key is saved only once its service takes it; Enter
-alone skips one. [manage-api-keys.js](#manage-api-keysjs-1), under
+alone skips one. CoinGecko gives two types of key, which look alike: a
+Demo key, its free one, which only its public api takes, and the key of
+one of its paid plans, which only its Pro api takes. So the manager checks
+a CoinGecko key at the public api, then at the Pro api, saves it with the
+type of the one that takes it, and lists that type beside it, and the
+scripts send the key to that api.
+
+The keys also have an order of priority. Where more than one service
+with a key can do one job, the programs ask them in that order: the
+exchange script asks CoinGecko and CoinPaprika in it, in the sheet and
+under Node, and crypto-price-filler asks Moralis, CoinGecko and
+CoinPaprika in it. A source that takes no key stays with the sources it
+goes with: MEXC is asked right before the first of CoinGecko and
+CoinPaprika, and GeckoTerminal right after Moralis. DexTools and x1.ninja
+never do one job, since the chain decides which is asked. The manager
+lists the services numbered in that order. While no order is saved, the
+programs follow the order the top `config.json` lists them in, which
+puts Moralis first and CoinGecko before CoinPaprika, and the manager asks
+for an order: type the services' numbers, highest priority first, such
+as `2 1 3 4 5`, or Enter alone to keep the order shown. The order is
+saved in `api-keys.json` beside the keys, in plain text, since it is no
+secret. [manage-api-keys.js](#manage-api-keysjs-1), under
 [Run](#run), shows its other uses. The store itself is a module
 any Node project can use: see [its README](./api-key-store/README.md).
 
@@ -571,7 +594,8 @@ case the script asks nothing.
 ##### A Past Price: getCryptoPrice
 
 `getCryptoPrice(token, dateStr, tz, mode)` gives a coin's price in USD
-at a past time, from MEXC, then CoinGecko, then CoinPaprika. Each source
+at a past time, from MEXC, then CoinGecko and CoinPaprika in the order of
+priority their keys are ranked in, CoinGecko first until they are. Each source
 prices a period that holds the time. MEXC's is the minute, for a time in
 about the last 30 days, else the hour; when nothing traded in it, the
 script widens it a step at a time, up to the year, among the periods
@@ -887,6 +911,21 @@ DexTools' saved key replaced, as after DexTools issues a new one:
 npm run api-keys -- set dextools
 ```
 
+A CoinGecko key saved in place of the one saved, a Demo key or a paid
+plan's, which the manager tells apart by asking CoinGecko, and saves with
+its type:
+
+```bash
+npm run api-keys -- set coingecko
+```
+
+The keys' order of priority shown, numbered, and a new one saved, typed as
+those numbers, highest priority first, or Enter alone to keep it:
+
+```bash
+npm run api-keys -- rank
+```
+
 Whether the password in `API_KEYS_PASSWORD` opens every saved key, by its
 exit code, 0 when it does; run with no `API_KEYS_PASSWORD` set, it says so
 and ends with exit code 1:
@@ -1049,8 +1088,9 @@ await prices.close();
 ```
 
 The functions take the Sheets arguments and return what the cell would show.
-`openCentralizedExchangePrices({ apiKeys: { coingecko, coinpaprika } })`
-sends the keys given, such as those `unlockProjectKeys` (`api-key-store/`)
+`openCentralizedExchangePrices({ apiKeys: { coingecko, coingeckoKeyType, coinpaprika } })`
+sends the keys given, the CoinGecko key to the api its type, `"demo"` or
+`"paid"`, takes, such as those `unlockProjectKeys` (`api-key-store/`)
 opens. `openCentralizedExchangeSources` opens the script's three price
 sources instead, each taking an id, a time in UTC milliseconds and a
 target, as crypto-price-filler asks them.
@@ -1059,15 +1099,19 @@ target, as crypto-price-filler asks them.
 
 A token that trades in a blockchain's pools, such as HEX on PulseChain, is
 priced by the services that read those pools, in LP Ranger's order:
-Moralis first, which gives the price at the block the chain had at the
+Moralis, which gives the price at the block the chain had at the
 time, when a Moralis key is saved; then GeckoTerminal, for the last 180
 days, from the candles of one pool: of the first pools GeckoTerminal
 lists for the token, the deepest that traded in the last day. Their clients are in `dex-prices/`, with the
 one loop that sends a request again when a service refuses it as one too
 many, which every client shares.
 
-crypto-price-filler prices such a token this way, and falls back to the
-exchange script's three sources: MEXC, then CoinGecko, then CoinPaprika.
+crypto-price-filler prices such a token with these, and with the
+exchange script's three sources: MEXC, then CoinGecko and CoinPaprika. It
+asks Moralis, CoinGecko and CoinPaprika, which each take a key, in the
+order of priority the keys are ranked in, with GeckoTerminal right after
+Moralis and MEXC right before the first of CoinGecko and CoinPaprika;
+until the keys are ranked, Moralis comes first.
 Other repos install this one to use the clients, as
 `crypto-price-fetchers/dex-prices/geckoterminal`,
 `crypto-price-fetchers/dex-prices/moralis`,

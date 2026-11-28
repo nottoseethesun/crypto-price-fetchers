@@ -109,8 +109,10 @@ names the chain and the token, or a pool.
 `fetch-from-any-exchange/src/getCryptoPriceFromCentralizedExchange.gs`
 gives a token's price at a past minute: by default the average of the high and the low of the candle
 that holds it, or else the candle's high, low or close, from MEXC, a
-centralized exchange, first, then CoinGecko, then CoinPaprika, two
-services that gather the exchanges' prices. MEXC keeps minute candles for
+centralized exchange, first, then CoinGecko and CoinPaprika, two
+services that gather the exchanges' prices, in the order of priority
+their keys are ranked in (`CONFIG.API_KEY_PRIORITY`, which
+`sourcesInPriority` reads; [The Key Store](#the-key-store)). MEXC keeps minute candles for
 about the last 30 days, so for an older time its period is the hour that
 holds it. When nothing traded in that minute or hour, MEXC's price comes
 from the first larger period around it, up to a year, in which something
@@ -186,8 +188,8 @@ day's close is its price at its end, 24:00 UTC, which is 00:00 UTC of the
 next day, so for close the script asks for the price at 00:00 UTC of the
 day after the time's: a date one day later than the time's, on purpose.
 Without a key, CoinPaprika so gives no average, high or low: the script
-asks it for none, and a cell no earlier source prices says CoinPaprika
-needs a key; crypto-price-filler, run for a high or a low with no
+asks it for none, goes on to the next source, and a cell no source prices
+says CoinPaprika needs a key; crypto-price-filler, run for a high or a low with no
 CoinPaprika key saved, for a token CoinPaprika lists, says so and asks
 whether to go on without
 CoinPaprika's prices (`utils/coinpaprika-key.js`). Apps Script runs
@@ -207,9 +209,9 @@ shows the script's busy message, and no source keeps the lack of an
 answer from a request cut short, since it says nothing of whether the
 source has a price.
 The script is
-in three files, which Apps Script loads into one scope: the function and
-its settings, the price sources (`-sources.gs`), and the tests run from the
-editor (`-tests.gs`). Each file names what it uses from the others in a
+in three files, which Apps Script loads into one scope: the function, its
+settings and the requests its sources send, the price sources
+(`-sources.gs`), and the tests run from the editor (`-tests.gs`). Each file names what it uses from the others in a
 `/* global */` comment, for the lint. How both scripts are tested is in
 [`docs/engineering.md`](engineering.md#how-the-sheets-scripts-gs-are-tested).
 
@@ -294,8 +296,10 @@ the keys it opens over the script's config: `bin/end-user/crypto-price-fetchers.
 opens only the key its call needs, DexTools' or x1.ninja's, for
 `DEXTOOLS_CONFIG.API_KEY` or `X1_CONFIG.API_KEY`;
 `bin/end-user/getCryptoPriceFromCentralizedExchange.js` opens CoinGecko's and
-CoinPaprika's, for `CONFIG.COINGECKO_API_KEY` and
-`CONFIG.COINPAPRIKA_API_KEY`. Its `openCentralizedExchangeSources` opens
+CoinPaprika's, for `CONFIG.COINGECKO_API_KEY`, with the CoinGecko key's
+type in `CONFIG.COINGECKO_API_KEY_TYPE`, which names the api the script
+sends the key to, and `CONFIG.COINPAPRIKA_API_KEY`, with the services'
+order of priority in `CONFIG.API_KEY_PRIORITY`. Its `openCentralizedExchangeSources` opens
 the script's three price sources rather than its Sheets function, for
 crypto-price-filler.
 
@@ -376,7 +380,14 @@ No line it prints holds a key.
 
 The filler reads a CSV of timestamps and writes it out with each row's
 price, for as many rows as the file holds, asking its sources in turn
-(`sources/price.js`), with a cache of answers (`utils/cache.js`):
+(`sources/price.js`), with a cache of answers (`utils/cache.js`). The
+order is the one the exchange script's rule gives (`sourcesInPriority`),
+which the filler runs through the script's Node version, so the sheet and
+the filler follow one rule: Moralis, CoinGecko and CoinPaprika, which
+each take a key, in the run's order of priority
+([The Key Store](#the-key-store)); GeckoTerminal right after Moralis; and
+MEXC right before the first of CoinGecko and CoinPaprika. Before the keys
+are ranked, that is the order below:
 
 1. For a token whose entry in `supported-tokens.json` names its contract
    and chains, the pool sources: Moralis (`sources/moralis.js`), when a
@@ -466,19 +477,38 @@ A project lists the services whose keys its programs send in its top
 `config.json`, under `apiKeys`. The keys are kept in `api-keys.json` beside
 it, which git ignores, each encrypted by AES-256-GCM with a key made from
 one password by PBKDF2-SHA512 at 600,000 rounds: LP Ranger's format, so
-each opens a file the other wrote.
+each opens a file the other wrote. A key of a service whose keys come in
+types has its type beside it, the services' order of priority is kept
+there too, and the file is held to its JSON Schema (`key-file.js`) as it
+is read and before it is written.
+
+Where more than one service with a key can do one job, a program asks
+them in the order of priority the owner ranked them in: the exchange
+script asks CoinGecko and CoinPaprika in it, and crypto-price-filler
+Moralis, CoinGecko and CoinPaprika. Until the owner ranks them, the order
+is the one `config.json` lists them in (`projectPriority`,
+`project-keys.js`). DexTools and x1.ninja never do one job: the chain
+decides which the current-price script asks.
 
 - `npm run api-keys`, the key manager (`key-manager.js`), lists the keys,
   saved or not, never showing a key's characters, and saves each key typed
   once its service takes it (`services.js` holds each service's check).
+  CoinGecko gives two types of key, which look alike: a Demo key, its free
+  one, which only its public api takes, and a paid plan's key, which only
+  its Pro api takes. So the manager checks a CoinGecko key as each type in
+  turn, saves it with the type CoinGecko takes it as, and lists that type.
+  It numbers the services in their order of priority, asks for an order
+  when none is saved for them, typed as those numbers, highest priority
+  first, and `npm run api-keys -- rank` changes it (`key-ranking.js`).
 - `source ./bin/unlock-api-keys.sh`, a script in the repo's `bin/`, asks
   for the password once, checks that it opens the keys saved, and keeps it
   for that terminal in `API_KEYS_PASSWORD`.
 - A program calls `unlockProjectKeys` as it starts. It opens the keys it
   uses with that password, or asks for one, has each service check its key,
-  and keeps the keys in memory for the run (`key-holder.js`). A key a
-  service refuses stops the run with a message that says how to save a new
-  one.
+  as the type saved with it, and keeps the keys in memory for the run, with
+  their types and the order of priority (`key-holder.js`), which it also
+  gives with the keys, as `priority`. A key a service refuses stops the run with
+  a message that says how to save a new one.
 
 The password is kept nowhere on disk, and the plain keys only in memory.
 
@@ -584,7 +614,8 @@ The settings files of this repo, and the schemas they are held to:
 | File | Schema | Read by |
 | --- | --- | --- |
 | `config.json`, its `apiKeys` | `apiKeysSchema` in `api-key-store/project-keys.js`: a list of services the key store knows, each once; it reads no other key, since every other key of the file is the project's | The key store, for any project |
-| A Node version's `config.json`, in its tool's folder: `crypto-price-fetchers/config.json`, `fetch-from-any-exchange/config.json` | `CONFIG_SCHEMAS` in the Node version (`bin/end-user/crypto-price-fetchers.js`, `bin/end-user/getCryptoPriceFromCentralizedExchange.js`), which it passes to the runner and the build as `configSchemas`: for each config object it names, every field the script reads each time it is called, of its kind of value. An api key, which the key store sets, and a field the script reads as it loads, which a value laid after the load does not reach, are refused. The runner's `configSchemaProblems` (`apps-script-runner/config-schema-check.js`) holds each schema to its script: it loads the script with each config object watched, and names a field a schema names that the script reads as it loads, holds a key or lacks, a field read only when called that no schema names, and a value of the script's own that its schema refuses; `test/config-schemas.test.js` runs it on each Node version | The runner, before the script opens (`apps-script-runner/config-file.js`), and the build step, before its first question |
+| `api-keys.json`, the key file | `KEY_FILE_SCHEMA` in `api-key-store/key-file.js`: each key's entry an object, in LP Ranger's format; for each service whose keys come in types, CoinGecko's, the type of its key, `"demo"` or `"paid"`, with the key and only with it; the order of priority, `priority`, a list of services' names, each once; and no other entry. It is checked as the file is read and before it is written | The key store, for any project |
+| A Node version's `config.json`, in its tool's folder: `crypto-price-fetchers/config.json`, `fetch-from-any-exchange/config.json` | `CONFIG_SCHEMAS` in the Node version (`bin/end-user/crypto-price-fetchers.js`, `bin/end-user/getCryptoPriceFromCentralizedExchange.js`), which it passes to the runner and the build as `configSchemas`: for each config object it names, every field the script reads each time it is called, of its kind of value. An api key, a key's type or the order of priority, which the key store sets, and a field the script reads as it loads, which a value laid after the load does not reach, are refused. The runner's `configSchemaProblems` (`apps-script-runner/config-schema-check.js`) holds each schema to its script: it loads the script with each config object watched, and names a field a schema names that the script reads as it loads, that the key store sets or that the object lacks, a field read only when called that no schema names, and a value of the script's own that its schema refuses; `test/config-schemas.test.js` runs it on each Node version | The runner, before the script opens (`apps-script-runner/config-file.js`), and the build step, before its first question |
 | `crypto-price-filler/config-example.json`, `crypto-price-filler/config.json` | `SETTINGS_SCHEMA` in `config.js` | crypto-price-filler |
 | `crypto-price-filler/supported-tokens.json` | `SUPPORTED_TOKENS_SCHEMA` in `supported-tokens.js` | crypto-price-filler |
 | `summ-csv/settings.json` | `SUMM_CSV_SETTINGS_SCHEMA` in `summ-csv/index.js` | The Summ CSV writer |

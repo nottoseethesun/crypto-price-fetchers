@@ -244,7 +244,8 @@ The script takes these steps, in order, before it asks any source:
    the calendar does not have, gets a message that names the problem.
 2. A time after now gets `No data available for future dates`.
 3. An answer the script keeps for the same token, time, time zone and
-   mode is given again ([Answers the Script Keeps](#answers-the-script-keeps)).
+   mode, kept by a build with the same order of priority and the same
+   keys saved, is given again ([Answers the Script Keeps](#answers-the-script-keeps)).
 4. The call waits its turn among the cells
    ([Waiting for Other Cells](#waiting-for-other-cells)).
 
@@ -290,9 +291,22 @@ The script asks three sources, one after another, and gives the first
 price one of them gives:
 
 1. MEXC, a centralized exchange: a company that runs markets in which
-   people trade coins, and publishes each market's candles.
-2. CoinGecko, a service that gathers the prices of many exchanges.
-3. CoinPaprika, a service like CoinGecko.
+   people trade coins, and publishes each market's candles. It takes no
+   api key.
+2. CoinGecko, a service that gathers the prices of many exchanges, and
+   CoinPaprika, a service like CoinGecko, which each take an api key, one
+   after the other in the order of priority the owner ranked their keys
+   in (`npm run api-keys -- rank`), which the build step writes into the
+   script as `CONFIG.API_KEY_PRIORITY`. Until the owner ranks them, and in
+   the script as committed, CoinGecko comes first.
+
+So a time's price comes from the highest-ranked source that has one: a
+source ranked higher whose period for the time is not over makes the
+cell say when to ask again rather than let a source ranked lower answer
+([When CoinGecko's 24 Hours Are Not Over](#when-coingeckos-24-hours-are-not-over),
+[The Day That Holds the Time](#the-day-that-holds-the-time)). A source
+that needs a key no one saved for the price asked is passed over
+([With a Key and Without One](#with-a-key-and-without-one)).
 
 None of them is asked for the current price, which would put today's
 price on a past date. Each prices a period around the time, a different
@@ -408,10 +422,10 @@ The script then asks CoinGecko whether it has prices of the coin from 12
 hours before the time to now:
 
 - With some, the cell says `Too recent for a final price: ask again
-  after …`, naming the end of the 24 hours, and the script asks
-  CoinPaprika nothing.
+  after …`, naming the end of the 24 hours, and the script asks no
+  source ranked after CoinGecko.
 - With none, as for a ticker that is no coin's id at CoinGecko, the
-  script goes on to CoinPaprika.
+  script goes on to the next source.
 
 When a request of the call was cut short before or during that check
 ([When a Cell Gets No Price](#when-a-cell-gets-no-price)), the cell shows
@@ -428,7 +442,8 @@ paid server, which the script asks with the key of one of CoinPaprika's
 paid plans, keeps them as far back as the plan reaches. So without a
 key, the script asks CoinPaprika for close only, which it gets another
 way ([CoinPaprika's Close From the Next Day](#coinpaprikas-close-from-the-next-day));
-for an average, a high or a low, the cell says
+for an average, a high or a low, it passes CoinPaprika over and asks
+the next source, and when no source gives a price, the cell says
 `No data available from any source; CoinPaprika gives average, high and low only with an api key`.
 
 #### The Day That Holds the Time
@@ -438,8 +453,9 @@ from 00:00 to 23:59:59, that holds the time, once that day is over, and
 gives the average of its high and low, its high, its low or its close.
 Before the day is over, the cell says
 `Too recent for a final price: ask again after …`, naming the day's end,
-midnight UTC, and the script asks CoinPaprika nothing, so this message
-comes whether or not CoinPaprika has the coin.
+midnight UTC, and the script asks CoinPaprika nothing, nor any source
+ranked after it, so this message comes whether or not CoinPaprika has
+the coin.
 
 #### CoinPaprika's Close From the Next Day
 
@@ -456,7 +472,7 @@ no price.
 | The cell shows | When |
 | --- | --- |
 | `No data available from any source` | No source had a price for the coin at that time. `No data available (cached)` repeats it for 5 minutes. |
-| `No data available from any source; CoinPaprika gives average, high and low only with an api key` | No earlier source had an average, a high or a low, and no CoinPaprika key is saved. |
+| `No data available from any source; CoinPaprika gives average, high and low only with an api key` | No source had an average, a high or a low, and no CoinPaprika key is saved. |
 | `Too recent for a final price: ask again after …` | A period that holds the time is not over: MEXC's minute, CoinGecko's 24 hours or CoinPaprika's day (above). |
 | `Rate limit busy - retry later` | Other cells kept the call from its turn, or no source gave a price and a request of the call was cut short (below). |
 | `No data available for future dates` | The time is after now. |
@@ -597,14 +613,24 @@ settings in that folder's `config.json`, laid over the
 For each row, the filler asks these sources in turn, and takes the first
 price one gives:
 
-1. Moralis, for `--mode close`, for a token whose entry names its
-   contract and Moralis's id for its chain, when a Moralis key is saved.
-2. GeckoTerminal, for a token whose entry names its contract and
-   GeckoTerminal's id for its chain.
-3. MEXC, then CoinGecko, then CoinPaprika, the sources of
-   `getCryptoPrice`, each under the id the token's entry names, and
-   passed over when the entry names none, as HEX on PulseChain names
-   none at MEXC.
+- Moralis, for `--mode close`, for a token whose entry names its
+  contract and Moralis's id for its chain, when a Moralis key is saved.
+- GeckoTerminal, for a token whose entry names its contract and
+  GeckoTerminal's id for its chain.
+- MEXC, CoinGecko and CoinPaprika, the sources of `getCryptoPrice`,
+  each under the id the token's entry names, and passed over when the
+  entry names none, as HEX on PulseChain names none at MEXC.
+
+Moralis, CoinGecko and CoinPaprika, which each take an api key, are asked
+in the order of priority the owner ranked their keys in
+(`npm run api-keys -- rank`). The two that take none go with their
+family: GeckoTerminal right after Moralis, both of which read pools, and
+MEXC right before the first of CoinGecko and CoinPaprika, as in
+`getCryptoPrice`. The rule is the Sheets script's own
+(`sourcesInPriority`), which the filler runs through the script's Node
+version, so a coin a sheet and the filler both price is asked of the same
+sources in the same order. Until the owner ranks the keys, Moralis comes
+first, so the order is the one in the list above.
 
 A saved key is checked before any row is priced: a key its service
 refuses, or a password that does not open the keys, stops the run, and

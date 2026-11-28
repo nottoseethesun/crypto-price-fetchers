@@ -2,7 +2,7 @@
  * getCryptoPriceFromCentralizedExchange-sources.gs: the price sources of
  * getCryptoPriceFromCentralizedExchange.gs: MEXC, a centralized exchange,
  * and CoinGecko and CoinPaprika, two services that gather the exchanges'
- * prices.
+ * prices; and the order sources are asked in (sourcesInPriority).
  *
  * The repo's build step, `npm run build apps-script` (npm is the package
  * manager of Node, the program that runs JavaScript outside a browser),
@@ -12,7 +12,9 @@
  * run inside its apps, such as Google Sheets, its spreadsheet app. Apps
  * Script loads every
  * script file of a project into one global scope, so these functions read
- * CONFIG and the cache declared there, and getCryptoPrice calls them. The
+ * CONFIG and the cache declared there, and send their requests through the
+ * requests declared there (fetchWithRetries), and getCryptoPrice calls
+ * them. The
  * script is in three files to keep each under the 500 lines of code that
  * LP Ranger's rules allow (LP Ranger, the owner's bot that manages his 9mm
  * V3 liquidity positions, sets the repo's coding standards); its header,
@@ -28,88 +30,46 @@
  */
 
 // Declared in getCryptoPriceFromCentralizedExchange.gs, in the same project:
-/* global CONFIG, CALL, callHasTimeFor, getCachedResult, setCachedResult, waitInCall, mexcWindowOver, coinGeckoWindowEndMs, coinGeckoServesDayEnd, coinPaprikaDayEndMs, coinPaprikaCanGive */
+/* global CONFIG, CALL, getCachedResult, setCachedResult, fetchWithRetries, jsonOf, configuredKey, mexcWindowOver, coinGeckoWindowEndMs, coinGeckoServesDayEnd, coinPaprikaDayEndMs, coinPaprikaCanGive */
 
 /** ============================================================================
- *                          REQUESTS
+ *                          THE ORDER OF THE SOURCES
  * ========================================================================== */
 
 /**
- * Asks a url, and asks it again after each wait in CONFIG.RETRY_DELAYS_MS
- * while the provider refuses it as one too many (status 429), within the
- * time the call has left (callHasTimeFor). Returns the last response,
- * whatever its status; or null when the request got no response at all,
- * for which UrlFetchApp.fetch throws, as on a timeout, a refused
- * connection or Apps Script's own quota of requests, or the call had no
- * time left to send it. A refusal as one too many still there after the
- * last try, or one the call has no time left to wait out, an answer with a
- * server error (5xx) or a request timeout (408), a request with no
- * response, and a request it has no time to send are counted as cut short
- * (CALL.cutRequests): the source then answers nothing, which is no answer
- * to keep, since none of them says whether it has a price.
+ * The order in which to ask sources: those that take an api key in the
+ * order of priority given, a service it does not name after those it
+ * names, in the order given; and each source that takes no key next to
+ * the keyed sources it goes with, right before the first of those it is
+ * asked before, or right after the one it is asked after, so it is asked
+ * only next to one that takes a key. getCryptoPrice orders the sheet's
+ * sources with it (SHEET_SOURCES), and crypto-price-filler, through the
+ * repo's runner, its own, so both follow one rule.
+ *
+ * @param {Array<{name: string, service: (string|undefined), before: (Array<string>|undefined), after: (string|undefined)}>} sources - Each source: its name, and the service whose key it takes, or the services it is asked right before, or the one it is asked right after
+ * @param {Array<string>} priority - The services, by name, highest first
+ * @return {Array<string>} The sources' names, in the order to ask them
  */
-function fetchWithRetries(url, headers, label) {
-  const delays = CONFIG.RETRY_DELAYS_MS;
-  for (let attempt = 0; ; attempt++) {
-    if (!callHasTimeFor(0)) {
-      Logger.log(`${label}: the call has used its time, so it is not sent`);
-      CALL.cutRequests += 1;
-      return null;
+function sourcesInPriority(sources, priority) {
+  const rank = (service) => {
+    const at = priority.indexOf(service);
+    return at === -1 ? priority.length : at;
+  };
+  const keyed = sources
+    .filter((source) => typeof source.service === "string")
+    .sort((a, b) => rank(a.service) - rank(b.service));
+  const order = [];
+  for (const source of keyed) {
+    for (const lead of sources) {
+      if (lead.before?.includes(source.service) && !order.includes(lead.name))
+        order.push(lead.name);
     }
-    let response;
-    try {
-      response = UrlFetchApp.fetch(url, {
-        muteHttpExceptions: true,
-        headers: headers,
-      });
-    } catch (e) {
-      Logger.log(`${label} got no response: ${e.message}`);
-      CALL.cutRequests += 1;
-      return null;
+    order.push(source.name);
+    for (const tail of sources) {
+      if (tail.after === source.service) order.push(tail.name);
     }
-    const code = response.getResponseCode();
-    if (code >= 500 || code === 408) {
-      Logger.log(`${label} answered ${code}, which says nothing of its data`);
-      CALL.cutRequests += 1;
-      return response;
-    }
-    if (code !== 429) return response;
-    if (attempt >= delays.length || !callHasTimeFor(delays[attempt])) {
-      Logger.log(
-        attempt >= delays.length
-          ? `${label} answered 429 to every try`
-          : `${label} answered 429, and the call has no time left to wait`,
-      );
-      CALL.cutRequests += 1;
-      return response;
-    }
-    Logger.log(
-      `${label} answered 429 - waiting ${delays[attempt]} ms (try ${attempt + 2} of ${delays.length + 1} next)`,
-    );
-    waitInCall(delays[attempt]);
   }
-}
-
-/** The json body of a response with status 200, or null for any other status, a body that is not json, or no response */
-function jsonOf(response, label) {
-  if (response === null) return null;
-  const code = response.getResponseCode();
-  if (code !== 200) {
-    Logger.log(`${label} failed: HTTP ${code}`);
-    return null;
-  }
-  try {
-    return JSON.parse(response.getContentText());
-  } catch (e) {
-    Logger.log(`${label} gave a body that is not json: ${e.message}`);
-    return null;
-  }
-}
-
-/** An api key set in CONFIG, trimmed, or null when none is set */
-function configuredKey(key) {
-  if (typeof key !== "string" || key.trim() === "") return null;
-  return key.trim();
+  return order;
 }
 
 /** ============================================================================
@@ -577,16 +537,17 @@ function keepNoData(key, cutBefore) {
  * @returns {?Array<Array<number>>} The points, none when CoinGecko has none; null when the request failed, as for an id CoinGecko does not know, or was cut short
  */
 function coinGeckoRangePoints(id, fromSec, toSec) {
+  const access = coinGeckoAccess();
   const url = CONFIG.COINGECKO_MARKET_CHART_RANGE_TEMPLATE.replace(
     "{base}",
-    CONFIG.COINGECKO_BASE,
+    access.base,
   )
     .replace("{id}", id)
     .replace("{from}", fromSec)
     .replace("{to}", toSec);
 
   const label = "CoinGecko market_chart/range";
-  const body = jsonOf(fetchWithRetries(url, coinGeckoHeaders(), label), label);
+  const body = jsonOf(fetchWithRetries(url, access.headers, label), label);
   if (body === null) return null;
 
   return (Array.isArray(body.prices) ? body.prices : []).filter(
@@ -656,15 +617,13 @@ function pickFromPoints(points, utcMs, target) {
 
 /** The day's price from CoinGecko's history, which names it market_data.current_price: the price on the date asked, not today's */
 function tryCoinGeckoHistory(id, dateStr) {
-  const url = CONFIG.COINGECKO_HISTORY_TEMPLATE.replace(
-    "{base}",
-    CONFIG.COINGECKO_BASE,
-  )
+  const access = coinGeckoAccess();
+  const url = CONFIG.COINGECKO_HISTORY_TEMPLATE.replace("{base}", access.base)
     .replace("{id}", id)
     .replace("{date}", dateStr);
 
   const label = "CoinGecko history";
-  const body = jsonOf(fetchWithRetries(url, coinGeckoHeaders(), label), label);
+  const body = jsonOf(fetchWithRetries(url, access.headers, label), label);
   if (body === null) return null;
 
   const price = body.market_data?.current_price?.usd;
@@ -672,12 +631,34 @@ function tryCoinGeckoHistory(id, dateStr) {
 }
 
 /**
- * The headers of a request to CoinGecko: the demo api key's, when CONFIG
- * sets a key, else none.
+ * Where CoinGecko is asked, and with which headers: with no key set in
+ * CONFIG, its public api, with none; with a key, the api its type takes,
+ * with the key in that api's header: a Demo key ("demo") at
+ * CONFIG.COINGECKO_BASE, in CONFIG.COINGECKO_API_KEY_HEADER; a paid plan's
+ * key ("paid") at CONFIG.COINGECKO_PRO_BASE, in
+ * CONFIG.COINGECKO_PRO_API_KEY_HEADER.
+ *
+ * @returns {{base: string, headers: Object<string, string>}} The api's root and the headers
+ * @throws {Error} When a key is set and CONFIG.COINGECKO_API_KEY_TYPE is neither "demo" nor "paid"
  */
-function coinGeckoHeaders() {
+function coinGeckoAccess() {
   const key = configuredKey(CONFIG.COINGECKO_API_KEY);
-  return key === null ? {} : { [CONFIG.COINGECKO_API_KEY_HEADER]: key };
+  if (key === null) return { base: CONFIG.COINGECKO_BASE, headers: {} };
+  if (CONFIG.COINGECKO_API_KEY_TYPE === "paid") {
+    return {
+      base: CONFIG.COINGECKO_PRO_BASE,
+      headers: { [CONFIG.COINGECKO_PRO_API_KEY_HEADER]: key },
+    };
+  }
+  if (CONFIG.COINGECKO_API_KEY_TYPE === "demo") {
+    return {
+      base: CONFIG.COINGECKO_BASE,
+      headers: { [CONFIG.COINGECKO_API_KEY_HEADER]: key },
+    };
+  }
+  throw new Error(
+    `CONFIG.COINGECKO_API_KEY_TYPE is ${JSON.stringify(CONFIG.COINGECKO_API_KEY_TYPE)}; it takes "demo" or "paid"`,
+  );
 }
 
 /** ============================================================================

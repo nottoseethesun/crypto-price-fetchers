@@ -14,8 +14,9 @@ It prices two kinds of token, each where it trades:
 
 - A coin that trades on centralized exchanges rather than in pools, such
   as Bitcoin and Monero, has no pool for a pool's price service to read.
-  The tool asks MEXC, a centralized exchange, then CoinGecko, then
-  CoinPaprika, two services that gather the exchanges' prices, through the
+  The tool asks MEXC, a centralized exchange, then CoinGecko and
+  CoinPaprika, two services that gather the exchanges' prices, in the
+  order of priority their keys are ranked in, through the
   price sources of the repo's script for Google Sheets, Google's
   spreadsheet app, written in Apps Script, Google's platform for scripts
   that run inside its apps:
@@ -32,11 +33,17 @@ It prices two kinds of token, each where it trades:
   rows around it
   ([Current Roster of Utilities](#current-roster-of-utilities)).
 - A token that trades in a blockchain's pools, such as HEX on PulseChain,
-  is asked of Moralis first, when a Moralis key is saved, then of
+  is asked of Moralis, when a Moralis key is saved, then of
   GeckoTerminal, two services that price a token from its chain's pools,
   in the order LP Ranger, the owner's bot that manages his 9mm V3
-  liquidity positions, asks them, and then, as every token is, of MEXC,
-  CoinGecko and CoinPaprika, each under the id the token's entry in
+  liquidity positions, asks them, and, as every token is, of MEXC,
+  CoinGecko and CoinPaprika. Moralis, CoinGecko and CoinPaprika, which
+  each take an api key, are asked in the order of priority the keys are
+  ranked in (`npm run api-keys -- rank`, in the repo's top folder), with
+  GeckoTerminal right after Moralis and MEXC right before the first of
+  CoinGecko and CoinPaprika, by the Sheets script's own rule
+  (`sourcesInPriority`); until the keys are ranked, Moralis comes first.
+  Each of the last three is asked under the id the token's entry in
   `supported-tokens.json` names, and skipped where the entry names none:
   HEX on PulseChain names none at MEXC. GeckoTerminal's candle of a minute
   or an hour gives no price before that minute or hour is over. The

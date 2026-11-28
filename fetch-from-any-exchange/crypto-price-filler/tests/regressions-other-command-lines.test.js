@@ -62,6 +62,7 @@ describe("the command lines' checks", () => {
       "coingecko",
       "made-up-key-for-the-test",
       "test-password",
+      "demo",
     );
     try {
       for (const [args, named] of [

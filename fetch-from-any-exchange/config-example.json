@@ -19,9 +19,11 @@
       "NEGATIVE_CACHE": 300
     },
     "COINGECKO_BASE": "https://api.coingecko.com/api/v3",
+    "COINGECKO_PRO_BASE": "https://pro-api.coingecko.com/api/v3",
     "COINPAPRIKA_BASE": "https://api.coinpaprika.com/v1",
     "COINPAPRIKA_PRO_BASE": "https://api-pro.coinpaprika.com/v1",
     "COINGECKO_API_KEY_HEADER": "x-cg-demo-api-key",
+    "COINGECKO_PRO_API_KEY_HEADER": "x-cg-pro-api-key",
     "COINPAPRIKA_API_KEY_HEADER": "Authorization",
     "COINGECKO_HISTORY_TEMPLATE": "{base}/coins/{id}/history?date={date}",
     "COINGECKO_MARKET_CHART_RANGE_TEMPLATE": "{base}/coins/{id}/market_chart/range?vs_currency=usd&from={from}&to={to}",

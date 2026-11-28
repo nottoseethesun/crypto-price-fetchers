@@ -47,6 +47,7 @@ const COMMAND_LINES = Object.freeze([
   { file: "build/tools/build.js", command: ["apps-script"] },
   { file: "bin/end-user/manage-api-keys.js", command: [] },
   { file: "bin/end-user/manage-api-keys.js", command: ["set"] },
+  { file: "bin/end-user/manage-api-keys.js", command: ["rank"] },
   { file: "bin/end-user/manage-api-keys.js", command: ["check-password"] },
   { file: "bin/summ-csv.js", command: [] },
   { file: "bin/github-project-deps.js", command: [] },

@@ -6,7 +6,9 @@
  *
  * What: `exchangeSources` gives the Sheets script's three price sources,
  * `getPriceFromMEXC`, `getPriceFromCoinGecko` and `getPriceFromCoinPaprika`,
- * as async calls. Each takes an id (the ticker for MEXC, the coin's id at
+ * as async calls, with the script's rule for the order to ask sources in,
+ * `sourcesInPriority`, which `price.js` orders all the filler's sources
+ * with. Each takes an id (the ticker for MEXC, the coin's id at
  * CoinGecko or CoinPaprika), the time in UTC milliseconds and "high", "low"
  * or "close", and gives the price in USD, or null when it has none.
  * `closeExchangeSources` closes them once the run is done.
@@ -19,7 +21,9 @@
  * `bin/end-user/getCryptoPriceFromCentralizedExchange.js`, at the repo's top). It is opened once, at
  * the first price asked, with the CoinGecko and CoinPaprika keys the run
  * opened (`../../../api-key-store/`), which the Node version hands the
- * script as `CONFIG.COINGECKO_API_KEY` and `CONFIG.COINPAPRIKA_API_KEY`.
+ * script as `CONFIG.COINGECKO_API_KEY`, with its type in
+ * `CONFIG.COINGECKO_API_KEY_TYPE`, and `CONFIG.COINPAPRIKA_API_KEY`, with
+ * the run's order of priority in `CONFIG.API_KEY_PRIORITY`.
  * With verbose on, each line the script logs is printed.
  *
  * Fit: `price.js` asks these after the pool sources. The script's header
@@ -31,7 +35,11 @@ import {
   openCentralizedExchangeSources,
   readCentralizedExchangeConfig,
 } from "../../../bin/end-user/getCryptoPriceFromCentralizedExchange.js";
-import { getApiKey } from "../../../api-key-store/index.js";
+import {
+  getApiKey,
+  getApiKeyPriority,
+  getApiKeyType,
+} from "../../../api-key-store/index.js";
 import { logv } from "../utils/log.js";
 
 /** The script as it opens, from the first price asked; null until then, and once closed. */
@@ -62,14 +70,16 @@ export function checkExchangeSettings() {
  * Gives the Sheets script's price sources, opening the script at the
  * first call.
  * @param {boolean} [verbose=false] - Print the lines the script logs; the first call decides
- * @returns {Promise<{getPriceFromMEXC: function(string, number, string): Promise<?number>, getPriceFromCoinGecko: function(string, number, string): Promise<?number>, getPriceFromCoinPaprika: function(string, number, string): Promise<?number>, close: function(): Promise<void>}>} The sources
+ * @returns {Promise<{getPriceFromMEXC: function(string, number, string): Promise<?number>, getPriceFromCoinGecko: function(string, number, string): Promise<?number>, getPriceFromCoinPaprika: function(string, number, string): Promise<?number>, sourcesInPriority: function(Array<Object>, Array<string>): Promise<Array<string>>, close: function(): Promise<void>}>} The sources, and the rule for their order
  */
 export function exchangeSources(verbose = false) {
   if (opening === null) {
     opening = openCentralizedExchangeSources({
       apiKeys: {
         coingecko: getApiKey("coingecko"),
+        coingeckoKeyType: getApiKeyType("coingecko"),
         coinpaprika: getApiKey("coinpaprika"),
+        priority: getApiKeyPriority(),
       },
       onLog: verbose ? printScriptLine : null,
     });

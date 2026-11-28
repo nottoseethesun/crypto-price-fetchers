@@ -11,7 +11,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { closeExchangeSources, exchangeSources } from "../sources/exchange.js";
 import { openCentralizedExchangeSources } from "../../../bin/end-user/getCryptoPriceFromCentralizedExchange.js";
-import { getApiKey } from "../../../api-key-store/index.js";
+import {
+  getApiKey,
+  getApiKeyPriority,
+  getApiKeyType,
+} from "../../../api-key-store/index.js";
 import { logLines } from "./helpers/log-lines.js";
 
 vi.mock(
@@ -23,10 +27,14 @@ vi.mock(
 
 vi.mock("../../../api-key-store/index.js", () => ({
   getApiKey: vi.fn(),
+  getApiKeyPriority: vi.fn(),
+  getApiKeyType: vi.fn(),
 }));
 
 const mockOpen = vi.mocked(openCentralizedExchangeSources);
 const mockGetApiKey = vi.mocked(getApiKey);
+const mockGetApiKeyType = vi.mocked(getApiKeyType);
+const mockGetApiKeyPriority = vi.mocked(getApiKeyPriority);
 
 /** The opened sources the stand-in opener gives. */
 const opened = {
@@ -42,6 +50,10 @@ beforeEach(() => {
   mockGetApiKey.mockImplementation((service) =>
     service === "coingecko" ? "gecko-key" : null,
   );
+  mockGetApiKeyType.mockImplementation((service) =>
+    service === "coingecko" ? "paid" : null,
+  );
+  mockGetApiKeyPriority.mockReturnValue(["coinpaprika", "coingecko"]);
 });
 
 afterEach(async () => {
@@ -55,11 +67,13 @@ describe("exchangeSources", () => {
     expect(mockOpen).toHaveBeenCalledTimes(1);
   });
 
-  it("hands the script the CoinGecko and CoinPaprika keys the run opened", async () => {
+  it("hands the script the CoinGecko and CoinPaprika keys the run opened, with the CoinGecko key's type and the run's order of priority", async () => {
     await exchangeSources();
     expect(mockOpen.mock.calls[0][0].apiKeys).toEqual({
       coingecko: "gecko-key",
+      coingeckoKeyType: "paid",
       coinpaprika: null,
+      priority: ["coinpaprika", "coingecko"],
     });
   });
 

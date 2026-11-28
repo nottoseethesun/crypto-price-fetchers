@@ -146,8 +146,9 @@ x1-validator-analytics and pulsechain-validator-analytics send their
 requests to a chain's endpoint or a beacon node through
 `crypto-price-fetchers/lib/time-limited-fetch`, and so do this repo's
 runner, key store checks and downloads. The exchange script keeps a
-loop of its own in its `-sources.gs`, since Apps Script cannot load a Node
-module.
+loop of its own, `fetchWithRetries` in
+`getCryptoPriceFromCentralizedExchange.gs`, which its `-sources.gs` sends
+every request through, since Apps Script cannot load a Node module.
 
 ## Summ csv files
 
@@ -168,7 +169,8 @@ address of the owner's.
 
 **Never show any character of an api key once it is entered**: not in a
 reply, a log line, an error message, a test's output, or a listing. The key
-manager says only whether each key is saved.
+manager says only whether each key is saved, a saved CoinGecko key's type,
+and the services' order of priority.
 
 No api key is committed. The keys the programs send (CoinGecko's,
 CoinPaprika's and Moralis', for past prices; DexTools' and x1.ninja's,
@@ -187,14 +189,47 @@ x1-validator-analytics install the module from GitHub and keep a copy of
 `bin/unlock-api-keys.sh` in their own `bin/`, which their tests hold to
 this one.
 
+CoinGecko gives two types of key, which look alike: a Demo key, its free
+one, which only its public api takes, and the key of one of its paid
+plans, which only its Pro api takes. So a service in `api-key-store/services.js`
+may list types of key (`keyTypes`), each with its own check, in place of
+one check: the key manager checks a CoinGecko key as each in turn and
+saves the type CoinGecko takes it as beside it, as `coingeckoKeyType`,
+`"demo"` or `"paid"`, in plain text. The key file's JSON Schema
+(`KEY_FILE_SCHEMA`, `api-key-store/key-file.js`) holds every CoinGecko key
+to its type, as the file is read and before it is written, and a run
+checks a saved key as its saved type alone.
+
+Where more than one service with a key can do one job, the code asks them
+in the order of priority the owner ranked them in, saved in `api-keys.json`
+as `priority`, held to the same schema: the exchange script asks CoinGecko
+and CoinPaprika in it (`CONFIG.API_KEY_PRIORITY`), in the sheet and under
+Node, and crypto-price-filler asks Moralis, CoinGecko and CoinPaprika in
+it. A source that takes no key goes with its family: MEXC right before the
+first of CoinGecko and CoinPaprika, GeckoTerminal right after Moralis. The
+rule is written once, as the exchange script's `sourcesInPriority`, which
+crypto-price-filler runs through the runner, since Apps Script cannot load
+a Node module and LP Ranger's rules forbid a second copy. Until the owner
+ranks them, the order is the one the top `config.json` lists them in
+(`projectPriority`, `api-key-store/project-keys.js`), which gives today's
+order: Moralis first, CoinGecko before CoinPaprika. The key manager asks
+for an order whenever none ranks exactly the services `config.json` lists,
+as it lists the keys or sets one, and `npm run api-keys -- rank` changes
+it (`api-key-store/key-ranking.js`). A program gets the order with its keys
+(`priority`, from `unlockProjectKeys`) and from `getApiKeyPriority`.
+DexTools and x1.ninja never do one job: the chain decides which the
+current-price script asks.
+
 A test names a key file of its own, never the owner's, and passes no
 `API_KEYS_PASSWORD` it did not set: crypto-price-filler's
 `vitest.config.js`, the settings of vitest, the test runner its tests run
 on, names a key file that does not exist and empties the password.
 
 The Node versions hand the keys they open to their scripts as config values:
-`CONFIG.COINGECKO_API_KEY` and `CONFIG.COINPAPRIKA_API_KEY` in the exchange
-script, `DEXTOOLS_CONFIG.API_KEY` and `X1_CONFIG.API_KEY` in
+`CONFIG.COINGECKO_API_KEY`, with its type in `CONFIG.COINGECKO_API_KEY_TYPE`,
+which sends it to `CONFIG.COINGECKO_BASE` or `CONFIG.COINGECKO_PRO_BASE`,
+`CONFIG.COINPAPRIKA_API_KEY`, and the order of priority in
+`CONFIG.API_KEY_PRIORITY` in the exchange script, `DEXTOOLS_CONFIG.API_KEY` and `X1_CONFIG.API_KEY` in
 `crypto-price-fetchers/src/crypto-price-fetchers.gs`, which the committed
 scripts leave empty or holding a placeholder. For Apps Script, `npm run build apps-script`
 (`build/tools/build.js`, `build/tools/apps-script-build/`) sets the same
@@ -248,13 +283,14 @@ version's example to its schemas and to the values written in its
 script. The schemas here: the
 key store's of a project's `apiKeys`
 (`api-key-store/project-keys.js`), which reads only that key, every other
-key of the file being the project's; crypto-price-filler's of its settings
+key of the file being the project's, and of its key file
+(`api-key-store/key-file.js`); crypto-price-filler's of its settings
 (`config.js`) and of its token list (`supported-tokens.js`); and the Summ
 csv utility's of its settings (`summ-csv/index.js`). A Node version's
 config file is held, by the runner and by the build, to the schemas the
 Node version gives its script's config objects (`CONFIG_SCHEMAS`): each
 names every field the script reads each time it is called, of its kind of
-value, and refuses an api key, which the key store sets, and a field the
+value, and refuses an api key, a key's type or the order of priority, which the key store sets, and a field the
 script reads as it loads, which a value laid after the load does not
 reach. The runner's `configSchemaProblems`
 (`apps-script-runner/config-schema-check.js`) holds each schema to its

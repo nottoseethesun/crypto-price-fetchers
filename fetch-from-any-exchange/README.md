@@ -23,7 +23,8 @@ gathers the exchanges' prices: the API of MEXC, an exchange, first, then
 those of CoinGecko and CoinPaprika, two such services. A token that
 trades in pools, such as HEX on PulseChain, is priced from the pools:
 crypto-price-filler asks Moralis and GeckoTerminal, two services that
-price a token from its chain's pools, for it before those three.
+price a token from its chain's pools, for it too, before those three
+until the keys are ranked otherwise (`npm run api-keys -- rank`).
 
 ## Tools
 
@@ -45,7 +46,9 @@ inside its apps:
 A custom `=getCryptoPrice()` function for Google Sheets, which gives
 the average of the high and the low, by default, or the high, the low or
 the close, of the period around a time. It asks
-MEXC for the price first, then CoinGecko, then CoinPaprika. It caches
+MEXC for the price first, then CoinGecko and CoinPaprika, in the order of
+priority their keys are ranked in (`npm run api-keys -- rank`), CoinGecko
+first until they are. It caches
 each answer, and its lock makes the calls of many cells take turns,
 so a sheet stays within each service's rate limit.
 
@@ -54,7 +57,8 @@ one, since Apps Script runs every script file of a project in one global
 scope:
 
 - [`getCryptoPriceFromCentralizedExchange.gs`](src/getCryptoPriceFromCentralizedExchange.gs):
-  `=getCryptoPrice()`, its settings and the cache.
+  `=getCryptoPrice()`, its settings, the cache, and the requests the price
+  sources send, each sent again after a refusal as one too many.
 - [`getCryptoPriceFromCentralizedExchange-sources.gs`](src/getCryptoPriceFromCentralizedExchange-sources.gs):
   the price sources.
 - [`getCryptoPriceFromCentralizedExchange-tests.gs`](src/getCryptoPriceFromCentralizedExchange-tests.gs):
@@ -83,8 +87,9 @@ data sources.
 
 A command-line tool for batch processing CSV files with thousands of
 timestamps. For a token that trades in pools, it asks Moralis and
-GeckoTerminal first; for every token, it then asks MEXC, CoinGecko and
-CoinPaprika through the Apps Script's own price sources, run unchanged
+GeckoTerminal; for every token, it asks MEXC, CoinGecko and CoinPaprika,
+in the order of priority the keys are ranked in, Moralis first until
+they are, the last three through the Apps Script's own price sources, run unchanged
 under Node, so the sheet and the tool take a price from the same sources,
 and neither from a period before it is over: MEXC's candle of the minute
 that holds the time, or of the larger period MEXC is asked for when
